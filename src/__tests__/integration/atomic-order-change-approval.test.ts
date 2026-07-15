@@ -29,6 +29,7 @@ afterAll(async () => {
 async function createFixture(db: PoolClient, label: string): Promise<Fixture> {
   const suffix = `${label}-${randomUUID()}`;
   const salesChannelId = randomUUID();
+  const pricingTierId = randomUUID();
   const customerId = randomUUID();
   const orderId = randomUUID();
   const containerId = randomUUID();
@@ -43,9 +44,19 @@ async function createFixture(db: PoolClient, label: string): Promise<Fixture> {
     [salesChannelId, `Change request channel ${suffix}`, `cr-${randomUUID()}`],
   );
   await db.query(
-    `INSERT INTO customers (id, name, customer_type, sales_channel_id)
-     VALUES ($1, $2, 'wholesale', $3)`,
-    [customerId, `Change request customer ${suffix}`, salesChannelId],
+    "INSERT INTO pricing_tiers (id, name) VALUES ($1, $2)",
+    [pricingTierId, `Change request tier ${suffix}`],
+  );
+  await db.query(
+    `INSERT INTO customers (
+       id, name, customer_type, sales_channel_id, price_tier_id
+     ) VALUES ($1, $2, 'wholesale', $3, $4)`,
+    [
+      customerId,
+      `Change request customer ${suffix}`,
+      salesChannelId,
+      pricingTierId,
+    ],
   );
   await db.query(
     `INSERT INTO orders (id, customer_id, order_number, status)
@@ -65,6 +76,12 @@ async function createFixture(db: PoolClient, label: string): Promise<Fixture> {
   await db.query(
     "INSERT INTO brands (id, name) VALUES ($1, $2)",
     [brandId, `Change request brand ${suffix}`],
+  );
+  await db.query(
+    `INSERT INTO pricing_tier_prices (
+       pricing_tier_id, format_id, sales_channel_id, price
+     ) VALUES ($1, $2, $3, 72.50)`,
+    [pricingTierId, sellingFormatId, salesChannelId],
   );
   await db.query(
     `INSERT INTO order_change_requests (
@@ -165,8 +182,10 @@ describe("apply_change_request", () => {
         brand_id: string;
         quantity: number;
         selling_format_id: string;
+        unit_price: number;
       }>(
-        `SELECT brand_id, selling_format_id, quantity
+        `SELECT brand_id, selling_format_id, quantity,
+                unit_price::float8 AS unit_price
          FROM order_items
          WHERE order_id = $1`,
         [fixture.orderId],
@@ -175,6 +194,7 @@ describe("apply_change_request", () => {
         brand_id: fixture.brandId,
         selling_format_id: fixture.sellingFormatId,
         quantity: 7,
+        unit_price: 72.5,
       }]);
 
       const request = await db.query<{
