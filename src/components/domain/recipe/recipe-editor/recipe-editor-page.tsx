@@ -51,7 +51,7 @@ function SaveAllButton() {
       await saveAll();
       toast.success("Recipe saved");
     } catch {
-      // Errors are surfaced via per-section handleSaveError already.
+      // The aggregate provider surfaces validation, conflict, and RPC errors.
     } finally {
       setPending(false);
     }
@@ -67,6 +67,22 @@ function SaveAllButton() {
       )}
       Save
     </Button>
+  );
+}
+
+function RecipeEditorSections() {
+  const { isSaving } = useRecipeEditor();
+
+  return (
+    <fieldset disabled={isSaving} className="space-y-4 min-w-0">
+      <RecipeBasicsSection />
+      <FermentablesSection />
+      <WaterChemistrySection />
+      <MashSection />
+      <WhirlpoolSection />
+      <KnockoutSection />
+      <FermentationSection />
+    </fieldset>
   );
 }
 
@@ -238,15 +254,7 @@ export function RecipeEditorPage({ id }: RecipeEditorPageProps) {
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           {/* Left: Sections */}
-          <div className="space-y-4 min-w-0">
-            <RecipeBasicsSection />
-            <FermentablesSection />
-            <WaterChemistrySection />
-            <MashSection />
-            <WhirlpoolSection />
-            <KnockoutSection />
-            <FermentationSection />
-          </div>
+          <RecipeEditorSections />
 
           {/* Right: Sticky sidebar */}
           <div className="hidden lg:block">

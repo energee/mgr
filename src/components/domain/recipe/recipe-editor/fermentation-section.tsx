@@ -7,12 +7,8 @@
 
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
-import { recipeKeys, entityKeys } from "@/lib/query-keys";
-import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { FermentationScheduleEditor, type FermentationStage } from "@/components/domain/recipe/fermentation-schedule-editor";
@@ -26,9 +22,7 @@ type FermentationFormValues = {
 }
 
 export function FermentationSection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
-  const supabase = createClient();
-  const queryClient = useQueryClient();
+  const { recipe } = useRecipeEditor();
 
   const form = useForm<FermentationFormValues>({
     defaultValues: {
@@ -41,42 +35,14 @@ export function FermentationSection() {
   const { isDirty } = form.formState;
   const fermSchedule = form.watch("fermentation_schedule");
 
-  const stopSavingRef = useRef<(() => void) | null>(null);
-
-  const saveMutation = useMutation({
-    mutationFn: async (values: FermentationFormValues) => {
-      stopSavingRef.current = startSaving();
-      return updateWithOptimisticLockOrThrow(
-        supabase,
-        "recipes",
-        recipe.id,
-        {
-          fermentation_days: values.fermentation_days,
-          conditioning_days: values.conditioning_days,
-          fermentation_schedule: values.fermentation_schedule,
-        },
-        getVersion()
-      );
-    },
-    onSuccess: (data) => {
-      updateRecipe({ version: data.version });
-      form.reset(form.getValues());
-      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
-      queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-    },
-    onError: handleSaveError,
-    onSettled: () => {
-      stopSavingRef.current?.();
-      stopSavingRef.current = null;
-    },
-  });
-
   useRegisterSaver("fermentation", isDirty, useCallback(async () => {
-    if (!form.formState.isDirty) return;
-    await form.handleSubmit(async (values) => {
-      await saveMutation.mutateAsync(values);
-    })();
-  }, [form, saveMutation]));
+    if (!(await form.trigger())) throw new Error("Fermentation settings are invalid");
+    const values = form.getValues();
+    return {
+      recipePatch: values,
+      onCommitted: () => form.reset(values),
+    };
+  }, [form]));
 
   return (
     <RecipeSectionCard

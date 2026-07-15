@@ -5,7 +5,7 @@
  *
  * All four tabs are instances of one generic IngredientTab driven by a
  * declarative spec ({ table, fkColumn, catalog, columns[] }). Each tab uses
- * useRecipeChildRows for the fetch/dirty/delete-all-reinsert save cycle.
+ * useRecipeChildRows for fetch/dirty state and the aggregate atomic save.
  * View mode = read-only tables; Edit mode = interactive with add/remove and save.
  */
 
@@ -33,7 +33,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CatalogPicker } from "@/components/domain/recipe/catalog-picker";
-import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
+import {
+  useRecipeEditor,
+  useRegisterSaver,
+  type RecipeChildSection,
+} from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 import { Plus, Trash2, ChevronsUpDown } from "lucide-react";
 
 // =============================================================================
@@ -87,7 +91,7 @@ type IngredientTabSpec = {
   errorLabel: string;
   emptyMessage: string;
   /** Junction table (e.g. "recipe_adjuncts") */
-  table: string;
+  table: RecipeChildSection;
   /** FK column to the catalog table (e.g. "adjunct_id") */
   fkColumn: string;
   /** Joined relation name in the select (e.g. "adjuncts") */
@@ -373,6 +377,7 @@ function IngredientTab({
   spec: IngredientTabSpec;
 }) {
   const { fkColumn } = spec;
+  const { isSaving } = useRecipeEditor();
 
   const { data: catalog = [], isLoading: catalogLoading } =
     useCatalog<CatalogItem>(
@@ -382,7 +387,7 @@ function IngredientTab({
       CATALOG_ORDER
     );
 
-  const { items, setItems, dirty, setDirty, save, isLoading, isPending } =
+  const { items, setItems, dirty, setDirty, prepareSave, isLoading } =
     useRecipeChildRows<Record<string, unknown>, IngredientRow>({
       recipeId,
       table: spec.table,
@@ -412,7 +417,7 @@ function IngredientTab({
       },
     });
 
-  useRegisterSaver(spec.saverKey, Boolean(editing && dirty), save);
+  useRegisterSaver(spec.saverKey, Boolean(editing && dirty), prepareSave);
 
   const addItem = useCallback(
     (cat: CatalogItem) => {
@@ -420,6 +425,7 @@ function IngredientTab({
       setItems((prev) => [
         ...prev,
         {
+          id: crypto.randomUUID(),
           [fkColumn]: cat.id,
           ...spec.newItemDefaults,
           position: prev.length,
@@ -466,7 +472,7 @@ function IngredientTab({
             items={availableCatalog}
             loading={catalogLoading}
             onSelect={addItem}
-            disabled={isPending}
+            disabled={isSaving}
           />
         </div>
       )}

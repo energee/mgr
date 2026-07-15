@@ -6,8 +6,8 @@
  * pre-save data via update callbacks; the sidebar reads computed estimates
  * reactively via useMemo.
  *
- * Also provides save coordination (isSaving / startSaving) to prevent
- * concurrent optimistic-lock conflicts between independent sections.
+ * Also coordinates one aggregate, version-checked save for every dirty
+ * parent-field and child-row section.
  */
 
 "use client";
@@ -22,10 +22,14 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { GrainBillItem } from "@/components/domain/recipe/grain-bill-editor";
 import type { HopScheduleItem } from "@/components/domain/recipe/hop-schedule-editor";
 import type { MashStep } from "@/components/domain/recipe/mash-schedule-editor";
 import type { FermentationStage } from "@/components/domain/recipe/fermentation-schedule-editor";
+import { createClient } from "@/lib/supabase/client";
+import { entityKeys, recipeKeys } from "@/lib/query-keys";
+import type { Json } from "@/types/supabase";
 import {
   calculateEstimates,
   type RecipeEstimates,
@@ -84,6 +88,27 @@ export type RecipeData = {
   batch_count?: number | null;
 };
 
+export type RecipeChildSection =
+  | "recipe_malts"
+  | "recipe_hops"
+  | "recipe_adjuncts"
+  | "recipe_sugars"
+  | "recipe_spices"
+  | "recipe_fruits";
+
+export type RecipeSaveContribution = {
+  /** Allowlisted columns on the recipes row. */
+  recipePatch?: Record<string, unknown>;
+  /** Present child sections are replaced; omitted sections remain unchanged. */
+  sections?: Partial<Record<RecipeChildSection, Array<Record<string, unknown>>>>;
+  /** Exact query keys owned by this contribution. */
+  queryKeys?: ReadonlyArray<readonly unknown[]>;
+  /** Reset local dirty state only after the database transaction commits. */
+  onCommitted: () => void;
+};
+
+type RecipeSavePreparer = () => Promise<RecipeSaveContribution>;
+
 type RecipeEditorContextValue = {
   recipe: RecipeData;
   /** Update recipe data (for form field changes before save) */
@@ -106,26 +131,14 @@ type RecipeEditorContextValue = {
    * to prevent concurrent optimistic-lock conflicts.
    */
   isSaving: boolean;
-  /** Mark a section save as started. Returns a callback to mark it complete. */
-  startSaving: () => () => void;
-  /** Handle save errors with version conflict detection and auto-reload */
-  handleSaveError: (error: Error) => void;
-
-  /** Register a section's save callback. Returns an unregister function. */
-  registerSaver: (id: string, save: () => Promise<void>) => () => void;
+  /** Register a section's atomic-save contribution. */
+  registerSaver: (id: string, prepare: RecipeSavePreparer) => () => void;
   /** Update a section's dirty state. */
   setSectionDirty: (id: string, isDirty: boolean) => void;
   /** True if any registered section is dirty. */
   anyDirty: boolean;
-  /** Save all dirty sections sequentially. */
+  /** Save all dirty sections in one database transaction. */
   saveAll: () => Promise<void>;
-  /**
-   * Read the latest recipe.version synchronously. Sections must call this
-   * inside their mutationFn (rather than reading recipe.version from closure)
-   * so saveAll can chain multiple section saves without each subsequent
-   * save fighting an out-of-date version captured at render time.
-   */
-  getVersion: () => number;
 };
 
 // =============================================================================
@@ -150,14 +163,15 @@ export function RecipeEditorProvider({
   onRefresh,
   children,
 }: RecipeEditorProviderProps) {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
   const [recipe, setRecipe] = useState<RecipeData>(initialRecipe);
   const [grainItems, setGrainItems] = useState<GrainBillItem[]>([]);
   const [hopItems, setHopItems] = useState<HopScheduleItem[]>([]);
   const [savingCount, setSavingCount] = useState(0);
 
-  // Tracks the latest recipe.version synchronously, independent of React's
-  // render cycle. Section mutations must read from here so chained saveAll
-  // calls don't collide on stale closure state.
+  // Tracks the database version synchronously so a conflict-driven parent
+  // refetch can update the next aggregate save without discarding local forms.
   const versionRef = useRef<number>(initialRecipe.version);
 
   const updateRecipe = useCallback((partial: Partial<RecipeData>) => {
@@ -166,8 +180,6 @@ export function RecipeEditorProvider({
     }
     setRecipe((prev) => ({ ...prev, ...partial }));
   }, []);
-
-  const getVersion = useCallback(() => versionRef.current, []);
 
   // Keep versionRef in sync if the parent reloads with a newer recipe
   // (e.g., after a conflict-driven refetch).
@@ -178,10 +190,8 @@ export function RecipeEditorProvider({
   }, [initialRecipe.version]);
 
   /**
-   * Mark a section save as started. Returns a cleanup callback
-   * that marks the save as complete. Sections should call startSaving()
-   * before their mutation and the returned callback in onSettled.
-   * Uses functional state updates to avoid race conditions with concurrent saves.
+   * Mark the aggregate save as started and return its cleanup callback.
+   * Functional updates also guard against a double-click before React renders.
    */
   const startSaving = useCallback(() => {
     setSavingCount(prev => prev + 1);
@@ -192,7 +202,7 @@ export function RecipeEditorProvider({
 
   const isSaving = savingCount > 0;
 
-  /** Shared error handler for section save mutations with version conflict detection */
+  /** Shared error handler with version-conflict detection. */
   const handleSaveError = useCallback((error: Error) => {
     const msg = error.message ?? "";
     const isConflict =
@@ -201,8 +211,8 @@ export function RecipeEditorProvider({
       msg.includes("conflict") ||
       msg.includes("modified by another user");
     if (isConflict) {
-      toast.error("Someone else edited this recipe. Reloading...", {
-        description: "Your changes were not saved.",
+      toast.error("Someone else edited this recipe.", {
+        description: "Your local changes are still here. Review them and save again.",
       });
       onRefresh?.();
     } else {
@@ -210,21 +220,22 @@ export function RecipeEditorProvider({
     }
   }, [onRefresh]);
 
-  // Saver registry — sections register their save callback so the page-level
-  // Save button can run them sequentially. Sequential execution avoids the
-  // optimistic-lock race that occurred when each section had its own button.
-  const saversRef = useRef(new Map<string, () => Promise<void>>());
+  // Contribution registry — dirty sections take a snapshot, then one RPC
+  // commits every parent field and child collection together.
+  const saversRef = useRef(new Map<string, RecipeSavePreparer>());
+  const dirtyIdsRef = useRef<ReadonlySet<string>>(new Set());
   const [dirtyIds, setDirtyIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const registerSaver = useCallback(
-    (id: string, save: () => Promise<void>) => {
-      saversRef.current.set(id, save);
+    (id: string, prepare: RecipeSavePreparer) => {
+      saversRef.current.set(id, prepare);
       return () => {
         saversRef.current.delete(id);
         setDirtyIds((prev) => {
           if (!prev.has(id)) return prev;
           const next = new Set(prev);
           next.delete(id);
+          dirtyIdsRef.current = next;
           return next;
         });
       };
@@ -238,6 +249,7 @@ export function RecipeEditorProvider({
       const next = new Set(prev);
       if (isDirty) next.add(id);
       else next.delete(id);
+      dirtyIdsRef.current = next;
       return next;
     });
   }, []);
@@ -245,16 +257,89 @@ export function RecipeEditorProvider({
   const anyDirty = dirtyIds.size > 0;
 
   const saveAll = useCallback(async () => {
-    const ids = Array.from(saversRef.current.keys());
-    for (const id of ids) {
-      const save = saversRef.current.get(id);
-      if (!save) continue;
-      await save();
-      // Yield so React can commit pending state updates (notably the recipe
-      // version bump) before the next section's save closure is re-read.
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const ids = Array.from(dirtyIdsRef.current);
+    if (ids.length === 0) return;
+
+    const contributions: RecipeSaveContribution[] = [];
+    const recipePatch: Record<string, unknown> = {};
+    const sections: Partial<
+      Record<RecipeChildSection, Array<Record<string, unknown>>>
+    > = {};
+
+    try {
+      for (const id of ids) {
+        const prepare = saversRef.current.get(id);
+        if (!prepare) continue;
+        const contribution = await prepare();
+        Object.assign(recipePatch, contribution.recipePatch);
+        for (const [section, rows] of Object.entries(contribution.sections ?? {})) {
+          const key = section as RecipeChildSection;
+          if (sections[key]) {
+            throw new Error(`Recipe section registered more than once: ${key}`);
+          }
+          sections[key] = rows;
+        }
+        contributions.push(contribution);
+      }
+    } catch (error) {
+      const preparationError = error instanceof Error ? error : new Error(String(error));
+      handleSaveError(preparationError);
+      throw preparationError;
     }
-  }, []);
+    if (contributions.length === 0) return;
+
+    const stopSaving = startSaving();
+    try {
+      const { data, error } = await supabase.rpc("save_recipe_aggregate_atomic", {
+        p_recipe_id: recipe.id,
+        p_expected_version: versionRef.current,
+        p_recipe_patch: recipePatch as Json,
+        p_sections: sections as Json,
+      });
+      if (error) {
+        throw Object.assign(new Error(error.message), error);
+      }
+
+      const result = data as { version?: number } | null;
+      if (typeof result?.version !== "number") {
+        throw new Error("Atomic recipe save returned no committed version");
+      }
+
+      versionRef.current = result.version;
+      setRecipe((prev) => ({
+        ...prev,
+        ...recipePatch,
+        version: result.version!,
+      }));
+      for (const contribution of contributions) contribution.onCommitted();
+
+      const committedIds = new Set(ids);
+      setDirtyIds((prev) => {
+        const next = new Set(Array.from(prev).filter((id) => !committedIds.has(id)));
+        dirtyIdsRef.current = next;
+        return next;
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: recipeKeys.detail(recipe.id),
+        exact: true,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: entityKeys.detail("recipes_with_estimates", recipe.id),
+        exact: true,
+      });
+      const queryKeys = contributions.flatMap((contribution) => contribution.queryKeys ?? []);
+      await Promise.all(
+        queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey, exact: true })),
+      );
+    } catch (error) {
+      const saveError = error instanceof Error ? error : new Error(String(error));
+      handleSaveError(saveError);
+      throw saveError;
+    } finally {
+      stopSaving();
+    }
+  }, [handleSaveError, queryClient, recipe.id, startSaving, supabase]);
 
   // Compute estimates reactively from current editor state
   const estimates = useMemo<RecipeEstimates>(() => {
@@ -287,13 +372,10 @@ export function RecipeEditorProvider({
       setHopItems,
       estimates,
       isSaving,
-      startSaving,
-      handleSaveError,
       registerSaver,
       setSectionDirty,
       anyDirty,
       saveAll,
-      getVersion,
     }),
     [
       recipe,
@@ -302,13 +384,10 @@ export function RecipeEditorProvider({
       hopItems,
       estimates,
       isSaving,
-      startSaving,
-      handleSaveError,
       registerSaver,
       setSectionDirty,
       anyDirty,
       saveAll,
-      getVersion,
     ]
   );
 
@@ -336,24 +415,23 @@ export function useRecipeEditor(): RecipeEditorContextValue {
 }
 
 /**
- * Register a section with the saver registry. The save callback is invoked
- * sequentially by the page-level Save button. The save closure is read at
- * call time via a ref so it always sees the latest state.
+ * Register a section with the atomic-save registry. The prepare closure is
+ * read at save time so it snapshots the latest form or child-row state.
  */
 export function useRegisterSaver(
   id: string,
   isDirty: boolean,
-  save: () => Promise<void>
+  prepare: RecipeSavePreparer
 ) {
   const { registerSaver, setSectionDirty } = useRecipeEditor();
-  const saveRef = useRef(save);
+  const prepareRef = useRef(prepare);
 
   useEffect(() => {
-    saveRef.current = save;
+    prepareRef.current = prepare;
   });
 
   useEffect(() => {
-    return registerSaver(id, () => saveRef.current());
+    return registerSaver(id, () => prepareRef.current());
   }, [id, registerSaver]);
 
   useEffect(() => {
