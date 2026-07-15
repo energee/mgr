@@ -10436,6 +10436,31 @@ export type Database = {
         Args: { p_boil_time_min: number; p_gravity: number; p_timing: string }
         Returns: number
       }
+      ingest_square_refund_atomic: {
+        Args: {
+          p_event_id: string
+          p_order_id: string
+          p_order_total: number
+          p_payment_id: string
+          p_refund_amount: number
+          p_refund_id: string
+          p_refunded_at: string
+          p_square_location_id: string
+        }
+        Returns: Json
+      }
+      ingest_square_sale_atomic: {
+        Args: {
+          p_claim_key: string
+          p_event_id: string
+          p_lines: Json
+          p_order_id: string
+          p_payment_id: string
+          p_sold_at: string
+          p_square_location_id: string
+        }
+        Returns: Json
+      }
       is_admin: { Args: { p_user_id?: string }; Returns: boolean }
       is_admin_rls: { Args: { p_user_id: string }; Returns: boolean }
       is_sensitive_setting: { Args: { setting_key: string }; Returns: boolean }

@@ -18,9 +18,10 @@ Every integration credential is DB-stored in `system_settings` (JSONB `value`, k
 
 ### Square (bidirectional: catalog/inventory push, sale-ingest webhook)
 - The **only signed webhook** in the app: `HMAC-SHA256(signingKey, notificationUrl + rawBody)` base64, `timingSafeEqual` (`src/integrations/square/webhook.ts`). The signature covers the URL — `SQUARE_WEBHOOK_URL`/`NEXT_PUBLIC_APP_URL` must match Square's config exactly, trailing slash included; the route throws 500 if neither env is set so a misconfigured URL can't silently fail every signature.
-- Replay window ±5 min on the signed `event.created_at`; failures return **200** `{ignored}` deliberately (a 4xx would trigger Square's 24h retry storm). Dedup is a race-safe claim: `upsert` on `square_sync_log.event_id` with `ignoreDuplicates:true` (UNIQUE added late, in `00173_audit_webhook_event_id.sql`); on handler failure the claimed row is deleted so retries reprocess. Events without `event_id` proceed **without dedup**.
-- Handled events are hardcoded strings: `payment.completed` (→ `allocations` for packaged, `square_draft_sales` for draft) and `inventory.count.updated` (log-only — MGR is source of truth for inventory). Everything else is 200-and-ignore.
-- **Migration-replay drift (live is fine):** live `square_draft_sales` has no `keg_type_id` column — it was dropped when keg formats unified into `selling_formats` (see the Row type in `src/types/supabase.ts`; 00168/00183 headers confirm the drop) — so the webhook's `selling_format_id`-only insert works. But `00091`'s `keg_type_id UUID NOT NULL` and its `(square_order_id, brand_id, keg_type_id)` UNIQUE index are never dropped by any migration, so a from-scratch replay recreates both and would break the insert. The draft-sale path also has zero test coverage.
+- Replay checks use signed `event.created_at`; failures return **200** `{ignored}` deliberately (a 4xx would trigger Square's retry storm). Payment/refund events accept the 25-hour Square retry horizon because their database claims are unconditional; other events keep ±5 minutes.
+- Handled lifecycle events are `payment.created` / `payment.updated` and `refund.created` / `refund.updated`; only a `COMPLETED` payload mutates data. `inventory.count.updated` is log-only because MGR is the inventory source of truth. Everything else is 200-and-ignore.
+- Sale/refund idempotency and side effects live in `ingest_square_sale_atomic` / `ingest_square_refund_atomic` (00257), not route-side table writes. The route fetches Square order data first, then calls one service-role-only RPC. Sales claim the order ID; refunds claim their refund ID; a per-order transaction lock serializes sale/refund races. Claim, ledger, bin, draft, and finalization effects commit or roll back together. Never reintroduce delete-on-failure or stale-claim replay: pre-00257 incomplete claims may have unknowable partial effects and are durably marked for manual reconciliation.
+- `square_draft_sales` is selling-format-only after 00254; the former replay drift around required `keg_type_id` is resolved and covered by fresh-migration plus real-Postgres tests.
 - Client gating: `getSquareClient()` returns `null` unless `square_settings.isEnabled` (singleton row id `…0002`); env switch `SQUARE_ENVIRONMENT` defaults to **production**. Catalog push regenerates `idempotencyKey` per call (retries not idempotent on Square's side); the mapping "upsert" into `square_catalog_map` is manual INSERT-then-UPDATE; `deleteStaleItems` with an empty active set deletes **everything**, and Square-side delete failures are swallowed while the local map row is still removed. `STANDARD_POUR_OZ` is hardcoded 16 (`utils.ts`).
 
 ### QuickBooks (one-way push: customer→Customer, supplier→Vendor, order→Invoice, PO→Bill)
@@ -43,14 +44,14 @@ Every integration credential is DB-stored in `system_settings` (JSONB `value`, k
 - The route's `VALID_ENTITIES` list (13 entries) and `sync.ts`'s `syncEntity` map have drifted (e.g. `packaging_sessions` missing from the route) — sync them when adding entities. Hardcoded db name `"lolev-manager"`; caller must `closeMongoClient()` in `finally`.
 
 ## Review checklist
-1. Webhook changes preserve: raw-body signature over `notificationUrl + body`, ±5 min replay window returning 200, race-safe `event_id` claim, claimed-row delete on failure.
+1. Webhook changes preserve: raw-body signature over `notificationUrl + body`, event-type replay windows returning 200 for stale events, order/refund claim keys, one atomic RPC per completed sale/refund, and 503 + `Retry-After` for fresh in-flight legacy claims.
 2. New credentials go through `settings/api-key` route + `system_settings` (and `VALID_INTEGRATION_IDS`), not env vars or new tables; never weaken `system_settings_hide_sensitive`/`is_sensitive_setting()` (00099 + 00200: `qbo_*` tokens and all `%_api_key` rows).
 3. QBO token writes stay on the single `token-manager.ts` bulk-upsert path (do NOT wire the `00100` RPCs — SECURITY INVOKER, UPDATE-only, nothing seeds the rows); no third refresh implementation; single-flight guard preserved.
 4. Any duplicated map/list updated everywhere: QBO `SYNC_FUNCTIONS` ×3 routes, Mongo `VALID_ENTITIES` ↔ `syncEntity`, api-key ids ↔ client key strings.
 5. Sync code fails loudly: no new swallowed catch blocks; per-item errors logged to the relevant `*_sync_log` table.
 6. Mongo UUIDv5 namespace and name-matched entity set unchanged unless the legacy Python scripts change with them.
 7. New external calls consider rate limits (QBO 600ms pacing pattern) and idempotency (stable keys, not per-call `randomUUID()`).
-8. Behavior changes in untested files (QuickBooks apart from `mapAddress`, `mongodb/sync.ts`, Square catalog/inventory, webhook route handler) get a characterization test first — only the pure webhook helpers, email, QBO `mapAddress`, and mongo id/transformers have coverage today.
+8. Behavior changes in untested files (QuickBooks apart from `mapAddress`, `mongodb/sync.ts`, Square catalog/inventory) get a characterization test first. Square webhook route contracts and atomic database effects have dedicated unit/integration coverage.
 
 ## Key files
 - `src/app/api/square/webhook/route.ts` (verify → replay → dedup → ingest branching)
@@ -59,4 +60,4 @@ Every integration credential is DB-stored in `system_settings` (JSONB `value`, k
 - `src/integrations/mongodb/{sync.ts,id.ts,transformers.ts}`
 - `src/integrations/{slack.ts,email.ts}`
 - `src/app/api/settings/api-key/route.ts`
-- `supabase/migrations/{00090_slack_integration.sql,00091_square_integration.sql,00100_qbo_token_save_rpc.sql,00173_audit_webhook_event_id.sql}`
+- `supabase/migrations/{00090_slack_integration.sql,00091_square_integration.sql,00100_qbo_token_save_rpc.sql,00173_audit_webhook_event_id.sql,00241_square_refund_sync_type.sql,00254_canonicalize_square_draft_sales.sql,00257_atomic_square_ingestion.sql}`
