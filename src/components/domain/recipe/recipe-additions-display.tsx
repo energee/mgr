@@ -158,7 +158,10 @@ export function RecipeAdditionsDisplay({
   // The estimates view used by the universal detail page does not expose
   // recipes.version. Keep this projection on its own key so it cannot replace
   // the full recipe detail cache with a partial row.
-  const { data: versionRow } = useQuery({
+  // Keep the recipe version query warm so recipeKeys.version stays populated for
+  // other consumers; the apply mutation itself reads the version fresh from the
+  // DB rather than trusting this cache (see applyMutation below).
+  useQuery({
     queryKey: recipeKeys.version(recipeId!),
     queryFn: async () => {
       return await unwrap(
@@ -270,16 +273,29 @@ export function RecipeAdditionsDisplay({
   const applyMutation = useMutation({
     mutationFn: async () => {
       if (!calculatedAdditions || !recipeId) throw new Error("Missing data");
-      if (typeof versionRow?.version !== "number") {
-        throw new Error("Recipe version is not loaded");
-      }
 
       const saltItems = mapSaltAdditionsToItems(calculatedAdditions, additiveCatalog);
       if (saltItems.length === 0) throw new Error("No salt additions to apply");
 
+      // Read the recipe version FRESH from the database immediately before the
+      // atomic RPC. Do NOT trust the cached recipeKeys.version query: its
+      // initialData is only honored on first render and nothing invalidates the
+      // key when the version is bumped out-of-band (another recipe section save,
+      // the additions editor page, etc.), so the cached value goes stale and
+      // triggers spurious PT409 optimistic-lock conflicts. Reading latest then
+      // writing under the RPC's FOR UPDATE lock still catches genuine concurrent
+      // human edits (the RPC re-checks version under lock), it only removes the
+      // false positives from benign prior version bumps.
+      const { version: freshVersion } = await unwrap(
+        supabase.from("recipes").select("version").eq("id", recipeId).single()
+      ) as { version: number };
+      if (typeof freshVersion !== "number") {
+        throw new Error("Recipe version is not loaded");
+      }
+
       return replaceRecipeAdditions(supabase, {
         recipeId,
-        expectedVersion: versionRow.version,
+        expectedVersion: freshVersion,
         scope: "water_chemistry",
         items: saltItems,
       });
