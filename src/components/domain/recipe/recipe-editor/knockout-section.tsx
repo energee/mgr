@@ -7,12 +7,8 @@
 
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
-import { recipeKeys, entityKeys } from "@/lib/query-keys";
-import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
 import { Label } from "@/components/ui/label";
@@ -24,9 +20,7 @@ type KnockoutFormValues = {
 }
 
 export function KnockoutSection() {
-  const { recipe, updateRecipe, startSaving, handleSaveError, getVersion } = useRecipeEditor();
-  const supabase = createClient();
-  const queryClient = useQueryClient();
+  const { recipe } = useRecipeEditor();
 
   const form = useForm<KnockoutFormValues>({
     defaultValues: {
@@ -37,41 +31,14 @@ export function KnockoutSection() {
 
   const { isDirty } = form.formState;
 
-  const stopSavingRef = useRef<(() => void) | null>(null);
-
-  const saveMutation = useMutation({
-    mutationFn: async (values: KnockoutFormValues) => {
-      stopSavingRef.current = startSaving();
-      return updateWithOptimisticLockOrThrow(
-        supabase,
-        "recipes",
-        recipe.id,
-        {
-          target_ko_temp_f: values.target_ko_temp_f,
-          target_ko_volume_bbl: values.target_ko_volume_bbl,
-        },
-        getVersion()
-      );
-    },
-    onSuccess: (data) => {
-      updateRecipe({ version: data.version });
-      form.reset(form.getValues());
-      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
-      queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-    },
-    onError: handleSaveError,
-    onSettled: () => {
-      stopSavingRef.current?.();
-      stopSavingRef.current = null;
-    },
-  });
-
   useRegisterSaver("knockout", isDirty, useCallback(async () => {
-    if (!form.formState.isDirty) return;
-    await form.handleSubmit(async (values) => {
-      await saveMutation.mutateAsync(values);
-    })();
-  }, [form, saveMutation]));
+    if (!(await form.trigger())) throw new Error("Knock-out settings are invalid");
+    const values = form.getValues();
+    return {
+      recipePatch: values,
+      onCommitted: () => form.reset(values),
+    };
+  }, [form]));
 
   return (
     <RecipeSectionCard

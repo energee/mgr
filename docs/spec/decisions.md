@@ -516,6 +516,26 @@ Bulk operations use **per-record atomicity**. Each selected record invokes the c
 
 **Rationale**: A committed terminal status is operationally false when its inventory or accounting work failed. A database transaction is the only boundary shared by every client and route entry point.
 
+### DEC-GAP-012: Recipe Editor Saves One Versioned Aggregate
+**Status**: Implemented (migration 00259)
+
+The recipe editor submits every dirty recipe field and each dirty ingredient
+collection to one `SECURITY INVOKER` PostgreSQL command. The command locks the
+recipe row, rejects a stale `recipes.version`, applies only allowlisted fields
+and the six concrete ingredient tables, and increments the version once.
+Omitted collections remain unchanged; an explicitly present empty collection
+clears that ingredient type.
+
+Child rows keep client-generated UUIDs across saves. The database derives their
+positions from array order and preserves catalog snapshots on updates. The UI
+resets dirty state and invalidates exact cache keys only after the transaction
+returns its committed version.
+
+**Rationale**: sequential DELETE/INSERT requests could leave a section empty,
+merge concurrent formulations, or report success after only some sections
+committed. The recipe row is the shared serialization boundary for the full
+editor aggregate.
+
 ---
 
 ## Redundancy Resolutions

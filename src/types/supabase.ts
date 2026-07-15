@@ -10515,6 +10515,15 @@ export type Database = {
         Args: { p_items: Json; p_reason?: string; p_session_id: string }
         Returns: Json
       }
+      save_recipe_aggregate_atomic: {
+        Args: {
+          p_expected_version: number
+          p_recipe_id: string
+          p_recipe_patch?: Json
+          p_sections?: Json
+        }
+        Returns: Json
+      }
       ship_transfer_partial: {
         Args: { p_line_quantities: Json; p_transfer_id: string }
         Returns: string

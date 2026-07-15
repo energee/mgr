@@ -9,12 +9,8 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
-import { recipeKeys, entityKeys } from "@/lib/query-keys";
-import { updateWithOptimisticLockOrThrow } from "@/lib/optimistic-lock";
 import { useDynamicOptions } from "@/hooks/use-dynamic-options";
 import { useRecipeEditor, useRegisterSaver } from "./recipe-editor-context";
 import { RecipeSectionCard } from "./recipe-section-card";
@@ -53,9 +49,7 @@ const YEAST_FIELDS = [
 ];
 
 export function FermentablesSection() {
-  const { recipe, updateRecipe, setGrainItems, setHopItems, startSaving, handleSaveError, getVersion } = useRecipeEditor();
-  const supabase = createClient();
-  const queryClient = useQueryClient();
+  const { recipe, updateRecipe, setGrainItems, setHopItems } = useRecipeEditor();
 
   const { optionsMap, isLoading: optionsLoading } = useDynamicOptions(YEAST_FIELDS);
   const yeastOptions = optionsMap.yeast_id ?? [];
@@ -99,42 +93,14 @@ export function FermentablesSection() {
     [setHopItems]
   );
 
-  const stopSavingRef = useRef<(() => void) | null>(null);
-
-  const saveMutation = useMutation({
-    mutationFn: async (values: YeastFormValues) => {
-      stopSavingRef.current = startSaving();
-      return updateWithOptimisticLockOrThrow(
-        supabase,
-        "recipes",
-        recipe.id,
-        {
-          yeast_id: values.yeast_id,
-          target_attenuation: values.target_attenuation,
-          target_pitching_rate: values.target_pitching_rate,
-        },
-        getVersion()
-      );
-    },
-    onSuccess: (data) => {
-      updateRecipe({ version: data.version });
-      form.reset(form.getValues());
-      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipe.id) });
-      queryClient.invalidateQueries({ queryKey: entityKeys.detail("recipes_with_estimates", recipe.id) });
-    },
-    onError: handleSaveError,
-    onSettled: () => {
-      stopSavingRef.current?.();
-      stopSavingRef.current = null;
-    },
-  });
-
   useRegisterSaver("yeast", isDirty, useCallback(async () => {
-    if (!form.formState.isDirty) return;
-    await form.handleSubmit(async (values) => {
-      await saveMutation.mutateAsync(values);
-    })();
-  }, [form, saveMutation]));
+    if (!(await form.trigger())) throw new Error("Yeast settings are invalid");
+    const values = form.getValues();
+    return {
+      recipePatch: values,
+      onCommitted: () => form.reset(values),
+    };
+  }, [form]));
 
   return (
     <RecipeSectionCard title="Fermentables & Ingredients" isDirty={isDirty}>

@@ -10,32 +10,33 @@
  * 2. Mirror the fetched rows into local `items` state with a `dirty` flag,
  *    using a render-time sync (setPrev pattern) so edits are kept until the
  *    query result actually changes.
- * 3. Save via delete-all-then-reinsert keyed on `recipe_id`, re-deriving
- *    `position` from array order.
- * 4. Invalidate the section's query key plus `recipeKeys.detail(recipeId)`.
+ * 3. Contribute a stable-id row snapshot to the editor's aggregate RPC.
+ * 4. Reset dirty state only after the aggregate transaction commits.
  *
  * Registration with the recipe editor's saver registry stays in the caller
- * (one `useRegisterSaver(key, Boolean(editing && dirty), save)` line), since
+ * (one `useRegisterSaver(key, Boolean(editing && dirty), prepareSave)` line), since
  * that depends on the component-layer RecipeEditorContext.
  */
 
 import { useCallback, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
-import { recipeKeys } from "@/lib/query-keys";
-import { toast } from "sonner";
+import type {
+  RecipeChildSection,
+  RecipeSaveContribution,
+} from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 
-type UseRecipeChildRowsOptions<Fetched, Row> = {
+type UseRecipeChildRowsOptions<Fetched, Row extends { id?: string }> = {
   /** Parent recipe id; rows are scoped by `recipe_id`. */
   recipeId: string;
   /** Junction table name (e.g. "recipe_malts"). */
-  table: string;
+  table: RecipeChildSection;
   /** Select string for the fetch, including any joined catalog relation. */
   select: string;
   /** Query key for this section (also invalidated after save). */
   queryKey: readonly unknown[];
-  /** Human label used in the save-failure toast (e.g. "grain bill"). */
+  /** Human label used in pre-save validation errors (e.g. "grain bill"). */
   errorLabel: string;
   /** Maps a fetched row (with joined relation) to the local item shape. */
   mapRow: (row: Fetched) => Row;
@@ -58,15 +59,13 @@ type UseRecipeChildRowsResult<Row> = {
   setDirty: React.Dispatch<React.SetStateAction<boolean>>;
   /** Replace items and mark dirty (the common edit path). */
   update: (items: Row[]) => void;
-  /** Saves if dirty (delete-all + reinsert); safe to register as a saver. */
-  save: () => Promise<void>;
+  /** Snapshot rows for the recipe editor's one aggregate transaction. */
+  prepareSave: () => Promise<RecipeSaveContribution>;
   /** Initial fetch in flight. */
   isLoading: boolean;
-  /** Save mutation in flight. */
-  isPending: boolean;
 };
 
-export function useRecipeChildRows<Fetched, Row>({
+export function useRecipeChildRows<Fetched, Row extends { id?: string }>({
   recipeId,
   table,
   select,
@@ -77,7 +76,6 @@ export function useRecipeChildRows<Fetched, Row>({
   validate,
 }: UseRecipeChildRowsOptions<Fetched, Row>): UseRecipeChildRowsResult<Row> {
   const supabase = createClient();
-  const queryClient = useQueryClient();
 
   const [items, setItems] = useState<Row[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -102,43 +100,23 @@ export function useRecipeChildRows<Fetched, Row>({
     setDirty(false);
   }
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (validate) {
-        const message = validate(items);
-        if (message) throw new Error(message);
+  const prepareSave = useCallback(async (): Promise<RecipeSaveContribution> => {
+    if (validate) {
+      const message = validate(items);
+      if (message) throw new Error(message);
+    }
+    const rows = items.map((item) => {
+      if (!item.id) {
+        throw new Error(`Failed to save ${errorLabel}: a row has no stable id`);
       }
-
-      const { error: deleteError } = await dynamicFrom(supabase, table)
-        .delete()
-        .eq("recipe_id", recipeId);
-      if (deleteError) throw deleteError;
-
-      if (items.length > 0) {
-        const { error: insertError } = await dynamicFrom(supabase, table).insert(
-          items.map((item, index) => ({
-            recipe_id: recipeId,
-            ...toInsert(item),
-            position: index,
-          }))
-        );
-        if (insertError) throw insertError;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
-      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(recipeId) });
-      setDirty(false);
-    },
-    onError: (error) => {
-      toast.error(`Failed to save ${errorLabel}: ` + error.message);
-    },
-  });
-
-  const save = useCallback(async () => {
-    if (!dirty) return;
-    await saveMutation.mutateAsync();
-  }, [dirty, saveMutation]);
+      return { id: item.id, ...toInsert(item) };
+    });
+    return {
+      sections: { [table]: rows },
+      queryKeys: [queryKey],
+      onCommitted: () => setDirty(false),
+    };
+  }, [errorLabel, items, queryKey, table, toInsert, validate]);
 
   const update = useCallback((next: Row[]) => {
     setItems(next);
@@ -151,8 +129,7 @@ export function useRecipeChildRows<Fetched, Row>({
     dirty,
     setDirty,
     update,
-    save,
+    prepareSave,
     isLoading,
-    isPending: saveMutation.isPending,
   };
 }

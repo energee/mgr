@@ -3,8 +3,8 @@
 /**
  * HopScheduleSection - Section wrapper for HopScheduleEditor in recipe detail view.
  *
- * Uses useRecipeChildRows for the recipe_hops fetch/dirty/delete-all-reinsert
- * save cycle, and registers with the recipe editor's saver registry.
+ * Uses useRecipeChildRows for fetch/dirty state and contributes recipe_hops
+ * to the recipe editor's aggregate atomic save.
  * Passes batchSizeGal and estimatedOG to the editor for IBU calculations.
  */
 
@@ -16,7 +16,10 @@ import {
   type HopScheduleItem,
 } from "@/components/domain/recipe/hop-schedule-editor";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useRegisterSaver } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
+import {
+  useRecipeEditor,
+  useRegisterSaver,
+} from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
 
 /** Barrels to gallons conversion factor */
 const BBL_TO_GAL = 31.0;
@@ -34,11 +37,12 @@ type HopScheduleSectionProps = {
 
 export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleSectionProps) {
   const recipeId = data.id;
+  const { isSaving } = useRecipeEditor();
 
   const batchSizeGal = (data.batch_size_bbl ?? 0) * BBL_TO_GAL || 5;
   const estimatedOG = data.est_og ?? 1.05;
 
-  const { items: hopItems, dirty, update, save, isLoading, isPending } =
+  const { items: hopItems, dirty, update, prepareSave, isLoading } =
     useRecipeChildRows<HopScheduleItem & { hops: HopScheduleItem["hop"] }, HopScheduleItem>({
       recipeId,
       table: "recipe_hops",
@@ -90,7 +94,7 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
     onDataChange?.(hopItems);
   }, [hopItems, onDataChange]);
 
-  useRegisterSaver("hop-schedule", Boolean(editing && dirty), save);
+  useRegisterSaver("hop-schedule", Boolean(editing && dirty), prepareSave);
 
   if (isLoading) {
     return (
@@ -107,7 +111,7 @@ export function HopScheduleSection({ data, editing, onDataChange }: HopScheduleS
       <HopScheduleEditor
         items={hopItems}
         onChange={update}
-        disabled={!editing || isPending}
+        disabled={!editing || isSaving}
         batchSizeGal={batchSizeGal}
         estimatedOG={estimatedOG}
       />
