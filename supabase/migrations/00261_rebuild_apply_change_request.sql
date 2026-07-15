@@ -134,9 +134,13 @@ BEGIN
   v_order_state_rank := array_position(v_state_ranks, v_order.status);
   v_cutoff_rank := array_position(v_state_ranks, v_cutoff_state);
 
+  -- Changes are allowed up to and including the cutoff state; only orders that
+  -- have advanced strictly past it are locked. With the default cutoff
+  -- 'confirmed', a confirmed order is still editable and a scheduled/later one
+  -- is not.
   IF v_order_state_rank IS NULL
      OR v_cutoff_rank IS NULL
-     OR v_order_state_rank >= v_cutoff_rank THEN
+     OR v_order_state_rank > v_cutoff_rank THEN
     RAISE EXCEPTION 'Order has passed the change request cutoff state (%)',
       v_cutoff_state
       USING ERRCODE = 'serialization_failure';
@@ -190,6 +194,16 @@ BEGIN
           v_item.selling_format_id,
           v_item.brand_id
         );
+
+        -- get_price_for_customer returns no row when no tier price resolves.
+        -- unit_price is nullable, so without this guard the approval would
+        -- silently insert a price-less line and corrupt the order total.
+        IF v_price IS NULL THEN
+          RAISE EXCEPTION
+            'No active price for selling format % (brand %); configure pricing before approving change-request item %',
+            v_item.selling_format_id, v_item.brand_id, v_item.id
+            USING ERRCODE = 'check_violation';
+        END IF;
 
         INSERT INTO order_items (
           order_id,
