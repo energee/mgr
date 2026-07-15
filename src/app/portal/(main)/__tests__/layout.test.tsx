@@ -66,6 +66,9 @@ function setup(opts: {
   profile?: { data: unknown; error: unknown };
   links?: unknown[];
   customers?: CustomerRow[];
+  linkReadError?: { message: string };
+  linkWriteError?: { message: string };
+  linkWriteData?: unknown;
 }) {
   let linkReads = 0;
   const userMock = makeAdminMock({
@@ -75,7 +78,7 @@ function setup(opts: {
     },
     customer_portal_users: () => {
       linkReads += 1;
-      return { data: opts.links ?? [], error: null };
+      return { data: opts.links ?? [], error: opts.linkReadError ?? null };
     },
     system_settings: { data: [], error: null },
   });
@@ -87,6 +90,18 @@ function setup(opts: {
 
   const adminMock = makeAdminMock({
     customers: customersTable(opts.customers ?? []),
+    customer_portal_users: ({ ops }) => ({
+      data:
+        ops.length > 0
+          ? (opts.linkWriteData === undefined
+              ? (opts.customers ?? []).map((customer) => ({
+                  customer_id: customer.id,
+                  user_id: opts.user?.id,
+                }))
+              : opts.linkWriteData)
+          : null,
+      error: ops.length > 0 ? (opts.linkWriteError ?? null) : null,
+    }),
   });
   adminWrites = adminMock.writes;
   mockedCreateAdminClient.mockResolvedValue(adminMock.admin as never);
@@ -117,7 +132,7 @@ describe("PortalLayout customer auto-link", () => {
       expect.objectContaining({
         table: "customer_portal_users",
         op: "upsert",
-        row: { customer_id: "cust-1", user_id: "user-1" },
+        row: [{ customer_id: "cust-1", user_id: "user-1" }],
       }),
     );
     expect(element.props.customers).toEqual([{ id: "cust-1", name: "Acme Taproom" }]);
@@ -163,6 +178,42 @@ describe("PortalLayout customer auto-link", () => {
     expect(element.props.customers).toEqual([
       { id: "cust-1", name: "Acme Taproom", email: "Buyer@Acme.com" },
     ]);
+  });
+
+  it("fails closed when the durable customer-link read fails", async () => {
+    setup({
+      user: { id: "user-1", email: "buyer@acme.com" },
+      linkReadError: { message: "link read failed" },
+    });
+
+    await expect(renderLayout()).rejects.toMatchObject({
+      message: "link read failed",
+    });
+    expect(mockedCreateAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("does not grant in-memory access when the durable auto-link write fails", async () => {
+    setup({
+      user: { id: "user-1", email: "buyer@acme.com" },
+      customers: [{ id: "cust-1", name: "Acme Taproom", email: "buyer@acme.com" }],
+      linkWriteError: { message: "link write failed" },
+    });
+
+    await expect(renderLayout()).rejects.toMatchObject({
+      message: "link write failed",
+    });
+  });
+
+  it("does not grant access when an error-free auto-link returns no durable row", async () => {
+    setup({
+      user: { id: "user-1", email: "buyer@acme.com" },
+      customers: [{ id: "cust-1", name: "Acme Taproom", email: "buyer@acme.com" }],
+      linkWriteData: [],
+    });
+
+    await expect(renderLayout()).rejects.toThrow(
+      "Customer portal link verification failed",
+    );
   });
 
   it("redirects unauthenticated users to the portal login", async () => {

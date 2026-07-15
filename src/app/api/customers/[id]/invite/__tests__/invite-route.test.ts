@@ -55,6 +55,7 @@ const SECOND_EMAIL = "buyer@example.com";
 
 let writes: Write[];
 let createUser: ReturnType<typeof vi.fn>;
+let deleteUser: ReturnType<typeof vi.fn>;
 let generateLink: ReturnType<typeof vi.fn>;
 let updateUserById: ReturnType<typeof vi.fn>;
 let signInWithOtp: ReturnType<typeof vi.fn>;
@@ -71,6 +72,10 @@ type SetupOptions = {
     status: string;
   };
   profileMissing?: boolean;
+  profileWriteData?: unknown;
+  linkWriteError?: { message: string };
+  linkWriteData?: unknown;
+  deleteUserError?: { message: string };
 };
 
 function setup(options: SetupOptions = {}) {
@@ -87,14 +92,30 @@ function setup(options: SetupOptions = {}) {
     customer_portal_users: ({ ops }) => {
       if (ops.length > 0) {
         linkWritten();
-        return { data: null, error: null };
+        const userId = options.existingProfile?.id
+          ?? (options.profileMissing ? "existing-user-1" : "new-user-1");
+        return {
+          data:
+            options.linkWriteData === undefined
+              ? { customer_id: CUSTOMER_ID, user_id: userId }
+              : options.linkWriteData,
+          error: options.linkWriteError ?? null,
+        };
       }
       return { data: links[0] ?? null, error: null };
     },
     user_profiles: ({ ops, calls }) => {
       if (ops.length > 0) {
         profileWritten();
-        return { data: null, error: null };
+        const userId = options.existingProfile?.id
+          ?? (options.profileMissing ? "existing-user-1" : "new-user-1");
+        return {
+          data:
+            options.profileWriteData === undefined
+              ? { id: userId, roles: ["customer"], status: "active" }
+              : options.profileWriteData,
+          error: null,
+        };
       }
       if (calls.some((call) => call.method === "ilike")) {
         return { data: options.existingProfile ?? null, error: null };
@@ -121,6 +142,10 @@ function setup(options: SetupOptions = {}) {
     data: { user: { id: "new-user-1", email } },
     error: null,
   }));
+  deleteUser = vi.fn(async () => ({
+    data: {},
+    error: options.deleteUserError ?? null,
+  }));
   generateLink = vi.fn(async () => ({
     data: {
       user: { id: "existing-user-1", email: SECOND_EMAIL },
@@ -134,7 +159,7 @@ function setup(options: SetupOptions = {}) {
   mockedCreateAdminClient.mockResolvedValue({
     ...(adminMock.admin as object),
     auth: {
-      admin: { createUser, generateLink, updateUserById },
+      admin: { createUser, deleteUser, generateLink, updateUserById },
       signInWithOtp,
     },
   } as never);
@@ -286,5 +311,64 @@ describe("POST /api/customers/[id]/invite", () => {
     );
     expect(signInWithOtp).toHaveBeenCalledTimes(1);
     expect(response.status).toBe(200);
+  });
+
+  it("removes a newly created Auth user when the durable customer link fails", async () => {
+    setup({
+      profileRoles: ["viewer"],
+      linkWriteError: { message: "junction write failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({ message: "junction write failed" });
+
+    expect(signInWithOtp).not.toHaveBeenCalled();
+    expect(deleteUser).toHaveBeenCalledWith("new-user-1");
+  });
+
+  it("removes a newly created Auth user when profile verification returns no row", async () => {
+    setup({ profileRoles: ["viewer"], profileWriteData: null });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: expect.stringContaining("profile verification failed"),
+    });
+
+    expect(linkWritten).not.toHaveBeenCalled();
+    expect(signInWithOtp).not.toHaveBeenCalled();
+    expect(deleteUser).toHaveBeenCalledWith("new-user-1");
+  });
+
+  it("removes a newly created Auth user when link verification returns no row", async () => {
+    setup({ profileRoles: ["viewer"], linkWriteData: null });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: expect.stringContaining("link verification failed"),
+    });
+
+    expect(signInWithOtp).not.toHaveBeenCalled();
+    expect(deleteUser).toHaveBeenCalledWith("new-user-1");
+  });
+
+  it("surfaces a cleanup failure when customer provisioning cannot compensate", async () => {
+    setup({
+      profileRoles: ["viewer"],
+      linkWriteError: { message: "junction write failed" },
+      deleteUserError: { message: "auth cleanup failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: expect.stringContaining("auth cleanup failed"),
+    });
+    expect(deleteUser).toHaveBeenCalledWith("new-user-1");
   });
 });

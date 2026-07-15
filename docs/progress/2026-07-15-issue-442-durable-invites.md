@@ -1,0 +1,1 @@
+- **2026-07-15 (Durable account provisioning).** Made staff and customer invites verify persisted roles, status, and portal links; compensated failed new-user provisioning; replaced non-delivering customer resend links with delivered OTPs; and made portal auto-linking fail closed, with regression coverage for write, readback, and cleanup failures.
