@@ -1576,7 +1576,7 @@ function ListSearchInput({
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         className={cn(
-          "pl-8 pr-8 border-transparent bg-transparent focus-visible:border-border focus-visible:bg-background",
+          "pl-8 pr-8 border-transparent bg-transparent focus-visible:bg-background",
           isTouch ? "h-9 text-sm" : "h-7 text-xs"
         )}
       />
