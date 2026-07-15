@@ -10490,6 +10490,10 @@ export type Database = {
         }
         Returns: number
       }
+      recalculate_order_materials: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
       reconcile_mongodb_batch_reading_aggregate: {
         Args: { p_mongo_id: string; p_readings?: Json }
         Returns: number

@@ -9,8 +9,8 @@
  * refactors of the shared order line-item editor stay verifiable.
  *
  * Follows the repo's render-test idiom (createRoot + act; no
- * @testing-library/react). react-query, the Supabase client, and the catalog /
- * material-planning hooks are mocked so render is deterministic and offline:
+ * @testing-library/react). react-query, the Supabase client, and the catalog
+ * hooks are mocked so render is deterministic and offline:
  *   - useQuery switches on queryKey and reads a hoisted, per-test-mutable
  *     fixture for the order-items query; every other query (order detail,
  *     inventory availability) returns empty.
@@ -64,10 +64,6 @@ vi.mock("@/hooks/use-catalog", () => ({
   usePackagingFormats: () => ({ data: h.formats }),
   useKegOwners: () => ({ data: h.owners }),
   formatVolumeLabel: (v: unknown) => String(v),
-}));
-
-vi.mock("@/hooks/use-material-planning", () => ({
-  useCalculateOrderMaterials: () => ({ data: undefined, mutate: vi.fn(), isPending: false }),
 }));
 
 import { OrderItemsEditor } from "../order-items-editor";

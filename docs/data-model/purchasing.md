@@ -223,7 +223,7 @@ cancelled  cancelled   cancelled   cancelled
 
 ## `order_materials`
 
-Shipping materials (estimated and actual quantities) associated with a specific order. Rows are auto-populated from customer/brewery shipping defaults when an order is created, and can be adjusted through fulfillment.
+Shipping materials (estimated and actual quantities) associated with a specific order. Rows are derived from the current order lines and the customer/brewery shipping configuration, and can be adjusted through fulfillment.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -236,6 +236,16 @@ Shipping materials (estimated and actual quantities) associated with a specific 
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
 **Unique constraint:** `(order_id, inventory_item_id)`
+
+**Transactional recalculation:** Every insert, quantity/format update, or delete
+on `order_items` calls `recalculate_order_materials(order_id)` through database
+triggers. The function locks the parent order, totals pallets per line using a
+customer layer override when present (otherwise the selling-format pallet
+quantity), and resolves one material per role with customer materials taking
+precedence over brewery defaults. It updates `estimated_qty`, adds/removes
+configured rows, and leaves a non-null `actual_qty` untouched. This same trigger
+boundary covers both direct staff edits and approved customer change requests,
+so a recalculation error rolls the line change back.
 
 **Quantity resolution:** `calculate_shipping_material_demand()` uses `actual_qty` when set, otherwise falls back to `estimated_qty`. See [calculate_material_shortfalls](#calculate_material_shortfalls) for the full shortfall calculation.
 

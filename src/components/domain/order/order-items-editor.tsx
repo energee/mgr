@@ -12,8 +12,9 @@
  * - Manual price override support
  * - Uses unified selling_format_id (containers + selling_formats model)
  * - Qty/price edits on existing rows are buffered locally and committed on
- *   blur/Enter (one write + one shipping-materials recalc per edit, not per
- *   keystroke); invalid input reverts to the saved value
+ *   blur/Enter (one write per edit, not per keystroke); a database trigger
+ *   recalculates shipping materials in the same transaction, and invalid input
+ *   reverts to the saved value
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -51,9 +52,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { orderKeys, finishedGoodKeys } from "@/lib/query-keys";
+import { orderKeys, finishedGoodKeys, materialPlanningKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners, formatVolumeLabel } from "@/hooks/use-catalog";
-import { useCalculateOrderMaterials } from "@/hooks/use-material-planning";
 import {
   parseItemFieldEdit,
   type EditableItemField,
@@ -222,12 +222,6 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   // Use passed customerId or fetch from order
   const effectiveCustomerId = customerId ?? order?.customer_id;
 
-  // Shipping material auto-calculation — triggered after line item changes
-  const calculateMaterials = useCalculateOrderMaterials(
-    orderId,
-    effectiveCustomerId ?? ""
-  );
-
   // Fetch order items
   const { data: items, isLoading: itemsLoading } = useQuery({
     queryKey: orderKeys.items(orderId),
@@ -329,6 +323,12 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
   );
   const newItemTotalAvailable = newItemFGs?.reduce((sum, fg) => sum + (fg.available_quantity ?? 0), 0);
 
+  const invalidateOrderMaterials = () => {
+    queryClient.invalidateQueries({
+      queryKey: materialPlanningKeys.orderMaterials(orderId),
+    });
+  };
+
   // Add item mutation
   const addItem = useMutation({
     mutationFn: async (item: NewItemState) => {
@@ -347,8 +347,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       setNewItem({ ...EMPTY_NEW_ITEM });
       setShowAddRow(false);
       toast.success("Item added");
-      // Recalculate shipping materials now that line items changed
-      if (effectiveCustomerId) calculateMaterials.mutate();
+      invalidateOrderMaterials();
     },
     onError: () => {
       toast.error("Failed to add item");
@@ -380,9 +379,8 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     },
     onSuccess: (_data, { field }) => {
       queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
-      // Recalculate when quantity or selling format changes (pallet count may change)
-      if (effectiveCustomerId && (field === "quantity" || field === "selling_format_id")) {
-        calculateMaterials.mutate();
+      if (field === "quantity" || field === "selling_format_id") {
+        invalidateOrderMaterials();
       }
     },
     onError: () => {
@@ -434,8 +432,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
       return;
     }
     queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
-    // Recalculate materials — new format may have different pallet config
-    if (effectiveCustomerId) calculateMaterials.mutate();
+    invalidateOrderMaterials();
   };
 
   // Delete item mutation
@@ -446,8 +443,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
       toast.success("Item removed");
-      // Recalculate materials — fewer line items means fewer pallets
-      if (effectiveCustomerId) calculateMaterials.mutate();
+      invalidateOrderMaterials();
     },
     onError: () => {
       toast.error("Failed to remove item");
