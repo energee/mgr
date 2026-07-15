@@ -14,12 +14,46 @@
 
 import * as Sentry from "@sentry/nextjs";
 
+// Supabase/postgrest-js represents both real Postgrest error responses and
+// network-level fetch failures (DNS, offline, CORS) as a plain object literal
+// — `{ message, details, hint, code }` — not an instance of `Error`, even
+// though its TS type (`PostgrestError`) is declared as an `Error` subclass.
+// See postgrest-js `PostgrestBuilder`'s fetch `.catch()` handler. Without this
+// check, `instanceof Error` below misses these and every Supabase failure
+// degrades to a stack-less `captureMessage` (SENTRY-7597067722).
+type PostgrestErrorLike = {
+  message: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+};
+
+function isPostgrestErrorLike(value: unknown): value is PostgrestErrorLike {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { message?: unknown }).message === "string" &&
+    ("details" in value || "hint" in value || "code" in value)
+  );
+}
+
 function forward(level: Sentry.SeverityLevel, message: string, args: unknown[]) {
-  // Walk the args looking for the first Error — if present, capture it directly
-  // so Sentry uses the stack trace. Otherwise capture the message string.
+  // Walk the args looking for the first Error (or Postgrest-error-shaped
+  // object) — if present, capture it directly so Sentry uses the stack
+  // trace/details. Otherwise capture the message string.
   for (const arg of args) {
     if (arg instanceof Error) {
       Sentry.captureException(arg, { level, extra: { message, args } });
+      return;
+    }
+    if (isPostgrestErrorLike(arg)) {
+      const error = new Error(arg.message);
+      error.name = "PostgrestError";
+      if (arg.details) error.stack = arg.details;
+      Sentry.captureException(error, {
+        level,
+        extra: { message, args, code: arg.code, hint: arg.hint, details: arg.details },
+      });
       return;
     }
   }
