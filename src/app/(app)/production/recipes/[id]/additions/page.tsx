@@ -18,8 +18,9 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { recipeKeys } from "@/lib/query-keys";
+import { entityKeys, recipeKeys } from "@/lib/query-keys";
 import { unwrap } from "@/lib/supabase/query-helpers";
+import { replaceRecipeAdditions } from "@/services/recipe-additions-service";
 
 /** Additive types managed via water chemistry calculations, excluded from this editor */
 const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
@@ -30,6 +31,10 @@ export default function RecipeAdditionsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  return <RecipeAdditionsPageContent id={id} />;
+}
+
+export function RecipeAdditionsPageContent({ id }: { id: string }) {
   const supabase = createClient();
   const queryClient = useQueryClient();
   const [items, setItems] = useState<AdditionItem[]>([]);
@@ -37,15 +42,20 @@ export default function RecipeAdditionsPage({
 
   // Fetch recipe details
   const { data: recipe, isLoading: recipeLoading } = useQuery({
-    queryKey: recipeKeys.detail(id),
+    queryKey: recipeKeys.additionsEditor(id),
     queryFn: async () => {
       return await unwrap(
         supabase
           .from("recipes")
-          .select("id, name, target_water_profile_id")
+          .select("id, name, target_water_profile_id, version")
           .eq("id", id)
           .single()
-      ) as unknown as { id: string; name: string; target_water_profile_id: string | null };
+      ) as unknown as {
+        id: string;
+        name: string;
+        target_water_profile_id: string | null;
+        version: number;
+      };
     },
   });
 
@@ -114,45 +124,39 @@ export default function RecipeAdditionsPage({
     setHasChanges(true);
   };
 
-  // Save mutation — only touches non-water-chemistry items
+  // Save mutation — Postgres replaces only non-water additions atomically.
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Get IDs of existing non-water-chemistry additions to delete
-      const existingNonWaterIds = (additions || [])
-        .filter((a) => !WATER_CHEMISTRY_TYPES.includes(a.additives?.type || ""))
-        .map((a) => a.id)
-        .filter(Boolean) as string[];
-
-      // Delete existing non-water additions for this recipe
-      if (existingNonWaterIds.length > 0) {
-        await unwrap(
-          supabase
-            .from("recipe_additions")
-            .delete()
-            .in("id", existingNonWaterIds)
-        );
+      if (typeof recipe?.version !== "number") {
+        throw new Error("Recipe version is not loaded");
       }
-
-      // Insert new additions
-      if (items.length > 0) {
-        const insertData = items.map((item, index) => ({
-          recipe_id: id,
+      return replaceRecipeAdditions(supabase, {
+        recipeId: id,
+        expectedVersion: recipe.version,
+        scope: "other",
+        items: items.map((item) => ({
+          id: item.id,
           additive_id: item.additive_id,
           amount: item.amount,
           unit: item.unit,
           timing: item.timing,
           target: item.target || null,
-          position: index,
-        }));
-
-        await unwrap(
-          supabase.from("recipe_additions").insert(insertData)
-        );
-      }
+        })),
+      });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: recipeKeys.additions(id) });
-      queryClient.invalidateQueries({ queryKey: recipeKeys.detail(id) });
+    onSuccess: async ({ version }) => {
+      queryClient.setQueryData(
+        recipeKeys.additionsEditor(id),
+        (current: typeof recipe) => current ? { ...current, version } : current,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: recipeKeys.additions(id) }),
+        queryClient.invalidateQueries({ queryKey: recipeKeys.detail(id), exact: true }),
+        queryClient.invalidateQueries({
+          queryKey: entityKeys.detail("recipes_with_estimates", id),
+          exact: true,
+        }),
+      ]);
       setHasChanges(false);
       toast.success("Additions saved");
     },

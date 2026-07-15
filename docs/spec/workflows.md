@@ -440,29 +440,11 @@ Brinks are vessels of type `brink` (added to `vessel_type` enum). Yeast pitches 
 
 ---
 
-## Water Addition Profiles
+## Recipe Water Additions
 
-Named, reusable sets of water salt/acid additions (migration `00096_water_addition_profiles.sql`).
+`water_profiles` stores source/target water chemistry (Ca, Mg, SO4, etc.). Calculated salt and acid rows are stored directly in `recipe_additions` for the recipe. The named `water_addition_profiles` design was removed from the deployed schema during migration renumbering.
 
-### Model
-
-- **`water_profiles`** = Source water chemistry (Ca, Mg, SO4, etc.) -- existing table
-- **`water_addition_profiles`** = Named sets of salt/acid additions (e.g., "Hoppy IPA Salts") -- new table
-- **`recipe_additions`** = Individual addition items, owned by either a recipe or a profile (mutual exclusivity constraint)
-
-### Recipe Linkage
-
-Recipes link to a water addition profile via `water_addition_profile_id` FK. Non-water additions (clarifiers, nutrients) remain recipe-specific in `recipe_additions` with `recipe_id` set.
-
-### Ownership Constraint
-
-Each `recipe_additions` row belongs to exactly one owner:
-```sql
-CHECK (
-  (recipe_id IS NOT NULL AND profile_id IS NULL) OR
-  (recipe_id IS NULL AND profile_id IS NOT NULL)
-)
-```
+The water-chemistry and non-water editors replace their own categories through `replace_recipe_additions_atomic`. Postgres resolves category membership from `additives.type`, locks the recipe version, and commits the delete/insert replacement as one transaction. A stale concurrent editor receives a conflict and keeps its local changes.
 
 ### Default Source Water
 

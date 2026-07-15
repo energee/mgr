@@ -46,6 +46,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FlaskConical, Pencil, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { unwrap } from "@/lib/supabase/query-helpers";
+import { replaceRecipeAdditions } from "@/services/recipe-additions-service";
 
 /** Water chemistry additive types */
 const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
@@ -132,6 +133,7 @@ const GAL_PER_BBL = 31.0;
 type RecipeAdditionsDisplayProps = {
   data: {
     id: string | null;
+    version?: number;
     water_profile_id?: string | null;
     target_water_profile_id?: string | null;
     mash_water_volume_gal?: number | null;
@@ -139,14 +141,40 @@ type RecipeAdditionsDisplayProps = {
     batch_size_bbl?: number | null;
     volume_bbl?: number | null;
   };
+  /** Keep an enclosing recipe editor's optimistic-lock version in sync. */
+  onVersionCommitted?: (version: number) => void;
 }
 
-export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
+export function RecipeAdditionsDisplay({
+  data,
+  onVersionCommitted,
+}: RecipeAdditionsDisplayProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
   const recipeId = data.id;
   const sourceWaterProfileId = data.water_profile_id;
   const targetWaterProfileId = data.target_water_profile_id;
+
+  // The estimates view used by the universal detail page does not expose
+  // recipes.version. Keep this projection on its own key so it cannot replace
+  // the full recipe detail cache with a partial row.
+  // Keep the recipe version query warm so recipeKeys.version stays populated for
+  // other consumers; the apply mutation itself reads the version fresh from the
+  // DB rather than trusting this cache (see applyMutation below).
+  useQuery({
+    queryKey: recipeKeys.version(recipeId!),
+    queryFn: async () => {
+      return await unwrap(
+        supabase
+          .from("recipes")
+          .select("version")
+          .eq("id", recipeId!)
+          .single()
+      ) as { version: number };
+    },
+    initialData: typeof data.version === "number" ? { version: data.version } : undefined,
+    enabled: !!recipeId,
+  });
 
   // Fetch recipe-specific additions
   const { data: additions, isLoading: additionsLoading } = useQuery({
@@ -240,7 +268,7 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
     [additions]
   );
 
-  // "Apply to Recipe" mutation: resolve additive IDs, insert recipe_additions rows
+  // "Apply to Recipe" mutation: replace only water chemistry in one transaction.
   const [applySuccess, setApplySuccess] = useState(false);
   const applyMutation = useMutation({
     mutationFn: async () => {
@@ -249,36 +277,43 @@ export function RecipeAdditionsDisplay({ data }: RecipeAdditionsDisplayProps) {
       const saltItems = mapSaltAdditionsToItems(calculatedAdditions, additiveCatalog);
       if (saltItems.length === 0) throw new Error("No salt additions to apply");
 
-      // Delete existing water_salt/acid additions for this recipe
-      const existingWaterIds = waterAdditions.map((a) => a.id);
-      if (existingWaterIds.length > 0) {
-        await unwrap(
-          supabase
-            .from("recipe_additions")
-            .delete()
-            .in("id", existingWaterIds)
-        );
+      // Read the recipe version FRESH from the database immediately before the
+      // atomic RPC. Do NOT trust the cached recipeKeys.version query: its
+      // initialData is only honored on first render and nothing invalidates the
+      // key when the version is bumped out-of-band (another recipe section save,
+      // the additions editor page, etc.), so the cached value goes stale and
+      // triggers spurious PT409 optimistic-lock conflicts. Reading latest then
+      // writing under the RPC's FOR UPDATE lock still catches genuine concurrent
+      // human edits (the RPC re-checks version under lock), it only removes the
+      // false positives from benign prior version bumps.
+      const { version: freshVersion } = await unwrap(
+        supabase.from("recipes").select("version").eq("id", recipeId).single()
+      ) as { version: number };
+      if (typeof freshVersion !== "number") {
+        throw new Error("Recipe version is not loaded");
       }
 
-      // Insert calculated salt additions
-      const insertData = saltItems.map((item, index) => ({
-        recipe_id: recipeId,
-        additive_id: item.additive_id,
-        amount: item.amount,
-        unit: item.unit,
-        timing: item.timing,
-        target: item.target,
-        position: index,
-      }));
-
-      await unwrap(
-        supabase
-          .from("recipe_additions")
-          .insert(insertData)
-      );
+      return replaceRecipeAdditions(supabase, {
+        recipeId,
+        expectedVersion: freshVersion,
+        scope: "water_chemistry",
+        items: saltItems,
+      });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: recipeKeys.additions(recipeId!) });
+    onSuccess: async ({ version }) => {
+      queryClient.setQueryData(recipeKeys.version(recipeId!), { version });
+      onVersionCommitted?.(version);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: recipeKeys.additions(recipeId!) }),
+        queryClient.invalidateQueries({
+          queryKey: recipeKeys.detail(recipeId!),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: entityKeys.detail("recipes_with_estimates", recipeId!),
+          exact: true,
+        }),
+      ]);
       setApplySuccess(true);
       setTimeout(() => setApplySuccess(false), 2000);
       toast.success("Salt additions applied to recipe");

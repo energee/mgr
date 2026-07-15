@@ -442,13 +442,12 @@ Users who collaborated on a recipe.
 
 ## `recipe_additions`
 
-Additive additions for recipes or water addition profiles: water salts, acids, clarifiers, nutrients, etc. Each row belongs to exactly one owner (recipe or profile), enforced by a mutual exclusivity constraint.
+Additive additions attached to recipes: water salts, acids, clarifiers, nutrients, etc. Water chemistry rows use additive types `water_salt` and `acid`; every other additive type is managed by the separate additions editor.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| recipe_id | UUID | FK to recipes (NULL if owned by profile) |
-| profile_id | UUID | FK to water_addition_profiles (NULL if owned by recipe) |
+| recipe_id | UUID | FK to recipes |
 | additive_id | UUID | FK to additives |
 | position | INTEGER | Sort order |
 | amount | DECIMAL(8,4) | Amount |
@@ -457,40 +456,15 @@ Additive additions for recipes or water addition profiles: water salts, acids, c
 | target | TEXT | Target (for water salts): mash, sparge, kettle |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
-**Ownership constraint:**
-```sql
--- Exactly one owner: recipe or profile
-CONSTRAINT recipe_additions_owner_check CHECK (
-  (recipe_id IS NOT NULL AND profile_id IS NULL) OR
-  (recipe_id IS NULL AND profile_id IS NOT NULL)
-)
-```
-
 **Usage patterns:**
-- **Recipe-specific additions** (clarifiers, nutrients): `recipe_id` is set, `profile_id` is NULL
-- **Water addition profile items** (salts, acids): `profile_id` is set, `recipe_id` is NULL
-- Recipes link to a profile via `recipes.water_addition_profile_id` FK
+- **Water chemistry:** additives whose catalog type is `water_salt` or `acid`
+- **Other additions:** clarifiers, nutrients, enzymes, antifoam, and other catalog types
+- `replace_recipe_additions_atomic` locks `recipes`, checks its optimistic-lock version, validates the requested category from `additives.type`, and replaces only that category in one transaction. `NULL` items omit the category; `[]` clears it.
+- The replacement predicate always requires the target `recipe_id`, so legacy ownerless rows and any profile-owned rows in historical databases are outside its mutation boundary.
 
 Water salt additions can be auto-calculated from the recipe's source and target water profiles, then applied via the "Apply to Recipe" button on the recipe detail page.
 
----
-
-## `water_addition_profiles`
-
-Named, reusable sets of water salt/acid additions. A profile's items are stored in `recipe_additions` with `profile_id` set. Recipes link to a profile via `water_addition_profile_id` FK.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| name | TEXT | Profile name (e.g., "Hoppy IPA Salts", "Pilsner Minerals") |
-| description | TEXT | Description |
-| is_active | BOOLEAN | Inactive profiles hidden from dropdowns |
-| created_at | TIMESTAMPTZ | Created timestamp |
-| updated_at | TIMESTAMPTZ | Updated timestamp |
-
-**Relationships:**
-- Has many `recipe_additions` (via `profile_id` FK, CASCADE delete)
-- Has many `recipes` (via `recipes.water_addition_profile_id` FK, SET NULL on delete)
+**Historical note:** `water_addition_profiles`, `recipe_additions.profile_id`, and `recipes.water_addition_profile_id` were removed from the deployed schema and their migration was removed during migration renumbering. Source and target water chemistry continue to use `water_profiles` through `recipes.water_profile_id` and `recipes.target_water_profile_id`.
 
 ---
 
