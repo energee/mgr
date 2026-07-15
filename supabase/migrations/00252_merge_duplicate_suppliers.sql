@@ -49,8 +49,18 @@ JOIN survivors v ON v.norm = s.norm
 WHERE s.id <> v.keep_id;
 
 -- 2. supplier_catalog has UNIQUE(supplier_id, catalog_type, catalog_id).
---    Drop loser rows that would collide with a survivor row, then repoint the
---    rest onto the survivor.
+--    Preserve a preferred designation from any colliding loser before dropping
+--    those rows, then repoint the rest onto the survivor.
+UPDATE supplier_catalog keep
+SET is_preferred = true
+FROM supplier_catalog loser
+JOIN supplier_merge_map m ON m.loser_id = loser.supplier_id
+WHERE keep.supplier_id = m.keep_id
+  AND keep.catalog_type = loser.catalog_type
+  AND keep.catalog_id = loser.catalog_id
+  AND loser.is_preferred IS TRUE
+  AND keep.is_preferred IS DISTINCT FROM true;
+
 DELETE FROM supplier_catalog sc
 USING supplier_merge_map m
 WHERE sc.supplier_id = m.loser_id
