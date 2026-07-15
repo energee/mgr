@@ -53,6 +53,15 @@
   - Documentation only — cannot enforce naming, protected-branch rules, dirty-tree protection, or canonical paths.
 - **Reversibility**: easy — existing worktrees remain standard Git worktrees and can be moved or recreated elsewhere.
 
+## 2026-07-15 — QuickBooks creates use durable request identities
+
+- **Decision**: Before creating a QuickBooks Invoice or Bill, persist the exact outbound payload in `qbo_sync_log` and send a deterministic, per-entity `requestid`. Treat mapping and log-write errors as sync failures; a known remote success with a failed local mapping is reported as requiring reconciliation and is retried with the same request identity.
+- **Why**: A QuickBooks POST and a Postgres mapping write cannot share a transaction. Intuit deduplicates repeated writes with the same request ID, so this closes both lost-response and remote-success/local-write-failure duplicate windows while retaining an operator-visible recovery record.
+- **Alternatives rejected**:
+  - Query by `DocNumber` before every create — document numbers are business-controlled and not a reliable unique request identity.
+  - Only propagate mapping-write errors — honest failure reporting alone would still let the retry create a second remote document.
+- **Reversibility**: easy — the intent uses the existing sync-log schema, and the request-ID behavior is isolated to the two transaction create paths.
+
 ## 2026-07-15 — Recipe Save All is one database transaction
 
 - **Decision**: The main recipe editor collects dirty parent fields and the six ingredient collections, then sends one version-checked `SECURITY INVOKER` RPC. Local dirty state and cache invalidation occur only after that transaction commits.
