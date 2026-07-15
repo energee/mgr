@@ -31,7 +31,8 @@ import { BatchBlendDialog } from "@/components/domain/batch/batch-blend-dialog";
 import { VesselTransferDialog } from "@/components/domain/batch/vessel-transfer-dialog";
 import { StartBrewDayDialog } from "@/components/domain/brew/start-brew-day-dialog";
 import { useBrewConsumptionFlow } from "@/components/domain/brew/use-brew-consumption-flow";
-import { runTransitionSideEffects } from "@/services/transition-side-effects";
+import { entityService } from "@/services/entity-service";
+import { formatServiceError } from "@/services/types";
 import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-batch-dialog";
 import { AddToPackagingSessionDialog } from "@/components/domain/packaging/add-to-packaging-session-dialog";
 import { BatchPackagingHistory } from "@/components/domain/batch/batch-packaging-history";
@@ -260,34 +261,18 @@ export function BatchDetailClient({ id }: { id: string }) {
   const completeBatch = useCallback(async () => {
     if (!batch) return;
     const client = createClient();
-    const { data: updated, error } = await client
-      .from("batches")
-      .update({ status: "completed" })
-      .eq("id", id)
-      .eq("status", batch.status)
-      .select("id");
-    if (error) {
-      toast.error(`Failed to complete batch: ${error.message}`);
-      return;
-    }
-    if (!updated || updated.length === 0) {
-      toast.error("Transition no longer valid — status may have changed");
+    const result = await entityService.transition(
+      client,
+      batchEntity,
+      id,
+      "completed"
+    );
+    if (!result.success) {
+      toast.error(`Failed to complete batch: ${formatServiceError(result.error)}`);
       queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
       return;
     }
-    const sideEffects = await runTransitionSideEffects(client, "batches", [id], "completed", queryClient);
-    if (sideEffects.error) {
-      toast.error(sideEffects.error);
-    } else {
-      const details: string[] = [];
-      if (sideEffects.completedAllocations > 0) {
-        details.push(`${sideEffects.completedAllocations} ingredient allocation${sideEffects.completedAllocations === 1 ? "" : "s"} confirmed`);
-      }
-      if (sideEffects.reconciledLossBbl > 0) {
-        details.push(`${sideEffects.reconciledLossBbl.toFixed(2)} bbl recorded as loss (packaged vs produced)`);
-      }
-      toast.success(details.length > 0 ? `Batch completed — ${details.join("; ")}` : "Batch completed");
-    }
+    toast.success("Batch completed");
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
     queryClient.invalidateQueries({ queryKey: batchKeys.all() });
   }, [id, queryClient, batch]);
@@ -358,12 +343,15 @@ export function BatchDetailClient({ id }: { id: string }) {
         label: "Yes, update",
         onClick: async () => {
           const client = createClient();
-          const { error } = await client
-            .from("batches")
-            .update({ status: toState })
-            .eq("id", id);
-          if (error) {
-            toast.error("Failed to update status");
+          if (!batch) return;
+          const result = await entityService.transition(
+            client,
+            batchEntity,
+            id,
+            toState
+          );
+          if (!result.success) {
+            toast.error(`Failed to update status: ${formatServiceError(result.error)}`);
           } else {
             queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
             toast.success(`Batch marked as ${stateLabel}`);
@@ -373,7 +361,7 @@ export function BatchDetailClient({ id }: { id: string }) {
       cancel: { label: "Not yet", onClick: () => {} },
       duration: 10000,
     });
-  }, [id, queryClient]);
+  }, [id, queryClient, batch]);
 
   return (
     <div className="space-y-4">

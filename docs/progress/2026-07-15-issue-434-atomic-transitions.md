@@ -1,0 +1,1 @@
+- **2026-07-15 (Atomic entity transitions).** Routed universal and custom state-transition entry points through a per-record PostgreSQL transaction that rolls status, inventory/accounting, vessel, and linked-order effects back together; added rollback/call-site regression coverage and documented the command boundary (issue #434).

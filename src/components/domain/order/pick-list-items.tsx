@@ -25,8 +25,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { entityKeys, pickListKeys } from "@/lib/query-keys";
-import { dynamicFrom } from "@/services/types";
-import { runTransitionSideEffects } from "@/services/transition-side-effects";
+import { dynamicFrom, formatServiceError } from "@/services/types";
+import { entityService } from "@/services/entity-service";
+import { pickListEntity } from "@/entities/pick-list";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -304,30 +305,16 @@ export function PickListItems({ data }: PickListItemsProps) {
   // parent order picking → packed and invalidate order caches.
   const completePickListMutation = useMutation({
     mutationFn: async () => {
-      const { data: updated, error } = await supabase
-        .from("pick_lists")
-        .update({ status: "completed" })
-        .eq("id", pickListId)
-        .eq("status", "in_progress")
-        .select("id");
-
-      if (error) throw error;
-      if (!updated || updated.length === 0)
-        throw new Error("Transition no longer valid — status may have changed");
-    },
-    onSuccess: async () => {
-      const sideEffects = await runTransitionSideEffects(
+      const result = await entityService.transition(
         supabase,
-        "pick_lists",
-        [pickListId],
-        "completed",
-        queryClient
+        pickListEntity,
+        pickListId,
+        "completed"
       );
-      if (sideEffects.error) {
-        toast.error(sideEffects.error);
-      } else {
-        toast.success("Pick list completed");
-      }
+      if (!result.success) throw new Error(formatServiceError(result.error));
+    },
+    onSuccess: () => {
+      toast.success("Pick list completed");
       // entityKeys cover the generic detail page (table + view) and lists;
       // pickListKeys cover the order-page pick list panels.
       queryClient.invalidateQueries({ queryKey: entityKeys.all("pick_lists") });

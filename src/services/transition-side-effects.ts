@@ -1,8 +1,14 @@
 /**
- * Transition Side Effects
+ * Legacy Transition Side-Effect Reference
  *
- * Central registry of side effects that must run after an entity state
- * transition succeeds, regardless of which UI path performed the UPDATE
+ * @deprecated Application callers must use entityService.transition, whose
+ * transition_entity_atomic RPC performs these effects in the same PostgreSQL
+ * transaction as the status change. This module is retained temporarily as a
+ * behavioral reference for parity tests; importing it from a runtime entry
+ * point would reintroduce issue #434.
+ *
+ * Historical registry of side effects that ran after an entity state
+ * transition succeeded, regardless of which UI path performed the UPDATE
  * (list-row action, kanban drag, mobile card menu, bulk action bar, detail
  * page dropdown, or a custom page handler). Before this module existed the
  * batch-completion effect was duplicated in only 2 of the 4 transition

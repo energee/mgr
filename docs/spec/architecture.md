@@ -277,6 +277,8 @@ Recipe ingredients, measurements, and schedules use JSONB arrays for flexibility
 Stateful entities use consistent state machine patterns defined in their respective domain docs.
 Transitions are enforced at **both** the client (TypeScript `StateMachineConfig` in `src/entities/`) and the server (PostgreSQL trigger `validate_state_transition()` reading from `get_state_transitions()`). The transition map in `get_state_transitions()` must stay in sync with the TypeScript configs. Tables with server-side enforcement: `batches`, `orders`, `purchase_orders`, `packaging_sessions`, `brew_logs`, `allocations`, `pick_lists`, `recipes`.
 
+All application transition entry points submit `transition_entity_atomic` through `entityService.transition`. The RPC locks and compares the current state, applies allowlisted pre-transition fields, changes status, and performs registered inventory/accounting/vessel/order effects in one PostgreSQL transaction. Bulk transitions are atomic per record: one record may roll back without undoing successful peers, and callers report the failed count. Do not reintroduce a client `UPDATE` followed by asynchronous side effects.
+
 ---
 
 ## Performance & Optimization
