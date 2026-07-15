@@ -21,9 +21,7 @@ import {
   AnimatedPackageCheck,
   AnimatedWarehouse,
   AnimatedBuilding2,
-  AnimatedCalendarClock,
   AnimatedArrowRightLeft,
-  AnimatedArrowLeft,
   AnimatedContainer,
   AnimatedBatches,
   AnimatedUpload,
@@ -78,8 +76,6 @@ export const navigation: NavSection[] = [
     label: "Production",
     icon: AnimatedFlask,
     items: [
-      { label: "Planning", href: "/production/planning", icon: AnimatedCalendarClock },
-      { label: "Backward Planning", href: "/production/planning/backward", icon: AnimatedArrowLeft },
       { label: "Batches", href: "/production/batches", icon: AnimatedBatches },
       { label: "Recipes", href: "/production/recipes", icon: AnimatedFileText },
       { label: "Cellar", href: "/production/cellar", icon: AnimatedWarehouse },

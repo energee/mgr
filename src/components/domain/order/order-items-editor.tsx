@@ -16,7 +16,7 @@
  *   keystroke); invalid input reverts to the saved value
  */
 
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
@@ -38,6 +38,7 @@ import {
   ComboboxAnchor,
   ComboboxContent,
   ComboboxEmpty,
+  ComboboxField,
   ComboboxInput,
   ComboboxItem,
   ComboboxTrigger,
@@ -105,58 +106,6 @@ const EMPTY_NEW_ITEM: NewItemState = {
   suggestedPrice: null,
   tierName: null,
 };
-
-type CatalogComboboxProps = {
-  value: string;
-  selectedLabel: string;
-  placeholder: string;
-  emptyText: string;
-  onValueChange: (value: string) => void;
-  onFilter: (values: string[], search: string) => string[];
-  children: ReactNode;
-};
-
-/**
- * Dice UI snapshots a selected item's label when the combobox mounts. Order
- * rows often arrive before their catalog queries, so an uncontrolled input
- * stays blank even after the matching brand/format/owner option appears.
- * Keep the searchable input controlled and resync it whenever that async
- * catalog label changes.
- */
-function CatalogCombobox({
-  value,
-  selectedLabel,
-  placeholder,
-  emptyText,
-  onValueChange,
-  onFilter,
-  children,
-}: CatalogComboboxProps) {
-  const [inputValue, setInputValue] = useState(selectedLabel);
-
-  useEffect(() => {
-    setInputValue(selectedLabel);
-  }, [selectedLabel]);
-
-  return (
-    <Combobox
-      value={value}
-      inputValue={inputValue}
-      onInputValueChange={setInputValue}
-      onValueChange={onValueChange}
-      onFilter={onFilter}
-    >
-      <ComboboxAnchor className="h-8">
-        <ComboboxInput className="h-8" placeholder={placeholder} />
-        <ComboboxTrigger />
-      </ComboboxAnchor>
-      <ComboboxContent>
-        <ComboboxEmpty>{emptyText}</ComboboxEmpty>
-        {children}
-      </ComboboxContent>
-    </Combobox>
-  );
-}
 
 // =============================================================================
 // Inventory Awareness Hooks
@@ -593,11 +542,13 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 {readOnly ? (
                   getBrandName(item.brand_id)
                 ) : (
-                  <CatalogCombobox
+                  <ComboboxField
                     value={item.brand_id || ""}
                     selectedLabel={item.brand_id ? (brandNameMap.get(item.brand_id) ?? "") : ""}
                     placeholder="Select brand"
                     emptyText="No brands found"
+                    anchorClassName="h-8"
+                    inputClassName="h-8"
                     onValueChange={(v) =>
                       updateItem.mutate({ id: item.id, field: "brand_id", value: v || null })
                     }
@@ -617,7 +568,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                         </span>
                       </ComboboxItem>
                     ))}
-                  </CatalogCombobox>
+                  </ComboboxField>
                 )}
               </TableCell>
               <TableCell>
@@ -630,11 +581,13 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   </span>
                 ) : (
                   <div className="space-y-1">
-                    <CatalogCombobox
+                    <ComboboxField
                       value={getFormatId(item)}
                       selectedLabel={getFormatName(item) === "—" ? "" : getFormatName(item)}
                       placeholder="Select format"
                       emptyText="No formats found"
+                      anchorClassName="h-8"
+                      inputClassName="h-8"
                       onValueChange={(v) => handleFormatChange(item.id, v)}
                       onFilter={(values, search) => {
                         const term = search.toLowerCase();
@@ -658,13 +611,15 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                           </span>
                         </ComboboxItem>
                       ))}
-                    </CatalogCombobox>
+                    </ComboboxField>
                     {kegFormatIds.has(item.selling_format_id ?? "") && (
-                      <CatalogCombobox
+                      <ComboboxField
                         value={item.keg_owner_id || ""}
                         selectedLabel={item.keg_owner_id ? (kegOwnerNameMap.get(item.keg_owner_id) ?? "") : ""}
                         placeholder="Keg owner (optional)"
                         emptyText="No owners found"
+                        anchorClassName="h-8"
+                        inputClassName="h-8"
                         onValueChange={(v) =>
                           updateItem.mutate({ id: item.id, field: "keg_owner_id", value: v || null })
                         }
@@ -678,7 +633,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                             {o.name}
                           </ComboboxItem>
                         ))}
-                      </CatalogCombobox>
+                      </ComboboxField>
                     )}
                   </div>
                 )}

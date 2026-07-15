@@ -41,15 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Combobox,
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxTrigger,
-} from "@/components/ui/combobox";
+import { ComboboxField, ComboboxItem } from "@/components/ui/combobox";
 import { Loader2, Lock, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { entityKeys, transferKeys } from "@/lib/query-keys";
@@ -486,8 +478,9 @@ export function TransferLinesEditor({
           {editable && showAddRow && (
             <TableRow>
               <TableCell>
-                <Combobox
+                <ComboboxField
                   value={selectedKey}
+                  selectedLabel={selectedItem?.name ?? ""}
                   onValueChange={setSelectedKey}
                   onFilter={(values, search) => {
                     const term = search.toLowerCase();
@@ -495,36 +488,28 @@ export function TransferLinesEditor({
                       sourceItemMap.get(v)?.name.toLowerCase().includes(term)
                     );
                   }}
+                  placeholder={
+                    sourceLoading ? "Loading bin contents..." : "Select item"
+                  }
+                  emptyText="No transferable stock in the source bin"
+                  anchorClassName="h-8"
+                  inputClassName="h-8"
                 >
-                  <ComboboxAnchor className="h-8">
-                    <ComboboxInput
-                      className="h-8"
-                      placeholder={
-                        sourceLoading ? "Loading bin contents..." : "Select item"
-                      }
-                    />
-                    <ComboboxTrigger />
-                  </ComboboxAnchor>
-                  <ComboboxContent>
-                    <ComboboxEmpty>
-                      No transferable stock in the source bin
-                    </ComboboxEmpty>
-                    {pickerItems.map((item) => (
-                      <ComboboxItem
-                        key={item.key}
-                        value={item.key}
-                        label={item.name}
-                      >
-                        <span className="flex items-center gap-2">
-                          {item.name}
-                          <Badge variant="secondary" className="text-xs">
-                            {item.available} on hand
-                          </Badge>
-                        </span>
-                      </ComboboxItem>
-                    ))}
-                  </ComboboxContent>
-                </Combobox>
+                  {pickerItems.map((item) => (
+                    <ComboboxItem
+                      key={item.key}
+                      value={item.key}
+                      label={item.name}
+                    >
+                      <span className="flex items-center gap-2">
+                        {item.name}
+                        <Badge variant="secondary" className="text-xs">
+                          {item.available} on hand
+                        </Badge>
+                      </span>
+                    </ComboboxItem>
+                  ))}
+                </ComboboxField>
               </TableCell>
               <TableCell className="text-right">
                 <Input

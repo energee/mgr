@@ -106,6 +106,7 @@ export function SessionLineItemsEditor({
     <BatchCell
       brandId={item.brand_id}
       currentBatchId={item.batch_id ?? ""}
+      currentBatchCode={item.batch_code}
       onSelect={(batchId) =>
         updateItem.mutate({ id: item.id, field: "batch_id", value: batchId })
       }

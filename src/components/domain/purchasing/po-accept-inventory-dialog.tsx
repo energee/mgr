@@ -55,22 +55,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Combobox,
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxTrigger,
-} from "@/components/ui/combobox";
+import { ComboboxField, ComboboxItem } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  PackageCheck,
-  AlertCircle,
-  AlertTriangle,
-  X,
-} from "lucide-react";
+import { PackageCheck, AlertCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { resolveCatalogNames } from "@/entities/po-line-item";
 import { unitsEquivalent } from "@/domain/inventory-units";
@@ -737,11 +724,11 @@ function ReceivedUnitNote({
 // =============================================================================
 
 /**
- * Table-cell-sized searchable Combobox. Like the universal framework's
- * RelationCombobox (field-input.tsx), it manages `inputValue` locally
- * because the diceui Combobox doesn't sync its display text when `value`
- * changes programmatically — which happens here when rows are prefilled
- * from prior mappings.
+ * Table-cell-sized searchable picker for table cells. Wraps the shared
+ * {@link ComboboxField} primitive, which owns the "control inputValue from
+ * the selected label" fix (the diceui Combobox doesn't sync its display text
+ * when `value` changes programmatically — which happens here when rows are
+ * prefilled from prior mappings).
  */
 function CellCombobox({
   value,
@@ -770,13 +757,6 @@ function CellCombobox({
   );
 
   const resolvedLabel = value ? (labelByValue.get(value) ?? "") : "";
-  const [inputText, setInputText] = useState(resolvedLabel);
-
-  // Sync display text when value or options change (e.g. prefill applied,
-  // options finish loading)
-  useEffect(() => {
-    setInputText(resolvedLabel);
-  }, [resolvedLabel]);
 
   const onFilter = useMemo(
     () => (values: string[], inputValue: string) => {
@@ -790,46 +770,27 @@ function CellCombobox({
   );
 
   return (
-    <Combobox
+    <ComboboxField
       value={value || undefined}
-      inputValue={inputText}
-      onInputValueChange={setInputText}
+      selectedLabel={resolvedLabel}
       onValueChange={(v) => onChange(v || "")}
       onFilter={onFilter}
+      placeholder={placeholder}
+      emptyText={emptyText}
+      anchorClassName={tall ? "h-10" : "h-8"}
+      inputClassName={tall ? "h-10" : "h-8"}
+      inputProps={{ "aria-label": ariaLabel }}
+      onClear={clearable ? () => onChange("") : undefined}
     >
-      <ComboboxAnchor className={tall ? "h-10" : "h-8"}>
-        <ComboboxInput
-          className={tall ? "h-10" : "h-8"}
-          placeholder={placeholder}
-          aria-label={ariaLabel}
-        />
-        {clearable && !!value && (
-          <button
-            type="button"
-            onClick={() => {
-              onChange("");
-              setInputText("");
-            }}
-            className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            aria-label="Clear selection"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
-        <ComboboxTrigger />
-      </ComboboxAnchor>
-      <ComboboxContent>
-        <ComboboxEmpty>{emptyText}</ComboboxEmpty>
-        {options.map((option) => (
-          <ComboboxItem
-            key={option.value}
-            value={option.value}
-            label={option.label}
-          >
-            {option.label}
-          </ComboboxItem>
-        ))}
-      </ComboboxContent>
-    </Combobox>
+      {options.map((option) => (
+        <ComboboxItem
+          key={option.value}
+          value={option.value}
+          label={option.label}
+        >
+          {option.label}
+        </ComboboxItem>
+      ))}
+    </ComboboxField>
   );
 }
