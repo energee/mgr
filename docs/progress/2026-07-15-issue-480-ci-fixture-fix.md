@@ -1,0 +1,1 @@
+- **2026-07-15 (Issue #480 CI fixture fix).** Updated the water-additions rejection test to model and verify both recipe-version reads required by the fresh-version atomic mutation flow, restoring deterministic shard coverage.

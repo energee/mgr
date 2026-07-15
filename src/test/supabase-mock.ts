@@ -38,6 +38,7 @@ const CHAIN_METHODS = [
   "gt",
   "single",
   "limit",
+  "order",
   "insert",
   "update",
 ] as const;
