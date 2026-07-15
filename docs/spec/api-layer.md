@@ -93,15 +93,15 @@ Only **batches** and **recipes** have full REST API routes. All other entities u
 | `/api/square/sync/inventory` | POST | `integrations:manage` | Push inventory to Square |
 | `/api/square/sync/status` | GET/POST | `integrations:manage` | Square status + toggle |
 | `/api/square/webhook` | POST | HMAC signature | Receive Square events |
-| `/api/integrations/quickbooks/auth` | GET | `withAuth` only | QBO OAuth URL |
-| `/api/integrations/quickbooks/callback` | GET | Manual auth | QBO OAuth callback |
-| `/api/integrations/quickbooks/disconnect` | POST | `withAuth` only | Revoke QBO tokens |
-| `/api/integrations/quickbooks/status` | GET/POST | `withAuth` only | QBO connection status |
-| `/api/integrations/quickbooks/accounts` | GET/PUT | `withAuth` only | QBO account mappings |
-| `/api/integrations/quickbooks/sync` | POST | `withAuth` only | Single entity sync |
-| `/api/integrations/quickbooks/sync/batch` | POST | `withAuth` only | Bulk entity sync |
-| `/api/integrations/quickbooks/sync/retry` | POST | `withAuth` only | Retry failed sync |
-| `/api/integrations/quickbooks/sync-log` | GET | `withAuth` only | Query sync log |
+| `/api/integrations/quickbooks/auth` | GET | `integrations:manage` | QBO OAuth URL; state bound to initiating user |
+| `/api/integrations/quickbooks/callback` | GET | Manual auth + `integrations:manage` | QBO OAuth callback; rechecks initiating identity and permission |
+| `/api/integrations/quickbooks/disconnect` | POST | `integrations:manage` | Revoke QBO tokens |
+| `/api/integrations/quickbooks/status` | GET/POST | `integrations:manage` | QBO connection status |
+| `/api/integrations/quickbooks/accounts` | GET/PUT | `integrations:manage` | QBO account mappings |
+| `/api/integrations/quickbooks/sync` | POST | `integrations:manage` | Single entity sync |
+| `/api/integrations/quickbooks/sync/batch` | POST | `integrations:manage` | Bulk entity sync |
+| `/api/integrations/quickbooks/sync/retry` | POST | `integrations:manage` | Retry failed sync |
+| `/api/integrations/quickbooks/sync-log` | GET | `integrations:manage` | Query sync log |
 
 ### System
 
@@ -114,23 +114,20 @@ Only **batches** and **recipes** have full REST API routes. All other entities u
 
 ## Known Inconsistencies
 
-### 1. QuickBooks routes lack permission checks
-All 10 QBO routes use `withAuth` (any logged-in user) while Square and Slack use `withPermission("integrations:manage")` (admin only). **Should be `integrations:manage`.**
-
-### 2. Non-standard error codes
+### 1. Non-standard error codes
 ~15 routes use error codes not in `ApiErrorCode`: `"BAD_REQUEST"`, `"INVALID_INPUT"`, `"DB_ERROR"`, `"INTEGRATION_DISABLED"`, `"SYNC_FAILED"`, `"CATALOG_SYNC_FAILED"`, `"CONFIGURATION_ERROR"`.
 
-### 3. Raw response format
+### 2. Raw response format
 ~10 routes return `NextResponse.json(...)` directly instead of `successResponse`/`errorResponse`. Clients see `{ hasKey, keyHint }` instead of `{ data: { hasKey, keyHint } }`.
 
 Affected: settings API key routes, Slack settings/test, chat route, dev route.
 
-### 4. Missing body validation
+### 3. Missing body validation
 ~12 routes skip `validateBody` for POST/PUT bodies, using `req.json()` with type assertions instead of Zod schemas.
 
-### 5. Manual auth (justified)
+### 4. Manual auth (justified)
 - Chat route: needs streaming response format, not `NextResponse`
-- QBO callback: OAuth redirect flow
+- QBO callback: OAuth redirect flow; manually enforces `integrations:manage`
 - Slack send: called by pg_net, uses shared secret
 - Square webhook: called by Square, uses HMAC
 

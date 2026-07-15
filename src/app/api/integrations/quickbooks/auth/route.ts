@@ -6,14 +6,14 @@
  */
 
 import { cookies } from "next/headers";
-import { withAuth } from "@/lib/api/auth";
+import { withPermission } from "@/lib/api/auth";
 import { errorResponse, successResponse } from "@/lib/api/response";
 import { getClientCredentials } from "@/integrations/quickbooks";
 
 const QBO_AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
 const SCOPES = "com.intuit.quickbooks.accounting";
 
-export const GET = withAuth(async (request) => {
+export const GET = withPermission("integrations:manage", async (request, { user }) => {
   const creds = await getClientCredentials();
   if (!creds) {
     return errorResponse(
@@ -37,6 +37,13 @@ export const GET = withAuth(async (request) => {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: 600, // 10 minutes
+    path: "/api/integrations/quickbooks",
+  });
+  cookieStore.set("qbo_oauth_initiator", user.id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 600, // Match the state cookie lifetime
     path: "/api/integrations/quickbooks",
   });
 

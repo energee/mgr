@@ -38,6 +38,46 @@ type PermissionHandler = (
   context: PermissionContext & { params?: Record<string, string> }
 ) => Promise<NextResponse>;
 
+/**
+ * Resolve and enforce a permission for an already-authenticated request.
+ *
+ * Most routes should use `withPermission`. Manual redirect handlers such as
+ * OAuth callbacks can call this helper to preserve their response semantics
+ * while sharing the same fail-closed role lookup and permission map.
+ */
+export async function requirePermission(
+  permission: Permission,
+  context: AuthContext,
+): Promise<PermissionContext> {
+  const { user, supabase } = context;
+
+  // Dynamic access: generated types may not include the `roles` column yet
+  const { data: profile, error } = await dynamicFrom(supabase, "user_profiles")
+    .select("roles")
+    .eq("id", user.id)
+    .single();
+
+  if (error || !profile) {
+    throw new ApiError("FORBIDDEN", "Unable to determine user roles", 403);
+  }
+
+  const roles = (profile.roles ?? []) as UserRole[];
+
+  if (!hasPermission(roles, permission)) {
+    throw new ApiError(
+      "FORBIDDEN",
+      `This action requires the ${permission} permission`,
+      403,
+    );
+  }
+
+  return {
+    ...context,
+    roles,
+    permissions: getPermissions(roles),
+  };
+}
+
 export function withAuth(handler: AuthHandler) {
   return async (
     request: NextRequest,
@@ -81,32 +121,6 @@ export function withPermission(
   handler: PermissionHandler,
 ) {
   return withAuth(async (request, context) => {
-    const { user, supabase } = context;
-
-    // Dynamic access: generated types may not include the `roles` column yet
-    const { data: profile, error } = await dynamicFrom(supabase, "user_profiles")
-      .select("roles")
-      .eq("id", user.id)
-      .single();
-
-    if (error || !profile) {
-      throw new ApiError("FORBIDDEN", "Unable to determine user roles", 403);
-    }
-
-    const roles = (profile.roles ?? []) as UserRole[];
-
-    if (!hasPermission(roles, permission)) {
-      throw new ApiError(
-        "FORBIDDEN",
-        `This action requires the ${permission} permission`,
-        403,
-      );
-    }
-
-    return handler(request, {
-      ...context,
-      roles,
-      permissions: getPermissions(roles),
-    });
+    return handler(request, await requirePermission(permission, context));
   });
 }
