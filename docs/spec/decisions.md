@@ -917,16 +917,28 @@ CSP header added to `next.config.ts` with the following directives:
 
 **Note:** `'unsafe-inline'` is required for Next.js compatibility. A future improvement would be nonce-based CSP via Next.js middleware, which would provide stronger XSS protection.
 
-### DEC-SEC-002: In-Memory Rate Limiter (Known Limitation)
-**Status**: RESOLVED/DOCUMENTED
+### DEC-SEC-002: Endpoint-Appropriate Cross-Instance Rate Limiting
+**Status**: Partially implemented
 
 The rate limiter in `src/lib/api/rate-limit.ts` uses a module-level `Map` that is per-instance and resets on every cold start. Under concurrent load on Vercel, the same IP can hit different serverless instances with independent buckets, effectively multiplying the per-window request allowance.
 
-**Affected endpoints:** `/api/chat` (paid Anthropic API calls), `/api/customers/[id]/invite` (sends emails), `/api/email/send` (sends emails).
+**Durable endpoint:** `/api/chat` uses the service-role-only
+`consume_ai_rate_limit` Postgres function and one fixed-window bucket per
+authenticated staff user. The function is the only bucket access boundary:
+direct table privileges are revoked even from `service_role`, while its
+service-role-only `SECURITY DEFINER` execution bypasses RLS consistently.
+Atomic upsert semantics provide a single 10/minute allowance across serverless
+instances. The limiter runs after `ai:use` authorization and before either the
+personal or brewery Anthropic key is read.
 
-**Current mitigation:** The in-memory limiter still provides best-effort protection against burst abuse from a single client within a single instance. Combined with admin-only restrictions on `/api/email/send` and auth requirements on all endpoints, the risk is bounded.
+**Remaining affected endpoints:** `/api/customers/[id]/invite` (sends emails)
+and `/api/email/send` (sends emails) retain the module-level, per-instance
+limiter. It provides best-effort burst protection, while the endpoints'
+authorization gates bound access.
 
-**Production-grade solution:** Replace with Redis or [Upstash Rate Limit](https://github.com/upstash/ratelimit) for cross-instance, durable rate limiting. This is the recommended upgrade path when the app moves to production traffic levels.
+**Future solution:** Move the remaining email-related endpoints to a durable
+database bucket or a managed cross-instance limiter such as Redis/Upstash when
+their traffic and retry semantics justify it.
 
 ---
 

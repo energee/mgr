@@ -25,6 +25,13 @@ The chat API resolves the Anthropic API key in this order:
 
 If neither is configured, the chat returns a 400 error prompting the user to add a key in Settings.
 
+The route requires the `ai:use` permission, which is granted to every staff
+role and never to the customer-portal role. Authorization completes before a
+service-role client is created or the system key is read. Each authorized user
+also has a durable 10-request-per-minute Postgres bucket shared across all app
+instances. Chat tools continue to use the caller's Supabase client, so normal
+RLS applies to every brewery-data query.
+
 ### Page Context Awareness
 
 The chat panel sends the current page context (section, entity type, entity ID) with each request. The system prompt is augmented with this context so the assistant knows what the user is looking at:
