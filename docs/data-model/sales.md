@@ -552,6 +552,32 @@ Successful sync records for deduplication and audit.
 
 ---
 
+## `square_draft_sales`
+
+Draft-pour rows staged by the Square payment webhook before inventory and TTB
+reconciliation. The canonical packaging reference is `selling_format_id`;
+the legacy required `keg_type_id` column was retired by migration 00254.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| square_order_id | TEXT | Square order ID used for traceability and deduplication |
+| square_payment_id | TEXT | Associated Square payment ID, when present |
+| brand_id | UUID | FK to `brands` |
+| selling_format_id | UUID | FK to `selling_formats`; nullable only for historical rows predating format mapping |
+| quantity | INTEGER | Number of pours sold |
+| volume_oz | NUMERIC(10,2) | Total staged draft volume in fluid ounces |
+| unit_price_cents | INTEGER | Price per pour in cents, when present |
+| location_id | UUID | FK to the MGR `locations` row resolved from the Square POS bin |
+| sold_at | TIMESTAMPTZ | Square sale timestamp |
+| voided_at | TIMESTAMPTZ | Full-refund marker; voided rows are not reconciled |
+| reconciled_at | TIMESTAMPTZ | When the staged pour was converted into TTB-removal allocations |
+| created_at | TIMESTAMPTZ | Created timestamp |
+
+**Deduplication index:** `(square_order_id, brand_id, selling_format_id)`.
+
+---
+
 ## `square_sync_errors`
 
 Failed/skipped items for manual review.

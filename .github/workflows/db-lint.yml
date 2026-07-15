@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - "supabase/migrations/**/*.sql"
+      - "supabase/config.toml"
       - "supabase/functions/**"
       - "src/__tests__/integration/**"
+      - "scripts/migration-dry-run.sh"
       - "scripts/live-catalog.sql"
       - "vitest.integration.config.ts"
       - "package.json"
@@ -15,8 +17,10 @@ on:
     branches: [main]
     paths:
       - "supabase/migrations/**/*.sql"
+      - "supabase/config.toml"
       - "supabase/functions/**"
       - "src/__tests__/integration/**"
+      - "scripts/migration-dry-run.sh"
       - "scripts/live-catalog.sql"
       - "vitest.integration.config.ts"
       - "package.json"
@@ -31,6 +35,22 @@ permissions:
   contents: read
 
 jobs:
+  supabase-reset:
+    name: Fresh Supabase Migration Replay
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: "2.109.1"
+
+      - name: Replay migrations in real local Supabase
+        run: make db-dry-run
+
   db-lint:
     name: Database Lint and Integration Tests
     runs-on: ubuntu-latest

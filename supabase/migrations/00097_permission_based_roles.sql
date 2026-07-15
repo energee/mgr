@@ -241,18 +241,26 @@ DROP POLICY IF EXISTS "Authenticated users can insert slack log" ON slack_notifi
 DROP POLICY IF EXISTS "Authenticated users can update slack log" ON slack_notification_log;
 
 -- Integrations (QBO)
-DROP POLICY IF EXISTS qbo_account_mappings_select ON qbo_account_mappings;
-DROP POLICY IF EXISTS qbo_account_mappings_insert ON qbo_account_mappings;
-DROP POLICY IF EXISTS qbo_account_mappings_update ON qbo_account_mappings;
-DROP POLICY IF EXISTS qbo_account_mappings_delete ON qbo_account_mappings;
-DROP POLICY IF EXISTS qbo_sync_log_select ON qbo_sync_log;
-DROP POLICY IF EXISTS qbo_sync_log_insert ON qbo_sync_log;
-DROP POLICY IF EXISTS qbo_sync_log_update ON qbo_sync_log;
-DROP POLICY IF EXISTS qbo_sync_log_delete ON qbo_sync_log;
-DROP POLICY IF EXISTS qbo_sync_mappings_select ON qbo_sync_mappings;
-DROP POLICY IF EXISTS qbo_sync_mappings_insert ON qbo_sync_mappings;
-DROP POLICY IF EXISTS qbo_sync_mappings_update ON qbo_sync_mappings;
-DROP POLICY IF EXISTS qbo_sync_mappings_delete ON qbo_sync_mappings;
+-- The qbo_* tables are introduced by 00099. A real Supabase reset rejects
+-- DROP POLICY ... ON a relation that does not exist yet even with IF EXISTS,
+-- so guard the historical pre-creation cleanup just like Section 5i below.
+DO $$ DECLARE _tbl TEXT; _operation TEXT; BEGIN
+  FOREACH _tbl IN ARRAY ARRAY[
+    'qbo_account_mappings','qbo_sync_log','qbo_sync_mappings'
+  ] LOOP
+    IF to_regclass('public.'||_tbl) IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    FOREACH _operation IN ARRAY ARRAY['select','insert','update','delete'] LOOP
+      EXECUTE format(
+        'DROP POLICY IF EXISTS %I ON %I',
+        _tbl||'_'||_operation,
+        _tbl
+      );
+    END LOOP;
+  END LOOP;
+END $$;
 
 -- System settings (keep system_settings_hide_sensitive RESTRICTIVE)
 DROP POLICY IF EXISTS system_settings_select ON system_settings;

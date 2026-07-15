@@ -17,9 +17,9 @@
 -- 0. DRIFT SHIM (added retroactively — see PR #322)
 -- -----------------------------------------------------------------------------
 -- selling_format_id was added to these pre-existing tables directly in the
--- live DB (no migration captured the ALTERs; the selling_formats table itself
--- is out-of-band drift — see 00199). This file and later ones assume the
--- column exists. FK actions mirror live. No-op on live.
+-- live DB (no migration captured the ALTERs). Migration 00112 now establishes
+-- the lost selling_formats/containers foundation before this first reference;
+-- 00199 later converges it to the captured live shape. FK actions mirror live.
 ALTER TABLE order_items        ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
 ALTER TABLE finished_goods     ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
 ALTER TABLE keg_transactions   ADD COLUMN IF NOT EXISTS selling_format_id UUID REFERENCES selling_formats(id) ON DELETE SET NULL;
