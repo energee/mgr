@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => {
     user: { id: "user-1" } as { id: string } | null,
     authError: null as Error | null,
     roles: ["viewer"] as string[],
+    status: "active",
     profileError: null as Error | null,
   };
 
@@ -22,7 +23,9 @@ const mocks = vi.hoisted(() => {
     error: session.authError,
   }));
   const profileSingle = vi.fn(async () => ({
-    data: session.profileError ? null : { roles: session.roles },
+    data: session.profileError
+      ? null
+      : { roles: session.roles, status: session.status },
     error: session.profileError,
   }));
   const profileEq = vi.fn(() => ({ single: profileSingle }));
@@ -149,6 +152,7 @@ beforeEach(() => {
   mocks.session.user = { id: "user-1" };
   mocks.session.authError = null;
   mocks.session.roles = ["viewer"];
+  mocks.session.status = "active";
   mocks.session.profileError = null;
   mocks.cookieValues.clear();
 });

@@ -565,6 +565,28 @@ Multi-role permission system with defense-in-depth enforcement:
 
 See `docs/spec/auth.md` for the full permission matrix.
 
+### DEC-SEC-008: Active Profile Is an Authorization Prerequisite
+
+**Status:** Enforced
+**Date:** 2026-07-15
+
+A valid Supabase JWT and an authorized role are both insufficient unless the
+caller's matching `user_profiles` row exists with `status = 'active'`.
+`pending`, `inactive`, missing, and unreadable profiles fail closed across the
+staff and portal layouts, API wrappers, permission helpers, and authenticated
+RLS policies. Every public RLS table carries a restrictive enabled-user policy
+so permissive customer or legacy policies cannot bypass account revocation.
+
+Account status and role changes are not self-service profile writes.
+Status changes use a durable per-user database fence so concurrent commands
+cannot interleave across Supabase Auth. Deactivation claims and persists the
+database denial before banning the Auth user; reactivation claims without
+opening RLS, unbans Auth, then enables the profile while releasing the fence.
+A failed enable re-bans as compensation. Fences do not automatically expire,
+because a paused old process must never resume after a newer opposite command.
+This ordering makes an old JWT lose database access immediately and keeps
+known partial failures safely retryable.
+
 ### Automated Security Checks
 
 The project includes CI checks that run `supabase db lint` on every PR. All ERROR-level findings must be resolved before merging.

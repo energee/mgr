@@ -24,6 +24,21 @@ export default async function PortalLayout({
     redirect("/portal/login");
   }
 
+  // Portal sessions are subject to the same account-status revocation as
+  // staff sessions. Check before customer-link reads or service-role fallback
+  // work so a disabled old JWT cannot trigger any downstream effect.
+  const { data: profile, error: profileError } = await dynamicFrom(
+    supabase,
+    "user_profiles",
+  )
+    .select("status")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || profile?.status !== "active") {
+    redirect("/portal/login?error=account_disabled");
+  }
+
   // Find linked customers via junction table
   const { data: links } = await dynamicFrom(supabase, "customer_portal_users")
     .select("customer_id, customers(id, name, email)")

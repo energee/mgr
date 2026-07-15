@@ -33,6 +33,25 @@ export type PermissionContext = AuthContext & {
   permissions: Permission[];
 }
 
+/**
+ * Enforce the database-backed account-status contract for a valid session.
+ * A JWT may remain valid until expiry after deactivation, so missing,
+ * pending, inactive, and unreadable profiles all fail closed here.
+ */
+export async function requireEnabledUser(context: AuthContext): Promise<void> {
+  const { data: profile, error } = await dynamicFrom(
+    context.supabase,
+    "user_profiles",
+  )
+    .select("status")
+    .eq("id", context.user.id)
+    .single();
+
+  if (error || profile?.status !== "active") {
+    throw new ApiError("FORBIDDEN", "This account is not active", 403);
+  }
+}
+
 type PermissionHandler = (
   request: NextRequest,
   context: PermissionContext & { params?: Record<string, string> }
@@ -51,14 +70,16 @@ export async function requirePermission(
 ): Promise<PermissionContext> {
   const { user, supabase } = context;
 
-  // Dynamic access: generated types may not include the `roles` column yet
+  // Dynamic access: generated types may not include the `roles` column yet.
+  // Include status because OAuth callbacks call this helper directly rather
+  // than entering through withAuth first.
   const { data: profile, error } = await dynamicFrom(supabase, "user_profiles")
-    .select("roles")
+    .select("roles, status")
     .eq("id", user.id)
     .single();
 
-  if (error || !profile) {
-    throw new ApiError("FORBIDDEN", "Unable to determine user roles", 403);
+  if (error || !profile || profile.status !== "active") {
+    throw new ApiError("FORBIDDEN", "This account is not active", 403);
   }
 
   const roles = (profile.roles ?? []) as UserRole[];
@@ -98,6 +119,11 @@ export function withAuth(handler: AuthHandler) {
           401
         );
       }
+
+      // Auth bans prevent refresh and future sign-in, but already-issued JWTs
+      // remain valid until expiry. Recheck the profile on every shared API
+      // boundary so those old tokens cannot reach the handler.
+      await requireEnabledUser({ user, supabase });
 
       const params = routeContext?.params
         ? await routeContext.params
