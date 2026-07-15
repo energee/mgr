@@ -1,0 +1,1 @@
+- **2026-07-15 (Atomic Square ingestion).** Moved Square sale/refund claims, FIFO allocations and reversals, bin movements, draft mutations, and sync-log finalization into service-role-only transactional RPCs; added route contract tests plus real-Postgres rollback, concurrency, validation, and idempotency coverage for #443.
