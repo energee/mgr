@@ -559,7 +559,7 @@ finalized inside the same transaction as their inventory effects.
 | location_id | UUID | FK to the resolved MGR location, when applicable |
 | items_synced | INTEGER | Number of items successfully processed |
 | items_failed | INTEGER | Number of deterministic item failures requiring review |
-| details | JSONB | Order/refund identifiers, errors, warnings, reversals, and manual-reconciliation flags |
+| details | JSONB | Order/refund identifiers, errors, warnings, reversals, cumulative refund sizing, and manual-reconciliation flags |
 | started_at | TIMESTAMPTZ | Claim/sync start timestamp |
 | completed_at | TIMESTAMPTZ | Completion timestamp; null only for an unfinished legacy/in-flight operation |
 | created_at | TIMESTAMPTZ | Row creation timestamp |
@@ -572,8 +572,11 @@ finalized inside the same transaction as their inventory effects.
   lines, locks finished goods then bin rows in canonical order, records FIFO TTB
   allocations or draft rows, debits physical inventory, and finalizes the log.
 - `ingest_square_refund_atomic(...)` serializes with the order's sale/refunds,
-  writes inverse adjustment allocations, credits bins, voids full-refund draft
-  rows, and finalizes the refund claim.
+  totals completed refund amounts, calculates the cumulative target reversal
+  for each original sale allocation, and writes only the unreversed delta. It
+  credits bins, voids draft rows once cumulative refunds cover the order, and
+  finalizes the refund claim. Cumulative targeting means rounding happens once
+  across the refund history rather than once per event.
 
 Both functions are `SECURITY INVOKER`, executable only by `service_role`, and
 run as one PostgreSQL statement/transaction. Unexpected errors roll back the

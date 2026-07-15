@@ -608,6 +608,61 @@ describe("atomic Square refund ingestion", () => {
     });
   });
 
+  it("catches up cumulative rounding across sequential partial refunds", async () => {
+    await withTransaction(async (db) => {
+      const suffix = randomUUID();
+      const fixture = await createFixture(db, suffix);
+      const orderId = `sequential-refund-order-${suffix}`;
+      await ingestSale(db, fixture, orderId, `sequential-sale-${suffix}`, true);
+
+      const first = await ingestRefund(
+        db,
+        fixture,
+        orderId,
+        `sequential-refund-a-${suffix}`,
+        1250,
+        2500,
+      );
+      const second = await ingestRefund(
+        db,
+        fixture,
+        orderId,
+        `sequential-refund-b-${suffix}`,
+        1250,
+        2500,
+      );
+
+      expect(first).toMatchObject({ kind: "processed", items_failed: 0 });
+      expect(second).toMatchObject({ kind: "processed", items_failed: 0 });
+      expect(await readEffects(db, fixture, orderId)).toMatchObject({
+        binQuantity: 20,
+        draftRows: [{ voided_at: expect.any(Date) }],
+        reversalCount: 2,
+        saleCount: 1,
+      });
+
+      const { rows } = await db.query<{ quantity: number }>(
+        `SELECT quantity::integer AS quantity
+         FROM allocations
+         WHERE notes LIKE $1 AND destination_type = 'adjustment'
+         ORDER BY completed_at, notes`,
+        [`Square refund % of order ${orderId}`],
+      );
+      expect(rows).toEqual([{ quantity: -1 }, { quantity: -2 }]);
+
+      const { rows: logs } = await db.query<{ details: Record<string, unknown> }>(
+        `SELECT details FROM square_sync_log WHERE square_payment_id = $1`,
+        [`sequential-refund-b-${suffix}`],
+      );
+      expect(logs[0]!.details).toMatchObject({
+        atomic_version: 2,
+        cumulative_full: true,
+        cumulative_refund_amount: 2500,
+        prior_refund_amount: 1250,
+      });
+    });
+  });
+
   it("rolls reversal, bin credit, draft void, and refund claim back together", async () => {
     await withTransaction(async (db) => {
       const suffix = randomUUID();
