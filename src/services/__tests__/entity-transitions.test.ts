@@ -60,10 +60,19 @@ function createMockSupabase(
     : createMockBuilder({ data: null, error: null });
 
   const client = {
+    rpc: vi.fn().mockResolvedValue(
+      updateResult
+        ? {
+            data: updateResult.data == null ? null : { record: updateResult.data },
+            error: updateResult.error,
+          }
+        : { data: null, error: null }
+    ),
     from: vi.fn(() => {
       callCount++;
       // First .from() call is the SELECT (fetch current state)
-      // Second .from() call is the UPDATE (apply transition)
+      // A second builder is retained to prove the service never performs a
+      // direct UPDATE outside the transactional RPC.
       return callCount === 1 ? selectBuilder : updateBuilder;
     }),
   } as unknown as SupabaseClient<Database>;
@@ -120,7 +129,7 @@ describe("Entity State Transitions", () => {
     });
 
     it("allows packaging -> completed", async () => {
-      const { client } = createMockSupabase(
+      const { client, updateBuilder } = createMockSupabase(
         { data: { status: "packaging" }, error: null },
         { data: { id: TEST_ID, status: "completed" }, error: null }
       );
@@ -128,6 +137,53 @@ describe("Entity State Transitions", () => {
       const result = await entityService.transition(client, batchEntity, TEST_ID, "completed");
 
       expect(result.success).toBe(true);
+      expect(client.rpc).toHaveBeenCalledWith("transition_entity_atomic", {
+        p_table_name: "batches",
+        p_id: TEST_ID,
+        p_from_state: "packaging",
+        p_to_state: "completed",
+        p_extra_fields: {},
+      });
+      expect(updateBuilder.update).not.toHaveBeenCalled();
+    });
+
+    it("sends pre-transition fields inside the atomic command", async () => {
+      const { client } = createMockSupabase(
+        { data: { status: "packaging" }, error: null },
+        { data: { id: TEST_ID, status: "completed", actual_fg: 1.012 }, error: null }
+      );
+
+      const result = await entityService.transition(
+        client,
+        batchEntity,
+        TEST_ID,
+        "completed",
+        { actual_fg: 1.012 }
+      );
+
+      expect(result.success).toBe(true);
+      expect(client.rpc).toHaveBeenCalledWith(
+        "transition_entity_atomic",
+        expect.objectContaining({ p_extra_fields: { actual_fg: 1.012 } })
+      );
+    });
+
+    it("does not commit completion when the transactional transition command fails", async () => {
+      const { client, updateBuilder } = createMockSupabase(
+        { data: { status: "packaging" }, error: null },
+        { data: { id: TEST_ID, status: "completed" }, error: null }
+      );
+      const rpc = vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "P0001", message: "ingredient consumption failed" },
+      });
+      Object.assign(client, { rpc });
+
+      const result = await entityService.transition(client, batchEntity, TEST_ID, "completed");
+
+      expect(result.success).toBe(false);
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(updateBuilder.update).not.toHaveBeenCalled();
     });
 
     it("rejects planned -> completed (skip states)", async () => {

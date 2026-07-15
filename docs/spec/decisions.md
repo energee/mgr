@@ -507,6 +507,15 @@ deactivated_by  UUID REFERENCES users(id)
 - Packaging session with shipped FGs
 - Order with status `fulfilled` or later
 
+### DEC-GAP-011: Atomic State Transition Commands
+**Status**: Implemented (migration 00256)
+
+Entity state changes with inventory, fulfillment, vessel, or accounting effects use one `transition_entity_atomic` PostgreSQL command. The command retains the server transition map and optimistic state comparison, accepts only table-specific allowlisted transition fields, and rolls back status when a critical effect fails. Idempotency/status guards make timeout retries safe.
+
+Bulk operations use **per-record atomicity**. Each selected record invokes the command independently, so a bad record does not roll back unrelated successful records; the UI reports partial failure counts and refreshes the affected caches.
+
+**Rationale**: A committed terminal status is operationally false when its inventory or accounting work failed. A database transaction is the only boundary shared by every client and route entry point.
+
 ---
 
 ## Redundancy Resolutions

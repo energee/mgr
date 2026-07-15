@@ -29,7 +29,7 @@
  *    so planned brew-day ingredient allocations are depleted.
  */
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -60,10 +60,6 @@ import {
   inventoryKeys,
   materialPlanningKeys,
 } from "@/lib/query-keys";
-import {
-  consumePackagingMaterials,
-  type PackagingDepletionLineItem,
-} from "@/services/consumption-service";
 import { computePackagingLoss, computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
 import {
   packagingBatchCandidates,
@@ -73,10 +69,11 @@ import {
   type SourceBatchCandidate,
   type GravityLogLike,
 } from "@/domain/packaging-completion";
-import { runTransitionSideEffects } from "@/services/transition-side-effects";
+import { entityService } from "@/services/entity-service";
+import { batchEntity } from "@/entities/batch";
+import { packagingSessionEntity } from "@/entities/packaging-session";
 import { RecordLossDialog } from "@/components/domain/shared/record-loss-dialog";
 import { formatServiceError } from "@/services/types";
-import { parsePostgresError } from "@/lib/errors";
 import { log } from "@/lib/client-logger";
 
 type ReviewLineItem = {
@@ -209,38 +206,22 @@ async function completeSourceBatch(
   suggestion: { actual_fg?: number; actual_abv?: number }
 ) {
   const { batchId, batchCode } = candidate;
-  const { data: updated, error } = await supabase
-    .from("batches")
-    .update({ status: "completed", ...suggestion })
-    .eq("id", batchId)
-    .eq("status", "packaging")
-    .select("id");
+  const result = await entityService.transition(
+    supabase,
+    batchEntity,
+    batchId,
+    "completed",
+    suggestion
+  );
 
-  if (error) {
-    toast.error(`Failed to complete batch ${batchCode}: ${parsePostgresError(error)}`);
-    return;
-  }
-  if (!updated || updated.length === 0) {
-    toast.info(`Batch ${batchCode} was not completed — its status already changed`);
+  if (!result.success) {
+    toast.error(
+      `Failed to complete batch ${batchCode}: ${formatServiceError(result.error)}`
+    );
     queryClient.invalidateQueries({ queryKey: batchKeys.detail(batchId) });
     return;
   }
-
-  const sideEffects = await runTransitionSideEffects(
-    supabase,
-    "batches",
-    [batchId],
-    "completed"
-  );
-  if (sideEffects.error) {
-    toast.error(sideEffects.error);
-  } else if (sideEffects.completedAllocations > 0) {
-    toast.success(
-      `Batch ${batchCode} completed — ${sideEffects.completedAllocations} ingredient allocation${sideEffects.completedAllocations === 1 ? "" : "s"} confirmed`
-    );
-  } else {
-    toast.success(`Batch ${batchCode} completed`);
-  }
+  toast.success(`Batch ${batchCode} completed`);
   queryClient.invalidateQueries({ queryKey: batchKeys.detail(batchId) });
   // batchKeys.all() === ["batches"] also covers entityKeys.all("batches"),
   // so universal list/table caches refresh too (batch leaves active filters).
@@ -259,10 +240,6 @@ export function PackagingCompletionReview({
   const [notes, setNotes] = useState("");
   // Implied-loss prompts queued before completion. null = not computed yet.
   const [lossQueue, setLossQueue] = useState<LossPrompt[] | null>(null);
-  // Line items fetched by the loss check, reused by consumePackagingMaterials
-  // so the service doesn't re-fetch the same rows. null when the loss check
-  // failed (the service then falls back to fetching them itself).
-  const lineItemsRef = useRef<PackagingDepletionLineItem[] | null>(null);
 
   const missingActualCount = items.filter(
     (item) => item.actual_quantity == null
@@ -280,27 +257,16 @@ export function PackagingCompletionReview({
   // Step 2+3: flip status (trigger creates FGs), then deplete materials.
   const completeMutation = useMutation({
     mutationFn: async () => {
-      const updates: Record<string, unknown> = { status: "completed" };
-      if (notes.trim()) {
-        updates.notes = notes.trim();
-      }
-      const { error } = await supabase
-        .from("packaging_sessions")
-        .update(updates)
-        .eq("id", sessionId);
-      if (error) throw error;
-
-      // Material depletion (9.2). The session is already completed at this
-      // point — depletion failures are surfaced but do not roll it back.
-      // Reuses the loss check's line-item rows when available.
-      const depletion = await consumePackagingMaterials(
+      const result = await entityService.transition(
         supabase,
+        packagingSessionEntity,
         sessionId,
-        lineItemsRef.current ?? undefined,
+        "completed",
+        notes.trim() ? { notes: notes.trim() } : {}
       );
-      return depletion;
+      if (!result.success) throw new Error(formatServiceError(result.error));
     },
-    onSuccess: (depletion) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: entityKeys.detail("packaging_sessions", sessionId),
       });
@@ -316,20 +282,6 @@ export function PackagingCompletionReview({
         queryKey: materialPlanningKeys.sessionMaterials(sessionId),
       });
       toast.success("Packaging session completed");
-      if (!depletion.success) {
-        log.error("Packaging material depletion failed:", depletion.error);
-        toast.warning(
-          `Material depletion failed: ${formatServiceError(depletion.error)}`
-        );
-      } else if (depletion.data.shortfalls.length > 0) {
-        toast.warning(
-          `${depletion.data.shortfalls.length} material${depletion.data.shortfalls.length === 1 ? "" : "s"} had insufficient lot inventory — partial depletion recorded`
-        );
-      } else if (depletion.data.allocations_inserted > 0) {
-        toast.success(
-          `${depletion.data.allocations_inserted} material allocation${depletion.data.allocations_inserted === 1 ? "" : "s"} recorded`
-        );
-      }
       // Step 4: per-batch completion suggestions. Fire-and-forget — the
       // toasts are global, so they outlive this dialog's unmount and the
       // day view's navigation to the completed-session page.
@@ -348,10 +300,7 @@ export function PackagingCompletionReview({
   // completion (this dialog unmounts once the session status flips).
   const lossCheckMutation = useMutation({
     mutationFn: async (): Promise<LossPrompt[]> => {
-      lineItemsRef.current = null;
-      // Selects the union of what the loss math needs and what
-      // consumePackagingMaterials needs (selling_format_id), so the rows
-      // can be passed through and the service skips its own fetch.
+      // Fetch the rows used by the loss math before the completion command.
       const { data, error } = await supabase
         .from("session_line_items")
         .select(
@@ -375,12 +324,6 @@ export function PackagingCompletionReview({
         } | null;
       };
       const rows = (data ?? []) as unknown as LossRow[];
-      lineItemsRef.current = rows.map((row) => ({
-        selling_format_id: row.selling_format_id,
-        actual_quantity: row.actual_quantity,
-        batch_id: row.batch_id,
-      }));
-
       const codeByBatch = new Map<string, string>();
       const lossLines = rows.map((row) => {
         // Shared domain math — includes the volume_oz fallback, so can/bottle

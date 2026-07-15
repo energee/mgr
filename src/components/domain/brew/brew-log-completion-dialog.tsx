@@ -13,7 +13,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicFrom, dynamicRpc } from "@/services/types";
+import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
+import { entityService } from "@/services/entity-service";
+import { batchEntity } from "@/entities/batch";
+import { brewLogEntity } from "@/entities/brew-log";
 import {
   brewLogKeys,
   entityKeys,
@@ -305,21 +308,28 @@ export function BrewLogCompletionDialog({
             })
           );
         } else if (batch.current_vessel_id) {
-          // Vessel already assigned; just update batch status to fermenting
-          await unwrap(
-            dynamicFrom(supabase, "batches")
-              .update({ status: "fermenting" })
-              .eq("id", batch.id)
+          const transition = await entityService.transition(
+            supabase,
+            batchEntity,
+            batch.id,
+            "fermenting"
           );
+          if (!transition.success) {
+            throw new Error(formatServiceError(transition.error));
+          }
         }
       }
 
       // Mark brew log as completed
-      await unwrap(
-        dynamicFrom(supabase, "brew_logs")
-          .update({ status: "completed" })
-          .eq("id", brewLogId)
+      const transition = await entityService.transition(
+        supabase,
+        brewLogEntity,
+        brewLogId,
+        "completed"
       );
+      if (!transition.success) {
+        throw new Error(formatServiceError(transition.error));
+      }
 
       // Invalidate caches
       queryClient.invalidateQueries({ queryKey: brewLogKeys.all() });
