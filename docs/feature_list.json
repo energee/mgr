@@ -4,7 +4,7 @@
   "wip_rule": {
     "rule": "WIP=1 per branch",
     "description": "At most one feature may be in `in_progress` per git branch. Multiple worktrees can each have one in-flight feature.",
-    "enforcement": "Soft \u2014 agents check at session start; not yet a CI gate."
+    "enforcement": "Soft — agents check at session start; not yet a CI gate."
   },
   "states": [
     "not_started",
@@ -14,7 +14,7 @@
   ],
   "verification_conventions": {
     "executable": "Shell command that exits 0 on pass and non-zero on fail.",
-    "manual": "Verification not yet automated \u2014 requires a human or agent to walk a UI flow.",
+    "manual": "Verification not yet automated — requires a human or agent to walk a UI flow.",
     "null": "No verification defined yet. Treat as a gap to fix."
   },
   "features": [
@@ -26,17 +26,17 @@
       "verification": "make check",
       "state": "passing",
       "evidence": "Makefile",
-      "notes": "Lecture 09 \u2014 three-layer validation hierarchy."
+      "notes": "Lecture 09 — three-layer validation hierarchy."
     },
     {
       "id": "F002",
       "area": "harness",
       "title": "AGENTS.md router + topic docs",
-      "user_visible_behavior": "Single 50\u2013200 line entry file (AGENTS.md) links to focused topic docs in docs/agents/.",
+      "user_visible_behavior": "Single 50–200 line entry file (AGENTS.md) links to focused topic docs in docs/agents/.",
       "verification": "test -f AGENTS.md && ! test -f CLAUDE.md && test -d docs/agents && grep -q 'docs/agents/patterns.md' AGENTS.md",
       "state": "passing",
       "evidence": "AGENTS.md, docs/agents/",
-      "notes": "Lecture 04 \u2014 split monolithic instruction file."
+      "notes": "Lecture 04 — split monolithic instruction file."
     },
     {
       "id": "F003",
@@ -46,7 +46,7 @@
       "verification": "bash scripts/verify-feature.sh F003",
       "state": "passing",
       "evidence": "docs/feature_list.json",
-      "notes": "Lecture 08 \u2014 feature lists as harness primitives."
+      "notes": "Lecture 08 — feature lists as harness primitives."
     },
     {
       "id": "F004",
@@ -56,7 +56,7 @@
       "verification": "make check-db",
       "state": "passing",
       "evidence": "scripts/check-rls.ts, scripts/check-security-invoker.ts, scripts/check-auth-users-leak.ts",
-      "notes": "Lecture 10 \u2014 promote prose rules to executable checks."
+      "notes": "Lecture 10 — promote prose rules to executable checks."
     },
     {
       "id": "F005",
@@ -66,7 +66,7 @@
       "verification": "test -f PROGRESS.md && test -f DECISIONS.md && test -f docs/agents/session-handoff.md",
       "state": "passing",
       "evidence": "PROGRESS.md, DECISIONS.md, docs/agents/session-handoff.md",
-      "notes": "Lecture 05 \u2014 agents are engineers with amnesia."
+      "notes": "Lecture 05 — agents are engineers with amnesia."
     },
     {
       "id": "F006",
@@ -76,27 +76,27 @@
       "verification": "bash scripts/cleanup-session.sh && test -f docs/agents/clean-state-checklist.md",
       "state": "passing",
       "evidence": "scripts/cleanup-session.sh, docs/agents/clean-state-checklist.md",
-      "notes": "Lecture 12 \u2014 idempotent cleanup operations."
+      "notes": "Lecture 12 — idempotent cleanup operations."
     },
     {
       "id": "F007",
       "area": "harness",
       "title": "Evaluator rubric",
-      "user_visible_behavior": "Six-dimension 0\u20132 rubric used at session end and code review.",
+      "user_visible_behavior": "Six-dimension 0–2 rubric used at session end and code review.",
       "verification": "test -f docs/agents/evaluator-rubric.md",
       "state": "passing",
       "evidence": "docs/agents/evaluator-rubric.md",
-      "notes": "Lecture 11 \u2014 quality scoring via structured rubric."
+      "notes": "Lecture 11 — quality scoring via structured rubric."
     },
     {
       "id": "F008",
       "area": "harness",
-      "title": "Observability \u2014 task traces + Sentry guidance + quality doc",
-      "user_visible_behavior": "Per-session decision trail in .harness/sessions/; Sentry covers runtime; weekly A\u2013D quality grades.",
+      "title": "Observability — task traces + Sentry guidance + quality doc",
+      "user_visible_behavior": "Per-session decision trail in .harness/sessions/; Sentry covers runtime; weekly A–D quality grades.",
       "verification": "test -d .harness/sessions && test -f docs/agents/observability.md && test -f docs/agents/quality.md",
       "state": "passing",
       "evidence": "docs/agents/observability.md, docs/agents/quality.md, .harness/sessions/",
-      "notes": "Lecture 11 \u2014 observability inside the harness."
+      "notes": "Lecture 11 — observability inside the harness."
     },
     {
       "id": "F009",
@@ -316,7 +316,7 @@
       "verification": "manual",
       "state": "passing",
       "evidence": "docs/plans/2026-02-12-wcag-accessibility-{design,plan}.md",
-      "notes": "No automated axe-core gate yet \u2014 gap candidate."
+      "notes": "No automated axe-core gate yet — gap candidate."
     },
     {
       "id": "F120",
@@ -512,7 +512,7 @@
       "id": "F201",
       "area": "sales",
       "title": "Beer orders spreadsheet sync",
-      "user_visible_behavior": "Admins can upload Beer orders.xlsx from Settings \u2192 Integrations, preview a non-destructive reconciliation, resolve saved customer and brand mappings, and atomically apply spreadsheet-owned order changes without consulting MongoDB.",
+      "user_visible_behavior": "Admins can upload Beer orders.xlsx from Settings → Integrations, preview a non-destructive reconciliation, resolve saved customer and brand mappings, and atomically apply spreadsheet-owned order changes without consulting MongoDB.",
       "verification": "bun run test src/integrations/beer-orders src/app/api/integrations/beer-orders src/components/domain/beer-orders",
       "state": "passing",
       "evidence": "docs/plans/2026-07-14-beer-order-spreadsheet-sync.md; 11 focused tests; real workbook parity 216 orders/1205 lines; make check",
@@ -522,7 +522,7 @@
     {
       "id": "SENTRY-7465830666",
       "area": "infra",
-      "title": "Error: ./src/components/dashboard/batch-activity-heatmap.tsx:20:1 \u2014 Module not found: Can't resolve 'react-activity-calendar'",
+      "title": "Error: ./src/components/dashboard/batch-activity-heatmap.tsx:20:1 — Module not found: Can't resolve 'react-activity-calendar'",
       "verification": "bun run test src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts",
       "state": "passing",
       "evidence": "commit:b72f09a",
@@ -567,18 +567,18 @@
       "state": "passing",
       "evidence": "pr:396",
       "branch": "sentry-fix/SENTRY-7477285440",
-      "notes": "PR #308 already fixed the originally-reported cause (ChatLayout's ChatPanel using next/dynamic(ssr:false)), merged 2026-07-05 \u2014 but the issue kept receiving new events afterward (last seen 2026-07-11, in a release that already had that fix). Root cause of the recurrence: TrendChartLazy and BatchActivityHeatmapLazy (src/components/dashboard/) also used next/dynamic({ ssr:false }), and are rendered inside ProductionTrends/SalesTrends, which sit inside a Suspense boundary that itself genuinely suspends (usePeriod() -> useSearchParams()). Nesting a dynamic(ssr:false) client-only bailout boundary inside another suspending boundary is the same class of bug already fixed for ChatLayout. Fix: converted both to React.lazy + an explicit <Suspense> at each call site (4 usages across src/app/(app)/dashboard/page.tsx and src/app/(app)/dashboard/sales/page.tsx), mirroring the established ChatLayout fix. cogs-period-chart-lazy.tsx and batch-readings-chart-lazy.tsx use the same next/dynamic(ssr:false) pattern but are not nested inside a suspending boundary, so left as-is."
+      "notes": "PR #308 already fixed the originally-reported cause (ChatLayout's ChatPanel using next/dynamic(ssr:false)), merged 2026-07-05 — but the issue kept receiving new events afterward (last seen 2026-07-11, in a release that already had that fix). Root cause of the recurrence: TrendChartLazy and BatchActivityHeatmapLazy (src/components/dashboard/) also used next/dynamic({ ssr:false }), and are rendered inside ProductionTrends/SalesTrends, which sit inside a Suspense boundary that itself genuinely suspends (usePeriod() -> useSearchParams()). Nesting a dynamic(ssr:false) client-only bailout boundary inside another suspending boundary is the same class of bug already fixed for ChatLayout. Fix: converted both to React.lazy + an explicit <Suspense> at each call site (4 usages across src/app/(app)/dashboard/page.tsx and src/app/(app)/dashboard/sales/page.tsx), mirroring the established ChatLayout fix. cogs-period-chart-lazy.tsx and batch-readings-chart-lazy.tsx use the same next/dynamic(ssr:false) pattern but are not nested inside a suspending boundary, so left as-is."
     },
     {
       "id": "SENTRY-7542174707",
       "area": "infra",
       "title": "Upsert error for %s batch %d: %s",
-      "user_visible_behavior": "MongoDB sync (POST /api/integrations/mongodb/sync) failed an entire 50-row upsert chunk whenever the source Mongo data had two documents resolving to the same onConflict key (e.g. duplicate beer_styles/brands/vessels names) \u2014 Postgres rejects a whole INSERT ... ON CONFLICT statement, not just the offending rows, when two rows in it target the same conflict key.",
+      "user_visible_behavior": "MongoDB sync (POST /api/integrations/mongodb/sync) failed an entire 50-row upsert chunk whenever the source Mongo data had two documents resolving to the same onConflict key (e.g. duplicate beer_styles/brands/vessels names) — Postgres rejects a whole INSERT ... ON CONFLICT statement, not just the offending rows, when two rows in it target the same conflict key.",
       "verification": "bun run test src/integrations/mongodb/__tests__/sync.test.ts src/lib/__tests__/logger.test.ts",
       "state": "passing",
       "evidence": "pr:432",
       "branch": "sentry-fix/SENTRY-7542174707",
-      "notes": "Root cause (2026-07-13, PR #395): upsertRows() (src/integrations/mongodb/sync.ts) sent Mongo-derived rows straight through to a single Supabase .upsert() call per 50-row chunk without deduping by the onConflict column(s) first. Fix added dedupeByConflictKey(), which keeps the last row per conflict-key value (rows missing the conflict column pass through untouched, e.g. recipes upserts with no explicit id) and logs a warning with the dropped count. The Sentry issue kept firing after that fix (36 events through 2026-07-14), so it was re-triaged: classification is (D) observability gap, not a recurrence of the original defect. logger.error(\"Upsert error for %s batch %d: %s\", table, batchIndex, error.message) is a pino printf-style call, but src/lib/logger.ts's forwardToSentry() only handled Error-instance / {err,...ctx}+message / bare-string call shapes \u2014 a printf template with substitution args fell into the bare-string branch and was forwarded to Sentry.captureMessage() UN-interpolated, so every event showed the literal template with no table name, batch index, or actual Postgres error message. That is exactly why this session's stack trace was (unavailable) and the event context was empty: the real failure is still unknown. Fixed forwardToSentry() to interpolate printf placeholders via node:util format() before forwarding (covers this and every other printf-style logger.error/fatal call site in the repo), and upgraded the two implicated sync.ts call sites (upsertRows, syncPhase) to structured logger.error({err, ...ctx}, msg) calls so they route to Sentry.captureException with a real stack instead of just a message. Followups: the underlying Postgres error that is still recurring after the 2026-07-13 dedup fix is NOT diagnosed by this session \u2014 only its reporting is fixed. The next production event for this issue will carry the real table name, batch index, and Postgres error message (or a full stack via captureException), and should be re-triaged as a fresh (A)/(B) investigation once it arrives. Investigation issue: energee/mgr#433."
+      "notes": "Root cause (2026-07-13, PR #395): upsertRows() (src/integrations/mongodb/sync.ts) sent Mongo-derived rows straight through to a single Supabase .upsert() call per 50-row chunk without deduping by the onConflict column(s) first. Fix added dedupeByConflictKey(), which keeps the last row per conflict-key value (rows missing the conflict column pass through untouched, e.g. recipes upserts with no explicit id) and logs a warning with the dropped count. The Sentry issue kept firing after that fix (36 events through 2026-07-14), so it was re-triaged: classification is (D) observability gap, not a recurrence of the original defect. logger.error(\"Upsert error for %s batch %d: %s\", table, batchIndex, error.message) is a pino printf-style call, but src/lib/logger.ts's forwardToSentry() only handled Error-instance / {err,...ctx}+message / bare-string call shapes — a printf template with substitution args fell into the bare-string branch and was forwarded to Sentry.captureMessage() UN-interpolated, so every event showed the literal template with no table name, batch index, or actual Postgres error message. That is exactly why this session's stack trace was (unavailable) and the event context was empty: the real failure is still unknown. Fixed forwardToSentry() to interpolate printf placeholders via node:util format() before forwarding (covers this and every other printf-style logger.error/fatal call site in the repo), and upgraded the two implicated sync.ts call sites (upsertRows, syncPhase) to structured logger.error({err, ...ctx}, msg) calls so they route to Sentry.captureException with a real stack instead of just a message. Followups: the underlying Postgres error that is still recurring after the 2026-07-13 dedup fix is NOT diagnosed by this session — only its reporting is fixed. The next production event for this issue will carry the real table name, batch index, and Postgres error message (or a full stack via captureException), and should be re-triaged as a fresh (A)/(B) investigation once it arrives. Investigation issue: energee/mgr#433."
     },
     {
       "id": "SENTRY-7597067731",
@@ -619,7 +619,7 @@
       "state": "passing",
       "evidence": "pr:407",
       "branch": "sentry-fix/SENTRY-7477285482",
-      "notes": "This issue ID has a three-act history on /dashboard: PR #297 fixed a prefill-store sessionStorage read happening during render; PR #306 fixed unpinned toLocaleDateString()/toLocaleString() locale mismatches; the issue kept recurring afterward (last seen 2026-07-11T02:25:44Z, release 00fbe79). The sibling Sentry issue MGR-6 (SENTRY-7477285440) \u2014 same culprit, same release, same last-seen minute \u2014 was root-caused to TrendChartLazy/BatchActivityHeatmapLazy using next/dynamic({ssr:false}) nested inside a genuinely-suspending Suspense (usePeriod->useSearchParams), and fixed by PR #396 (already merged before this run). Confirmed current dashboard/page.tsx and dashboard/sales/page.tsx already reflect that fix, so no further /dashboard-specific change was needed for this recurrence. Pattern scan for the same defect class (browser-storage read during render instead of in an effect \u2014 the exact mechanism of this issue's first fix in PR #297) found one more live instance: usePersistedPageSize (src/hooks/use-persisted-page-size.ts), used by EntityDataTable on every entity list page, read localStorage inside a useState lazy initializer. Fixed by deferring the read to useEffect, mirroring usePrefillHydration (PR #407)."
+      "notes": "This issue ID has a three-act history on /dashboard: PR #297 fixed a prefill-store sessionStorage read happening during render; PR #306 fixed unpinned toLocaleDateString()/toLocaleString() locale mismatches; the issue kept recurring afterward (last seen 2026-07-11T02:25:44Z, release 00fbe79). The sibling Sentry issue MGR-6 (SENTRY-7477285440) — same culprit, same release, same last-seen minute — was root-caused to TrendChartLazy/BatchActivityHeatmapLazy using next/dynamic({ssr:false}) nested inside a genuinely-suspending Suspense (usePeriod->useSearchParams), and fixed by PR #396 (already merged before this run). Confirmed current dashboard/page.tsx and dashboard/sales/page.tsx already reflect that fix, so no further /dashboard-specific change was needed for this recurrence. Pattern scan for the same defect class (browser-storage read during render instead of in an effect — the exact mechanism of this issue's first fix in PR #297) found one more live instance: usePersistedPageSize (src/hooks/use-persisted-page-size.ts), used by EntityDataTable on every entity list page, read localStorage inside a useState lazy initializer. Fixed by deferring the read to useEffect, mirroring usePrefillHydration (PR #407)."
     },
     {
       "id": "SENTRY-7611936148",
