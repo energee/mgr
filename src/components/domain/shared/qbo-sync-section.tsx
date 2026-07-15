@@ -21,7 +21,7 @@ import {
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
-type QBOSyncSectionProps = {
+export type QBOSyncSectionProps = {
   entityType: "customer" | "supplier" | "order" | "purchase_order";
   entityId: string;
 }
@@ -62,17 +62,6 @@ function parseQBOError(raw: string): { friendly: string; raw: string } {
   return {
     friendly: "Sync failed. Check the sync log for details.",
     raw,
-  };
-}
-
-/**
- * Factory function to create a QBO sync section for entity detail views.
- * Works with the section `component` pattern (receives { data } prop).
- */
-export function createQBOSyncDisplay(entityType: QBOSyncSectionProps["entityType"]) {
-  return function QBOSyncDisplay({ data }: { data: { id: string } }) {
-    if (!data?.id) return null;
-    return <QBOSyncSection entityType={entityType} entityId={data.id} />;
   };
 }
 

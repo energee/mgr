@@ -8,7 +8,7 @@
 import type { EntityPresentation } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
-import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-display";
 import { POLineItemsEditor } from "@/components/domain/purchasing/po-line-items-editor";
 import { localDateString } from "@/lib/format";
 import { purchaseOrderStateMachine, statusOptions } from "./core";

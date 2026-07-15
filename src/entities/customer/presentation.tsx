@@ -10,7 +10,7 @@ import type { EntityPresentation } from "@/types/entity";
 import { deleteAction } from "@/types/entity";
 import { getValueDisplay } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-display";
 import { CustomerShippingPreferences } from "@/components/domain/order/customer-shipping-preferences";
 import { CustomerPalletConfigs } from "@/components/domain/order/customer-pallet-configs";
 import { CustomerAddressSection } from "@/components/domain/order/customer-address-section";
