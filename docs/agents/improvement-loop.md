@@ -8,11 +8,11 @@ workflow — extend one of these loops instead if it fits.
 
 | Loop | Cadence | Owns | Model |
 |------|---------|------|-------|
-| [Sentry harness](../sentry-harness-setup.md) | 2× daily (17:00/22:00 UTC) | Production/runtime bugs → fix PRs | Sonnet |
+| [Sentry harness](../sentry-harness-setup.md) | Weekdays (17:00 UTC) | Production/runtime bugs → fix PRs | Sonnet |
 | [Scheduled health audit](health-audit-and-issue-triage.md#scheduled-automation) | Weekly (Wed 13:37 UTC) | Static correctness audit → deduplicated issues | Default |
 | [autoharness](autoharness.md) | On demand (`autoharness optimize`) | Mechanical `src/lib` refactors | Sonnet |
 | Quality re-grade (`quality-regrade.yml`) | Weekly (Mon) | [quality.md](quality.md) scorecard + trend log | Sonnet |
-| CI gates (`test.yml`, `db-lint.yml`, `make check`) | Every push | Coverage ratchets, DB lint, type/lint/test | none |
+| CI gates (`test.yml`, `db-lint.yml`, `make check`) | Every PR (static+unit); weekday nightly (build+E2E) | Coverage ratchets, DB lint, type/lint/test | none |
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether

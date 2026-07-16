@@ -1,14 +1,14 @@
 name: Claude Code Review
 
+# One automated review per PR (opened / ready_for_review) instead of on every
+# synchronize push — re-review on demand via an @claude PR comment. Docs-only
+# PRs (including the automated PROGRESS.md rebuild PRs) are excluded.
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    types: [opened, ready_for_review]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,6 +26,7 @@ jobs:
     # open a PR, so a second full review here is redundant.
     if: ${{ !startsWith(github.head_ref, 'sentry-fix/') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: write
