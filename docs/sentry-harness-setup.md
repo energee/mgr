@@ -74,10 +74,13 @@ colors.
 
 ## Scheduling
 
-The workflow runs automatically at:
+The workflow runs automatically each weekday at:
 
 - `17:00 UTC` — noon EST
-- `22:00 UTC` — 5pm EST
+
+(Reduced from twice daily on 2026-07-16 to stay inside the 3,000
+Actions-minutes allowance; each run also caps at 3 fix jobs. Use manual
+dispatch for urgent off-schedule runs.)
 
 DST transitions shift the local run time by one hour. Acceptable for this
 use case.

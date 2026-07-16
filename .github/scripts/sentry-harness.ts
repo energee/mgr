@@ -4,7 +4,8 @@
 // Entry point for the Sentry Error Harness. Run inside GitHub Actions.
 // Reads env, fetches unresolved Sentry issues, scores them, excludes those
 // that already have an open PR or a merged fix with no events since the
-// merge, and emits up to 5 as GITHUB_OUTPUT for a matrix job to consume.
+// merge, and emits up to MAX_ERRORS_PER_RUN as GITHUB_OUTPUT for a matrix
+// job to consume.
 
 import { appendFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -21,7 +22,9 @@ import { scoreIssues, sortByScore } from "./sentry-harness/scoring";
 import { enrichIssuesWithEvents, fetchIssueSummaries } from "./sentry-harness/sentry-api";
 import type { ScoredIssue } from "./sentry-harness/types";
 
-const MAX_ERRORS_PER_RUN = 5;
+// 3 (was 5) to fit the monthly Actions minutes allowance; lower-ranked
+// issues wait for the next weekday run.
+const MAX_ERRORS_PER_RUN = 3;
 
 function requireEnv(name: string): string {
   const value = process.env[name];

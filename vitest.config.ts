@@ -41,7 +41,7 @@ export default defineConfig({
       // fixtures.ts) — vitest only auto-excludes *.test.* files, and a
       // 100%-covered fixture would prop up its directory's gate.
       exclude: ["src/lib/supabase/**", "**/__tests__/**"],
-      // CI runs coverage on every push; html/clover output is never read
+      // CI runs coverage on every PR; html/clover output is never read
       // there. json-summary keeps a machine-readable rollup for tooling.
       reporter: ["text", "json-summary"],
       // Harness gate: per-directory floors set a few points under measured
@@ -50,8 +50,9 @@ export default defineConfig({
       // decay elsewhere. Ratchet each floor up as its dir's coverage grows.
       // See docs/agents/quality.md for the trend log. Enforced by CI
       // (test.yml) and `make check-coverage`.
-      thresholds:
-        process.env.VITEST_COVERAGE_SHARD === "true" ? undefined : {
+      // (CI ran sharded until 2026-07-16; the VITEST_COVERAGE_SHARD escape
+      // hatch went with the shards — thresholds now always apply.)
+      thresholds: {
           // NOTE: vitest's global thresholds always apply to ALL included
           // files as one blended aggregate — the glob entries below are
           // checked in ADDITION, not instead. Keep these at/below the

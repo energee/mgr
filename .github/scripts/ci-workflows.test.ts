@@ -27,17 +27,21 @@ describe("GitHub Actions performance contracts", () => {
     expect(contents).not.toContain("actions/upload-artifact@v4");
     expect(contents).toContain("actions/checkout@v7");
     expect(contents).toContain("actions/upload-artifact@v7");
-    expect(contents).toContain("actions/download-artifact@v8");
   });
 
-  it("runs static checks before sharded unit coverage and the cached build", () => {
+  // Minutes-budget contract (2026-07-16): PRs run static + one unsharded
+  // unit job only; build + E2E run on the weekday nightly schedule; docs-only
+  // changes skip the workflow. See docs/progress/2026-07-16-ci-minutes-diet.md.
+  it("keeps the PR lane lean and defers build/E2E to the nightly schedule", () => {
     const workflow = read(".github/workflows/test.yml");
 
-    expect(workflow).toContain("matrix:");
-    expect(workflow).toMatch(/shard:\s*\[1, 2\]/);
-    expect(workflow).toContain("--shard=${{ matrix.shard }}/2");
-    expect(workflow).toContain("--merge-reports");
-    expect(workflow).toContain("include-hidden-files: true");
+    expect(workflow).not.toContain("matrix:");
+    expect(workflow).not.toContain("--shard=");
+    expect(workflow).not.toContain("--merge-reports");
+    expect(workflow).toContain("bunx vitest run --coverage");
+    expect(workflow).toContain("paths-ignore:");
+    expect(workflow).toMatch(/build:[\s\S]*?if: github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch'/);
+    expect(workflow).not.toMatch(/\n  push:/);
     expect(workflow).toContain(".next/cache");
     expect(workflow).toContain(".eslintcache");
     expect(workflow).toContain("tsconfig.tsbuildinfo");
@@ -53,6 +57,9 @@ describe("GitHub Actions performance contracts", () => {
     const shellWorkflow = read(".github/workflows/shell-lint.yml");
 
     expect(dbWorkflow).toContain("concurrency:");
+    // PR-only, schema-relevant paths only — no push re-run, no dep-bump runs.
+    expect(dbWorkflow).not.toMatch(/\n  push:/);
+    expect(dbWorkflow).not.toMatch(/- "bun\.lock"/);
     expect(dbWorkflow).toContain("bun run test:integration");
     expect(dbWorkflow).toContain("supabase/setup-cli@v3");
     expect(dbWorkflow).toContain('version: "2.109.1"');
@@ -88,6 +95,9 @@ describe("GitHub Actions performance contracts", () => {
     expect(scoreJob).toBeDefined();
     expect(scoreJob).not.toContain("Install dependencies");
     expect(sentryWorkflow).toContain("max-parallel: 2");
+    // Minutes budget: one weekday run, and a hard ceiling on fix jobs.
+    expect(sentryWorkflow).toContain('cron: "0 17 * * 1-5"');
+    expect(sentryWorkflow).toContain("timeout-minutes: 45");
   });
 
   it("serializes bot updates and avoids duplicate Claude reviews", () => {
@@ -100,6 +110,9 @@ describe("GitHub Actions performance contracts", () => {
     expect(progressWorkflow).toContain("gh pr merge");
     expect(reviewWorkflow).toContain("concurrency:");
     expect(reviewWorkflow).toContain("sentry-fix/");
+    // One review per PR: no synchronize re-reviews, docs-only PRs skipped.
+    expect(reviewWorkflow).toMatch(/types: \[opened, ready_for_review\]/);
+    expect(reviewWorkflow).toContain("paths-ignore:");
   });
 
   it("keeps GitHub Actions dependencies updated weekly", () => {
