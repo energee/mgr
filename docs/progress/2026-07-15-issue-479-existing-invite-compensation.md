@@ -1,0 +1,1 @@
+- **2026-07-15 (Compensate failed existing-user portal invites).** Added pre-invite profile and customer-link snapshots to both existing-Auth provisioning paths, restoring only state introduced by a failed attempt while preserving pre-existing Auth users and links; added regression coverage for link, email-delivery, recovery, and cleanup-failure paths. Closes #479.
