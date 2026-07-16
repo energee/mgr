@@ -881,7 +881,7 @@ serialization, or a trustworthy category boundary across PostgREST requests.
 ## Integration Decisions
 
 ### DEC-INT-001: Atomic Square Sale and Refund Ingestion
-**Status**: Implemented (migration 00257_atomic_square_ingestion.sql)
+**Status**: Implemented (migrations 00257_atomic_square_ingestion.sql and 00262_cumulative_square_refund_reversals.sql)
 
 Square webhook handlers fetch the external order before starting durable work,
 then submit the normalized sale or refund to one service-role-only PostgreSQL
@@ -889,6 +889,13 @@ function. The function owns the dedup claim, FIFO allocation/reversal ledger,
 physical bin movement, draft sale mutation, and claim finalization in one
 transaction. A per-order transaction advisory lock serializes sales and refunds,
 including the interval before an uncommitted sale claim is visible.
+
+Partial refunds use the completed per-order refund log as a monetary history.
+For each original sale allocation, the refund function floors the cumulative
+target quantity and subtracts quantities recorded by prior reversal entries.
+Only that delta is inserted and credited. This retains the immutable sale
+ledger while preventing separate partial-refund rounding from permanently
+under-crediting inventory; cumulative full refunds also void staged draft rows.
 
 Unexpected failures roll the full statement back and are safe to retry.
 Deterministic line/sizing failures are finalized as audit records. Incomplete
@@ -899,7 +906,7 @@ reconciliation instead.
 **Rationale**: exactly-once claim rows alone cannot make several independent
 database requests atomic. Moving the complete state transition into PostgreSQL
 eliminates orphan allocations, unmatched bin movements, double effects after a
-timeout, and sale/refund ordering races.
+timeout, sale/refund ordering races, and per-event rounding drift.
 
 ---
 

@@ -71,6 +71,16 @@
   - Client-side sequencing plus optimistic updates — JavaScript cannot create a transaction across PostgREST requests, and broad cache invalidation can overwrite unsaved local sections.
 - **Reversibility**: moderate — the RPC and contribution registry can be reverted together, but doing so restores the known integrity gap.
 
+## 2026-07-15 — Square partial refunds use cumulative deltas
+
+- **Decision**: Size each Square refund against the order's cumulative completed refund amount, then insert only the difference between each original sale allocation's cumulative target and its previously recorded reversals.
+- **Why**: Flooring each event independently permanently lost units across split refunds; a three-unit sale refunded in two halves restored only two units. The existing per-order transaction lock makes the completed refund history stable while the delta is calculated.
+- **Alternatives rejected**:
+  - Decrement original sale allocations — completed allocations are the immutable removal ledger and must be reversed with adjustment entries.
+  - Round each refund event independently — changes which event gets a unit but still permits event-boundary drift.
+  - Alert and reconcile later — detects corruption after it occurs instead of preserving inventory in the ingest transaction.
+- **Reversibility**: moderate — the replacement RPC can be reverted, but doing so restores deterministic inventory drift for sequential refunds.
+
 ## 2026-07-15 — Recipe additions replace one server-owned category
 
 - **Decision**: Water-chemistry and non-water recipe additions share one version-checked PostgreSQL replacement command. The client names an allowlisted scope; the database derives membership from `additives.type`, locks the recipe, and commits the scoped delete/insert together.
