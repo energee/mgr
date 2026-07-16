@@ -1,0 +1,1 @@
+- **2026-07-15 (Preserve supplier preference during duplicate merges).** Updated the duplicate-supplier data migration to carry a preferred catalog designation from any colliding loser row onto the survivor before deletion, with a real-Postgres regression that executes the tracked migration against duplicate fixtures. Closes #478.
