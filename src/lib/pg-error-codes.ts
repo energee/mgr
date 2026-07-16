@@ -37,6 +37,10 @@ export const PG_ERROR_CODES = {
   SERIALIZATION_FAILURE: "40001",
   DEADLOCK_DETECTED: "40P01",
 
+  // Custom PostgREST status code (HTTP 409). Unlike 40001, PostgREST does not
+  // retry this expected business conflict behind the caller's back.
+  CONFLICT: "PT409",
+
   // Class 53 - Insufficient Resources
   INSUFFICIENT_RESOURCES: "53000",
   DISK_FULL: "53100",

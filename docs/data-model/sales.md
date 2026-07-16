@@ -41,7 +41,11 @@ Portal provisioning verifies the returned active customer profile and this
 junction row before it sends a login OTP or reports success. First-login
 email auto-linking likewise exposes a matched customer in memory only after
 every expected junction row is returned by the write. A failed new-user
-provisioning attempt deletes the new Auth identity as compensation.
+provisioning attempt deletes the new Auth identity as compensation. For a
+pre-existing Auth identity, the route snapshots the profile and requested
+junction before provisioning; a later failure removes only a newly added link
+and restores (or removes) only the profile state created by that attempt. It
+never deletes the pre-existing Auth identity or an earlier customer link.
 
 **Migration:** `00095_customer_portal_many_to_many.sql` (original),
 `00252_restore_customer_portal_users.sql` (hosted-database restoration and
@@ -482,6 +486,19 @@ Individual line-item changes within a change request.
 | quantity | INTEGER | Proposed quantity |
 | original_quantity | INTEGER | Original quantity (snapshot) |
 
+Approval is performed by
+`apply_change_request(p_order_id, p_change_request_id, p_approved_by)`. The
+invoker-rights function verifies `orders:write`, the route/order relationship,
+the authenticated reviewer, the sales-channel cutoff, and the original line
+snapshot before applying every add/modify/remove in one transaction. Adds use
+`selling_format_id` and customer-tier pricing. A retry of an already-approved
+request is a no-op.
+
+Orders with a non-cancelled pick list or an active/completed finished-good
+allocation must have those fulfillment artifacts cancelled or regenerated
+before approval. The command never rewrites fulfillment history while changing
+order lines.
+
 ---
 
 ## Square Integration (Taproom POS)
@@ -559,7 +576,7 @@ finalized inside the same transaction as their inventory effects.
 | location_id | UUID | FK to the resolved MGR location, when applicable |
 | items_synced | INTEGER | Number of items successfully processed |
 | items_failed | INTEGER | Number of deterministic item failures requiring review |
-| details | JSONB | Order/refund identifiers, errors, warnings, reversals, and manual-reconciliation flags |
+| details | JSONB | Order/refund identifiers, errors, warnings, reversals, cumulative refund sizing, and manual-reconciliation flags |
 | started_at | TIMESTAMPTZ | Claim/sync start timestamp |
 | completed_at | TIMESTAMPTZ | Completion timestamp; null only for an unfinished legacy/in-flight operation |
 | created_at | TIMESTAMPTZ | Row creation timestamp |
@@ -572,8 +589,11 @@ finalized inside the same transaction as their inventory effects.
   lines, locks finished goods then bin rows in canonical order, records FIFO TTB
   allocations or draft rows, debits physical inventory, and finalizes the log.
 - `ingest_square_refund_atomic(...)` serializes with the order's sale/refunds,
-  writes inverse adjustment allocations, credits bins, voids full-refund draft
-  rows, and finalizes the refund claim.
+  totals completed refund amounts, calculates the cumulative target reversal
+  for each original sale allocation, and writes only the unreversed delta. It
+  credits bins, voids draft rows once cumulative refunds cover the order, and
+  finalizes the refund claim. Cumulative targeting means rounding happens once
+  across the refund history rather than once per event.
 
 Both functions are `SECURITY INVOKER`, executable only by `service_role`, and
 run as one PostgreSQL statement/transaction. Unexpected errors roll back the

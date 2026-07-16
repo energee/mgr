@@ -36,8 +36,12 @@ type AdminClient = Awaited<ReturnType<typeof createAdminClient>>;
 type PortalProfile = {
   id: string;
   email: string | null;
+  display_name?: string | null;
   roles: UserRole[] | null;
   status?: string | null;
+  invited_at?: string | null;
+  invited_by?: string | null;
+  updated_at?: string | null;
 };
 
 type BreweryNameSetting = {
@@ -88,9 +92,25 @@ async function findProfileByEmail(
   email: string,
 ): Promise<PortalProfile | null> {
   const { data, error } = await dynamicFrom(adminDb, "user_profiles")
-    .select("id, email, roles, status")
+    .select(
+      "id, email, display_name, roles, status, invited_at, invited_by, updated_at",
+    )
     .ilike("email", escapeIlikePattern(email))
     .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as PortalProfile | null) ?? null;
+}
+
+async function findProfileById(
+  adminDb: AdminClient,
+  userId: string,
+): Promise<PortalProfile | null> {
+  const { data, error } = await dynamicFrom(adminDb, "user_profiles")
+    .select(
+      "id, email, display_name, roles, status, invited_at, invited_by, updated_at",
+    )
+    .eq("id", userId)
     .maybeSingle();
   if (error) throw error;
   return (data as PortalProfile | null) ?? null;
@@ -109,14 +129,11 @@ async function ensureCustomerProfile(
     displayName?: string;
     invitedBy: string;
   },
+  knownProfile?: PortalProfile | null,
 ) {
-  const { data, error } = await dynamicFrom(adminDb, "user_profiles")
-    .select("id, email, roles, status")
-    .eq("id", input.userId)
-    .maybeSingle();
-  if (error) throw error;
-
-  const profile = data as PortalProfile | null;
+  const profile = knownProfile === undefined
+    ? await findProfileById(adminDb, input.userId)
+    : knownProfile;
   const roles = profile?.roles ?? null;
   if (roles && isPortalUser(roles)) {
     if (profile?.status !== "active") {
@@ -189,6 +206,20 @@ async function linkPortalUser(
       500,
     );
   }
+}
+
+async function findPortalLink(
+  adminDb: AdminClient,
+  customerId: string,
+  userId: string,
+): Promise<PortalLink | null> {
+  const { data, error } = await dynamicFrom(adminDb, "customer_portal_users")
+    .select("customer_id, user_id")
+    .eq("customer_id", customerId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as PortalLink | null) ?? null;
 }
 
 async function readBreweryName(adminDb: AdminClient): Promise<string> {
@@ -294,6 +325,143 @@ async function compensateNewPortalUser(
   throw provisioningError;
 }
 
+function profileProvisioningChanges(profile: PortalProfile | null): boolean {
+  if (!profile) return true;
+  if (profile.roles && isPortalUser(profile.roles)) {
+    return profile.status !== "active";
+  }
+  return shouldAssignCustomerRole(profile.roles);
+}
+
+async function compensateExistingPortalUser(
+  adminDb: AdminClient,
+  input: {
+    customerId: string;
+    userId: string;
+    profileBefore: PortalProfile | null;
+    profileWriteAttempted: boolean;
+    linkExisted: boolean;
+    linkWriteAttempted: boolean;
+  },
+  provisioningError: unknown,
+): Promise<never> {
+  const cleanupErrors: string[] = [];
+
+  if (input.linkWriteAttempted && !input.linkExisted) {
+    try {
+      const { error } = await dynamicFrom(adminDb, "customer_portal_users")
+        .delete()
+        .eq("customer_id", input.customerId)
+        .eq("user_id", input.userId);
+      if (error) {
+        cleanupErrors.push(
+          `portal link cleanup failed: ${errorMessage(error)}`,
+        );
+      }
+    } catch (error) {
+      cleanupErrors.push(`portal link cleanup failed: ${errorMessage(error)}`);
+    }
+  }
+
+  if (input.profileWriteAttempted) {
+    try {
+      const profileWrite = input.profileBefore
+        ? dynamicFrom(adminDb, "user_profiles")
+            .update({
+              email: input.profileBefore.email,
+              display_name: input.profileBefore.display_name ?? null,
+              roles: input.profileBefore.roles,
+              status: input.profileBefore.status,
+              invited_at: input.profileBefore.invited_at ?? null,
+              invited_by: input.profileBefore.invited_by ?? null,
+              ...(input.profileBefore.updated_at === undefined
+                ? {}
+                : { updated_at: input.profileBefore.updated_at }),
+            })
+            .eq("id", input.userId)
+        : dynamicFrom(adminDb, "user_profiles")
+            .delete()
+            .eq("id", input.userId);
+      const { error } = await profileWrite;
+      if (error) {
+        cleanupErrors.push(`profile cleanup failed: ${errorMessage(error)}`);
+      }
+    } catch (error) {
+      cleanupErrors.push(`profile cleanup failed: ${errorMessage(error)}`);
+    }
+  }
+
+  if (cleanupErrors.length > 0) {
+    log.error(
+      {
+        provisioningError: errorMessage(provisioningError),
+        compensationErrors: cleanupErrors,
+        customerId: input.customerId,
+        userId: input.userId,
+      },
+      "Existing customer portal provisioning compensation failed",
+    );
+    throw new ApiError(
+      "INTERNAL_ERROR",
+      `Portal provisioning failed (${errorMessage(provisioningError)}), and cleanup also failed (${cleanupErrors.join("; ")}). Repair the account before retrying.`,
+      500,
+    );
+  }
+
+  throw provisioningError;
+}
+
+async function provisionExistingPortalUser(
+  adminDb: AdminClient,
+  input: {
+    customerId: string;
+    userId: string;
+    email: string;
+    displayName?: string;
+    invitedBy: string;
+    breweryName: string;
+    profileBefore: PortalProfile | null;
+  },
+) {
+  const linkBefore = await findPortalLink(
+    adminDb,
+    input.customerId,
+    input.userId,
+  );
+  const profileWriteAttempted = profileProvisioningChanges(input.profileBefore);
+  let linkWriteAttempted = false;
+
+  try {
+    await ensureCustomerProfile(
+      adminDb,
+      {
+        userId: input.userId,
+        email: input.email,
+        displayName: input.displayName,
+        invitedBy: input.invitedBy,
+      },
+      input.profileBefore,
+    );
+    linkWriteAttempted = true;
+    await linkPortalUser(adminDb, input.customerId, input.userId);
+    await updatePortalEmailMetadata(adminDb, input.userId, input.breweryName);
+    await sendOtp(adminDb, input.email);
+  } catch (provisioningError) {
+    return await compensateExistingPortalUser(
+      adminDb,
+      {
+        customerId: input.customerId,
+        userId: input.userId,
+        profileBefore: input.profileBefore,
+        profileWriteAttempted,
+        linkExisted: linkBefore !== null,
+        linkWriteAttempted,
+      },
+      provisioningError,
+    );
+  }
+}
+
 export const POST = withPermission(
   "customers:write",
   async (request, { user, params }) => {
@@ -358,15 +526,15 @@ export const POST = withPermission(
 
     const existingProfile = await findProfileByEmail(adminDb, email);
     if (existingProfile) {
-      await ensureCustomerProfile(adminDb, {
+      await provisionExistingPortalUser(adminDb, {
+        customerId,
         userId: existingProfile.id,
         email,
         displayName: invite.displayName,
         invitedBy: user.id,
+        breweryName,
+        profileBefore: existingProfile,
       });
-      await linkPortalUser(adminDb, customerId, existingProfile.id);
-      await updatePortalEmailMetadata(adminDb, existingProfile.id, breweryName);
-      await sendOtp(adminDb, email);
       log.info(
         { customerId, userId: existingProfile.id, email, invitedBy: user.id },
         "Customer portal access linked and OTP sent",
@@ -453,15 +621,16 @@ export const POST = withPermission(
       );
     }
 
-    await ensureCustomerProfile(adminDb, {
+    const recoveredProfile = await findProfileById(adminDb, linkData.user.id);
+    await provisionExistingPortalUser(adminDb, {
+      customerId,
       userId: linkData.user.id,
       email,
       displayName: invite.displayName,
       invitedBy: user.id,
+      breweryName,
+      profileBefore: recoveredProfile,
     });
-    await linkPortalUser(adminDb, customerId, linkData.user.id);
-    await updatePortalEmailMetadata(adminDb, linkData.user.id, breweryName);
-    await sendOtp(adminDb, email);
     return successResponse({
       invited: true,
       email,

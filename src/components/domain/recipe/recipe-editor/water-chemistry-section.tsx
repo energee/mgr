@@ -226,6 +226,7 @@ export function WaterChemistrySection() {
         <RecipeAdditionsDisplay
           data={{
             id: recipe.id,
+            version: recipe.version,
             water_profile_id: watchedSourceProfile,
             target_water_profile_id: watchedTargetProfile,
             mash_water_volume_gal: watchedMashWater,
@@ -233,6 +234,7 @@ export function WaterChemistrySection() {
             batch_size_bbl: recipe.batch_size_bbl,
             volume_bbl: recipe.volume_bbl,
           }}
+          onVersionCommitted={(version) => updateRecipe({ version })}
         />
       </div>
     </RecipeSectionCard>

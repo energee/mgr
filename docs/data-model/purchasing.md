@@ -43,6 +43,11 @@ What each supplier offers (links suppliers to catalog items and inventory items)
 
 **Unique constraint:** (supplier_id, catalog_type, catalog_id)
 
+Migration `00252_merge_duplicate_suppliers.sql` consolidates suppliers whose
+names differ only by case or whitespace. When both duplicate suppliers have a
+row for the same catalog item, a preferred designation on either row is carried
+onto the surviving row before the collision is removed.
+
 **Extension — `inventory_item` catalog_type (migration `00161`):** The `catalog_type` column now accepts `'inventory_item'` in addition to the brewing ingredient catalog types. When `catalog_type = 'inventory_item'`, `catalog_id` is a direct FK to `inventory_items.id`, enabling structured supplier relationships for raw packaging materials and other non-catalog inventory (e.g., cans, trays, pallets, stretch wrap). This replaces the legacy free-text `inventory_items.supplier` column.
 
 ```sql

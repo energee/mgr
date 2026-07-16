@@ -53,6 +53,15 @@
   - Documentation only — cannot enforce naming, protected-branch rules, dirty-tree protection, or canonical paths.
 - **Reversibility**: easy — existing worktrees remain standard Git worktrees and can be moved or recreated elsewhere.
 
+## 2026-07-15 — QuickBooks creates use durable request identities
+
+- **Decision**: Before creating a QuickBooks Invoice or Bill, persist the exact outbound payload in `qbo_sync_log` and send a deterministic, per-entity `requestid`. Treat mapping and log-write errors as sync failures; a known remote success with a failed local mapping is reported as requiring reconciliation and is retried with the same request identity.
+- **Why**: A QuickBooks POST and a Postgres mapping write cannot share a transaction. Intuit deduplicates repeated writes with the same request ID, so this closes both lost-response and remote-success/local-write-failure duplicate windows while retaining an operator-visible recovery record.
+- **Alternatives rejected**:
+  - Query by `DocNumber` before every create — document numbers are business-controlled and not a reliable unique request identity.
+  - Only propagate mapping-write errors — honest failure reporting alone would still let the retry create a second remote document.
+- **Reversibility**: easy — the intent uses the existing sync-log schema, and the request-ID behavior is isolated to the two transaction create paths.
+
 ## 2026-07-15 — Recipe Save All is one database transaction
 
 - **Decision**: The main recipe editor collects dirty parent fields and the six ingredient collections, then sends one version-checked `SECURITY INVOKER` RPC. Local dirty state and cache invalidation occur only after that transaction commits.
@@ -61,3 +70,42 @@
   - One transaction per ingredient section — protects each replacement but leaves Save All partially committed.
   - Client-side sequencing plus optimistic updates — JavaScript cannot create a transaction across PostgREST requests, and broad cache invalidation can overwrite unsaved local sections.
 - **Reversibility**: moderate — the RPC and contribution registry can be reverted together, but doing so restores the known integrity gap.
+
+## 2026-07-15 — Square partial refunds use cumulative deltas
+
+- **Decision**: Size each Square refund against the order's cumulative completed refund amount, then insert only the difference between each original sale allocation's cumulative target and its previously recorded reversals.
+- **Why**: Flooring each event independently permanently lost units across split refunds; a three-unit sale refunded in two halves restored only two units. The existing per-order transaction lock makes the completed refund history stable while the delta is calculated.
+- **Alternatives rejected**:
+  - Decrement original sale allocations — completed allocations are the immutable removal ledger and must be reversed with adjustment entries.
+  - Round each refund event independently — changes which event gets a unit but still permits event-boundary drift.
+  - Alert and reconcile later — detects corruption after it occurs instead of preserving inventory in the ingest transaction.
+- **Reversibility**: moderate — the replacement RPC can be reverted, but doing so restores deterministic inventory drift for sequential refunds.
+
+## 2026-07-15 — Recipe additions replace one server-owned category
+
+- **Decision**: Water-chemistry and non-water recipe additions share one version-checked PostgreSQL replacement command. The client names an allowlisted scope; the database derives membership from `additives.type`, locks the recipe, and commits the scoped delete/insert together.
+- **Why**: These editors live outside the main six-section Save All aggregate. Separate PostgREST deletes and inserts could erase rows on failure, merge concurrent replacements, and trust a stale client-computed category boundary.
+- **Alternatives rejected**:
+  - Add additions to the main recipe aggregate — these screens save independently and own different additive categories.
+  - Client compensation or retries — cannot roll back a committed delete or serialize two HTTP transactions.
+- **Reversibility**: moderate — both call sites and the RPC can be reverted together, but doing so restores the integrity gap.
+
+## 2026-07-15 — Yeast pitch events use their UUID as the retry key
+
+- **Decision**: `pitch_yeast_atomic` accepts a stable request UUID and stores it directly as `yeast_pitch_events.id`; source-row locking and defensive triggers make balance, status, and event creation one database transaction.
+- **Why**: the event already has a globally unique immutable identifier, so a second idempotency column would duplicate identity without improving retry semantics. The source lock is the shared serialization point for RPC and direct writers.
+- **Alternatives rejected**:
+  - A separate nullable `idempotency_key` column — adds a second unique identity and legacy-null behavior with no benefit for immutable events.
+  - Client-only availability checks — cached readers cannot serialize concurrent deductions.
+  - RPC without table guards — authenticated direct inserts and source edits could still produce a negative derived balance.
+- **Reversibility**: hard — event UUIDs become part of the public command contract, though the RPC can later accept a separate key while preserving existing IDs.
+
+## 2026-07-15 — Order change approval stops at fulfillment history
+
+- **Decision**: Apply order change requests atomically against `selling_format_id`, but reject approval when the order already has a non-cancelled pick list or active/completed finished-good allocation. Staff cancels and regenerates those artifacts first.
+- **Why**: Allocations are order-level and cannot reliably identify one of multiple matching order lines. Automatic cancellation could rewrite the wrong reservation, and sales users may approve orders without inventory-write permission.
+- **Alternatives rejected**:
+  - Reproduce the legacy brand/format running-total cancellation — ambiguous for duplicate product lines and could over-cancel a larger reservation.
+  - Give sales users inventory-write access — materially broadens their role beyond order management.
+  - Run the entire approval as `SECURITY DEFINER` — unnecessary privilege for the actual order/request mutation.
+- **Reversibility**: moderate — a future line-linked allocation model could safely replace the precondition with exact reservation reconciliation.

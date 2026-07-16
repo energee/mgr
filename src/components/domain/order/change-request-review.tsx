@@ -147,7 +147,11 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: changeRequestKeys.forOrder(orderId!) });
       queryClient.invalidateQueries({ queryKey: changeRequestKeys.pendingForOrder(orderId!) });
-      queryClient.invalidateQueries({ queryKey: entityKeys.detail("orders", orderId!) });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("orders") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("order_list_details") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.detail("order_items_for_review", orderId!),
+      });
       toast.success("Change request approved");
     },
     onError: (error: Error) => {

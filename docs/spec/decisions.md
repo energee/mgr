@@ -536,6 +536,49 @@ merge concurrent formulations, or report success after only some sections
 committed. The recipe row is the shared serialization boundary for the full
 editor aggregate.
 
+### DEC-GAP-013: Atomic Yeast Pitch Commands
+**Status**: Implemented (migration 00260)
+
+Yeast deductions use one `pitch_yeast_atomic` PostgreSQL command. A stable
+caller UUID becomes both the immutable event id and idempotency key. The
+command serializes retries by request id, locks the source pitch, recomputes
+committed usage, rejects overdraw, inserts the event, and maintains depleted
+status in one transaction. A retry with identical input returns the original
+result; reusing the id with different input conflicts.
+
+Defensive table triggers apply the same source-row lock to direct inserts,
+block event updates/deletes, and reject source-quantity reductions below
+committed usage. Partial sources stay `in_stock`; a pitch that consumes the
+last available quantity performs the automatic `in_stock → depleted`
+transition. Migration preflight aborts when legacy data is already invalid so
+operators reconcile it explicitly instead of guessing which events to remove.
+
+**Rationale**: a derived balance view prevents stale stored totals, but it does
+not serialize writers. The command and triggers keep the event ledger as the
+source of truth while guaranteeing that its derived balance cannot be
+negative.
+
+### DEC-GAP-014: Order Change Approval Preserves Fulfillment History
+**Status**: Implemented (migration `00261_rebuild_apply_change_request.sql`)
+
+Apply a pending order change request through one `SECURITY INVOKER` database
+command using the canonical `selling_format_id` model. The command verifies the
+route order, authenticated reviewer, channel cutoff, and original line
+snapshots, then commits every add/modify/remove plus the review status together.
+Approved retries are no-ops.
+
+Reject approval when a non-cancelled pick list or active/completed
+finished-good allocation already exists. A narrow, read-only
+`SECURITY DEFINER` predicate exposes only that cross-domain boolean to an
+active `orders:write` caller; the mutation itself never bypasses RLS or edits
+fulfillment history.
+
+**Rationale**: The old function targeted dropped package/keg columns and tried
+to infer order-line ownership from order-level allocations. Duplicate products
+make that inference ambiguous, and sales users do not have inventory-write
+permission. Requiring cancellation/regeneration is explicit, role-consistent,
+and preserves the allocation ledger.
+
 ---
 
 ## Redundancy Resolutions
@@ -794,7 +837,7 @@ selling_formats:
 ## Water Chemistry Decisions
 
 ### DEC-WATER-001: Water Addition Profiles
-**Status**: Implemented
+**Status**: Removed during migration renumbering; retained below as history
 
 Replace the non-functional `use_default_additions` toggle with named, reusable water addition profiles.
 
@@ -811,12 +854,34 @@ Replace the non-functional `use_default_additions` toggle with named, reusable w
 - `recipes`: dropped `use_default_additions`, added `water_addition_profile_id` FK
 - New `system_settings` key: `default_water_profile_id`
 
+The `water_addition_profiles` table and its ownership columns are absent from
+the current deployed schema and generated types. Source/target water chemistry
+still uses `water_profiles`; recipe salt/acid rows are recipe-owned.
+
+### DEC-WATER-002: Atomic Category-Scoped Recipe Additions
+**Status**: Implemented (migration 00263)
+
+The water-chemistry display and non-water additions editor share one
+`SECURITY INVOKER`, version-checked replacement function. The caller chooses an
+allowlisted `water_chemistry` or `other` scope, while Postgres resolves actual
+membership from `additives.type`. `NULL` means the category is omitted and an
+empty array explicitly clears it.
+
+The function locks the recipe before checking `recipes.version`; therefore two
+writers starting at the same version cannot merge replacement sets. Deletion
+and insertion share one transaction, so an insertion failure restores the old
+category. The predicate is also limited to the requested `recipe_id`, which
+leaves historical ownerless/profile rows untouched.
+
+**Rationale**: client-side DELETE followed by INSERT cannot provide rollback,
+serialization, or a trustworthy category boundary across PostgREST requests.
+
 ---
 
 ## Integration Decisions
 
 ### DEC-INT-001: Atomic Square Sale and Refund Ingestion
-**Status**: Implemented (migration 00257_atomic_square_ingestion.sql)
+**Status**: Implemented (migrations 00257_atomic_square_ingestion.sql and 00262_cumulative_square_refund_reversals.sql)
 
 Square webhook handlers fetch the external order before starting durable work,
 then submit the normalized sale or refund to one service-role-only PostgreSQL
@@ -824,6 +889,13 @@ function. The function owns the dedup claim, FIFO allocation/reversal ledger,
 physical bin movement, draft sale mutation, and claim finalization in one
 transaction. A per-order transaction advisory lock serializes sales and refunds,
 including the interval before an uncommitted sale claim is visible.
+
+Partial refunds use the completed per-order refund log as a monetary history.
+For each original sale allocation, the refund function floors the cumulative
+target quantity and subtracts quantities recorded by prior reversal entries.
+Only that delta is inserted and credited. This retains the immutable sale
+ledger while preventing separate partial-refund rounding from permanently
+under-crediting inventory; cumulative full refunds also void staged draft rows.
 
 Unexpected failures roll the full statement back and are safe to retry.
 Deterministic line/sizing failures are finalized as audit records. Incomplete
@@ -834,7 +906,7 @@ reconciliation instead.
 **Rationale**: exactly-once claim rows alone cannot make several independent
 database requests atomic. Moving the complete state transition into PostgreSQL
 eliminates orphan allocations, unmatched bin movements, double effects after a
-timeout, and sale/refund ordering races.
+timeout, sale/refund ordering races, and per-event rounding drift.
 
 ---
 

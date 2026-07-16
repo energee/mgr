@@ -40,6 +40,7 @@ export type SeededRole =
   | "viewer"
   | "inventory_manager"
   | "production_manager"
+  | "sales"
   | "admin"
   | "no_roles"
   | "no_profile"
@@ -55,6 +56,7 @@ export const SEEDED_UUIDS: Record<SeededRole, string> = {
   // production_manager role carries inventory:write in the permission map.
   inventory_manager: "00000000-0000-0000-0000-000000000002",
   production_manager: "00000000-0000-0000-0000-000000000003",
+  sales: "00000000-0000-0000-0000-000000000011",
   admin: "00000000-0000-0000-0000-000000000004",
   // auth.users row exists; user_profiles row has roles=[]
   no_roles: "00000000-0000-0000-0000-000000000005",
