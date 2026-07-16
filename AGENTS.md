@@ -101,7 +101,7 @@ Domain expertise lives in plain markdown under `.claude/agents/*.md`. Shared ski
 | `src/components/` | `ui-systems-expert` |
 | Writing/repairing tests, pre-refactor coverage | `test-surgeon` |
 | Reviewing any refactor/dedup diff (read-only gate) | `refactor-reviewer` |
-| Reviewing any multi-step write — ≥2 table writes that must succeed together, external call + local write, delete-then-insert replacement, compensation branches (read-only gate) | `transaction-safety-reviewer` |
+| Reviewing any multi-step write path (read-only gate) | `transaction-safety-reviewer` |
 
 Each agent file has YAML frontmatter (`name`, `description`, and optionally Claude-only `tools`). Harnesses that don't understand frontmatter keys should ignore them and read the body. Agent definitions remain under `.claude/` for historical reasons; their content is harness-agnostic.
 

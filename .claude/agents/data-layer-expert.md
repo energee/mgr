@@ -22,9 +22,9 @@ Read `docs/knowledge/entity-model.md` first; that file is the source of truth �
 - **Query-key discipline** (`src/lib/query-keys.ts`, dozens of domain factories + generic `entityKeys`): every key factory returns `as const` tuples; child keys are deliberately nested under a parent key so a broad `invalidateQueries(parentKey)` also covers them (e.g. `orderKeys.allocatedLots` nested under `allocations(id)`) — preserve this nesting when adding keys, don't hand-roll ad hoc key arrays elsewhere.
 - **Other conventions**: `unwrap()` (`src/lib/supabase/query-helpers.ts`) replaces `{data,error}` throw-on-error boilerplate — use it for new query/RPC calls. `optimistic-lock.ts` treats a 0-row update result as a version conflict (not an error) via `.eq("version", currentVersion)`. `pg-error-codes.ts` is the single source of truth for PG error-code→message mapping — don't hardcode new codes elsewhere. `server.ts`'s `createAdminClient()` bypasses RLS via the service-role key — use sparingly. There is no root `middleware.ts`: `src/proxy.ts` (Next.js 16 proxy, holds the route matcher) calls the `refreshSession` helper in `src/lib/supabase/middleware.ts`, and that pair ONLY refreshes sessions — authorization lives in layouts. The staff gate is `src/app/(app)/layout.tsx` (redirects anonymous users to `/login` and customer-only users to `/portal/orders`); `src/app/(auth)/` layouts merely bounce already-logged-in users off the login screens. That makes `(app)/layout.tsx` and the `src/app/portal/` layouts the authorization surface — treat changes there like RLS changes: check both the staff-facing and customer-portal path, since portal users get customer-scoped RLS policies layered on top of staff policies. CI note: `gh pr list --search` returns empty under Actions' `GITHUB_TOKEN` — harness scripts must plain-list + regex-filter instead.
 - Never trust local `main` as representing current production state — it can be well over a hundred commits behind `origin/main`; verify migration/schema state against the live project or `origin/main`, not the local checkout.
-- **PostgREST calls are per-request autocommit** — two `await supabase.from(...)` calls are two transactions, always. Write chains that must succeed together belong in one SQL RPC. This was the root pattern behind 16 of 50 issues in the 2026-07 issue-insights pass (#446/#447/#434/#416/#480/#488 among others — see `docs/plans/2026-07-16-issue-insights.md`); dispatch `transaction-safety-reviewer` on any diff adding a multi-step write.
-- **Column drops/renames have RPC blast radius** (#476): `apply_change_request()` kept reading `order_items` columns dropped by a later migration, so every approval 500'd. Before dropping/renaming a column, grep every migration-defined function body **and** `supabase/live-catalog.snapshot.txt` for references.
-- **Authorization ≠ authentication, and roles ≠ active** (#435, #448, #441): API routes need `withPermission`, not bare `withAuth` — authenticated customers could start QuickBooks OAuth and spend brewery Anthropic credits through routes that only checked login. And access checks must consider `user_profiles.status`, not roles alone — inactive users retained full access until #441 fixed layout, `withPermission`, TS checks, and `user_has_permission()` together. Any new auth surface must cover all four layers.
+- **PostgREST calls are per-request autocommit** — two `await supabase.from(...)` calls are two transactions, always; write chains that must succeed together belong in one SQL RPC. Dispatch `transaction-safety-reviewer` on any diff adding a multi-step write that isn't already inside one RPC (analysis: `docs/plans/2026-07-16-issue-insights.md`).
+- **Column drops/renames have RPC blast radius** (#476): `apply_change_request()` kept reading `order_items` columns a later migration dropped, so every approval 500'd. Before dropping/renaming a column, grep every migration-defined function body **and** `supabase/live-catalog.snapshot.txt` for references. Data-merge migrations must carry forward semantic flags on collision deletes (#478: `is_preferred` silently lost).
+- **Authorization ≠ authentication, and roles ≠ active** (#435/#448/#441): API routes need `withPermission`, not bare `withAuth` (authenticated customers could replace global QBO tokens and spend brewery Anthropic credits), and access checks must consider `user_profiles.status` — #441 had to fix all four layers together (staff layout, `withPermission`, TS checks, `user_has_permission()`). Any new auth surface covers all four.
 
 ## Review checklist
 1. New tables added to the correct RLS domain array in a migration, not a hand-written one-off policy.
@@ -36,15 +36,15 @@ Read `docs/knowledge/entity-model.md` first; that file is the source of truth �
 7. New PG error codes added to `pg-error-codes.ts`, not hardcoded at the call site.
 8. After DDL applied outside the normal migration pipeline, run `NOTIFY pgrst, 'reload schema';`.
 9. Any change to triggers/views/RPCs diffed against the live schema, not just the migration files.
-10. Multi-step writes are in one RPC or have per-branch compensation; every awaited Supabase write's `error` is checked (discarded `{error}` = silent partial state, #445/#436). Dispatch `transaction-safety-reviewer` for the full gate.
-11. Column drops/renames grep'd against all migration function bodies and `supabase/live-catalog.snapshot.txt` (#476); data-merge migrations carry forward semantic flags on collision deletes (#478).
-12. New/changed API routes use `withPermission` (not bare `withAuth`), and auth checks account for `user_profiles.status` across layout, API wrapper, TS checks, and RLS helper (#435/#441/#448).
+10. Multi-step writes: one SQL RPC or per-branch compensation, every awaited write's `{error}` checked — dispatch `transaction-safety-reviewer`.
+11. Column drops grep'd against migration function bodies + live snapshot (#476); merge migrations preserve semantic flags (#478).
+12. New/changed routes use `withPermission`; auth changes cover layout + API wrapper + TS checks + RLS helper, including `status` (#441).
 
 ## Key files
 - `supabase/migrations/00097_permission_based_roles.sql`
 - `src/lib/query-keys.ts`
 - `src/lib/supabase/query-helpers.ts`
-- `src/lib/supabase/optimistic-lock.ts`
+- `src/lib/optimistic-lock.ts`
 - `src/lib/supabase/pg-error-codes.ts`
 - `src/lib/supabase/server.ts`
 - `src/proxy.ts`
