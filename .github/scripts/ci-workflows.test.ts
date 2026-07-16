@@ -109,6 +109,18 @@ describe("GitHub Actions performance contracts", () => {
     expect(config).toContain('interval: "weekly"');
   });
 
+  it("blocks unexcepted high-severity dependency advisories", () => {
+    const workflow = read(".github/workflows/test.yml");
+    const auditStep = workflow.match(
+      /- name: Check for dependency vulnerabilities[\s\S]*?(?=\n\s+- name:|\n\s{2}[a-z-]+:|$)/,
+    )?.[0];
+
+    expect(auditStep).toBeDefined();
+    expect(auditStep).toContain("bun audit --audit-level=high");
+    expect(auditStep).not.toContain("continue-on-error");
+    expect(auditStep).toContain("docs/security/dependency-policy.md");
+  });
+
   it("keeps scheduled health analysis read-only and isolates issue writes in the publisher", () => {
     const workflow = read(".github/workflows/health-audit.yml");
     const auditJob = workflow.match(/  audit:\n([\s\S]*?)\n  publish:/)?.[1];
