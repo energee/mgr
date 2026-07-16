@@ -7,7 +7,6 @@ function read(relativePath: string): string {
 }
 
 const workflows = [
-  ".github/workflows/claude-code-review.yml",
   ".github/workflows/claude.yml",
   ".github/workflows/db-lint.yml",
   ".github/workflows/health-audit.yml",
@@ -100,19 +99,13 @@ describe("GitHub Actions performance contracts", () => {
     expect(sentryWorkflow).toContain("timeout-minutes: 45");
   });
 
-  it("serializes bot updates and avoids duplicate Claude reviews", () => {
+  it("serializes bot updates to PROGRESS.md", () => {
     const progressWorkflow = read(".github/workflows/progress.yml");
-    const reviewWorkflow = read(".github/workflows/claude-code-review.yml");
 
     expect(progressWorkflow).toContain("pull-requests: write");
     expect(progressWorkflow).toContain("cancel-in-progress: true");
     expect(progressWorkflow).toContain("gh pr create");
     expect(progressWorkflow).toContain("gh pr merge");
-    expect(reviewWorkflow).toContain("concurrency:");
-    expect(reviewWorkflow).toContain("sentry-fix/");
-    // One review per PR: no synchronize re-reviews, docs-only PRs skipped.
-    expect(reviewWorkflow).toMatch(/types: \[opened, ready_for_review\]/);
-    expect(reviewWorkflow).toContain("paths-ignore:");
   });
 
   it("keeps GitHub Actions dependencies updated weekly", () => {
