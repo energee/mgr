@@ -29,9 +29,10 @@ Rule of thumb: **the stronger the external gate, the lighter the model.**
   check` + review pass), autoharness proposals (typecheck+vitest screening),
   rubric-driven regrades. A weaker model here costs retries, not correctness.
 - **Default/stronger model** for work where the gate is human judgment:
-  interactive sessions, design decisions, `@claude` mentions and PR review
-  (`claude.yml`, `claude-code-review.yml` intentionally stay on default —
-  review is the safety net for Sonnet-generated fixes, so don't cheapen it).
+  interactive sessions, design decisions, `@claude` mentions (`claude.yml`
+  intentionally stays on default). Automated per-PR review was removed
+  2026-07-16 with the CI minutes diet — run `/code-review` locally before
+  pushing, or comment `@claude review this` on a PR for an on-demand pass.
   The scheduled health audit also stays on the default model because a schema
   can validate finding shape but cannot mechanically prove the diagnosis.
 
