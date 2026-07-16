@@ -23,6 +23,9 @@ Owns the entity registry system end to end — adding, modifying, and wiring ent
 - `knip`'s "unused exports" list flags core, definitely-live symbols (`EntityDataTable`, `EntityDetailUnified`, every entity `*Schema`) because they're consumed only via the entity registry or `z.infer`, which it doesn't trace. Only grep-verified zero-importer exports are safe to remove; acting on knip's raw list is churn/regression risk.
 - **Services layer** (`src/services/`): the orchestration tier between entity configs and the DB. `entity-service.ts` is the shared CRUD module — React-free so hooks, route handlers, and AI tools all share it; see its module header for the API contract. Every state-transition path MUST call `entityService.transition`, which dispatches to the `transition_entity_atomic` RPC; never issue a client status UPDATE followed by `runTransitionSideEffects`. The legacy `transition-side-effects.ts` module remains only as parity/reference coverage while migration 00256 owns the live `(table, toState)` effects. Pure math stays in `src/domain/` (e.g. `consumption-planning.ts`); services own only the Supabase reads/writes.
 - Historical incident: commit `93f944a3` ("QA pass — category mismatch") had to fix `inventory_items` category `'hops'` → `'hop'` across four places at once (entity config, seed data, tests, migration `00151`) because a hand-typed string literal drifted from the DB enum. Cross-check hand-typed `z.enum([...])` literals against option-array values and the DB enum whenever either changes.
+- **Child-row replacement must be atomic** (#446/#480/#488): editors that replace a parent's child rows must save through a single atomic RPC boundary, never a DELETE request followed by an INSERT request, and deletes must be scoped to the exact subset being edited (#480's generic path deleted recipe-wide while editing one category).
+- **Derived data needs one shared entry point** (#489, open): any mutation path that changes rows feeding a derivation (e.g. `order_items` → `order_materials`) must invoke the same reusable server-side recalculation as its sibling paths — the change-request approval RPC applied line mutations without the shipping-material recalculation the staff editor runs. When adding a mutation path, enumerate its siblings and check what they recalculate.
+- Dispatch `transaction-safety-reviewer` on any diff adding a multi-step write that isn't already inside one SQL RPC (analysis: `docs/plans/2026-07-16-issue-insights.md`).
 
 ## Review checklist
 1. New entity has `core.ts` + `presentation.tsx` + `index.ts` using `createEntityConfig()`, matching the `batch` template.
@@ -33,6 +36,8 @@ Owns the entity registry system end to end — adding, modifying, and wiring ent
 6. Any new action-visibility logic checked against `getApplicableActions()` in `src/lib/entity-actions.ts` — remember `entity-detail-unified.tsx` diverges intentionally.
 7. Hand-typed enum/option-array string literals cross-checked against the DB enum and against each other (the `93f944a3` failure mode).
 8. Don't act on knip's "unused exports" for entity symbols without a grep-verified zero-importer check.
+9. Child-row editors save through a single atomic RPC, never DELETE-then-INSERT via two PostgREST calls; deletes scoped to the edited subset (#446/#480/#488).
+10. Mutation paths that touch derivation inputs invoke the shared recalculation entry point — verified against every sibling path (#489).
 
 ## Key files
 - `src/entities/batch/{core.ts,presentation.tsx,index.ts}` (template)

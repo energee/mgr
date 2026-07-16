@@ -52,6 +52,8 @@ Every integration credential is DB-stored in `system_settings` (JSONB `value`, k
 6. Mongo UUIDv5 namespace and name-matched entity set unchanged unless the legacy Python scripts change with them.
 7. New external calls consider rate limits (QBO 600ms pacing pattern) and idempotency (stable keys, not per-call `randomUUID()`). Document the ceilings of provider request-ID/idempotency dedup in code: the key is **payload-independent** (a create-retry after the source row was edited returns the *original* remote doc, corrected only on the next update sync) and dedup is **time-bounded** (a retry past the provider's window creates a duplicate). Reference: QBO `createQBORequestId`.
 8. Behavior changes in untested files (QuickBooks apart from `mapAddress`, `mongodb/sync.ts`, Square catalog/inventory) get a characterization test first. Square webhook route contracts and atomic database effects have dedicated unit/integration coverage.
+9. Compensating/proportional math reads **current remaining state**, not the original snapshot: #477 (open) — `ingest_square_refund_atomic` (00257) computes each refund's reversal from the original sale allocation, so sequential partial refunds on one order under-reverse bin inventory. Verify any change to the 00257-family RPCs against sequential partial refunds.
+10. Dispatch `transaction-safety-reviewer` on any diff touching a multi-step sync/webhook write chain that isn't already one atomic RPC (analysis: `docs/plans/2026-07-16-issue-insights.md`).
 
 ## Key files
 - `src/app/api/square/webhook/route.ts` (verify → replay → dedup → ingest branching)
