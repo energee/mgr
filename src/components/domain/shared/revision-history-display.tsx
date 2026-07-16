@@ -1,10 +1,16 @@
-"use client";
-
 /**
  * RevisionHistoryDisplay - Wrapper component for entity detail sections
  *
  * Adapts RevisionHistory component to work with EntityDetail's custom
  * component section pattern. Extracts entity info from data prop.
+ *
+ * No "use client" here: this file only composes JSX around the client
+ * `RevisionHistory` component (which carries its own directive) and uses no
+ * hooks itself. `createRevisionHistoryDisplay()` is invoked eagerly at module
+ * scope inside each entity's `presentation.tsx`, so if this file were a
+ * client boundary, any server-only import of that presentation module would
+ * try to call a client-reference function and crash
+ * (SENTRY-7611936148 / MGR-S).
  */
 
 import { RevisionHistory } from "./revision-history";
