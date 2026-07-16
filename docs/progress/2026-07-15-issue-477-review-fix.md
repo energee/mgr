@@ -1,0 +1,1 @@
+- **2026-07-15 (Square refund review fix).** Unsizeable refunds (missing order total/amount) now raise and roll back the whole transaction instead of persisting a completed log that a retry mistook for a duplicate.
