@@ -28,6 +28,22 @@ CREATE POLICY change_requests_customer_lock ON order_change_requests
   USING (requested_by = (SELECT auth.uid()))
   WITH CHECK (false);
 
+-- Same lock-only pattern on orders: submission takes the order row lock so the
+-- cutoff check serializes with staff status transitions (mirrors
+-- apply_change_request in 00261). WITH CHECK (false) keeps customers unable to
+-- actually update the order.
+DROP POLICY IF EXISTS orders_customer_lock ON orders;
+CREATE POLICY orders_customer_lock ON orders
+  FOR UPDATE TO authenticated
+  USING (
+    customer_id IN (
+      SELECT customer_id
+      FROM customer_portal_users
+      WHERE user_id = (SELECT auth.uid())
+    )
+  )
+  WITH CHECK (false);
+
 CREATE OR REPLACE FUNCTION guard_order_change_request_item_write()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -114,7 +130,8 @@ BEGIN
    AND cpu.user_id = v_user_id
   JOIN customers c ON c.id = o.customer_id
   LEFT JOIN sales_channels sc ON sc.id = c.sales_channel_id
-  WHERE o.id = p_order_id;
+  WHERE o.id = p_order_id
+  FOR UPDATE OF o;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Order not found or unavailable to this portal user'

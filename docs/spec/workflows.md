@@ -98,7 +98,7 @@ rejected
 transaction and rejects an empty item array. Item writes and review transitions
 share a transaction lock, so a request cannot gain items after review.
 
-**Cutoff rule:** Change requests can only be submitted when the order's status is below the sales channel's `change_request_cutoff_state` (default: `confirmed`). The submission RPC derives the status ordering from the `order_status` enum registry.
+**Cutoff rule:** Change requests can only be submitted when the order's status is below the sales channel's `change_request_cutoff_state` (default: `confirmed`). The submission RPC derives the status ordering from the `order_status` enum registry and takes the order row lock (`FOR UPDATE OF o`, via the lock-only `orders_customer_lock` policy) so the cutoff check serializes with concurrent staff status transitions.
 
 **Fulfillment rule:** Approval is rejected while the order has a non-cancelled
 pick list or active/completed finished-good allocation. Staff must cancel and

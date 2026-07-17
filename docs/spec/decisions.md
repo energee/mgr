@@ -585,7 +585,9 @@ and preserves the allocation ledger.
 Customer submission creates the `order_change_requests` parent and every
 `order_change_request_items` child through one `SECURITY INVOKER` PostgreSQL
 command. The command derives the requester from `auth.uid()`, verifies portal
-ownership and the sales-channel cutoff, rejects empty requests, and derives
+ownership and the sales-channel cutoff under the order row lock (a lock-only
+customer UPDATE policy on `orders` with an always-false `WITH CHECK` makes the
+lock possible without granting writes), rejects empty requests, and derives
 existing-item snapshots from the order instead of trusting client values.
 
 Review commands scope a request by both request and order IDs and return
