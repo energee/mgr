@@ -1,0 +1,1 @@
+- **2026-07-15 (Atomic order change requests).** Moved portal submission and staff rejection into scoped invoker-rights PostgreSQL transactions, added a shared review/item lock and customer cutoff policy, and covered rollback, empty requests, identifier scoping, stale reviews, and late-item rejection in component, route, and real-Postgres regressions (#488).
