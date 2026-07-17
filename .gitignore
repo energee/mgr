@@ -101,3 +101,4 @@ autoharness.onboarding.json
 # Python bytecode (autoharness preflight runs `python -m compileall .`).
 __pycache__/
 *.pyc
+/.agents/worktrees/
