@@ -2,10 +2,37 @@ import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+// Shared exclude list for both projects (see `projects` below).
+const sharedExclude = [
+  // Spread the defaults: a bare `exclude` REPLACES them, un-ignoring
+  // node_modules/dist for the include globs above.
+  ...configDefaults.exclude,
+  // Integration tests require a live Postgres instance; they run under
+  // bun run test:integration (vitest.integration.config.ts), not here.
+  "src/__tests__/integration/**",
+];
+
+// Directories whose tests are pure logic (no DOM): they run in the `node`
+// project below, skipping jsdom environment setup entirely — jsdom
+// instantiation per test file dominated suite startup (~293s of per-worker
+// environment time across 188 files before the split). A test file in one
+// of these dirs that genuinely needs a DOM can opt back in with a
+// `// @vitest-environment jsdom` docblock, which overrides the project
+// environment.
+const nodeTestGlobs = [
+  "src/lib/**/*.test.{ts,tsx}",
+  "src/domain/**/*.test.{ts,tsx}",
+  "src/services/**/*.test.{ts,tsx}",
+  "src/integrations/**/*.test.{ts,tsx}",
+  "src/entities/**/*.test.{ts,tsx}",
+  "src/__tests__/**/*.test.{ts,tsx}",
+  "src/app/api/**/*.test.{ts,tsx}",
+  ".github/scripts/**/*.test.ts",
+];
+
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: "jsdom",
     // Deterministic timezone for every test file (CI is UTC without this).
     // A behind-UTC zone is load-bearing: backward-planner's tests
     // characterize the "date-only string renders a day early" behavior,
@@ -15,19 +42,41 @@ export default defineConfig({
     // platform for this suite.
     env: { TZ: "America/New_York" },
     globals: true,
+    // Worker threads instead of child-process forks: same isolation per test
+    // file, but far cheaper worker startup and module transfer. Nothing in
+    // this suite needs fork-only behavior (no process.chdir, no native
+    // segfault risk).
+    pool: "threads",
     setupFiles: ["./src/test/setup.ts"],
-    include: [
-      "src/**/*.test.ts",
-      "src/**/*.test.tsx",
-      ".github/scripts/**/*.test.ts",
-    ],
-    exclude: [
-      // Spread the defaults: a bare `exclude` REPLACES them, un-ignoring
-      // node_modules/dist for the include globs above.
-      ...configDefaults.exclude,
-      // Integration tests require a live Postgres instance; they run under
-      // bun run test:integration (vitest.integration.config.ts), not here.
-      "src/__tests__/integration/**",
+    // Two projects split the suite by environment. `extends: true` inherits
+    // everything above (plugins, env, globals, setupFiles, resolve aliases);
+    // only `environment` + `include` differ. The jsdom project's include is
+    // the full legacy glob minus the node globs, so the union of the two
+    // projects always equals the old single-project include — a test file in
+    // a brand-new directory lands in jsdom by default, never gets dropped.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "node",
+          environment: "node",
+          include: nodeTestGlobs,
+          exclude: sharedExclude,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "jsdom",
+          environment: "jsdom",
+          include: [
+            "src/**/*.test.ts",
+            "src/**/*.test.tsx",
+            ".github/scripts/**/*.test.ts",
+          ],
+          exclude: [...sharedExclude, ...nodeTestGlobs],
+        },
+      },
     ],
     coverage: {
       provider: "v8",
