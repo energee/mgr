@@ -1,16 +1,18 @@
 # .github/workflows/sentry-harness.yml
 #
-# Sentry Error Harness. Runs twice daily (noon and 5pm EST) and on manual
+# Sentry Error Harness. Runs each weekday at noon EST and on manual
 # dispatch. Score job pulls unresolved Sentry issues, ranks them, and emits
-# up to 5 for the fix-error matrix. Each matrix job invokes Claude Code
+# up to 3 for the fix-error matrix. Each matrix job invokes Claude Code
 # Action to analyze and fix one error, then opens a PR.
 
 name: Sentry Error Harness
 
+# Once per weekday (was twice daily): each run averaged ~44 billable minutes
+# across the fix matrix, and the second daily pass mostly re-scored the same
+# unresolved issues. Manual dispatch covers urgent one-offs.
 on:
   schedule:
-    - cron: "0 17 * * *"   # Noon EST (UTC-5)
-    - cron: "0 22 * * *"   # 5pm EST (UTC-5)
+    - cron: "0 17 * * 1-5"   # Noon EST (UTC-5), weekdays
   workflow_dispatch:
 
 concurrency:
@@ -21,6 +23,7 @@ jobs:
   score-errors:
     name: Score Sentry errors
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
@@ -58,6 +61,8 @@ jobs:
     needs: score-errors
     if: fromJSON(needs.score-errors.outputs.count) > 0
     runs-on: ubuntu-latest
+    # Cost ceiling: a stuck fix run otherwise bills the 6-hour job maximum.
+    timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write

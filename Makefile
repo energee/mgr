@@ -123,6 +123,6 @@ db-dry-run: ## Boot fresh local Supabase, replay all migrations from scratch
 
 # Hygiene
 
-clean: ## Remove build artifacts and caches
-	@rm -rf .next tsconfig.tsbuildinfo node_modules/.cache
-	@echo "Cleaned: .next/, tsconfig.tsbuildinfo, node_modules/.cache/"
+clean: ## Remove build artifacts and caches (fixes stale-cache typecheck/lint failures)
+	@rm -rf .next tsconfig.tsbuildinfo node_modules/.cache .eslintcache coverage .vitest-reports playwright-report test-results
+	@echo "Cleaned: .next/, tsconfig.tsbuildinfo, node_modules/.cache/, .eslintcache, coverage/, .vitest-reports/, playwright-report/, test-results/"
