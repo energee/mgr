@@ -455,6 +455,9 @@ Per-customer, per-selling-format pallet layer count overrides. When set, this ov
 ## `order_change_requests`
 
 Customer-submitted change requests for orders. Requires admin approval.
+The `submit_order_change_request()` invoker-rights RPC creates this parent and
+all child items atomically, derives `requested_by` from the authenticated user,
+and enforces portal ownership plus the configured sales-channel cutoff.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -474,6 +477,8 @@ Customer-submitted change requests for orders. Requires admin approval.
 ## `order_change_request_items`
 
 Individual line-item changes within a change request.
+Insert and update triggers serialize against parent review and reject writes
+unless the parent is still `pending`.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -498,6 +503,15 @@ Orders with a non-cancelled pick list or an active/completed finished-good
 allocation must have those fulfillment artifacts cancelled or regenerated
 before approval. The command never rewrites fulfillment history while changing
 order lines.
+
+---
+
+### Change-request workflow functions
+
+| Function | Result | Contract |
+|----------|--------|----------|
+| `submit_order_change_request(order_id, notes, items)` | New request UUID | Creates one non-empty request aggregate or rolls the whole statement back |
+| `reject_order_change_request(order_id, change_request_id, reason)` | Rejected request UUID | Requires both IDs and returns not-found or conflict for zero/stale matches |
 
 ---
 

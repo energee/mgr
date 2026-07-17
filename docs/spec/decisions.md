@@ -579,6 +579,28 @@ make that inference ambiguous, and sales users do not have inventory-write
 permission. Requiring cancellation/regeneration is explicit, role-consistent,
 and preserves the allocation ledger.
 
+### DEC-GAP-015: Order Change Requests Are Transactional Aggregates
+**Status**: Implemented (migration 00264)
+
+Customer submission creates the `order_change_requests` parent and every
+`order_change_request_items` child through one `SECURITY INVOKER` PostgreSQL
+command. The command derives the requester from `auth.uid()`, verifies portal
+ownership and the sales-channel cutoff under the order row lock (a lock-only
+customer UPDATE policy on `orders` with an always-false `WITH CHECK` makes the
+lock possible without granting writes), rejects empty requests, and derives
+existing-item snapshots from the order instead of trusting client values.
+
+Review commands scope a request by both request and order IDs and return
+distinct not-found and stale-state errors. Child writes and parent status
+changes share the parent row lock. A customer UPDATE policy exposes that lock
+only for the customer's own requests and uses an always-false `WITH CHECK`, so
+customers can serialize child inserts without being able to update the parent.
+
+**Rationale**: separate PostgREST inserts can commit an empty parent when a
+child fails, while an unscoped zero-row update can report a rejection that did
+not occur. One transaction plus a shared review lock preserves the aggregate
+and prevents reviewed requests from gaining late items.
+
 ---
 
 ## Redundancy Resolutions
