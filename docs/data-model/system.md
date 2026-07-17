@@ -697,6 +697,28 @@ opposite Auth action.
 
 ---
 
+## `ai_rate_limit_buckets`
+
+Service-role-only counters for the paid AI chat boundary. One row per Auth
+user is updated atomically by `consume_ai_rate_limit`, so every application
+instance shares the same request window.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| user_id | UUID | Primary key and FK to `auth.users`; deleted with the Auth user |
+| window_started_at | TIMESTAMPTZ | Start of the current fixed request window |
+| request_count | INTEGER | Requests consumed in the current window |
+| updated_at | TIMESTAMPTZ | Last bucket consumption time |
+
+RLS is enabled and all direct table privileges are revoked, including from
+`service_role`. A restrictive enabled-account policy is defense in depth but
+there is no permissive client policy. The `SECURITY DEFINER`
+`consume_ai_rate_limit` function is the only access boundary and is executable
+only by `service_role`; callers reach it after the API has enforced the
+`ai:use` staff permission.
+
+---
+
 ## MongoDB sync ownership and reconciliation
 
 `mongodb_sync_log` records the outcome of each entity sync. A phase/entity

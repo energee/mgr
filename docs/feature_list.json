@@ -605,11 +605,12 @@
       "id": "SENTRY-7597067722",
       "area": "infra",
       "title": "Failed to fetch notifications:",
-      "user_visible_behavior": "On /dashboard, NotificationsProvider's unread-notifications fetch intermittently failed with \"AbortError: Lock broken by another request with the 'steal' option.\" Root cause: src/lib/supabase/client.ts's createClient() built a brand-new Supabase browser client (and internal GoTrueClient) on every call; it is called fresh in 145+ client components/hooks, including on every re-render of NotificationsProviderInner. All instances share the same auth storage key, so concurrent GoTrueClient instances raced over the same navigator.locks name, and a newer instance could steal the lock from an older instance's in-flight supabase.auth.getSession()/getUser() call, aborting whatever fetch was waiting on it. Fixed by making createClient() a module-scoped singleton, per Supabase's own documented fix for this class of bug.",
-      "verification": "bun run test src/lib/supabase/__tests__/client.test.ts",
+      "user_visible_behavior": "Second recurrence of this Sentry issue, different root cause than the first. On /sales/customers/:id (dev environment), NotificationsProvider's unread-notifications fetch failed with a browser-level \"TypeError: Failed to fetch\" while calling the Supabase REST endpoint. Classified (D) observability gap: postgrest-js's fetch `.catch()` handler wraps network-level failures (and some Postgrest error responses) as a plain object literal `{ message, details, hint, code }` that is NOT an `instanceof Error`, despite its `PostgrestError` TS type claiming otherwise, so client-logger.ts's `instanceof Error` check missed it and Sentry got a stack-less captureMessage instead of the real message/stack/code. Fixed client-logger.ts to also recognize and unwrap Postgrest-error-shaped plain objects into a real Error (preserving message, stack from `details`, and code/hint as extra) before forwarding to Sentry.captureException — this applies to every log.error/log.warn call site in the app, not just notifications. The underlying network failure itself (why the fetch to Supabase failed) is still unresolved infra/(B) and is tracked in a separate GitHub issue, since it isn't fixable from application code. First recurrence (lock-steal AbortError from a non-singleton browser client) was fixed separately — see notes.",
+      "verification": "bun run test src/lib/__tests__/client-logger.test.ts",
       "state": "passing",
-      "evidence": "branch:sentry-fix/SENTRY-7597067722",
-      "branch": "sentry-fix/SENTRY-7597067722"
+      "evidence": "pr:513",
+      "branch": "sentry-fix/SENTRY-7597067722",
+      "notes": "History: first occurrence fixed by making src/lib/supabase/client.ts's createClient() a module-scoped singleton (lock-steal AbortError root cause). This second occurrence is a different symptom (network-level fetch failure) that exposed a pre-existing observability gap in client-logger.ts; see GitHub issue #514 for the still-unresolved network failure."
     },
     {
       "id": "SENTRY-7477285482",
@@ -620,6 +621,16 @@
       "evidence": "pr:407",
       "branch": "sentry-fix/SENTRY-7477285482",
       "notes": "This issue ID has a three-act history on /dashboard: PR #297 fixed a prefill-store sessionStorage read happening during render; PR #306 fixed unpinned toLocaleDateString()/toLocaleString() locale mismatches; the issue kept recurring afterward (last seen 2026-07-11T02:25:44Z, release 00fbe79). The sibling Sentry issue MGR-6 (SENTRY-7477285440) — same culprit, same release, same last-seen minute — was root-caused to TrendChartLazy/BatchActivityHeatmapLazy using next/dynamic({ssr:false}) nested inside a genuinely-suspending Suspense (usePeriod->useSearchParams), and fixed by PR #396 (already merged before this run). Confirmed current dashboard/page.tsx and dashboard/sales/page.tsx already reflect that fix, so no further /dashboard-specific change was needed for this recurrence. Pattern scan for the same defect class (browser-storage read during render instead of in an effect — the exact mechanism of this issue's first fix in PR #297) found one more live instance: usePersistedPageSize (src/hooks/use-persisted-page-size.ts), used by EntityDataTable on every entity list page, read localStorage inside a useState lazy initializer. Fixed by deferring the read to useEffect, mirroring usePrefillHydration (PR #407)."
+    },
+    {
+      "id": "SENTRY-7611936148",
+      "area": "infra",
+      "title": "Error: Attempted to call createRevisionHistoryDisplay() from the server but createRevisionHistoryDisplay is on the client.",
+      "user_visible_behavior": "While developing the sitewide server-prefetch loading pattern, importing an assembled entity presentation (e.g. batchEntity) from a Server Component crashed: createRevisionHistoryDisplay() is invoked eagerly at module scope inside every entity presentation.tsx, and its defining file carried an unnecessary \"use client\" directive even though it uses no hooks itself (the real hook logic lives in the child RevisionHistory component, which already has its own directive). Removed the incorrect directive so the factory can be called safely regardless of which context imports the presentation module. The same eagerly-invoked-factory-in-a-\"use client\"-file pattern existed for createQBOSyncDisplay (used by customer/supplier/order/purchase-order presentations); extracted it into a new non-client qbo-sync-display.tsx, mirroring the existing revision-history split, so QBOSyncSection keeps its (genuinely required) \"use client\" directive in its own file.",
+      "verification": "bun run test src/components/domain/shared/__tests__/entity-config-client-boundary.test.ts",
+      "state": "passing",
+      "evidence": "pr:497",
+      "branch": "sentry-fix/SENTRY-7611936148"
     },
     {
       "id": "SENTRY-7611936203",

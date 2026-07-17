@@ -208,6 +208,13 @@ describe("hasPermission", () => {
     }
   });
 
+  it("grants brewery-funded AI chat to staff but not portal customers", () => {
+    for (const role of STAFF_ROLES) {
+      expect(hasPermission([role], "ai:use"), `${role} should have ai:use`).toBe(true);
+    }
+    expect(hasPermission(["customer"], "ai:use")).toBe(false);
+  });
+
   it("customer combined with a staff role gains that role's permissions", () => {
     expect(hasPermission(["customer", "viewer"], "recipes:read")).toBe(true);
     expect(hasPermission(["customer", "viewer"], "recipes:write")).toBe(false);
@@ -292,6 +299,10 @@ describe("getPermissions", () => {
 // =============================================================================
 
 describe("getRolesForPermission", () => {
+  it("returns every staff role for ai:use", () => {
+    expect(getRolesForPermission("ai:use")).toEqual([...STAFF_ROLES]);
+  });
+
   it("returns all roles that have recipes:read", () => {
     const roles = getRolesForPermission("recipes:read");
     expect(roles).toEqual(
@@ -414,8 +425,8 @@ describe("PERMISSION_MAP", () => {
   });
 
   it("contains expected number of permissions", () => {
-    // 7 resources x 2 (read/write) + 3 manage = 17
-    expect(ALL_PERMISSIONS).toHaveLength(17);
+    // 7 resources x 2 (read/write) + 3 manage + AI use = 18
+    expect(ALL_PERMISSIONS).toHaveLength(18);
   });
 
   it("covers all expected resource areas", () => {
@@ -432,6 +443,7 @@ describe("PERMISSION_MAP", () => {
         "integrations",
         "settings",
         "users",
+        "ai",
       ])
     );
   });

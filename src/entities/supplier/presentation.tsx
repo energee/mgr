@@ -8,7 +8,7 @@
 import type { EntityPresentation } from "@/types/entity";
 import type { Database } from "@/types/supabase";
 import { Badge } from "@/components/ui/badge";
-import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-display";
 import { SupplierCatalogSection } from "@/components/domain/purchasing/supplier-catalog-section";
 
 type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];

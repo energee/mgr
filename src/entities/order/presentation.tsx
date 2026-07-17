@@ -12,7 +12,7 @@ import { createRevisionHistoryDisplay } from "@/components/domain/shared/revisio
 import { OrderQuickLinks } from "@/components/domain/order/order-quick-links";
 import { OrderItemsEditor } from "@/components/domain/order/order-items-editor";
 import { ChangeRequestReview } from "@/components/domain/order/change-request-review";
-import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-section";
+import { createQBOSyncDisplay } from "@/components/domain/shared/qbo-sync-display";
 import { OrderShippingMaterialsEditor } from "@/components/domain/order/order-shipping-materials-editor";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
