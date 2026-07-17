@@ -109,3 +109,13 @@
   - Give sales users inventory-write access — materially broadens their role beyond order management.
   - Run the entire approval as `SECURITY DEFINER` — unnecessary privilege for the actual order/request mutation.
 - **Reversibility**: moderate — a future line-linked allocation model could safely replace the precondition with exact reservation reconciliation.
+
+## 2026-07-15 — Shipping-material estimates share the order-item write boundary
+
+- **Decision**: Recalculate order shipping-material estimates with invoker-rights database triggers on material-impacting order-item writes. Serialize through the parent order row, preserve manual actual quantities, and let the browser only invalidate its cache after commit.
+- **Why**: Direct staff edits previously committed before a separate browser calculation, while change-request approval bypassed that browser path entirely. The shared trigger makes the line change, estimate update, and approval status one rollback boundary.
+- **Alternatives rejected**:
+  - Call a recalculation RPC after each mutation — it remains a second transaction and can leave stale estimates.
+  - Duplicate recalculation inside every mutation RPC — direct table writes would still bypass the contract and the same formula would drift across commands.
+  - Keep the browser hook for direct edits only — preserves the original partial-commit and manual-override bugs.
+- **Reversibility**: moderate — the triggers and calculator can be removed together, but doing so restores a multi-transaction derivation gap.

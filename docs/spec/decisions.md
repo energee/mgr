@@ -601,6 +601,29 @@ child fails, while an unscoped zero-row update can report a rejection that did
 not occur. One transaction plus a shared review lock preserves the aggregate
 and prevents reviewed requests from gaining late items.
 
+### DEC-GAP-016: Order Shipping Materials Derive at the Write Boundary
+**Status**: Implemented (migration `00265_atomic_order_material_recalculation.sql`)
+
+Every material-impacting `order_items` write locks the parent order before the
+child mutation and recalculates shipping-material estimates through a
+`SECURITY INVOKER` trigger after the mutation. The calculator resolves customer
+layer and material overrides over brewery defaults, changes only estimated
+quantities, and removes no-longer-configured generated rows — except rows
+holding a manually recorded `actual_qty`, which are preserved so configuration
+changes never destroy operational history. Manual actual quantities on
+still-configured rows remain unchanged.
+
+The order lock is the shared serialization boundary for direct staff writes and
+change-request approval. Recalculation therefore commits with the line mutation
+or causes the whole operation to roll back. The browser only refreshes its
+material cache after a committed edit; it does not own the derivation.
+
+**Rationale**: The previous five-request browser hook ran after the order-item
+commit, could fail independently, overwrote manual actual quantities, and was
+never invoked by the database approval command. A database trigger gives every
+writer one atomic contract without duplicating the calculation across mutation
+paths.
+
 ---
 
 ## Redundancy Resolutions

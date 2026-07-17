@@ -1,0 +1,1 @@
+- **2026-07-15 (Atomic order-material recalculation).** Moved shipping-material estimation to a serialized database trigger shared by direct order edits and change-request approval, preserved manual actual quantities, removed the post-commit browser calculator, and added real-Postgres rollback and add/modify/remove coverage for #489.
