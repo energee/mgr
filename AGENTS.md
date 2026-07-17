@@ -39,7 +39,7 @@ Run `make help` to list every target.
 
 ## Shared worktrees
 
-All harnesses use `scripts/agent-worktree` for worktree creation and discovery. Worktrees live under `${AGENT_WORKTREE_ROOT:-$HOME/.agents/worktrees}/<repo>/<name>`, outside the checkout but registered in the repository's common Git directory.
+All harnesses use `scripts/agent-worktree` for worktree creation and discovery. Worktrees live under `${AGENT_WORKTREE_ROOT:-<main-checkout>/.agents/worktrees}/<repo>/<name>` — repo-local by default (gitignored and excluded from tsc/eslint/next/vitest so tooling never recurses into the nested checkouts), registered in the repository's common Git directory.
 
 ```bash
 scripts/agent-worktree create my-task --base origin/main --branch feat/my-task
@@ -48,7 +48,7 @@ scripts/agent-worktree list
 scripts/agent-worktree doctor
 ```
 
-- **MUST NOT** create new worktrees under `.claude/worktrees/`, `.worktrees/`, the repository's `.agents/`, or another harness-specific directory.
+- **MUST NOT** create worktrees by hand. Use `scripts/agent-worktree`, which places them under `.agents/worktrees/` (the only sanctioned location). Do not create them under `.claude/worktrees/`, `.worktrees/`, or another harness-specific directory.
 - **MUST** hand another harness the absolute path from `scripts/agent-worktree path <name>`; do not create a duplicate checkout.
 - **MUST NOT** let multiple write agents edit the same worktree concurrently.
 - Use the `worktree-manager` skill for creation, handoff, diagnosis, and cleanup details.
