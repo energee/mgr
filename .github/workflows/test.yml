@@ -132,41 +132,16 @@ jobs:
         # Exception requirements: docs/security/dependency-policy.md
         run: bun audit --audit-level=high
 
-  e2e-secrets-check:
-    name: E2E Secrets Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: build
-    outputs:
-      configured: ${{ steps.check.outputs.configured }}
-
-    steps:
-      - name: Verify E2E secrets configured
-        id: check
-        env:
-          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          E2E_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-          E2E_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
-        run: |
-          missing=()
-          [ -n "$SUPABASE_URL" ]      || missing+=("NEXT_PUBLIC_SUPABASE_URL")
-          [ -n "$SUPABASE_ANON_KEY" ] || missing+=("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-          [ -n "$E2E_EMAIL" ]         || missing+=("E2E_USER_EMAIL")
-          [ -n "$E2E_PASSWORD" ]      || missing+=("E2E_USER_PASSWORD")
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::warning title=E2E skipped::Missing required secrets: ${missing[*]}. Configure via gh secret set (or repo Settings → Secrets) to enable e2e tests."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
-
+  # Nightly-only (same gate as build). Boots an isolated local Supabase stack
+  # instead of pointing Playwright at hosted credentials — the hosted E2E
+  # secrets were never configured, so the old secrets-gated job silently
+  # skipped and the browser suite never actually ran.
   e2e:
     name: E2E Tests
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: e2e-secrets-check
-    if: needs.e2e-secrets-check.outputs.configured == 'true'
+    needs: build
 
     steps:
       - name: Checkout
@@ -180,16 +155,27 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: "2.109.1"
+
+      - name: Start isolated local Supabase
+        run: |
+          set -euo pipefail
+          supabase start --exclude vector
+          eval "$(supabase status -o env 2>/dev/null)"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
 
       - name: Run E2E tests
         run: bun e2e
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
-          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -198,3 +184,7 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
