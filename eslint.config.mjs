@@ -96,6 +96,16 @@ const eslintConfig = defineConfig([
           message:
             "Use centralized query key factories from @/lib/query-keys instead of inline arrays. See docs/agents/query-keys.md.",
         },
+        {
+          // Destructured error copies passed to log.error degrade to a bare
+          // Sentry captureMessage with no stack/context — client-logger.ts
+          // only routes `instanceof Error` to captureException. Four shipped
+          // instances made production failures undiagnosable (#400/#401/#433).
+          selector:
+            "CallExpression[callee.object.name='log'][callee.property.name='error'] > ObjectExpression:has(Property[key.name='message']):has(Property[key.name='code'])",
+          message:
+            "Pass the original error object to log.error, not a destructured {message, code, ...} copy — plain objects reach Sentry with no stack trace (see src/lib/client-logger.ts and issues #400/#401).",
+        },
       ],
     },
   },
