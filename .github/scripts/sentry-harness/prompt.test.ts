@@ -30,6 +30,15 @@ describe("buildFixPrompt", () => {
     expect(prompt).toContain("342");
   });
 
+  it("requires checking for an existing triage issue before filing a (B)/(C) issue", () => {
+    const prompt = buildFixPrompt(issue);
+    expect(prompt).toContain("gh issue list --state all");
+    expect(prompt).toContain("[sentry] MGR-42:");
+    expect(prompt).toContain("gh issue comment");
+    expect(prompt).toContain("do **not** open a duplicate");
+    expect(prompt).toContain("deleted from main");
+  });
+
   it("enumerates the 14-step pipeline", () => {
     const prompt = buildFixPrompt(issue);
     for (let i = 1; i <= 14; i++) {

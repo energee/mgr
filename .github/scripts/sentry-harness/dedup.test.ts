@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { extractIssueIdFromBranch, filterClaimedIssues, filterFixedIssues } from "./dedup";
+import {
+  extractIssueIdFromBranch,
+  filterClaimedIssues,
+  filterFixedIssues,
+  filterTriagedIssues,
+  isWorktreeArtifact,
+} from "./dedup";
 import type { SentryIssue } from "./types";
 
 function makeIssue(issueId: string): SentryIssue {
@@ -87,5 +93,93 @@ describe("filterFixedIssues", () => {
       ],
     );
     expect(filtered.map((i) => i.issueId)).toEqual(["1"]);
+  });
+});
+
+describe("filterTriagedIssues", () => {
+  // makeIssue("1") has shortId MGR-1 and lastSeen 2026-04-16T00:00:00Z.
+  it("drops issues with an open triage issue", () => {
+    const filtered = filterTriagedIssues(
+      [makeIssue("1"), makeIssue("2")],
+      [{ title: "[sentry] MGR-1: dev artifact", state: "OPEN", closedAt: null }],
+    );
+    expect(filtered.map((i) => i.issueId)).toEqual(["2"]);
+  });
+
+  it("drops issues whose triage issue closed after the last event", () => {
+    const filtered = filterTriagedIssues(
+      [makeIssue("1")],
+      [{ title: "[sentry] MGR-1: stale route", state: "CLOSED", closedAt: "2026-04-20T00:00:00Z" }],
+    );
+    expect(filtered).toEqual([]);
+  });
+
+  it("keeps issues that recurred after their triage issue was closed", () => {
+    const filtered = filterTriagedIssues(
+      [makeIssue("1")],
+      [{ title: "[sentry] MGR-1: stale route", state: "CLOSED", closedAt: "2026-04-10T00:00:00Z" }],
+    );
+    expect(filtered.map((i) => i.issueId)).toEqual(["1"]);
+  });
+
+  it("uses the latest closure when several triage issues exist", () => {
+    const filtered = filterTriagedIssues(
+      [makeIssue("1")],
+      [
+        { title: "[sentry] MGR-1: first triage", state: "CLOSED", closedAt: "2026-04-10T00:00:00Z" },
+        { title: "[sentry] MGR-1: second triage", state: "CLOSED", closedAt: "2026-04-20T00:00:00Z" },
+      ],
+    );
+    expect(filtered).toEqual([]);
+  });
+
+  it("ignores non-sentry titles, other shortIds, and bad dates", () => {
+    const filtered = filterTriagedIssues(
+      [makeIssue("1")],
+      [
+        { title: "fix: unrelated bug", state: "OPEN", closedAt: null },
+        { title: "[sentry] MGR-9: other issue", state: "OPEN", closedAt: null },
+        { title: "[sentry] MGR-1: bad date", state: "CLOSED", closedAt: "not-a-date" },
+        { title: "[sentry] MGR-1: no date", state: "CLOSED", closedAt: null },
+      ],
+    );
+    expect(filtered.map((i) => i.issueId)).toEqual(["1"]);
+  });
+});
+
+describe("isWorktreeArtifact", () => {
+  it("detects worktree chunk paths in the stack trace", () => {
+    const issue = {
+      ...makeIssue("1"),
+      stackTrace:
+        "at x (app:///_next/static/chunks/_agents_worktrees_mgr_ux-improvements_src_8dd5dab1._.js:1:1)",
+    };
+    expect(isWorktreeArtifact(issue)).toBe(true);
+  });
+
+  it("detects legacy claude worktree chunk paths", () => {
+    const issue = {
+      ...makeIssue("1"),
+      stackTrace: "chunks/_claude_worktrees_batch-loss_src_components_00179f9a._.js",
+    };
+    expect(isWorktreeArtifact(issue)).toBe(true);
+  });
+
+  it("detects worktree paths embedded in the title (compile errors)", () => {
+    const issue = {
+      ...makeIssue("1"),
+      title: "Error: ./.agents/worktrees/mgr/ux-improvements/src/components/x.tsx:614:39",
+    };
+    expect(isWorktreeArtifact(issue)).toBe(true);
+  });
+
+  it("keeps ordinary issues", () => {
+    const issue = {
+      ...makeIssue("1"),
+      title: "TypeError: Failed to fetch",
+      culprit: "/sales/customers/:id",
+      stackTrace: "at fetchNotifications (app:///_next/static/chunks/src_lib_abc._.js:10:5)",
+    };
+    expect(isWorktreeArtifact(issue)).toBe(false);
   });
 });
