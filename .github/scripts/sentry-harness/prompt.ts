@@ -92,8 +92,17 @@ Gather evidence before you classify — do not guess:
   that the root cause is still unknown and that the next Sentry event for this
   issue will now carry a usable stack and context. Say exactly this in the PR
   body. Do not write "Followups: none".
-- **(B) or (C)** → **STOP. Do not open a code PR.** Open a GitHub *issue*
-  instead (\`gh issue create\`), titled \`[sentry] ${issue.shortId}: <root cause>\`,
+- **(B) or (C)** → **STOP. Do not open a code PR.** First check whether a
+  previous run already triaged this: run
+  \`gh issue list --state all --limit 200 --json number,title,state\` and grep
+  the titles for \`[sentry] ${issue.shortId}:\` (plain list + grep — \`--search\`
+  returns nothing under the Actions token). If a matching issue exists,
+  add ONE comment to it (\`gh issue comment\`) with any genuinely new evidence
+  and exit — do **not** open a duplicate. The same applies when the culprit
+  route or file has been **deleted from main** (verify with
+  \`git log --all --diff-filter=D\` on the path): that is a stale event, not
+  new triage. Only when no matching issue exists, open a GitHub *issue*
+  (\`gh issue create\`), titled \`[sentry] ${issue.shortId}: <root cause>\`,
   labelled \`sentry-fix\` and \`needs-human\`, containing: the classification and
   why, the specific evidence (error code, snapshot/migration findings, the
   object name), the concrete remediation you believe is required (e.g. "add

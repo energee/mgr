@@ -8,7 +8,14 @@
 
 import { appendFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { filterClaimedIssues, filterFixedIssues, type MergedFixPr } from "./sentry-harness/dedup";
+import {
+  filterClaimedIssues,
+  filterFixedIssues,
+  filterTriagedIssues,
+  isWorktreeArtifact,
+  type MergedFixPr,
+  type TriageIssue,
+} from "./sentry-harness/dedup";
 import { buildFixPrompt } from "./sentry-harness/prompt";
 import { scoreIssues, sortByScore } from "./sentry-harness/scoring";
 import { enrichIssuesWithEvents, fetchIssueSummaries } from "./sentry-harness/sentry-api";
@@ -26,14 +33,25 @@ function requireEnv(name: string): string {
 // Actions GITHUB_TOKEN (observed in run 28745947348 — 0 hits vs. 11 real
 // sentry-fix PRs), silently disabling dedup. Fetch the plain PR list and
 // let the branch regex in dedup.ts pick out sentry-fix branches.
-function ghPrList<T>(args: string[]): T {
-  const result = spawnSync("gh", ["pr", "list", ...args], {
+function ghList<T>(subcommand: "pr" | "issue", args: string[]): T {
+  const result = spawnSync("gh", [subcommand, "list", ...args], {
     encoding: "utf8",
   });
   if (result.status !== 0) {
-    throw new Error(`gh pr list failed: ${result.stderr}`);
+    throw new Error(`gh ${subcommand} list failed: ${result.stderr}`);
   }
   return JSON.parse(result.stdout) as T;
+}
+
+function ghPrList<T>(args: string[]): T {
+  return ghList<T>("pr", args);
+}
+
+// Plain list + title regex in dedup.ts, for the same --search reason above.
+function listSentryTriageIssues(): TriageIssue[] {
+  return ghList<TriageIssue[]>("issue", [
+    "--state", "all", "--json", "title,state,closedAt", "--limit", "200",
+  ]);
 }
 
 function listOpenSentryFixBranches(): string[] {
@@ -65,22 +83,41 @@ async function main(): Promise<void> {
   const environment = process.env.SENTRY_ENVIRONMENT || "development";
 
   console.error(`[harness] Fetching Sentry issues for ${org}/${project} (env: ${environment})`);
-  const issues = await fetchIssueSummaries({ org, project, authToken, environment });
-  console.error(`[harness] Fetched ${issues.length} issue summaries`);
+  const summaries = await fetchIssueSummaries({ org, project, authToken, environment });
+  console.error(`[harness] Fetched ${summaries.length} issue summaries`);
+
+  // Summary-level artifact filter catches markers in title/culprit (compile
+  // errors embed the worktree path there); the post-enrichment pass below
+  // catches the rest via stack-trace chunk paths.
+  const issues = summaries.filter((i) => !isWorktreeArtifact(i));
+  if (issues.length < summaries.length) {
+    console.error(`[harness] Dropped ${summaries.length - issues.length} worktree dev artifacts (summary pass)`);
+  }
 
   const openBranches = listOpenSentryFixBranches();
   console.error(`[harness] ${openBranches.length} open sentry-fix PRs`);
   const unclaimed = filterClaimedIssues(issues, openBranches);
   const mergedPrs = listMergedSentryFixPrs();
   console.error(`[harness] ${mergedPrs.length} merged sentry-fix PRs`);
-  const eligible = filterFixedIssues(unclaimed, mergedPrs);
+  const unfixed = filterFixedIssues(unclaimed, mergedPrs);
+  const triageIssues = listSentryTriageIssues();
+  console.error(`[harness] ${triageIssues.length} GitHub issues scanned for prior triage`);
+  const eligible = filterTriagedIssues(unfixed, triageIssues);
   console.error(`[harness] ${eligible.length} eligible after dedup`);
 
   const scored = scoreIssues(eligible);
   const sorted = sortByScore(scored);
   const selected = sorted.slice(0, MAX_ERRORS_PER_RUN);
   console.error(`[harness] Fetching event diagnostics for ${selected.length} selected issues`);
-  const top = await enrichIssuesWithEvents(selected, authToken);
+  const enriched = await enrichIssuesWithEvents(selected, authToken);
+
+  // ponytail: dropped artifacts are not backfilled from the sorted remainder —
+  // add backfill only if runs start emitting short matrices for real errors.
+  const top = enriched.filter((issue) => {
+    if (!isWorktreeArtifact(issue)) return true;
+    console.error(`[harness] Dropped ${issue.shortId}: worktree dev artifact (stack-trace pass)`);
+    return false;
+  });
 
   const output: ScoredIssue[] = top.map((issue) => ({
     ...issue,
