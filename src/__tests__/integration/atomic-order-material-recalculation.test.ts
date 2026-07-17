@@ -217,6 +217,56 @@ describe("transactional order-material recalculation", () => {
     });
   });
 
+  it("keeps rows with a manual actual quantity when their material leaves the configured set", async () => {
+    await withRoleClient("admin", async (db) => {
+      const fixture = await createFixture(db, "deconfigured");
+      const orderItemId = randomUUID();
+
+      await db.query(
+        `INSERT INTO order_items (
+           id, order_id, brand_id, selling_format_id, quantity, unit_price
+         ) VALUES ($1, $2, $3, $4, 31, 72.50)`,
+        [orderItemId, fixture.orderId, fixture.brandId, fixture.formatId],
+      );
+      await db.query(
+        `UPDATE order_materials SET actual_qty = 4
+         WHERE order_id = $1 AND inventory_item_id = $2`,
+        [fixture.orderId, fixture.wrapId],
+      );
+
+      // Drop the wrap role from the brewery defaults, then trigger a
+      // recalculation: the manually-recorded wrap row must survive.
+      await db.query(
+        "DELETE FROM brewery_shipping_defaults WHERE inventory_item_id = $1",
+        [fixture.wrapId],
+      );
+      await db.query("UPDATE order_items SET quantity = 61 WHERE id = $1", [
+        orderItemId,
+      ]);
+
+      let rows = byInventory(await readMaterials(db, fixture.orderId));
+      expect(rows.get(fixture.wrapId)).toMatchObject({
+        actual_qty: 4,
+        estimated_qty: 2,
+      });
+      expect(rows.get(fixture.overridePalletId)?.estimated_qty).toBe(3);
+
+      // Without a manual actual quantity the deconfigured row is removed.
+      await db.query(
+        `UPDATE order_materials SET actual_qty = NULL
+         WHERE order_id = $1 AND inventory_item_id = $2`,
+        [fixture.orderId, fixture.wrapId],
+      );
+      await db.query("UPDATE order_items SET quantity = 31 WHERE id = $1", [
+        orderItemId,
+      ]);
+
+      rows = byInventory(await readMaterials(db, fixture.orderId));
+      expect(rows.has(fixture.wrapId)).toBe(false);
+      expect(rows.get(fixture.overridePalletId)?.estimated_qty).toBe(2);
+    });
+  });
+
   it("recalculates an approved add in the approval transaction", async () => {
     await withRoleClient("admin", async (db) => {
       const fixture = await createFixture(db, "approve-add");

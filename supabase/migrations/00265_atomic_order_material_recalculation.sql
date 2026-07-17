@@ -94,15 +94,18 @@ BEGIN
   END LOOP;
 
   -- order_materials is auto-generated. Remove rows whose configured material
-  -- disappeared, while preserving actual_qty on every still-resolved row.
+  -- disappeared — unless staff manually recorded an actual_qty on them: that
+  -- is an operational fact about what was really used, and a config change
+  -- must not silently destroy it. Such rows keep their last estimate.
   DELETE FROM order_materials
   WHERE order_id = p_order_id
-    AND NOT (inventory_item_id = ANY(v_resolved_item_ids));
+    AND NOT (inventory_item_id = ANY(v_resolved_item_ids))
+    AND actual_qty IS NULL;
 END;
 $$;
 
 COMMENT ON FUNCTION recalculate_order_materials(UUID) IS
-  'Rebuilds estimated order shipping-material quantities from current line items, customer pallet overrides, and customer/brewery material defaults while preserving manual actual_qty values.';
+  'Rebuilds estimated order shipping-material quantities from current line items, customer pallet overrides, and customer/brewery material defaults. Rows with a manual actual_qty are never deleted, even when their material falls out of the configured set.';
 
 REVOKE ALL ON FUNCTION recalculate_order_materials(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION recalculate_order_materials(UUID)

@@ -243,9 +243,17 @@ triggers. The function locks the parent order, totals pallets per line using a
 customer layer override when present (otherwise the selling-format pallet
 quantity), and resolves one material per role with customer materials taking
 precedence over brewery defaults. It updates `estimated_qty`, adds/removes
-configured rows, and leaves a non-null `actual_qty` untouched. This same trigger
-boundary covers both direct staff edits and approved customer change requests,
-so a recalculation error rolls the line change back.
+configured rows, and leaves a non-null `actual_qty` untouched — a row whose
+material falls out of the configured set is deleted only when its `actual_qty`
+is null, so manually recorded usage survives configuration changes. This same
+trigger boundary covers both direct staff edits and approved customer change
+requests, so a recalculation error rolls the line change back.
+
+The per-row `AFTER` trigger re-runs the full order recalculation once per
+changed line, so a multi-item change request performs O(N) redundant
+recalculations. This is a known, accepted tradeoff: each run is cheap,
+correctness comes from the shared order lock, and per-statement batching is
+not worth the complexity at current order sizes.
 
 **Quantity resolution:** `calculate_shipping_material_demand()` uses `actual_qty` when set, otherwise falls back to `estimated_qty`. See [calculate_material_shortfalls](#calculate_material_shortfalls) for the full shortfall calculation.
 
