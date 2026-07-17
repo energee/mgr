@@ -631,6 +631,17 @@
       "state": "passing",
       "evidence": "pr:497",
       "branch": "sentry-fix/SENTRY-7611936148"
+    },
+    {
+      "id": "SENTRY-7611936203",
+      "area": "infra",
+      "title": "Error: Attempted to call createRevisionHistoryDisplay() from the server but createRevisionHistoryDisplay is on the client.",
+      "user_visible_behavior": "Dev-only /_error crash on /production/batches (5 events, 2026-07-15T06:00-06:05Z, release 492ff277, worktree loading-pattern). A prior revision of production/batches/loading.tsx imported the assembled batchEntity from '@/entities/batch' (a client module) instead of the server-safe batchCore, purely to read listColumns.length for a skeleton. presentation.tsx calls the client-only factory createRevisionHistoryDisplay(\"batches\") at module-evaluation top level (exported by a \"use client\" file), so evaluating that import chain in the server module graph threw exactly this error.",
+      "verification": "bun run test src/app/__tests__/server-entity-import-boundary.test.ts",
+      "state": "passing",
+      "evidence": "branch:sentry-fix/SENTRY-7611936203",
+      "branch": "sentry-fix/SENTRY-7611936203",
+      "notes": "Root cause already fixed on main before this harness run: commit c6b5539 (PR #453, authored 2026-07-15T07:11:53Z — after the last Sentry event at 06:05:31Z) rewrote loading.tsx to render null instead of importing batchEntity. Verified current production/batches/loading.tsx, page.tsx, and every other src/app server file import only *Core (server-safe) modules or @/entities/cores, never an assembled client entity config. No code fix was needed; added a regression test (server-entity-import-boundary.test.ts) that statically walks every non-\"use client\" file under src/app and fails if any imports an assembled @/entities/<name> config, so this class of RSC-boundary violation can't silently reappear. Confirmed the test fails against the exact pre-fix loading.tsx content and passes on current main."
     }
   ]
 }
