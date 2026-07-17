@@ -1,5 +1,10 @@
 name: Database Security Lint
 
+# PR-only gate. The push-to-main re-run was dropped (squash merge lands the
+# tree the PR run already validated) and package.json/bun.lock were removed
+# from the trigger paths — dependency bumps were replaying the full migration
+# chain for no schema signal. The daily live-drift watchdog covers
+# out-of-band schema changes.
 on:
   pull_request:
     paths:
@@ -10,22 +15,8 @@ on:
       - "scripts/migration-dry-run.sh"
       - "scripts/live-catalog.sql"
       - "vitest.integration.config.ts"
-      - "package.json"
-      - "bun.lock"
       - ".github/workflows/db-lint.yml"
-  push:
-    branches: [main]
-    paths:
-      - "supabase/migrations/**/*.sql"
-      - "supabase/config.toml"
-      - "supabase/functions/**"
-      - "src/__tests__/integration/**"
-      - "scripts/migration-dry-run.sh"
-      - "scripts/live-catalog.sql"
-      - "vitest.integration.config.ts"
-      - "package.json"
-      - "bun.lock"
-      - ".github/workflows/db-lint.yml"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
