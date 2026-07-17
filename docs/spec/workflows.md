@@ -105,6 +105,12 @@ pick list or active/completed finished-good allocation. Staff must cancel and
 regenerate those artifacts so approval never rewrites inventory history against
 changed order lines.
 
+**Shipping-material rule:** Any add, modify, or remove recalculates the order's
+estimated pallet, wrap, and other shipping materials inside the same database
+transaction. Customer pallet/material overrides remain authoritative, and a
+manually entered actual quantity is preserved. If recalculation fails, neither
+the order lines nor the approval status commit.
+
 ### Transfer States
 
 ```
