@@ -52,7 +52,10 @@ test: ## Vitest run (unit + integration)
 e2e: ## Playwright E2E
 	@bun run e2e
 
-check-fast: lint typecheck check-agent-config ## Layer 1: static checks only (fast feedback)
+check-fast: lint typecheck check-agent-config check-writes ## Layer 1: static checks only (fast feedback)
+
+check-writes: ## PostgREST write-atomicity ratchet (multi-write files need an RPC or tx-ok justification)
+	@bun run scripts/check-write-atomicity.ts
 
 check-agent-config: ## Validate shared agent skills and worktree tooling
 	@bash scripts/check-agent-config.sh
@@ -74,7 +77,7 @@ check-wip: ## Verify WIP=1 per branch in feature_list.json
 check-coverage: ## Vitest with coverage (thresholds enforced via vitest.config.ts)
 	@bun run test:coverage
 
-check: lint typecheck check-agent-config test check-db check-wip build ## Layers 1+2: pre-commit gate
+check: lint typecheck check-agent-config check-writes test check-db check-wip build ## Layers 1+2: pre-commit gate
 	@echo "OK: check passed"
 
 check-all: check e2e ## Layers 1+2+3: full gate including Playwright E2E
