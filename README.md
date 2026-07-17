@@ -1,6 +1,6 @@
-# MGR — Brewery Management System
+# MGR
 
-A full-stack brewery management system covering production, inventory, purchasing, sales, and TTB compliance. Built with an AI-first, config-driven architecture.
+A full-stack operations management system covering production, inventory, purchasing, sales, and compliance reporting. Built with an AI-first, config-driven architecture.
 
 ## Tech Stack
 
@@ -27,8 +27,8 @@ A full-stack brewery management system covering production, inventory, purchasin
 ### Setup
 
 ```bash
-# 1. Install dependencies
-bun install
+# 1. Install dependencies and run environment checks
+make setup        # or: bun install
 
 # 2. Configure environment
 cp .env.example .env.local
@@ -41,7 +41,7 @@ supabase db push
 bun db:generate
 
 # 5. Start dev server (uses Turbopack)
-bun dev
+make dev          # or: bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -54,22 +54,24 @@ src/
     (auth)/              # Login, magic link, OTP
     (app)/               # Authenticated app shell
       dashboard/         # Production, inventory, sales dashboards
-      production/        # Batches, recipes, vessels, brew logs, yeast, planning
-      inventory/         # Raw materials, finished goods, lots, kegs, bins, transfers
-      purchasing/        # Suppliers, purchase orders, ingredient demand
+      production/        # Batches, recipes, production logs, planning
+      inventory/         # Raw materials, finished goods, lots, containers, transfers
+      purchasing/        # Suppliers, purchase orders, material demand
       sales/             # Orders, pick lists, customers
-      reports/           # TTB, production summary, COGS, projections, batch cost
-      settings/          # Brewery, users, pricing, integrations
+      reports/           # Compliance, production summary, COGS, projections, batch cost
+      settings/          # Organization, users, pricing, integrations
     portal/              # Customer-facing order portal
     api/                 # API routes (chat, webhooks, invites)
   components/
     ui/                  # shadcn primitives + animated icons
     universal/           # Config-driven components (EntityList, EntityDetailUnified)
-    domain/              # Domain-specific components (recipe editor, brew log, etc.)
+    domain/              # Feature-specific components (recipe editor, production log, etc.)
     dashboard/           # Dashboard widgets (stats, charts, sections)
-  entities/              # Entity configuration files (37 entities)
-  services/              # Server-side business logic
-  lib/                   # Utilities, Supabase client, query keys, formatters
+  entities/              # Entity configs, one directory per entity (~40 entities)
+  domain/                # Business-logic calculations (units, BOM, planning, compliance)
+  services/              # Entity orchestration over domain logic and Supabase
+  integrations/          # Third-party clients (Square, QuickBooks, Slack, email)
+  lib/                   # Infrastructure: Supabase client, query keys, formatters
   hooks/                 # Custom React hooks
   types/                 # TypeScript types (including generated Supabase types)
   contexts/              # React contexts (permissions, notifications)
@@ -79,44 +81,45 @@ docs/
     architecture.md      # Tech stack, design patterns, security rules
     decisions.md         # Schema review decisions (DEC-*)
     workflows.md         # State machines, allocation rules
-    ai-integration.md    # AI patterns, brewing science
+    ai-integration.md    # AI patterns and queries
   data-model/            # Schema documentation per domain
+  agents/                # Agent-facing quick references
   plans/                 # Implementation plans
 
 supabase/
-  migrations/            # Numbered SQL migrations (00001–00139)
+  migrations/            # Numbered SQL migrations (00001–00266)
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `bun dev` | Start dev server (Turbopack) |
-| `bun build` | Production build |
-| `bun typecheck` | Run `tsc --noEmit` |
-| `bun lint` | ESLint |
-| `bun lint:fix` | ESLint with auto-fix |
-| `bun test` | Run unit tests (Vitest) |
-| `bun test:watch` | Tests in watch mode |
-| `bun e2e` | Run Playwright end-to-end tests |
+| `make dev` | Start dev server (Turbopack) |
+| `make check-fast` | Lint + typecheck (fast feedback loop) |
+| `make check` | Pre-commit gate: lint, typecheck, tests, DB rules, build |
+| `make check-all` | Full gate including Playwright E2E |
+| `bun run test` | Unit tests (Vitest — note: `bun test` is Bun's own runner, don't use it) |
+| `bun run test:watch` | Tests in watch mode |
+| `bun e2e` | Playwright end-to-end tests |
 | `bun db:generate` | Generate Supabase TypeScript types |
-| `bun db:generate:local` | Generate types from local Supabase |
 | `bun analyze` | Bundle analysis |
+
+Run `make help` for the full target list.
 
 ## Architecture
 
 ### Entity Configuration Pattern
 
-Every domain entity is defined declaratively in `src/entities/`. A single config file specifies list columns, form schema, state machine, relations, and AI context. Universal components render from these configs.
+Every domain entity is defined declaratively in `src/entities/<name>/` (`core.ts` + `presentation.tsx` + `index.ts`). The config specifies list columns, form schema, state machine, relations, and AI context. Universal components render from these configs.
 
 ```typescript
-// src/entities/batch.tsx
-export const batchEntity: EntityConfig<Batch> = {
-  name: "batch",
-  table: "batches",
-  viewTable: "batches_with_details",  // view with computed fields
+// src/entities/order/core.ts
+export const orderEntity: EntityConfig<Order> = {
+  name: "order",
+  table: "orders",
+  viewTable: "orders_with_details",  // view with computed fields
   listColumns: [...],
-  formSchema: batchSchema,
+  formSchema: orderSchema,
   stateMachine: { stateField: "status", states: {...}, transitions: {...} },
   relations: [...],
 };
@@ -136,7 +139,7 @@ export const batchEntity: EntityConfig<Batch> = {
 
 - **Allocation-based inventory** — quantities are calculated from an `allocations` table, never stored as mutable balances. This eliminates sync bugs and provides a full audit trail.
 - **State machines** — all stateful entities (batches, orders, purchase orders) use a universal state machine pattern with transitions validated on both client and server.
-- **Calculated fields via views** — recipe estimates (OG, FG, ABV, IBU, SRM), vessel status, and inventory quantities are computed in PostgreSQL views, not stored.
+- **Calculated fields via views** — recipe estimates, equipment status, and inventory quantities are computed in PostgreSQL views, not stored.
 - **Centralized query keys** — all React Query cache keys use factory functions from `src/lib/query-keys.ts`.
 - **Row Level Security** — every table has RLS policies. Views use `security_invoker = true`.
 
@@ -144,18 +147,17 @@ export const batchEntity: EntityConfig<Batch> = {
 
 - **QuickBooks Online** — sync invoices and customers
 - **Square** — POS webhook for order ingestion
-- **Slack** — notifications for batch events, low inventory alerts
-- **AI Chat** — Claude-powered assistant with brewery context and write capabilities
+- **Slack** — notifications for production events, low inventory alerts
+- **AI Chat** — Claude-powered assistant with full domain context and write capabilities
 
 ## Key Concepts
 
 | Concept | Description |
 |---------|-------------|
-| Batches | A single production run of beer, tracked through planning → brewing → fermenting → conditioning → packaging |
-| Recipes | Declarative beer recipes with grain bill, hop schedule, yeast, water chemistry, and mash/fermentation profiles |
-| Brinks | Physical yeast containers with viability tracking, cell counts, and lineage (parent → child harvests) |
+| Batches | A single production run, tracked through planning → in-progress → packaging states |
+| Recipes | Declarative bills of materials with process profiles and cost rollups |
 | Allocations | Every inventory movement (raw material usage, finished goods, order fulfillment) is an allocation record |
-| TTB Compliance | Built-in mapping to TTB Form 5130.9 lines for federal tax reporting |
+| Compliance Reports | Built-in mapping of production data to regulatory reporting lines |
 | Customer Portal | External-facing portal where customers can view orders and submit change requests |
 
 ## Documentation
