@@ -24,6 +24,7 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const baseUrl = new URL(BASE_URL);
 const IS_LOCAL_TARGET = ["localhost", "127.0.0.1", "[::1]"].includes(baseUrl.hostname);
 const PORT = baseUrl.port || "3000";
+const SERVER_READY_URL = new URL("/api/health", baseUrl).toString();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -52,7 +53,11 @@ export default defineConfig({
   ...(IS_LOCAL_TARGET && {
     webServer: {
       command: "bun dev",
-      url: BASE_URL,
+      // Probe a lightweight route that also confirms the isolated database is
+      // ready. Compiling the full root page exceeded Playwright's implicit
+      // 60-second startup limit on a cold GitHub Actions runner.
+      url: SERVER_READY_URL,
+      timeout: process.env.CI ? 120_000 : 60_000,
       // Next reads PORT, so BASE_URL moves the server and the tests together.
       env: { PORT },
       // Locally this adopts whatever already answers on BASE_URL — including
