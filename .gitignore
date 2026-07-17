@@ -48,8 +48,10 @@ bun-debug.log*
 .env*.local
 !.env.example
 
-# worktrees
+# worktrees — nested checkouts created by scripts/agent-worktree. Ignore the
+# worktrees dir specifically so tracked .agents/skills/ is unaffected.
 .worktrees/
+/.agents/worktrees/
 
 # Claude agent working directory — ignore everything under .claude/ except the
 # project-level settings.json (Stop hook, etc.), the project-scoped expert agents

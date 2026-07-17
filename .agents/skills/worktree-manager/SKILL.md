@@ -5,7 +5,7 @@ description: Create, enter, locate, hand off, diagnose, or remove shared Git wor
 
 # Worktree Manager
 
-Use `scripts/agent-worktree` as the only worktree creation and discovery interface. It stores worktrees under `${AGENT_WORKTREE_ROOT:-$HOME/.agents/worktrees}/<repo>/`, where every local harness can find them through the shared Git repository.
+Use `scripts/agent-worktree` as the only worktree creation and discovery interface. It stores worktrees under `${AGENT_WORKTREE_ROOT:-<main-checkout>/.agents/worktrees}/<repo>/` (repo-local by default, gitignored and excluded from tsc/eslint/next/vitest), where every local harness can find them through the shared Git repository.
 
 ## Create or resume
 
@@ -60,7 +60,7 @@ Removal refuses uncommitted changes. Use `--force` only with explicit user appro
 
 ## Constraints
 
-- Never create new worktrees under `.claude/worktrees/`, `.worktrees/`, the repository's `.agents/`, or another harness-specific directory.
+- Never create worktrees by hand or under `.claude/worktrees/`, `.worktrees/`, or another harness-specific directory. Always go through `scripts/agent-worktree`, which uses the sanctioned `.agents/worktrees/` location.
 - Never use `claude --worktree`, bare `EnterWorktree`, `grok -w`, or manual `git worktree add` when the shared script is available.
 - Never use `main` or `master` as an agent-worktree branch.
 - Preserve `.worktreeinclude`; the manager copies listed ignored local files into new worktrees.
