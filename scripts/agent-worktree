@@ -24,7 +24,7 @@ Usage:
   scripts/agent-worktree prune
 
 Worktrees live under:
-  ${AGENT_WORKTREE_ROOT:-$HOME/.agents/worktrees}/<repo>/<name>
+  ${AGENT_WORKTREE_ROOT:-<main-checkout>/.agents/worktrees}/<repo>/<name>
 EOF
 }
 
@@ -49,7 +49,10 @@ initialize_repo_context() {
 
   MAIN_ROOT=$(cd "$(dirname "$common_dir")" && pwd -P)
   REPO_NAME=$(basename "$MAIN_ROOT")
-  SHARED_ROOT=${AGENT_WORKTREE_ROOT:-"$HOME/.agents/worktrees"}
+  # Repo-local by default: worktrees sit under the main checkout's .agents/worktrees/.
+  # They are gitignored and excluded from tsc/eslint/next/vitest so tooling does not
+  # recurse into the nested checkouts. Override with AGENT_WORKTREE_ROOT.
+  SHARED_ROOT=${AGENT_WORKTREE_ROOT:-"$MAIN_ROOT/.agents/worktrees"}
   mkdir -p "$SHARED_ROOT"
   SHARED_ROOT=$(cd "$SHARED_ROOT" && pwd -P)
   REPO_WORKTREE_ROOT="$SHARED_ROOT/$REPO_NAME"

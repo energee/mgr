@@ -45,13 +45,14 @@
 
 ## 2026-07-13 — Agent worktrees use a harness-neutral root
 
-- **Decision**: Claude, Codex, and Grok create and locate worktrees through `scripts/agent-worktree`, stored under `${AGENT_WORKTREE_ROOT:-$HOME/.agents/worktrees}/<repo>/<name>`. Shared skills live canonically under `.agents/skills/`, with harness adapters pointing to them.
+- **Decision**: Claude, Codex, and Grok create and locate worktrees through `scripts/agent-worktree`, stored under `${AGENT_WORKTREE_ROOT:-<main-checkout>/.agents/worktrees}/<repo>/<name>`. Shared skills live canonically under `.agents/skills/`, with harness adapters pointing to them.
 - **Why**: Harness-native defaults scatter checkouts across `.claude`, `.codex`, and `.grok` locations, making handoff and cleanup unreliable. One Git-registered root gives every local harness the same absolute path and one lifecycle command.
+- **Update (2026-07-14)**: Root moved from `$HOME/.agents/worktrees` to the main checkout's `.agents/worktrees/` so worktrees sit beside the repo, not in the home directory. The nested-checkout hazard that originally ruled this out is neutralized by gitignoring `/.agents/worktrees/` and excluding it from `tsconfig.json`, `eslint.config.mjs`, `next` build, and `vitest`. `AGENT_WORKTREE_ROOT` still overrides.
 - **Alternatives rejected**:
-  - Repository-local `.agents/worktrees/` — nested checkouts expand search and file-watcher scope.
+  - Home-directory root (`$HOME/.agents/worktrees`) — the original choice; moved out of `$HOME` per preference, hazard mitigated by ignore/exclude globs.
   - Keep each harness default — requires per-harness discovery and permits duplicate worktrees for the same task.
   - Documentation only — cannot enforce naming, protected-branch rules, dirty-tree protection, or canonical paths.
-- **Reversibility**: easy — existing worktrees remain standard Git worktrees and can be moved or recreated elsewhere.
+- **Reversibility**: easy — existing worktrees remain standard Git worktrees and can be moved or recreated elsewhere; set `AGENT_WORKTREE_ROOT` to relocate.
 
 ## 2026-07-15 — QuickBooks creates use durable request identities
 
