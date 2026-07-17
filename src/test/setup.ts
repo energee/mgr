@@ -1,4 +1,14 @@
-import "@testing-library/jest-dom/vitest";
+// Keep this file a module (required for top-level await) now that the only
+// static import is gone.
+export {};
+
+// jest-dom's matchers only make sense (and are only referenced) in DOM tests.
+// Loading it unconditionally taxed every node-environment test file with the
+// full jest-dom + css-tools import graph, so gate it on a DOM being present.
+// Setup files may use top-level await; this runs before any test imports.
+if (typeof document !== "undefined") {
+  await import("@testing-library/jest-dom/vitest");
+}
 
 // Web Storage is missing under this jsdom setup: neither the bare `localStorage` global nor
 // `window.localStorage` is defined (Node's own experimental global is undefined without
