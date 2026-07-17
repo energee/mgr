@@ -1,0 +1,36 @@
+# Files with 2+ awaited PostgREST mutations that predate the write-atomicity
+# gate (2026-07-16, docs/plans/2026-07-16-issue-insights.md). Grandfathered as
+# a ratchet baseline — do NOT add new entries. New multi-write code moves the
+# writes into one SQL RPC (see 00256/00257) or justifies with `// tx-ok: <reason>`.
+# Several entries are known-open transaction-integrity work; remove each line
+# as its file is fixed.
+src/app/(app)/production/batches/[id]/readings/page.tsx
+src/app/api/batches/[id]/route.ts
+src/app/api/recipes/[id]/route.ts
+src/app/api/settings/api-key/route.ts
+src/app/api/square/sync/inventory/route.ts
+src/components/domain/brew/brew-log-linker.tsx
+src/components/domain/brew/start-brew-day-dialog.tsx
+src/components/domain/inventory/keg-owner-deposits-editor.tsx
+src/components/domain/inventory/transfer-lines-editor.tsx
+src/components/domain/order/order-allocation.tsx
+src/components/domain/order/order-items-editor.tsx
+src/components/domain/order/reorder.ts
+src/components/domain/packaging/add-to-packaging-session-dialog.tsx
+src/components/domain/packaging/packaging-batch-dialog.tsx
+src/components/domain/pricing/format-management.tsx
+src/components/domain/pricing/pricing-matrix-view.tsx
+src/components/domain/purchasing/po-accept-inventory-dialog.tsx
+src/components/domain/purchasing/po-line-items-editor.tsx
+src/components/domain/purchasing/supplier-catalog-section.tsx
+src/components/domain/recipe/recipe-clone-dialog.tsx
+src/components/domain/shared/avatar-upload.tsx
+src/domain/purchasing/po-generator.ts
+src/domain/purchasing/supplier-catalog.ts
+src/hooks/use-session-line-items.ts
+src/integrations/quickbooks/sync-utils.ts
+src/integrations/quickbooks/token-manager.ts
+src/integrations/square/catalog.ts
+src/services/consumption-service.ts
+src/services/inventory-count-service.ts
+src/services/transition-side-effects.ts
