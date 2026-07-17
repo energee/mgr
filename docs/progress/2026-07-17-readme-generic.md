@@ -1,0 +1,1 @@
+- **2026-07-17 (README rewrite).** Rewrote `README.md` to remove all brewery-specific framing (now a generic operations management system) and brought it current: migration range 00001–00266, per-directory entity layout (~40 entities), `src/domain`/`services`/`integrations` in the structure tree, `make` gates in the Commands table, and `bun test` corrected to `bun run test`.
