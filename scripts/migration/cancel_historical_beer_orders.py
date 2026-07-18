@@ -36,6 +36,14 @@ id/order_number list). ``--apply`` writes a JSON preimage backup first, then:
 Execution against hosted data is a HUMAN action: run the dry-run, review the
 IDs and histograms (a count deviating from the expected 200 prints a warning),
 then re-run with ``--apply``.
+
+Partial-failure recovery: if an ``--apply`` run dies between the orders PATCH
+(step 1) and the follow-up cleanup (steps 2-3), re-running with ``--apply``
+completes the still-packed remainder but does not repeat steps 2-3 for the
+already-cancelled subset (candidate selection is ``status=packed``). Both
+steps are cosmetic — planned allocations are expected to be 0 and the
+notifications are broadcast noise — and the preimage backup enumerates every
+candidate id, so they can be finished manually against those ids if needed.
 """
 
 from __future__ import annotations
@@ -354,7 +362,11 @@ def main() -> int:
         )
     print(f"Planned finished-goods allocations released: {released}")
 
-    # (d) Drop the per-user "Order Cancelled" broadcast rows this run created.
+    # (d) Drop the per-user "Order Cancelled" broadcast rows created by the
+    # PATCH above. No created_at bound: candidates were verified packed at
+    # select time and cancelled is terminal, so every matching notification
+    # stems from this script cancelling them — while comparing DB server
+    # now() against the local clock could silently match zero rows.
     deleted = 0
     for id_batch in chunks(candidate_ids):
         query = urllib.parse.urlencode(
@@ -362,7 +374,6 @@ def main() -> int:
                 "entity_type": "eq.order",
                 "entity_id": f"in.({','.join(id_batch)})",
                 "title": f"eq.{CANCELLED_NOTIFICATION_TITLE}",
-                "created_at": f"gte.{run_start.isoformat()}",
             },
             quote_via=urllib.parse.quote,
         )
@@ -375,12 +386,21 @@ def main() -> int:
     # (e) Post-apply verification.
     final_candidates = rest.select_by_ids("orders", "id,status", "id", candidate_ids)
     not_cancelled = [row for row in final_candidates if row.get("status") != "cancelled"]
-    xlsx_orders = rest.select("orders", "id,order_number,status", {"order_number": "like.XLSX-*"})
+    xlsx_orders = rest.select(
+        "orders", "id,order_number,status,order_date", {"order_number": "like.XLSX-*"}
+    )
     rejected_ids = {row["id"] for row in rejected}
+    # Only pre-cutover packed rows are failures: a post-cutover XLSX order that
+    # became packed between preview and apply is out of scope, not an error
+    # (it still shows up in the printed status histogram). ISO date strings
+    # compare correctly lexicographically.
     unexpected_packed = [
         row
         for row in xlsx_orders
-        if row.get("status") == "packed" and str(row["id"]) not in rejected_ids
+        if row.get("status") == "packed"
+        and str(row["id"]) not in rejected_ids
+        and row.get("order_date") is not None
+        and str(row["order_date"]) < cutover.isoformat()
     ]
     final_items = rest.select_by_ids("order_items", "id", "order_id", candidate_ids)
     checks = {

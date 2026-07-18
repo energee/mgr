@@ -110,6 +110,11 @@ generates, and verifies the result (all candidates cancelled, item rows
 unchanged). Completed allocations and pick lists are left untouched. Execution
 against hosted data is a human action.
 
+If an apply run dies partway, re-running `--apply` completes the still-packed
+remainder; the two cosmetic cleanup steps (allocation release, notification
+removal) are not repeated for the already-cancelled subset — the preimage
+backup lists every candidate id for finishing those manually if needed.
+
 ### migrate_orders.py (legacy — do not run)
 
 This historical Mongo/BSON converter is retained only for reference. Its SQL
