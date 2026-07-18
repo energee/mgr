@@ -333,6 +333,16 @@ function profileProvisioningChanges(profile: PortalProfile | null): boolean {
   return shouldAssignCustomerRole(profile.roles);
 }
 
+/**
+ * Undo the writes of a failed existing-user provisioning attempt, then rethrow.
+ *
+ * Ordering matters (#548): the customer_portal_users row is removed BEFORE the
+ * profile reverts, and the profile revert only runs if that removal succeeded
+ * (or was not needed). Reverting after a failed link delete would leave a
+ * dangling portal-user row referencing a non-customer profile. When any
+ * cleanup step fails, the raised error names the leftover rows explicitly so
+ * an operator can repair them.
+ */
 async function compensateExistingPortalUser(
   adminDb: AdminClient,
   input: {
@@ -346,7 +356,9 @@ async function compensateExistingPortalUser(
   provisioningError: unknown,
 ): Promise<never> {
   const cleanupErrors: string[] = [];
+  const danglingLinkNote = `dangling customer_portal_users row (customer_id=${input.customerId}, user_id=${input.userId}) must be removed manually`;
 
+  let linkRemoved = true;
   if (input.linkWriteAttempted && !input.linkExisted) {
     try {
       const { error } = await dynamicFrom(adminDb, "customer_portal_users")
@@ -354,16 +366,27 @@ async function compensateExistingPortalUser(
         .eq("customer_id", input.customerId)
         .eq("user_id", input.userId);
       if (error) {
+        linkRemoved = false;
         cleanupErrors.push(
-          `portal link cleanup failed: ${errorMessage(error)}`,
+          `portal link cleanup failed: ${errorMessage(error)} — ${danglingLinkNote}`,
         );
       }
     } catch (error) {
-      cleanupErrors.push(`portal link cleanup failed: ${errorMessage(error)}`);
+      linkRemoved = false;
+      cleanupErrors.push(
+        `portal link cleanup failed: ${errorMessage(error)} — ${danglingLinkNote}`,
+      );
     }
   }
 
-  if (input.profileWriteAttempted) {
+  if (input.profileWriteAttempted && !linkRemoved) {
+    // Skip the revert: it would point the surviving link row at a
+    // non-customer profile. Leaving the profile as a customer keeps the pair
+    // consistent, and retrying the invite can complete provisioning.
+    cleanupErrors.push(
+      `profile revert skipped so the surviving portal link does not reference a non-customer profile; user_profiles row (id=${input.userId}) remains provisioned as a customer`,
+    );
+  } else if (input.profileWriteAttempted) {
     try {
       const profileWrite = input.profileBefore
         ? dynamicFrom(adminDb, "user_profiles")
@@ -384,10 +407,14 @@ async function compensateExistingPortalUser(
             .eq("id", input.userId);
       const { error } = await profileWrite;
       if (error) {
-        cleanupErrors.push(`profile cleanup failed: ${errorMessage(error)}`);
+        cleanupErrors.push(
+          `profile cleanup failed: ${errorMessage(error)} — user_profiles row (id=${input.userId}) remains provisioned as a customer`,
+        );
       }
     } catch (error) {
-      cleanupErrors.push(`profile cleanup failed: ${errorMessage(error)}`);
+      cleanupErrors.push(
+        `profile cleanup failed: ${errorMessage(error)} — user_profiles row (id=${input.userId}) remains provisioned as a customer`,
+      );
     }
   }
 
