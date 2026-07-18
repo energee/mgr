@@ -33,8 +33,13 @@ test.describe("Customer order — portal", () => {
 });
 
 test.describe("Customer order — full flow", () => {
+  // SKIPPED (tracked in #437): blocked on a portal customer auth fixture.
+  // The portal is invite-only (no self-signup path to automate), so this
+  // flow needs a seeded customer + portal login as a SECOND Playwright
+  // storageState alongside the staff e2e/.auth/user.json — the auth.setup.ts
+  // project only provisions the staff session today.
   test.skip("place order through portal -> allocate -> fulfill", async () => {
-    // TODO: requires seed customer + finished goods
+    // Also requires seed customer + finished goods.
     // Step 1: portal login as a customer
     // Step 2: navigate to /portal/orders, click "New order"
     // Step 3: pick selling formats, set quantities, submit
