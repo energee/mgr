@@ -547,15 +547,96 @@ describe("POST /api/customers/[id]/invite", () => {
       linkCompensationError: { message: "link cleanup failed" },
     });
 
+    const error = await POST(
+      request({ email: SECOND_EMAIL }),
+      routeContext,
+    ).then(
+      () => {
+        throw new Error("expected the invite to reject");
+      },
+      (thrown: Error & { code?: string }) => thrown,
+    );
+    expect(error).toMatchObject({ code: "INTERNAL_ERROR" });
+    expect(error.message).toContain("link cleanup failed");
+    expect(error.message).toContain("customer_portal_users");
+    // Only the initial upgrade write: the revert is skipped while the
+    // invite-created link row may still exist (issue #548).
+    expect(
+      writes.filter((write) => write.table === "user_profiles"),
+    ).toHaveLength(1);
+    expect(deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("leaves the upgraded customer profile in place when link cleanup fails", async () => {
+    setup({
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["viewer"],
+        status: "active",
+      },
+      otpError: { message: "delivery failed" },
+      linkCompensationError: { message: "link cleanup failed" },
+    });
+
+    const error = await POST(
+      request({ email: SECOND_EMAIL }),
+      routeContext,
+    ).then(
+      () => {
+        throw new Error("expected the invite to reject");
+      },
+      (thrown: Error & { code?: string }) => thrown,
+    );
+    expect(error).toMatchObject({ code: "INTERNAL_ERROR" });
+    expect(error.message).toContain("delivery failed");
+    expect(error.message).toContain(
+      `a customer_portal_users row linking customer ${CUSTOMER_ID} to user existing-user-1 may remain`,
+    );
+
+    const profileWrites = writes.filter(
+      (write) => write.table === "user_profiles",
+    );
+    expect(profileWrites).toHaveLength(1);
+    expect(profileWrites[0]).toMatchObject({
+      op: "update",
+      row: expect.objectContaining({ roles: ["customer"] }),
+    });
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: "customer_portal_users",
+        op: "delete",
+      }),
+    );
+    expect(deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("does not delete a recovered profile while its portal link may remain", async () => {
+    setup({
+      profileMissing: true,
+      otpError: { message: "delivery failed" },
+      linkCompensationError: { message: "link cleanup failed" },
+    });
+    createUser.mockResolvedValue({
+      data: { user: null },
+      error: { code: "email_exists", message: "Email already exists" },
+    });
+
     await expect(
       POST(request({ email: SECOND_EMAIL }), routeContext),
     ).rejects.toMatchObject({
       code: "INTERNAL_ERROR",
-      message: expect.stringContaining("link cleanup failed"),
+      message: expect.stringContaining("customer_portal_users"),
     });
-    expect(
-      writes.filter((write) => write.table === "user_profiles"),
-    ).toHaveLength(2);
+
+    // The recovered profile must survive: deleting it while the link row
+    // remains would leave a portal link pointing at no profile at all.
+    expect(writes).not.toContainEqual(
+      expect.objectContaining({
+        table: "user_profiles",
+        op: "delete",
+      }),
+    );
     expect(deleteUser).not.toHaveBeenCalled();
   });
 });
