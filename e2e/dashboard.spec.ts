@@ -22,8 +22,10 @@ test.describe("Dashboard", () => {
     await expect(page.locator("body")).toContainText(/sales/i);
   });
 
+  // SKIPPED (tracked in #437): blocked on feature F200 (activity heatmap),
+  // which is still in_progress — there is no component to assert against yet.
   test.skip("activity heatmap (F200, in_progress) renders cells for the past 12 weeks", async () => {
-    // TODO: implement once F200 lands
+    // Implement once F200 lands.
     // Step 1: navigate to /dashboard
     // Step 2: locate the activity heatmap component
     // Step 3: verify ~84 cells render (12 weeks * 7 days)
@@ -31,8 +33,13 @@ test.describe("Dashboard", () => {
     // Step 5: hover a cell -> verify tooltip shows date + count
   });
 
+  // SKIPPED (tracked in #437): needs batches AND orders seeded with dated
+  // history, which today's per-spec seed namespaces don't provide — the
+  // charts aggregate across the whole database, so cross-spec seed ordering
+  // under fullyParallel would make the assertions nondeterministic. Low
+  // regression value relative to that cost.
   test.skip("dashboard trends charts render with real data", async () => {
-    // TODO: requires seed batches + orders
+    // Requires seed batches + orders with history.
     // Step 1: navigate to /dashboard
     // Step 2: verify production trend chart has at least 1 data point
     // Step 3: verify sales trend chart has at least 1 data point
