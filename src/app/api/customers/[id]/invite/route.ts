@@ -401,7 +401,11 @@ async function compensateExistingPortalUser(
     }
   }
 
-  if (linkCleanupFailed && input.profileWriteAttempted) {
+  // Name the surviving artifact whenever link cleanup fails — even when no
+  // profile write was attempted (the profile was already an active customer,
+  // verified before the link write), so the operator always sees which row
+  // needs manual repair.
+  if (linkCleanupFailed) {
     cleanupErrors.push(
       `a customer_portal_users row linking customer ${input.customerId} to user ${input.userId} may remain; the profile was intentionally left as an active customer so the link stays valid — retry the invite or remove the link manually`,
     );

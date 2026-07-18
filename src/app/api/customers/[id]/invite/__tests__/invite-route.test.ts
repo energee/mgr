@@ -535,39 +535,7 @@ describe("POST /api/customers/[id]/invite", () => {
     );
   });
 
-  it("surfaces a repair-required error when existing-user compensation fails", async () => {
-    setup({
-      existingProfile: {
-        id: "existing-user-1",
-        email: SECOND_EMAIL,
-        roles: ["viewer"],
-        status: "active",
-      },
-      otpError: { message: "delivery failed" },
-      linkCompensationError: { message: "link cleanup failed" },
-    });
-
-    const error = await POST(
-      request({ email: SECOND_EMAIL }),
-      routeContext,
-    ).then(
-      () => {
-        throw new Error("expected the invite to reject");
-      },
-      (thrown: Error & { code?: string }) => thrown,
-    );
-    expect(error).toMatchObject({ code: "INTERNAL_ERROR" });
-    expect(error.message).toContain("link cleanup failed");
-    expect(error.message).toContain("customer_portal_users");
-    // Only the initial upgrade write: the revert is skipped while the
-    // invite-created link row may still exist (issue #548).
-    expect(
-      writes.filter((write) => write.table === "user_profiles"),
-    ).toHaveLength(1);
-    expect(deleteUser).not.toHaveBeenCalled();
-  });
-
-  it("leaves the upgraded customer profile in place when link cleanup fails", async () => {
+  it("surfaces a repair-required error and leaves the upgraded profile when link cleanup fails", async () => {
     setup({
       existingProfile: {
         id: "existing-user-1",
@@ -590,10 +558,13 @@ describe("POST /api/customers/[id]/invite", () => {
     );
     expect(error).toMatchObject({ code: "INTERNAL_ERROR" });
     expect(error.message).toContain("delivery failed");
+    expect(error.message).toContain("link cleanup failed");
     expect(error.message).toContain(
       `a customer_portal_users row linking customer ${CUSTOMER_ID} to user existing-user-1 may remain`,
     );
 
+    // Only the initial upgrade write: the revert is skipped while the
+    // invite-created link row may still exist (issue #548).
     const profileWrites = writes.filter(
       (write) => write.table === "user_profiles",
     );
@@ -602,6 +573,41 @@ describe("POST /api/customers/[id]/invite", () => {
       op: "update",
       row: expect.objectContaining({ roles: ["customer"] }),
     });
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: "customer_portal_users",
+        op: "delete",
+      }),
+    );
+    expect(deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("names the surviving link even when no profile write was attempted", async () => {
+    // The profile is already an active customer, so compensation has nothing
+    // to revert — but the operator must still learn which row to repair.
+    setup({
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["customer"],
+        status: "active",
+      },
+      otpError: { message: "delivery failed" },
+      linkCompensationError: { message: "link cleanup failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: expect.stringContaining(
+        `a customer_portal_users row linking customer ${CUSTOMER_ID} to user existing-user-1 may remain`,
+      ),
+    });
+
+    expect(
+      writes.filter((write) => write.table === "user_profiles"),
+    ).toHaveLength(0);
     expect(writes).toContainEqual(
       expect.objectContaining({
         table: "customer_portal_users",
