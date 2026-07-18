@@ -346,6 +346,7 @@ async function compensateExistingPortalUser(
   provisioningError: unknown,
 ): Promise<never> {
   const cleanupErrors: string[] = [];
+  let linkCleanupFailed = false;
 
   if (input.linkWriteAttempted && !input.linkExisted) {
     try {
@@ -354,16 +355,25 @@ async function compensateExistingPortalUser(
         .eq("customer_id", input.customerId)
         .eq("user_id", input.userId);
       if (error) {
+        linkCleanupFailed = true;
         cleanupErrors.push(
           `portal link cleanup failed: ${errorMessage(error)}`,
         );
       }
     } catch (error) {
+      linkCleanupFailed = true;
       cleanupErrors.push(`portal link cleanup failed: ${errorMessage(error)}`);
     }
   }
 
-  if (input.profileWriteAttempted) {
+  // Never revert the profile while a link row this invite created may still
+  // exist: a reverted non-customer profile behind a live customer_portal_users
+  // link would grant portal access without the customer role (the portal
+  // layout gates only on status, and RLS matches on user_id = auth.uid()).
+  // Leaving the upgraded active-customer profile in place keeps the
+  // profile/link pair consistent, and a retried invite converges
+  // idempotently (issue #548).
+  if (input.profileWriteAttempted && !linkCleanupFailed) {
     try {
       const profileWrite = input.profileBefore
         ? dynamicFrom(adminDb, "user_profiles")
@@ -389,6 +399,12 @@ async function compensateExistingPortalUser(
     } catch (error) {
       cleanupErrors.push(`profile cleanup failed: ${errorMessage(error)}`);
     }
+  }
+
+  if (linkCleanupFailed && input.profileWriteAttempted) {
+    cleanupErrors.push(
+      `a customer_portal_users row linking customer ${input.customerId} to user ${input.userId} may remain; the profile was intentionally left as an active customer so the link stays valid — retry the invite or remove the link manually`,
+    );
   }
 
   if (cleanupErrors.length > 0) {
