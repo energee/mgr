@@ -7,6 +7,7 @@
  * transition, and verifies vessel occupancy plus the vessel_transfers row.
  */
 import { test, expect } from "@playwright/test";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   createSeedClient,
   cleanupTransferFixtures,
@@ -34,15 +35,20 @@ test.describe("Batch transfer", () => {
 // Single-test describe: with fullyParallel only one worker ever runs these
 // hooks, so the delete-and-recreate seeding cannot race itself (e2e/seed.ts).
 test.describe("Batch transfer — full flow", () => {
-  const seed = createSeedClient();
+  // Lazily initialized in beforeAll: if env resolution fails (no .env.local /
+  // stack not started), only this describe fails — the smoke tests above
+  // still collect and run.
+  let seed: SupabaseClient;
 
   test.beforeAll(async () => {
+    seed = createSeedClient();
     await cleanupTransferFixtures(seed); // reset leftovers from a crashed run
     await seedVessels(seed);
     await seedBatchInState(seed, "planned");
   });
 
   test.afterAll(async () => {
+    if (!seed) return; // beforeAll failed before the client existed
     await cleanupTransferFixtures(seed);
   });
 
@@ -65,13 +71,27 @@ test.describe("Batch transfer — full flow", () => {
     await dialog.getByRole("button", { name: "Transfer", exact: true }).click();
 
     // Step 3: dialog closes; the planned batch + fermenter destination
-    // triggers a suggested "fermenting" transition (toast) — accept it.
+    // triggers a suggested "fermenting" transition (toast) — accept it and
+    // wait for the success toast (the transition round-trip).
     await expect(dialog).not.toBeVisible({ timeout: 15_000 });
     await page.getByRole("button", { name: "Yes, update" }).click();
-
-    // Batch state machine advanced: detail badge shows Fermenting.
-    await expect(page.getByText("Fermenting").first()).toBeVisible({
+    await expect(page.getByText("Batch marked as fermenting")).toBeVisible({
       timeout: 15_000,
+    });
+
+    // The header StatusBadge does NOT live-update: handleSuggestTransition
+    // (batch-detail-client.tsx) invalidates ["batches", id] while the unified
+    // detail record is cached under ["batches_with_brew_info", id] (the
+    // entity's viewTable) — an app-level invalidation-key mismatch tracked in
+    // #437. Reload, then assert the badge, scoped to the batch-code heading's
+    // parent row so a toast or any unrelated "Fermenting" text can never
+    // satisfy the assertion.
+    await page.reload();
+    const headerRow = page
+      .getByRole("heading", { name: TRANSFER_BATCH_CODE })
+      .locator("..");
+    await expect(headerRow.getByText("Fermenting")).toBeVisible({
+      timeout: 30_000,
     });
 
     // Step 4: destination vessel now shows the batch (vessels list is backed

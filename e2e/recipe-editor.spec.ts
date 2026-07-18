@@ -8,6 +8,7 @@
  * reload.
  */
 import { test, expect } from "@playwright/test";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   createSeedClient,
   cleanupRecipeFixtures,
@@ -36,10 +37,14 @@ test.describe("Recipe editor", () => {
 // Single-test describe: with fullyParallel only one worker ever runs these
 // hooks, so the delete-and-recreate seeding cannot race itself (e2e/seed.ts).
 test.describe("Recipe editor — full flow", () => {
-  const seed = createSeedClient();
+  // Lazily initialized in beforeAll: if env resolution fails (no .env.local /
+  // stack not started), only this describe fails — the smoke tests above
+  // still collect and run.
+  let seed: SupabaseClient;
   const recipeName = `${RECIPE_NAME_PREFIX}437`;
 
   test.beforeAll(async () => {
+    seed = createSeedClient();
     await cleanupRecipeFixtures(seed); // reset leftovers from a crashed run
     await seedMaltCatalog(seed);
     // The recipe row is seeded, not created via /production/recipes/new: the
@@ -52,6 +57,7 @@ test.describe("Recipe editor — full flow", () => {
   });
 
   test.afterAll(async () => {
+    if (!seed) return; // beforeAll failed before the client existed
     await cleanupRecipeFixtures(seed);
   });
 

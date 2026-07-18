@@ -134,12 +134,13 @@ describe("guard_allocation_availability (00212)", () => {
 
       // A count correction larger than on-hand stock is allowed by policy
       // (00212) — it exists precisely to reconcile down to a physical count.
-      // chk_allocation_adjustment_reason requires a reason_code.
+      // chk_allocation_adjustment_reason requires a reason_code; the domain
+      // convention is 'count_adjustment' (00211 / src/domain/inventory-count.ts).
       await client.query(
         `INSERT INTO allocations
            (id, source_type, source_id, destination_type, destination_id,
             quantity, status, reason_code)
-         VALUES ($1, 'inventory_lot', $2, 'adjustment', NULL, 150, 'completed', 'count_correction')`,
+         VALUES ($1, 'inventory_lot', $2, 'adjustment', NULL, 150, 'completed', 'count_adjustment')`,
         [uid(210), lotId]
       );
 
