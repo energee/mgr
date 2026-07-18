@@ -79,6 +79,37 @@ The command is dry-run by default. Apply mode writes a JSON preimage backup to
 lines use Microstar; the internal/taproom rule is KegFleet. Customer and beer
 aliases are explicit in the script so unresolved workbook names fail closed.
 
+### cancel_historical_beer_orders.py
+
+Cancels: the ~200 historical pre-cutover `Beer orders.xlsx` keg orders that the
+reconciliation left `packed` (their packaging fills/lots were never recorded in
+MGR, so fulfilling them would fabricate keg inventory transactions).
+
+Per the decision on [issue #425](https://github.com/energee/mgr/issues/425),
+those orders are retained as reference records and transitioned
+`packed` → `cancelled` — a terminal state excluded from open-demand and
+material-planning queries — while every order/item row, source note, date,
+customer, price, and keg-owner assignment is preserved untouched. A dedicated
+historical-fulfillment bypass was explicitly rejected for this cleanup.
+
+```bash
+# Preview only (default): counts, histograms, full id/order_number list
+python3 scripts/migration/cancel_historical_beer_orders.py
+
+# Apply after reviewing the preview (expected ~200 candidates)
+python3 scripts/migration/cancel_historical_beer_orders.py --apply
+```
+
+The command is dry-run by default and identifies candidates by deterministic
+XLSX ownership metadata (`XLSX-*` order number, importer notes prefix) plus a
+pre-cutover `order_date` (`--cutover`, default 2026-07-14). Apply mode writes a
+JSON preimage backup to `/tmp/mgr-beer-orders-backups`, transitions only
+`packed` candidates, releases their still-planned finished-goods allocations,
+removes the per-user "Order Cancelled" broadcast notifications the run
+generates, and verifies the result (all candidates cancelled, item rows
+unchanged). Completed allocations and pick lists are left untouched. Execution
+against hosted data is a human action.
+
 ### migrate_orders.py (legacy — do not run)
 
 This historical Mongo/BSON converter is retained only for reference. Its SQL
