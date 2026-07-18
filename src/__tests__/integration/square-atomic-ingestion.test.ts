@@ -663,6 +663,109 @@ describe("atomic Square refund ingestion", () => {
     });
   });
 
+  it("quarantines an order-total-mismatch refund and still sizes later consistent refunds (#547)", async () => {
+    await withTransaction(async (db) => {
+      const suffix = randomUUID();
+      const fixture = await createFixture(db, suffix);
+      const orderId = `mismatch-order-${suffix}`;
+      await ingestSale(db, fixture, orderId, `mismatch-sale-${suffix}`);
+
+      const first = await ingestRefund(
+        db,
+        fixture,
+        orderId,
+        `mismatch-refund-a-${suffix}`,
+        1250,
+        2500,
+      );
+      expect(first).toMatchObject({ kind: "processed", items_failed: 0 });
+      expect(await readEffects(db, fixture, orderId)).toMatchObject({
+        binQuantity: 18,
+        reversalCount: 1,
+      });
+
+      // A refund event reporting a different order total than the completed
+      // refund history cannot be sized safely. It must fail durably without
+      // touching inventory.
+      const poisoned = await ingestRefund(
+        db,
+        fixture,
+        orderId,
+        `mismatch-refund-b-${suffix}`,
+        625,
+        1000,
+      );
+      expect(poisoned).toMatchObject({
+        kind: "processed",
+        items_failed: 1,
+        items_synced: 0,
+      });
+      expect(await readEffects(db, fixture, orderId)).toMatchObject({
+        binQuantity: 18,
+        reversalCount: 1,
+      });
+
+      // The failed log is quarantined as a manual-reconcile record so it never
+      // participates in future sizing (neither its divergent order total nor
+      // its never-applied refund amount).
+      const { rows: poisonedLogs } = await db.query<{
+        details: Record<string, unknown>;
+      }>(
+        "SELECT details FROM square_sync_log WHERE square_payment_id = $1",
+        [`mismatch-refund-b-${suffix}`],
+      );
+      expect(poisonedLogs[0]!.details).toMatchObject({
+        manual_reconcile: true,
+        errors: [expect.objectContaining({ item: "sizing" })],
+      });
+
+      // The mismatched refund itself stays sealed; its inventory effect is a
+      // manual reversal from the sync log, exactly as the recorded error says.
+      const sealed = await ingestRefund(
+        db,
+        fixture,
+        orderId,
+        `mismatch-refund-b-${suffix}`,
+        1250,
+        2500,
+      );
+      expect(sealed.kind).toBe("duplicate");
+
+      // Regression (#547): before 00267 the failed log's divergent order total
+      // re-triggered the mismatch branch forever, permanently blocking every
+      // later automatic reversal for the order. A later refund whose total is
+      // consistent with the effective history must size automatically.
+      const recovered = await ingestRefund(
+        db,
+        fixture,
+        orderId,
+        `mismatch-refund-c-${suffix}`,
+        1250,
+        2500,
+      );
+      expect(recovered).toMatchObject({ kind: "processed", items_failed: 0 });
+      expect(await readEffects(db, fixture, orderId)).toMatchObject({
+        binQuantity: 20,
+        reversalCount: 2,
+        saleCount: 1,
+      });
+
+      // Sizing after recovery counts only effective refunds: the quarantined
+      // 625 never inflates prior_refund_amount or the cumulative target.
+      const { rows: recoveredLogs } = await db.query<{
+        details: Record<string, unknown>;
+      }>(
+        "SELECT details FROM square_sync_log WHERE square_payment_id = $1",
+        [`mismatch-refund-c-${suffix}`],
+      );
+      expect(recoveredLogs[0]!.details).toMatchObject({
+        prior_refund_amount: 1250,
+        cumulative_refund_amount: 2500,
+        cumulative_full: true,
+      });
+    });
+  });
+
   it("rolls reversal, bin credit, draft void, and refund claim back together", async () => {
     await withTransaction(async (db) => {
       const suffix = randomUUID();
