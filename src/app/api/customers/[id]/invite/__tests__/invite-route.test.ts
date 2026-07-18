@@ -535,7 +535,7 @@ describe("POST /api/customers/[id]/invite", () => {
     );
   });
 
-  it("surfaces a repair-required error when existing-user compensation fails", async () => {
+  it("skips the profile revert and names the dangling link row when link cleanup fails", async () => {
     setup({
       existingProfile: {
         id: "existing-user-1",
@@ -547,15 +547,83 @@ describe("POST /api/customers/[id]/invite", () => {
       linkCompensationError: { message: "link cleanup failed" },
     });
 
+    const error = (await POST(request({ email: SECOND_EMAIL }), routeContext)
+      .then(() => {
+        throw new Error("expected the invite to reject");
+      })
+      .catch((caught: unknown) => caught)) as { code: string; message: string };
+
+    expect(error.code).toBe("INTERNAL_ERROR");
+    expect(error.message).toContain(
+      `dangling customer_portal_users row (customer_id=${CUSTOMER_ID}, user_id=existing-user-1)`,
+    );
+    expect(error.message).toContain("profile revert skipped");
+    // The revert must NOT run after a failed link delete (#548): the surviving
+    // customer_portal_users row would then reference a non-customer profile.
+    expect(
+      writes.filter((write) => write.table === "user_profiles"),
+    ).toHaveLength(1);
+    expect(deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("removes the portal link before reverting the profile during compensation", async () => {
+    setup({
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["viewer"],
+        status: "active",
+      },
+      otpError: { message: "delivery failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("delivery failed"),
+    });
+
+    const linkDeleteIndex = writes.findIndex(
+      (write) => write.table === "customer_portal_users" && write.op === "delete",
+    );
+    const profileWriteIndexes = writes
+      .map((write, index) => ({ write, index }))
+      .filter(({ write }) => write.table === "user_profiles")
+      .map(({ index }) => index);
+    expect(profileWriteIndexes).toHaveLength(2);
+    const profileRevertIndex = profileWriteIndexes[1];
+    expect(linkDeleteIndex).toBeGreaterThan(-1);
+    expect(linkDeleteIndex).toBeLessThan(profileRevertIndex);
+  });
+
+  it("names the un-reverted profile when only the profile cleanup fails", async () => {
+    setup({
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["viewer"],
+        status: "active",
+      },
+      otpError: { message: "delivery failed" },
+      profileCompensationError: { message: "profile revert rejected" },
+    });
+
     await expect(
       POST(request({ email: SECOND_EMAIL }), routeContext),
     ).rejects.toMatchObject({
       code: "INTERNAL_ERROR",
-      message: expect.stringContaining("link cleanup failed"),
+      message: expect.stringContaining(
+        "user_profiles row (id=existing-user-1) remains provisioned as a customer",
+      ),
+    });
+    // The link delete succeeded, so the revert was attempted (and failed).
+    expect(writes).toContainEqual({
+      table: "customer_portal_users",
+      op: "delete",
+      row: "existing-user-1",
     });
     expect(
       writes.filter((write) => write.table === "user_profiles"),
     ).toHaveLength(2);
-    expect(deleteUser).not.toHaveBeenCalled();
   });
 });
