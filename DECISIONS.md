@@ -81,6 +81,7 @@
   - Round each refund event independently — changes which event gets a unit but still permits event-boundary drift.
   - Alert and reconcile later — detects corruption after it occurs instead of preserving inventory in the ingest transaction.
 - **Reversibility**: moderate — the replacement RPC can be reverted, but doing so restores deterministic inventory drift for sequential refunds.
+- **Amendment (2026-07-19, #547)**: refund failure records (`items_failed > 0`) are excluded from the cumulative monetary ledger; order-total-mismatch refusals are additionally stamped `manual_reconcile` audit records. 00267 fixed the flagged v2 case; 00268 broadens the ledger filter to `items_failed = 0` so a never-flagged pre-atomic v1 (00257) failure log can neither phantom-inflate prior refunded money nor poison the mismatch check. One refusal no longer permanently blocks later refunds that agree on the order total.
 
 ## 2026-07-15 — Recipe additions replace one server-owned category
 

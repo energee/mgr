@@ -926,7 +926,7 @@ serialization, or a trustworthy category boundary across PostgREST requests.
 ## Integration Decisions
 
 ### DEC-INT-001: Atomic Square Sale and Refund Ingestion
-**Status**: Implemented (migrations 00257_atomic_square_ingestion.sql and 00262_cumulative_square_refund_reversals.sql)
+**Status**: Implemented (migrations 00257_atomic_square_ingestion.sql, 00262_cumulative_square_refund_reversals.sql, 00267_recoverable_refund_total_mismatch.sql, and 00268_refund_ledger_exclude_failed_logs.sql)
 
 Square webhook handlers fetch the external order before starting durable work,
 then submit the normalized sale or refund to one service-role-only PostgreSQL
@@ -943,10 +943,14 @@ ledger while preventing separate partial-refund rounding from permanently
 under-crediting inventory; cumulative full refunds also void staged draft rows.
 
 Unexpected failures roll the full statement back and are safe to retry.
-Deterministic line/sizing failures are finalized as audit records. Incomplete
-claims written by the former multi-request flow are never replayed because their
-prior effects cannot be reconstructed reliably; they are marked for manual
-reconciliation instead.
+Deterministic line/sizing failures are finalized as audit records; every refund
+failure record (`items_failed > 0`) is excluded from the cumulative monetary
+ledger and order-total-mismatch refusals are also stamped `manual_reconcile`
+(00267/00268), so one refusal — or a never-flagged pre-atomic v1 failure log —
+never blocks or over-sizes later refunds that agree on the order total (#547).
+Incomplete claims written by the former multi-request flow are never replayed
+because their prior effects cannot be reconstructed reliably; they are marked
+for manual reconciliation instead.
 
 **Rationale**: exactly-once claim rows alone cannot make several independent
 database requests atomic. Moving the complete state transition into PostgreSQL

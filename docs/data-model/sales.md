@@ -603,15 +603,21 @@ finalized inside the same transaction as their inventory effects.
   lines, locks finished goods then bin rows in canonical order, records FIFO TTB
   allocations or draft rows, debits physical inventory, and finalizes the log.
 - `ingest_square_refund_atomic(...)` serializes with the order's sale/refunds,
-  totals completed refund amounts, calculates the cumulative target reversal
-  for each original sale allocation, and writes only the unreversed delta. It
-  credits bins, voids draft rows once cumulative refunds cover the order, and
-  finalizes the refund claim. Cumulative targeting means rounding happens once
-  across the refund history rather than once per event. A refund whose reported
-  order total disagrees with the effective refund history cannot be sized; it
-  fails durably as a quarantined `manual_reconcile: true` log (reverse it
-  manually from the sync log) and is excluded from future sizing, so later
-  refunds with consistent totals proceed automatically (00267, #547).
+  totals completed **successful** refund amounts (`items_failed = 0`),
+  calculates the cumulative target reversal for each original sale allocation,
+  and writes only the unreversed delta. It credits bins, voids draft rows once
+  cumulative refunds cover the order, and finalizes the refund claim. Cumulative
+  targeting means rounding happens once across the refund history rather than
+  once per event. A refund whose reported order total disagrees with the
+  effective refund history cannot be sized; it fails durably as a quarantined
+  `manual_reconcile: true` log (reverse it manually from the sync log) and is
+  excluded from future sizing, so later refunds with consistent totals proceed
+  automatically (00267, #547). Every failure record — the v2 mismatch logs
+  above, and pre-atomic v1 (00257) unsizeable logs that were never flagged
+  `manual_reconcile` — is excluded from the cumulative monetary ledger by the
+  `items_failed = 0` filter, so a never-applied refund_amount cannot phantom-
+  inflate later sizing and a divergent order_total cannot poison the mismatch
+  check (00268, #547).
 
 Both functions are `SECURITY INVOKER`, executable only by `service_role`, and
 run as one PostgreSQL statement/transaction. Unexpected errors roll back the

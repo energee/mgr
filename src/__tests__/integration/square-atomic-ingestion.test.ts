@@ -805,4 +805,56 @@ describe("atomic Square refund ingestion", () => {
       });
     });
   });
+
+  it("ignores pre-existing failed sizing logs in the cumulative ledger (#547)", async () => {
+    await withTransaction(async (db) => {
+      const suffix = randomUUID();
+      const fixture = await createFixture(db, suffix);
+      const orderId = `poisoned-order-${suffix}`;
+      const legitRefund = `legit-refund-${suffix}`;
+      await ingestSale(db, fixture, orderId, `poisoned-sale-${suffix}`);
+      expect((await readEffects(db, fixture, orderId)).binQuantity).toBe(17);
+
+      // A failed sizing log as sealed by the pre-00268 function: completed,
+      // items_failed = 1, divergent order_total, NO manual_reconcile flag.
+      // Covers both pre-00267 v2 mismatch rows and v1-era (00257) failed logs —
+      // recovery requires no backfill because items_failed alone excludes them
+      // from the cumulative ledger. 00267's NOT-manual_reconcile filter alone
+      // would still count this row and refuse the legit refund below.
+      await db.query(
+        `INSERT INTO square_sync_log (
+           sync_type, event_id, square_payment_id, items_synced, items_failed,
+           completed_at, details
+         ) VALUES ('refund_ingest', $1, $2, 0, 1, now(), $3::jsonb)`,
+        [
+          `poison-event-${suffix}`,
+          `poison-refund-${suffix}`,
+          JSON.stringify({
+            atomic_version: 2,
+            order_id: orderId,
+            refund_amount: 625,
+            order_total: 1300,
+            errors: [{
+              item: "sizing",
+              error: "Prior refunds for this Square order recorded a different order total; reverse manually from the sync log",
+            }],
+          }),
+        ],
+      );
+
+      const result = await ingestRefund(db, fixture, orderId, legitRefund, 1250, 2500);
+      expect(result).toMatchObject({ kind: "processed", items_failed: 0 });
+      expect(await readEffects(db, fixture, orderId)).toMatchObject({
+        binQuantity: 18,
+        reversalCount: 1,
+      });
+      const { rows: logs } = await db.query<{ details: Record<string, unknown> }>(
+        "SELECT details FROM square_sync_log WHERE square_payment_id = $1",
+        [legitRefund],
+      );
+      // Neither the poison row's 1300 total counted as a mismatch nor its 625
+      // counted as prior refunded money.
+      expect(logs[0]!.details).toMatchObject({ prior_refund_amount: 0 });
+    });
+  });
 });
