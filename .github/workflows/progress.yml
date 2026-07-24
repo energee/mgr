@@ -43,7 +43,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git switch -C "$branch"
           git add PROGRESS.md
-          git commit -m "docs(progress): rebuild PROGRESS.md [skip ci]"
+          # No skip-ci marker: static + unit are required status checks on
+          # main, so the bot PR must let them run (they pass — nothing
+          # depends on PROGRESS.md) or auto-merge below would wait forever.
+          git commit -m "docs(progress): rebuild PROGRESS.md"
 
           remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"
           if [ -n "$remote_sha" ]; then
@@ -62,7 +65,10 @@ jobs:
             pr_number="${pr_url##*/}"
           fi
 
+          # --auto: wait for required status checks instead of merging
+          # immediately (an immediate merge fails once checks are required).
           gh pr merge "$pr_number" \
+            --auto \
             --squash \
             --delete-branch \
-            --subject "docs(progress): rebuild PROGRESS.md [skip ci]"
+            --subject "docs(progress): rebuild PROGRESS.md"
