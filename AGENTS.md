@@ -75,6 +75,7 @@ Agent-facing quick-references (must-follow rules, code examples):
 | [`docs/agents/quality.md`](docs/agents/quality.md) | Codebase health snapshot (A–D grades per domain/layer) |
 | [`docs/agents/autoharness.md`](docs/agents/autoharness.md) | Running the automated `src/lib` refactor screening loop |
 | [`docs/agents/improvement-loop.md`](docs/agents/improvement-loop.md) | How the automated loops compose; model-tier policy |
+| [`docs/agents/scheduled-jobs.md`](docs/agents/scheduled-jobs.md) | Adding/auditing any scheduled job (Actions crons, pg_cron, Claude scheduled agents) |
 | [`docs/feature_list.json`](docs/feature_list.json) | Feature tracker (state + verification per feature) |
 
 Full reference (deep architecture, decisions, data model):

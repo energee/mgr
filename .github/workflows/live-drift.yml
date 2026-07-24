@@ -29,6 +29,7 @@ on:
 
 permissions:
   contents: read
+  issues: write # upsert/close the single `live-drift` tracking issue
 
 jobs:
   live-drift:
@@ -43,6 +44,7 @@ jobs:
         run: psql --version
 
       - name: Check live drift
+        id: drift
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -56,4 +58,61 @@ jobs:
             echo "::warning::SUPABASE_DB_URL secret is not configured; skipping live-drift check (non-schedule run)."
             exit 0
           fi
-          bash scripts/check-live-drift.sh
+          # Distinguish real drift (exit 1 from the script) from infra failure
+          # (missing secret above, psql connection errors = exit 2) so the
+          # issue upsert below only fires on genuine drift.
+          if bash scripts/check-live-drift.sh; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          else
+            rc=$?
+            if [ "$rc" -eq 1 ]; then
+              echo "drift=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          fi
+
+      # Single tracking issue for real drift, mirroring the health-audit.yml
+      # publisher philosophy: one deterministic step owns issue mutations and
+      # dedupes by label before creating anything. Note: billing-blocked runs
+      # never start this job at all, so an issue that stops receiving updates
+      # (or a cron with no runs) means infra failure, not "drift resolved" —
+      # only an explicit green run closes the issue.
+      - name: Upsert drift tracking issue
+        if: failure() && steps.drift.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Live DB drift detected (snapshot vs live catalog)"
+          gh label create live-drift --repo "$REPO" \
+            --color D93F0B --description "Live database drifted from committed snapshot" \
+            2>/dev/null || true
+          existing="$(gh issue list --repo "$REPO" --label live-drift --state open \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" \
+              --body "Drift still present on the latest scheduled check: ${RUN_URL}"
+          else
+            gh issue create --repo "$REPO" --title "$title" --label live-drift \
+              --body "The scheduled live-drift watchdog found the live database catalog out of sync with \`supabase/live-catalog.snapshot.txt\`: ${RUN_URL}
+
+          See the run log for the exact missing/changed objects. Maintained by \`.github/workflows/live-drift.yml\`; closed automatically on the next clean run."
+          fi
+
+      - name: Close drift issue on clean run
+        if: success() && steps.drift.outputs.drift == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          existing="$(gh issue list --repo "$REPO" --label live-drift --state open \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" \
+              --body "Live catalog matches the snapshot again: ${RUN_URL}. Closing."
+            gh issue close "$existing" --repo "$REPO"
+          fi

@@ -1,0 +1,113 @@
+# Weekly branch-hygiene report. Historically this repo accumulated ~186 stale
+# branches and ~47 worktrees before a manual purge (see
+# docs/progress/2026-07-16 CI-diet notes); this cron keeps the problem visible
+# so it never silently regrows.
+#
+# REPORT-ONLY by design: it never deletes anything, merged or not. Auto-delete
+# of "fully merged" branches is unsafe here because squash-merge (the repo's
+# merge style) makes `git branch --merged` blind to most landed work, and the
+# converse — a branch that IS commit-merged — may still hold an open PR.
+# Humans (or an interactive session) act on the report.
+#
+# Output: the job summary of each run. No issues are opened (a weekly summary
+# is enough; issue spam for hygiene would train people to ignore it).
+#
+# Kill criterion: if the report is noise, disable the workflow from the
+# Actions UI — nothing depends on it.
+
+name: Branch Hygiene
+
+on:
+  schedule:
+    # Monday 07:23 UTC — start of the week, off the busy round-hour window.
+    - cron: "23 7 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  report:
+    name: Stale-branch report (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build report
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --prune origin
+
+          {
+            echo "# Branch hygiene report ($(date -u +%F))"
+            echo
+            echo "Report-only: nothing was deleted. Candidates below need a human decision."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Branches whose tip is an ancestor of main (true merges only —
+          # squash-merged branches will NOT appear here and instead show up
+          # in the stale list below).
+          merged="$(git branch -r --merged origin/main \
+            | sed 's/^ *//' \
+            | grep -v -E '^origin/(main|HEAD)' || true)"
+          {
+            echo "## Fully merged into main (safe to delete after eyeballing)"
+            echo
+            if [ -n "$merged" ]; then
+              echo '```'
+              echo "$merged"
+              echo '```'
+            else
+              echo "_None._"
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Stale: no commits in 30+ days and not merged. Cross-reference
+          # open PRs so in-review work is labeled rather than flagged.
+          cutoff="$(date -u -d '30 days ago' +%s)"
+          open_pr_branches="$(gh pr list --state open --limit 200 \
+            --json headRefName --jq '.[].headRefName' || true)"
+          {
+            echo "## Stale (no commits in 30+ days, not commit-merged)"
+            echo
+            echo "| Branch | Last commit | Age (days) | Open PR? |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          stale_count=0
+          while IFS= read -r ref; do
+            branch="${ref#origin/}"
+            case "$branch" in main|HEAD*) continue ;; esac
+            # Skip branches already listed as merged.
+            if printf '%s\n' "$merged" | grep -qx "origin/$branch"; then
+              continue
+            fi
+            last="$(git log -1 --format=%ct "$ref")"
+            if [ "$last" -lt "$cutoff" ]; then
+              stale_count=$((stale_count + 1))
+              age_days=$(( ( $(date -u +%s) - last ) / 86400 ))
+              last_date="$(git log -1 --format=%cs "$ref")"
+              if printf '%s\n' "$open_pr_branches" | grep -qx "$branch"; then
+                pr="yes"
+              else
+                pr="no"
+              fi
+              echo "| \`$branch\` | $last_date | $age_days | $pr |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done < <(git branch -r --format='%(refname:short)')
+          if [ "$stale_count" -eq 0 ]; then
+            echo "| _none_ | | | |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          {
+            echo
+            echo "_Squash-merged branches appear stale rather than merged; check their PRs before deleting. Local worktree cleanup stays manual (\`scripts/agent-worktree list\` / \`doctor\`)._"
+          } >> "$GITHUB_STEP_SUMMARY"

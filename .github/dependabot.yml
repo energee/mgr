@@ -8,3 +8,24 @@ updates:
       github-actions:
         patterns:
           - "*"
+
+  # JS dependencies. This repo uses Bun (bun.lock); Dependabot's npm ecosystem
+  # covers bun.lock in recent Dependabot versions — if lockfile updates are
+  # ever skipped, that's the Dependabot bun-support gap, not a config error.
+  # Minor + patch bumps land as ONE grouped weekly PR gated by the normal PR
+  # CI. Majors are deliberately left to humans (no automation here).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      js-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
