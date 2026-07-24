@@ -58,10 +58,30 @@ case "$VERIFICATION" in
     exit 3
     ;;
   "manual")
+    # A manual feature only "passes" verification when its entry carries a
+    # dated receipt: `last_verified` (ISO date) plus, ideally, `verified_by`
+    # (a verify-skill transcript path or e2e spec path). Without a receipt
+    # this exits 4 (UNVERIFIED) — printing INFO and exiting 0 let manual
+    # features pass with zero observed behavior.
+    LAST_VERIFIED=$(echo "$FEATURE_JSON" | bun -e "
+const f = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+console.log(f.last_verified ?? '');
+")
+    VERIFIED_BY=$(echo "$FEATURE_JSON" | bun -e "
+const f = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+console.log(f.verified_by ?? '');
+")
     echo
-    echo "INFO: feature '$ID' verification is marked 'manual' — walk the UI flow described in user_visible_behavior."
-    echo "      Mark passing in docs/feature_list.json once verified."
-    exit 0
+    if [ -n "$LAST_VERIFIED" ]; then
+      echo "OK: feature '$ID' is manual, verified $LAST_VERIFIED${VERIFIED_BY:+ by $VERIFIED_BY}."
+      echo "    Re-walk the UI flow in user_visible_behavior if the receipt looks stale."
+      exit 0
+    fi
+    echo "UNVERIFIED: feature '$ID' verification is 'manual' and has no dated receipt." >&2
+    echo "  Walk the UI flow described in user_visible_behavior, then record the receipt in" >&2
+    echo "  docs/feature_list.json: add \"last_verified\": \"YYYY-MM-DD\" and \"verified_by\":" >&2
+    echo "  \"<verify-skill transcript path or e2e spec path>\" to the feature entry." >&2
+    exit 4
     ;;
   *)
     echo

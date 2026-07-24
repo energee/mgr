@@ -33,6 +33,12 @@ useQuery({
 ## Available factories
 
 - `entityKeys` — generic CRUD operations (list, detail, options)
+- `batchRecordInvalidationKeys(id)` — every cache the batch record lives in
+  (domain detail key + the `batches_with_brew_info` view). Loop-invalidate
+  these after any batch mutation; `batchKeys.detail` alone misses the
+  unified detail page, which caches under the entity's `viewTable` key
+  (issue #560). Same rule applies to any entity with a `viewTable`:
+  invalidate the view key, not just the base table.
 - `dashboardKeys` — dashboard metrics and summaries
 - `notificationKeys` — user notifications
 - `catalogKeys` — catalog / lookup data

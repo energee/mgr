@@ -12,7 +12,6 @@ const workflows = [
   ".github/workflows/health-audit.yml",
   ".github/workflows/live-drift.yml",
   ".github/workflows/progress.yml",
-  ".github/workflows/quality-regrade.yml",
   ".github/workflows/sentry-harness.yml",
   ".github/workflows/shell-lint.yml",
   ".github/workflows/test.yml",
@@ -69,21 +68,6 @@ describe("GitHub Actions performance contracts", () => {
     expect(testWorkflow).not.toContain("Integration Tests (RLS)");
     expect(shellWorkflow).toContain("shellcheck");
     expect(shellWorkflow).not.toContain("postgres:");
-  });
-
-  it("avoids setup work when scheduled automation has nothing to do", () => {
-    const qualityWorkflow = read(".github/workflows/quality-regrade.yml");
-    const computeAt = qualityWorkflow.indexOf("Compute lookback window");
-    const setupAt = qualityWorkflow.indexOf("Setup Bun");
-
-    expect(computeAt).toBeGreaterThan(-1);
-    expect(setupAt).toBeGreaterThan(computeAt);
-    expect(qualityWorkflow).toMatch(
-      /- name: Setup Bun\n\s+if: steps\.window\.outputs\.commit_count != '0'/,
-    );
-    expect(qualityWorkflow).toMatch(
-      /- name: Install dependencies\n\s+if: steps\.window\.outputs\.commit_count != '0'/,
-    );
   });
 
   it("uses built-in psql and parallelizes only the selected Sentry fixes", () => {

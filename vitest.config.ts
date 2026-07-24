@@ -34,12 +34,19 @@ export default defineConfig({
   plugins: [react()],
   test: {
     // Deterministic timezone for every test file (CI is UTC without this).
-    // A behind-UTC zone is load-bearing: backward-planner's tests
-    // characterize the "date-only string renders a day early" behavior,
-    // which does not reproduce under UTC. Date-formatting tests must not
-    // depend on the host zone — pin here, not per-file. Note: runtime TZ
-    // changes are honored on POSIX only; Windows is not a supported dev
-    // platform for this suite.
+    // A behind-UTC zone matters: backward-planner's tests characterize the
+    // "date-only string renders a day early" behavior, which does not
+    // reproduce under UTC.
+    //
+    // WARNING: this pin is currently INERT under `pool: "threads"` (since
+    // PR #538) — Node worker threads share the parent process's timezone,
+    // and assigning process.env.TZ inside a worker does not re-run tzset(),
+    // so Date keeps the host zone (UTC in CI). Tracked in issue #568. Fix
+    // options: set TZ before any Date use in a context where it takes
+    // effect (a setupFiles/globalSetup assignment on the launching process,
+    // or TZ=America/New_York in the vitest invocation), or move the
+    // TZ-sensitive project to `pool: "forks"`. Kept as documentation of
+    // intent until #568 lands.
     env: { TZ: "America/New_York" },
     globals: true,
     // Worker threads instead of child-process forks: same isolation per test

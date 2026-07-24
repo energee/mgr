@@ -1,0 +1,9 @@
+# bunfig.toml — Bun runtime config.
+#
+# [test].preload guards AGENTS.md hard constraint 14: `bun test` is Bun's own
+# runner, not this repo's suite (vitest, run via `bun run test`). The preload
+# throws immediately with a pointer to the right command. Vitest does not read
+# this section, so `bun run test` is unaffected.
+
+[test]
+preload = ["./scripts/bun-test-guard.ts"]

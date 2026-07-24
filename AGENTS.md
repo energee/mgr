@@ -37,6 +37,8 @@ Run `make help` to list every target.
 3. Mark your feature `in_progress` *before* writing code.
 4. Mark it `passing` only after `make verify-feature ID=Fxxx` exits 0.
 
+For features with `verification: "manual"`, exit 0 requires a dated receipt on the entry: `last_verified` (ISO date the flow was last walked) and `verified_by` (verify-skill transcript path or e2e spec path). Without one, `make verify-feature` exits 4 (UNVERIFIED) — walk the flow, then record the receipt.
+
 ## Shared worktrees
 
 All harnesses use `scripts/agent-worktree` for worktree creation and discovery. Worktrees live under `${AGENT_WORKTREE_ROOT:-<main-checkout>/.agents/worktrees}/<repo>/<name>` — repo-local by default (gitignored and excluded from tsc/eslint/next/vitest so tooling never recurses into the nested checkouts), registered in the repository's common Git directory.
@@ -73,6 +75,8 @@ Agent-facing quick-references (must-follow rules, code examples):
 | [`docs/agents/evaluator-rubric.md`](docs/agents/evaluator-rubric.md) | Self-grading at session end and in code review |
 | [`docs/agents/observability.md`](docs/agents/observability.md) | Sentry use, runtime traces, agent task traces |
 | [`docs/agents/quality.md`](docs/agents/quality.md) | Codebase health snapshot (A–D grades per domain/layer) |
+| [`docs/agents/health-audit-and-issue-triage.md`](docs/agents/health-audit-and-issue-triage.md) | Auditing code health or creating/triaging GitHub issues |
+| [`docs/agents/ci.md`](docs/agents/ci.md) | Touching `.github/workflows/` — workflow set, triggers, when NOT to add a workflow |
 | [`docs/agents/autoharness.md`](docs/agents/autoharness.md) | Running the automated `src/lib` refactor screening loop |
 | [`docs/agents/improvement-loop.md`](docs/agents/improvement-loop.md) | How the automated loops compose; model-tier policy |
 | [`docs/feature_list.json`](docs/feature_list.json) | Feature tracker (state + verification per feature) |

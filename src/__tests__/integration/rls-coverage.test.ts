@@ -53,7 +53,7 @@ const PERMISSIVE_QUALS = ["true", "(auth.uid() IS NOT NULL)"] as const;
 /** Required prefix on the `COMMENT ON POLICY` text for a documented exception. */
 const EXCEPTION_PREFIX = "RLS-EXCEPTION:";
 
-interface PermissivePolicyRow {
+type PermissivePolicyRow = {
   tablename: string;
   policyname: string;
   cmd: string;

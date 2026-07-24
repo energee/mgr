@@ -14,7 +14,7 @@
   ],
   "verification_conventions": {
     "executable": "Shell command that exits 0 on pass and non-zero on fail.",
-    "manual": "Verification not yet automated — requires a human or agent to walk a UI flow.",
+    "manual": "Verification not yet automated — requires a human or agent to walk a UI flow. `make verify-feature` exits 4 (UNVERIFIED) unless the entry carries a dated receipt: optional `last_verified` (ISO date the flow was last walked) and `verified_by` (verify-skill transcript path or e2e spec path). Add both when marking a manual feature verified.",
     "null": "No verification defined yet. Treat as a gap to fix."
   },
   "features": [
