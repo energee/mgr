@@ -130,6 +130,17 @@ export const batchKeys = {
   lossSummary: (id: string) => ["batches", id, "loss-summary"] as const,
 };
 
+/**
+ * Every cache the batch record itself lives in: the domain detail key plus
+ * the `batches_with_brew_info` view backing the unified detail record and
+ * list pages. Invalidate all of these after any mutation that changes the
+ * batch row — invalidating `batchKeys.detail` alone leaves the detail
+ * header (status badge, vessel info) stale, since the unified page caches
+ * under the view key (issue #560).
+ */
+export const batchRecordInvalidationKeys = (id: string) =>
+  [batchKeys.detail(id), entityKeys.all("batches_with_brew_info")] as const;
+
 // =============================================================================
 // Batch Addition Keys
 // =============================================================================

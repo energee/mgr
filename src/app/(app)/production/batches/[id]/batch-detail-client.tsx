@@ -39,7 +39,7 @@ import { BatchPackagingHistory } from "@/components/domain/batch/batch-packaging
 import { BatchLossSummary } from "@/components/domain/batch/batch-loss-summary";
 import { NextStepBanner } from "@/components/domain/shared/next-step-banner";
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
-import { batchKeys, recipeKeys, packagingKeys } from "@/lib/query-keys";
+import { batchKeys, batchRecordInvalidationKeys, recipeKeys, packagingKeys } from "@/lib/query-keys";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { usePrefillStore } from "@/contexts/prefill-store";
 
@@ -71,6 +71,16 @@ export function BatchDetailClient({ id }: { id: string }) {
 
   const queryClient = useQueryClient();
   const supabase = createClient();
+
+  // Refresh the batch record everywhere it's cached — the domain detail key
+  // AND the batches_with_brew_info view backing the unified header (status
+  // badge, vessel info) and list pages. Invalidating batchKeys.detail alone
+  // left the header badge stale after transitions (issue #560).
+  const invalidateBatchRecord = useCallback(() => {
+    for (const key of batchRecordInvalidationKeys(id)) {
+      queryClient.invalidateQueries({ queryKey: key });
+    }
+  }, [queryClient, id]);
 
   // Fetch batch data for the dialogs (use view to get vessel info and
   // actual_og, which the view computes from brew-log knockout measurements
@@ -271,13 +281,13 @@ export function BatchDetailClient({ id }: { id: string }) {
     );
     if (!result.success) {
       toast.error(`Failed to complete batch: ${formatServiceError(result.error)}`);
-      queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+      invalidateBatchRecord();
       return;
     }
     toast.success("Batch completed");
-    queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+    invalidateBatchRecord();
     queryClient.invalidateQueries({ queryKey: batchKeys.all() });
-  }, [id, queryClient, batch]);
+  }, [id, queryClient, batch, invalidateBatchRecord]);
 
   // Custom action handler for batch-specific actions.
   // Returns true when the action is handled by a dialog, false to let EntityDetail handle it.
@@ -321,26 +331,26 @@ export function BatchDetailClient({ id }: { id: string }) {
   }, [completeBatch]);
 
   const handleDialogSuccess = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+    invalidateBatchRecord();
     queryClient.invalidateQueries({ queryKey: batchKeys.yeastSummary(id) });
     queryClient.invalidateQueries({ queryKey: batchKeys.yeastStrains(id) });
-  }, [queryClient, id]);
+  }, [queryClient, id, invalidateBatchRecord]);
 
   const handlePitchDialogSuccess = useCallback(() => {
     // PitchYeastDialog owns its yeast projections; the parent only refreshes
     // the batch record used by the surrounding detail page.
-    queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
-  }, [queryClient, id]);
+    invalidateBatchRecord();
+  }, [invalidateBatchRecord]);
 
   const handleBrewDayCreated = useCallback(
     (brewLogId: string) => {
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogLinks(id) });
       queryClient.invalidateQueries({ queryKey: batchKeys.brewLogs(id) });
-      queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+      invalidateBatchRecord();
       // Shared flow: consumption confirmation (with recipe) or direct navigation.
       handleBrewLogCreated(brewLogId);
     },
-    [queryClient, id, handleBrewLogCreated]
+    [queryClient, id, handleBrewLogCreated, invalidateBatchRecord]
   );
 
   /** Suggest a batch state transition via a toast confirmation. */
@@ -362,7 +372,7 @@ export function BatchDetailClient({ id }: { id: string }) {
           if (!result.success) {
             toast.error(`Failed to update status: ${formatServiceError(result.error)}`);
           } else {
-            queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+            invalidateBatchRecord();
             toast.success(`Batch marked as ${stateLabel}`);
           }
         },
@@ -370,7 +380,7 @@ export function BatchDetailClient({ id }: { id: string }) {
       cancel: { label: "Not yet", onClick: () => {} },
       duration: 10000,
     });
-  }, [id, queryClient, batch]);
+  }, [id, batch, invalidateBatchRecord]);
 
   return (
     <div className="space-y-4">
