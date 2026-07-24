@@ -28,9 +28,10 @@ describe("GitHub Actions performance contracts", () => {
     expect(contents).toContain("actions/upload-artifact@v7");
   });
 
-  // Minutes-budget contract (2026-07-16): PRs run static + one unsharded
-  // unit job only; build + E2E run on the weekday nightly schedule; docs-only
-  // changes skip the workflow. See docs/progress/2026-07-16-ci-minutes-diet.md.
+  // Public-repo contract (2026-07-24): static + unit run on EVERY PR —
+  // including docs-only ones — so their contexts always report and can be
+  // required status checks on main. Build + E2E stay on the weekday nightly
+  // schedule (design note in test.yml's header).
   it("keeps the PR lane lean and defers build/E2E to the nightly schedule", () => {
     const workflow = read(".github/workflows/test.yml");
 
@@ -38,7 +39,8 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).not.toContain("--shard=");
     expect(workflow).not.toContain("--merge-reports");
     expect(workflow).toContain("bunx vitest run --coverage");
-    expect(workflow).toContain("paths-ignore:");
+    // No paths-ignore: required checks must report on docs-only PRs too.
+    expect(workflow).not.toContain("paths-ignore:");
     expect(workflow).toMatch(/build:[\s\S]*?if: github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch'/);
     expect(workflow).not.toMatch(/\n  push:/);
     expect(workflow).toContain(".next/cache");
@@ -60,7 +62,8 @@ describe("GitHub Actions performance contracts", () => {
     expect(dbWorkflow).not.toMatch(/\n  push:/);
     expect(dbWorkflow).not.toMatch(/- "bun\.lock"/);
     expect(dbWorkflow).toContain("bun run test:integration");
-    expect(dbWorkflow).toContain("supabase/setup-cli@v3");
+    // SHA-pinned (tag as trailing comment) per docs/security/dependency-policy.md.
+    expect(dbWorkflow).toMatch(/supabase\/setup-cli@[0-9a-f]{40} # v3/);
     expect(dbWorkflow).toContain('version: "2.109.1"');
     expect(dbWorkflow).not.toContain("Lint shell scripts");
     expect(testWorkflow).not.toContain("Integration Tests (RLS)");
@@ -106,6 +109,29 @@ describe("GitHub Actions performance contracts", () => {
     expect(progressWorkflow).toContain("cancel-in-progress: true");
     expect(progressWorkflow).toContain("gh pr create");
     expect(progressWorkflow).toContain("gh pr merge");
+    // Required-checks compatibility: the bot PR must run the required
+    // checks ([skip ci] would suppress them) and wait for them via --auto.
+    expect(progressWorkflow).not.toContain("[skip ci]");
+    expect(progressWorkflow).toContain("--auto");
+  });
+
+  // Supply-chain contract (see docs/security/dependency-policy.md): every
+  // action outside the high-trust `actions/` namespace must be pinned to a
+  // full 40-hex commit SHA (tag recorded as a trailing comment). Dependabot
+  // keeps the SHAs current.
+  it("pins all non-actions/* actions to full commit SHAs", () => {
+    for (const path of workflows) {
+      const lines = read(path).split("\n");
+      for (const line of lines) {
+        const match = line.match(/^\s*(?:- )?uses:\s*(\S+)/);
+        if (!match) continue;
+        const [, ref] = match;
+        if (ref.startsWith("actions/")) continue;
+        expect(ref, `${path}: ${ref} must be pinned to a 40-char commit SHA`).toMatch(
+          /@[0-9a-f]{40}$/,
+        );
+      }
+    }
   });
 
   it("keeps GitHub Actions dependencies updated weekly", () => {

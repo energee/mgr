@@ -37,6 +37,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          # Read-only job; don't leave GITHUB_TOKEN in .git/config.
+          persist-credentials: false
 
       - name: Verify PostgreSQL client
         # ubuntu-latest already includes psql; avoid an 11-second apt install.

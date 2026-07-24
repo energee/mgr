@@ -32,6 +32,14 @@ The issue #438 baseline contained 41 high advisory records. Several records refe
 
 The current overrides remediate compatible transitive packages introduced by Square, Sentry, Mermaid/Streamdown, ESLint, Vitest/Vite, jsdom, and the bundle analyzer. Next.js, React, and React DOM are pinned directly so framework security releases cannot drift between environments.
 
+## GitHub Actions supply chain
+
+The repository is public, so workflow dependencies are part of the attack surface. Trust basis, enforced by a contract test in `.github/scripts/ci-workflows.test.ts` ("pins all non-actions/* actions to full commit SHAs"):
+
+- **`actions/*` namespace stays on version tags** (`actions/checkout@v7`, `actions/cache@v6`, `actions/upload-artifact@v7`). These are first-party, GitHub-maintained actions in a namespace GitHub controls; a tag hijack there implies a compromise of GitHub itself, which is already in our trust base. This is an explicit, recorded decision — not an oversight.
+- **Every other action is pinned to a full 40-character commit SHA**, with the intended tag recorded as a trailing comment (e.g. `oven-sh/setup-bun@0c5077e5… # v2`). Third-party tags are mutable: a compromised maintainer account can re-point `v2` at malicious code and every consumer picks it up on the next run. A commit SHA cannot be silently re-pointed.
+- **Dependabot keeps the SHAs current.** `.github/dependabot.yml` checks `github-actions` weekly and updates SHA pins (and their tag comments) the same way it bumps version tags, so pinning does not mean freezing.
+
 ## Exceptions
 
 An exception is a temporary last resort when no compatible patch exists. Its pull request must add a dated record to this file containing:
