@@ -786,3 +786,17 @@ User-to-brewery membership with roles.
 **Roles:** admin, production_manager, brewer, sales
 
 When multi-tenant is enabled, all other tables would include a `brewery_id` column with RLS policies enforcing tenant isolation.
+
+### `data_integrity_findings`
+
+Violations recorded by the nightly `check_data_integrity()` pg_cron sweep (migration 00272). One row per (check_name, entity_table, entity_id); re-detections refresh `detected_at`, and `resolved_at` is stamped when a later run no longer sees the violation. Read-only for staff with `inventory:read`; only the cron job owner writes.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| check_name | TEXT | Invariant that fired (`negative_on_hand`, `negative_bin_quantity`, `negative_lot_quantity`) |
+| entity_table | TEXT | Table the violating row lives in |
+| entity_id | UUID | Violating row (or item) id |
+| detail | TEXT | Human-readable description with the offending value |
+| detected_at | TIMESTAMPTZ | Last time the sweep saw the violation |
+| resolved_at | TIMESTAMPTZ | Set when the violation cleared; NULL while open |

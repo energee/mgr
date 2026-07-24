@@ -1,0 +1,92 @@
+# Nightly-failure watchdog. The nightly "Test" run (build + E2E on a schedule)
+# previously had no consumer: a red nightly produced an email nobody reads and
+# nothing else. This workflow is that consumer. It runs on completion of the
+# Test workflow and maintains exactly ONE tracking issue per source workflow:
+#
+#   - scheduled run FAILED   -> open (or comment on) the pinned tracking issue
+#   - scheduled run SUCCEEDED -> comment + close any open tracking issue
+#
+# The issue title is stable ("Nightly CI failing: Test") and runs are deduped
+# by the `nightly-red` label, so repeated failures update one issue instead of
+# spamming. Live-drift red runs are handled inside live-drift.yml itself
+# (which has the drift context); this watchdog deliberately covers only Test
+# to avoid double-issuing.
+#
+# Checkout-free: uses only the preinstalled `gh` CLI.
+#
+# Kill criterion: if this workflow itself misbehaves (issue spam), delete the
+# `nightly-red` label and disable the workflow from the Actions UI.
+
+name: Nightly Watch
+
+on:
+  workflow_run:
+    workflows: ["Test"]
+    types: [completed]
+
+permissions:
+  issues: write
+  actions: read
+
+jobs:
+  track:
+    name: Track nightly result
+    # Only scheduled runs matter: PR/dispatch failures already have an owner
+    # (the PR author / the person who clicked run).
+    if: github.event.workflow_run.event == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      WF_NAME: ${{ github.event.workflow_run.name }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      LABEL: nightly-red
+    steps:
+      - name: Upsert or resolve tracking issue
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="Nightly CI failing: ${WF_NAME}"
+
+          # Tolerate the label already existing (first run creates it).
+          gh label create "$LABEL" \
+            --repo "$REPO" \
+            --color B60205 \
+            --description "Scheduled CI run is red" \
+            2>/dev/null || true
+
+          # Stable dedupe: find the open tracking issue for this workflow by
+          # label + exact title (gh --search is unreliable under GITHUB_TOKEN,
+          # so filter a plain list instead).
+          existing="$(gh issue list \
+            --repo "$REPO" \
+            --label "$LABEL" \
+            --state open \
+            --json number,title \
+            --jq ".[] | select(.title == \"$title\") | .number" | head -1)"
+
+          if [ "$CONCLUSION" = "failure" ]; then
+            body="Scheduled run of **${WF_NAME}** failed: ${RUN_URL}
+
+          This issue is maintained by \`.github/workflows/nightly-watch.yml\`. It will be closed automatically by the next green scheduled run."
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$REPO" \
+                --body "Still failing: ${RUN_URL}"
+              echo "Updated existing tracking issue #$existing" >> "$GITHUB_STEP_SUMMARY"
+            else
+              gh issue create --repo "$REPO" \
+                --title "$title" \
+                --label "$LABEL" \
+                --body "$body"
+              echo "Opened tracking issue for red nightly ($WF_NAME)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          elif [ "$CONCLUSION" = "success" ] && [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" \
+              --body "Scheduled run is green again: ${RUN_URL}. Closing."
+            gh issue close "$existing" --repo "$REPO"
+            echo "Closed tracking issue #$existing (nightly green)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Conclusion=$CONCLUSION, no open tracking issue — nothing to do." >> "$GITHUB_STEP_SUMMARY"
+          fi
