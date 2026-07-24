@@ -19,19 +19,13 @@ test.describe("Packaging session", () => {
     await expect(page.locator("body")).toContainText(/packaging/i);
   });
 
-  // SKIPPED (tracked in #437): blocked by replay-chain vs live schema drift,
-  // not by missing seed data. The replayed migration chain still enforces the
-  // 00080 constraints chk_sli_format_xor / chk_fg_format_xor (legacy
-  // package_type_id / keg_type_id must be set), but every UI line-item insert
-  // (packaging-batch-dialog, add-to-packaging-session-dialog,
-  // use-session-line-items) writes selling_format_id-only rows — verified
-  // empirically against a fresh `supabase db reset`: the "Start packaging"
-  // INSERT is rejected before a session can even be completed. Live dropped
-  // those constraints (uncaptured drift; 00232's own self-verification block
-  // writes the same selling_format-only shape). Until a migration captures
-  // the constraint drops, this flow cannot run against the local stack. The
-  // completion trigger's DB semantics are covered end-to-end at the SQL layer
-  // by src/__tests__/integration/packaging-completion-trigger.test.ts.
+  // SKIPPED (tracked in #437): scaffold not yet implemented. The former
+  // schema-drift blocker is gone — migration 00269 captured live's drop of
+  // the legacy 00080 xor constraints, so selling_format-only line-item
+  // inserts now succeed against a replayed local stack. The completion
+  // trigger's DB semantics are covered end-to-end at the SQL layer by
+  // src/__tests__/integration/packaging-completion-trigger.test.ts; this
+  // browser flow still needs to be written.
   test.skip("full packaging session flow", async () => {
     // Step 1: from batch detail, click "Start packaging"
     // Step 2: select selling formats and quantities
