@@ -73,10 +73,13 @@ export default function BrewLogDetailPage({
     },
   });
 
-  // Invalidate both the domain-specific and generic entity caches for this brew log
+  // Invalidate every cache holding this brew log: the domain key, the base
+  // table key, and the brew_logs_with_batches view the unified detail page
+  // actually caches under (same stale-header pattern as issue #560).
   const invalidateBrewLog = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: brewLogKeys.detail(id) });
     queryClient.invalidateQueries({ queryKey: entityKeys.detail("brew_logs", id) });
+    queryClient.invalidateQueries({ queryKey: entityKeys.all("brew_logs_with_batches") });
   }, [queryClient, id]);
 
   // Direct state transition for "Start Brew" from the banner
