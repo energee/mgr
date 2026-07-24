@@ -53,6 +53,17 @@ CREATE POLICY data_integrity_findings_select
   FOR SELECT
   USING (user_has_permission('inventory:read'));
 
+-- Disabled-account gate (00255 pattern): every RLS-enabled public table must
+-- carry this restrictive policy — the account-status-rls integration guard
+-- fails the chain without it.
+CREATE POLICY current_user_enabled
+  ON public.data_integrity_findings
+  AS RESTRICTIVE
+  FOR ALL
+  TO authenticated
+  USING ((SELECT current_user_is_enabled()))
+  WITH CHECK ((SELECT current_user_is_enabled()));
+
 REVOKE INSERT, UPDATE, DELETE ON TABLE public.data_integrity_findings
   FROM PUBLIC, anon, authenticated;
 
