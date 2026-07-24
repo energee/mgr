@@ -11,15 +11,10 @@ import {
   getDefaultPaymentTermsDays,
   createQBORequestId,
   reconciliationRequiredError,
+  addDays,
 } from "./sync-utils";
 import { syncSupplier } from "./sync-supplier";
 import type { QBOBill, QBOBillLine, QBOEntityResponse } from "./types";
-
-function addDays(dateStr: string, days: number): string {
-  const date = new Date(dateStr);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split("T")[0];
-}
 
 /** Extract numeric days from a payment terms string like "Net 30" or "COD". Returns NaN if no number found. */
 function parsePaymentTermsDays(terms: string | null | undefined): number {

@@ -249,3 +249,14 @@ export async function getDefaultPaymentTermsDays(): Promise<number> {
   }
   return parseInt(String(data?.value ?? "30"), 10);
 }
+
+/**
+ * Add N calendar days to a YYYY-MM-DD date string, entirely in UTC.
+ * Must not use setDate/getDate (local time): mixing them with the UTC parse
+ * shifts the result by a day depending on host timezone and DST transitions.
+ */
+export function addDays(dateStr: string, days: number): string {
+  const date = new Date(dateStr);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().split("T")[0];
+}

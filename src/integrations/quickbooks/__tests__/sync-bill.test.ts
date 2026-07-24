@@ -22,11 +22,9 @@
  * module-mocked. Assertions are on the payloads posted to QBO and the rows
  * written to qbo_sync_mappings / qbo_sync_log, not on mock call counts.
  *
- * NOTE on DueDate strings: vitest.config pins TZ=America/New_York, and
- * addDays parses date-only strings as UTC midnight but adds days in LOCAL
- * time — so "2026-03-01" + N days lands one calendar day earlier than naive
- * UTC arithmetic (e.g. +45 → "2026-04-14", not "-15"). The hardcoded
- * expectations below characterize that existing behavior under the pinned TZ.
+ * NOTE on DueDate strings: addDays (sync-utils) does pure UTC calendar
+ * arithmetic, so expectations are plain date math ("2026-03-01" + 45 →
+ * "2026-04-15") and hold in any host timezone.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -192,7 +190,7 @@ describe("syncBill — happy paths (characterization)", () => {
       DocNumber: "PO-1001",
       VendorRef: { value: "V-77" },
       TxnDate: "2026-03-01",
-      DueDate: "2026-04-14", // "Net 45" parsed from supplier payment_terms (see TZ note)
+      DueDate: "2026-04-15", // "Net 45" parsed from supplier payment_terms
     });
     expect(bill.Line).toEqual([
       {
@@ -340,7 +338,7 @@ describe("syncBill — failed reads are not treated as empty", () => {
 
     expect(result).toEqual({ qboId: "B-9", action: "create" });
     // Default terms from system_settings ("10" days), not the supplier's Net 45.
-    expect(postedBill().DueDate).toBe("2026-03-10");
+    expect(postedBill().DueDate).toBe("2026-03-11");
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ err: "supplier read failed", supplierId: SUPPLIER_ID }),
       expect.stringContaining("failed to read supplier payment terms")
