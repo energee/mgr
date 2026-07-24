@@ -22,7 +22,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { teardownPool, withRoleClient } from "./_helpers/role-client";
 
-interface Expectation {
+type Expectation = {
   table: string;
   selectQualContains: string;
   writeQualContains: string;

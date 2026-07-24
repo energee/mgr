@@ -11,7 +11,7 @@ workflow — extend one of these loops instead if it fits.
 | [Sentry harness](../sentry-harness-setup.md) | Weekdays (17:00 UTC) | Production/runtime bugs → fix PRs | Sonnet |
 | [Scheduled health audit](health-audit-and-issue-triage.md#scheduled-automation) | Weekly (Wed 13:37 UTC) | Static correctness audit → deduplicated issues | Default |
 | [autoharness](autoharness.md) | On demand (`autoharness optimize`) | Mechanical `src/lib` refactors | Sonnet |
-| Quality re-grade (`quality-regrade.yml`) | Weekly (Mon) | [quality.md](quality.md) scorecard + trend log | Sonnet |
+| Quality re-grade | Removed 2026-07-24 (`quality-regrade.yml` never produced output — no `--allowed-tools`; a scheduled agent will replace it) | [quality.md](quality.md) scorecard + trend log | — |
 | CI gates (`test.yml`, `db-lint.yml`, `make check`) | Every PR (static+unit); weekday nightly (build+E2E) | Coverage ratchets, DB lint, type/lint/test | none |
 
 The loops compose: CI gates make the generative loops safe (a bad

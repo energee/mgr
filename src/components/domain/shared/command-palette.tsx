@@ -85,7 +85,7 @@ const SEARCH_DEBOUNCE_MS = 200;
 type AnyEntityConfig = EntityConfig<Record<string, unknown>>;
 type IconComponent = ComponentType<{ className?: string }>;
 
-interface SearchEntityDescriptor {
+type SearchEntityDescriptor = {
   entity: AnyEntityConfig;
   /** Read permission required to query + show results for this entity. */
   permission: Permission;
@@ -111,7 +111,7 @@ const SEARCH_ENTITY_ICONS = new Map<string, IconComponent>(
   SEARCH_ENTITIES.map((d) => [d.entity.name, d.icon]),
 );
 
-export interface RecordSearchSpec {
+export type RecordSearchSpec = {
   /** Table/view to query — same choice the entity list page makes. */
   table: string;
   /** Column projection: id + detail-header title/subtitle. */
@@ -144,7 +144,7 @@ export function buildRecordSearchSpec(
   };
 }
 
-interface RecordSearchResult {
+type RecordSearchResult = {
   entityName: string;
   /** Entity type label shown on the right of the row (e.g. "Batch"). */
   displayName: string;
@@ -185,7 +185,7 @@ function toSearchResult(
 // Quick actions
 // =============================================================================
 
-interface QuickAction {
+type QuickAction = {
   label: string;
   href: string;
   permission: Permission;

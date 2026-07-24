@@ -2,7 +2,7 @@ import type { ColumnSort, Row, RowData } from "@tanstack/react-table";
 import type { DataTableConfig } from "@/lib/data-table-config";
 import type { FilterItemSchema } from "@/lib/parsers";
 
-/* eslint-disable @typescript-eslint/no-unused-vars -- TData/TValue required for module augmentation but not used in interface body */
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/consistent-type-definitions -- TData/TValue required for module augmentation but not used in interface body; `interface` required for declaration merging inside `declare module` (AGENTS.md constraint 3 exception) */
 declare module "@tanstack/react-table" {
   interface TableMeta<TData extends RowData> {
     queryKeys?: QueryKeys;

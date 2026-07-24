@@ -215,11 +215,11 @@
 - [x] **Version pins**
   - `package.json` — `engines.node: ">=24"`, `engines.bun: ">=1.3"`, `packageManager: bun@1.3.10`
 
-## In progress
+## In progress (frozen 2026-07-12 — historical; see Current state above)
 
 - **[PR #338](https://github.com/energee/mgr/pull/338)** (this branch) — open, ready to merge. PR #336 was squash-merged mid-session with only its original commit; #338 carries all 15 review-finding fixes, the 00200 API-key RLS migration (already applied to live), and backlog #7 (transfer-route side effects + enforcement test).
 
-## Deferred
+## Deferred (frozen 2026-07-12 — historical; re-verify before pulling)
 
 Open work that's logged but not currently being executed. Pull from this list when picking up new work.
 
@@ -245,13 +245,13 @@ Open work that's logged but not currently being executed. Pull from this list wh
 - **2026-05-03** — #251 autoharness screening + Claude OAuth shim; #250 `src/lib` dead-code removal + dedup
 - **2026-05-02..03** — Walkinglabs harness rollout (#249, merged): `Makefile` with layered gates, `AGENTS.md` router + topic docs, `feature_list.json` (48 features), 8 executable DB checks, ESLint custom rules (DEC-008 / centralized query keys / `EntityDetail` re-introduction block), WIP=1 enforcement, bootstrap contract validation, Sentry harness writes harness state, coverage thresholds, migration dry-run
 
-## Known issues
+## Known issues (frozen 2026-07-12 — historical; see Current state above)
 
 - ~~Integration API keys readable by any authenticated user~~ — **FIXED 2026-07-05** by `00200_extend_sensitive_settings.sql` (`is_sensitive_setting()` now also matches `%_api_key`; applied to live and verified). Was: only the 3 `qbo_*` token keys were hidden from the permissive SELECT policy (00097:402-403).
 - `make` warnings about `xcrun_db` permission errors only appear inside Claude Code's sandbox; normal terminals don't show them.
 - `make check` cannot be exercised end-to-end inside the agent sandbox because Turbopack `next build` requires port binding. Verified piecewise: `make check-fast`, `bun run test`, `make check-db`.
 
-## Next steps
+## Next steps (frozen 2026-07-12 — historical, long since done; see Current state above)
 
 1. **Review + merge PR #343** (audit #9 enforcement restore + live-drift CI); add the read-only `SUPABASE_DB_URL` repo secret so the drift job runs.
 2. **Audit fix backlog** (`docs/plans/2026-07-06-audit-fix-backlog.md`): P0 #1–#3 (#341) and P1 #4–#7 (#342) shipped; #9 = PR #343. Remaining data-layer items to pick up next as separate PRs: **#11 keg_inventory netting, #12 server-side availability guard, #13 chk_fg_entry_point, #15 ledger audit hardening, #16 vessel integrity, and the new #21 (get_inventory_overview rewrite) / #22 (start_batch_fermentation rewrite)**. Product-decision/other-agent items (#10, #17, #19, #20) need the user / entity-architect.

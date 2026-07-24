@@ -55,6 +55,10 @@ const eslintConfig = defineConfig([
       // All console usage must go through the centralized logger
       // (src/lib/logger.ts for server, src/lib/client-logger.ts for client)
       "no-console": "error",
+      // AGENTS.md hard constraint 3: `type` aliases, never `interface`.
+      // Exception: declaration merging inside `declare module` blocks
+      // (e.g. src/types/data-table.ts) — suppress inline there.
+      "@typescript-eslint/consistent-type-definitions": ["error", "type"],
     },
   },
   // Harness conventions promoted from prose to executable checks.
