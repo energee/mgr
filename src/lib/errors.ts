@@ -161,11 +161,11 @@ const CONSTRAINT_ERROR_CODES: ReadonlySet<string> = new Set([
  * the message on the matching form field (react-hook-form `setError`)
  * instead of a toast.
  */
-export interface ParsedPostgresError {
+export type ParsedPostgresError = {
   message: string;
   /** Column name from a unique violation (e.g. "po_number"), when determinable. */
   field?: string;
-}
+};
 
 /**
  * Extract the column and value from a unique-violation `details` string:

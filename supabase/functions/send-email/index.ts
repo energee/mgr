@@ -15,7 +15,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-interface EmailPayload {
+type EmailPayload = {
   /** Recipient email address */
   to: string;
   /** Email subject line */
@@ -24,7 +24,7 @@ interface EmailPayload {
   html: string;
   /** Optional plain-text body (fallback for non-HTML clients) */
   text?: string;
-}
+};
 
 Deno.serve(async (req: Request) => {
   // Only accept POST requests
