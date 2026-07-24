@@ -20,3 +20,31 @@ export function zodResolver<T extends FieldValues>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod v4 compatibility workaround
   return _zodResolver(schema as any) as Resolver<T>;
 }
+
+/**
+ * zodResolver that maps `""` → `null` on non-required fields before
+ * validation (issue #558): the unified form initializes untouched optional
+ * selects to `""`, which optional `.uuid()` schema fields reject as
+ * "Invalid UUID" — blocking submit even though the save path would have
+ * nulled them. Normalizing inside the resolver keeps `form.trigger()` and
+ * the save-time `""→null` pass in agreement.
+ *
+ * `fields` only needs `name`/`required` from the entity's editable field
+ * defs; fields not listed (or marked required) pass through untouched.
+ */
+export function makeFormResolver<T extends FieldValues>(
+  schema: ZodSchema,
+  fields: ReadonlyArray<{ name: string; required?: boolean }>,
+): Resolver<T> {
+  const base = zodResolver<T>(schema);
+  const optionalNames = fields.filter((f) => !f.required).map((f) => f.name);
+  return (values, context, options) => {
+    const normalized = { ...values };
+    for (const name of optionalNames) {
+      if (normalized[name] === "") {
+        (normalized as Record<string, unknown>)[name] = null;
+      }
+    }
+    return base(normalized, context, options);
+  };
+}

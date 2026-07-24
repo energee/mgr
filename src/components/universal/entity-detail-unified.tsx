@@ -56,7 +56,7 @@ import { DOMAIN_WRITE_PERMISSIONS } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@/lib/form-resolver";
+import { makeFormResolver } from "@/lib/form-resolver";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
 import { formatServiceError } from "@/services/types";
@@ -616,8 +616,21 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
     [sections, defaultValues, storePrefill, entity.stateMachine]
   );
 
+  // makeFormResolver nulls ""-initialized optional selects before validation
+  // (issue #558) — otherwise optional .uuid() schema fields reject the
+  // untouched form and it can never submit.
+  const resolver = useMemo(
+    () =>
+      entity.formSchema
+        ? makeFormResolver<Record<string, unknown>>(
+            entity.formSchema,
+            getEditableFieldsFromSections(sections)
+          )
+        : undefined,
+    [entity.formSchema, sections]
+  );
   const form = useForm<Record<string, unknown>>({
-    resolver: entity.formSchema ? zodResolver(entity.formSchema) : undefined,
+    resolver,
     defaultValues: formDefaults,
   });
 
