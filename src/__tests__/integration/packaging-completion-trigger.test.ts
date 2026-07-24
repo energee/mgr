@@ -11,17 +11,10 @@
  * (00142/00205). Also covers the 00159 packaging_session_before_update
  * guards and the 00232 revise_packaging_session below-committed rejection.
  *
- * Replay-chain drift shim: the migration chain still carries the 00080
- * constraints chk_sli_format_xor / chk_fg_format_xor, which require the
- * legacy package_type_id / keg_type_id columns to be populated. The live DB
- * dropped them (uncaptured drift): every UI line-item insert and 00232's own
- * self-verification block write selling_format-only rows, which the replayed
- * chain rejects — verified empirically against a fresh `supabase db reset`.
- * Tests therefore seed line items with a legacy package_types row and add a
- * pg_temp BEFORE INSERT trigger stamping the same legacy id onto the
- * function-created finished_goods rows, satisfying the replayed constraints
- * without altering the schema under test. Same idiom as the "Replay-only
- * package" seed in square-atomic-ingestion.test.ts.
+ * Line items are seeded selling_format-only (the live shape): migration
+ * 00269 captured live's out-of-band drop of the legacy 00080 xor
+ * constraints, so replayed chains accept these rows directly — the pg_temp
+ * stamping shim this suite previously carried is gone (#559).
  *
  * All tests run inside BEGIN/ROLLBACK; nothing is committed.
  */
@@ -66,7 +59,6 @@ async function seedPackagingFixture(
   const brandId = uid(base + 1);
   const containerId = uid(base + 2);
   const formatId = uid(base + 3);
-  const packageTypeId = uid(base + 4);
   const batchAId = uid(base + 5);
   const batchBId = uid(base + 6);
   const sessionId = uid(base + 7);
@@ -87,12 +79,6 @@ async function seedPackagingFixture(
      VALUES ($1, $2, $3, 4)`,
     [formatId, containerId, `Pkg trigger 4-pack ${base}`]
   );
-  // Legacy package_types row: replay-only xor-constraint shim (see header).
-  await client.query(
-    `INSERT INTO package_types (id, name, container_type, volume_oz, units_per_case)
-     VALUES ($1, $2, 'can', 16, 4)`,
-    [packageTypeId, `Replay-only package ${base}`]
-  );
   await client.query(
     `INSERT INTO batches (id, batch_code, name, status, volume_bbl)
      VALUES ($1, $2, 'Pkg trigger batch A', 'packaging', 10),
@@ -106,32 +92,12 @@ async function seedPackagingFixture(
   );
   await client.query(
     `INSERT INTO session_line_items
-       (id, session_id, brand_id, selling_format_id, package_type_id, batch_id,
+       (id, session_id, brand_id, selling_format_id, batch_id,
         planned_quantity, actual_quantity)
-     VALUES ($1, $3, $4, $5, $6, $7, 100, 96),
-            ($2, $3, $4, $5, $6, $8, 64, 60)`,
-    [lineAId, lineBId, sessionId, brandId, formatId, packageTypeId, batchAId, batchBId]
+     VALUES ($1, $3, $4, $5, $6, 100, 96),
+            ($2, $3, $4, $5, $7, 64, 60)`,
+    [lineAId, lineBId, sessionId, brandId, formatId, batchAId, batchBId]
   );
-
-  // Replay-only xor-constraint shim for the finished_goods rows the DB
-  // function inserts (it writes neither legacy format column — live has no
-  // such constraint). pg_temp-scoped: vanishes with the session.
-  await client.query(`
-    CREATE FUNCTION pg_temp.shim_fg_format_xor()
-    RETURNS trigger
-    LANGUAGE plpgsql
-    AS $fn$
-    BEGIN
-      IF NEW.package_type_id IS NULL AND NEW.keg_type_id IS NULL THEN
-        NEW.package_type_id := '${packageTypeId}'::uuid;
-      END IF;
-      RETURN NEW;
-    END;
-    $fn$;
-    CREATE TRIGGER shim_fg_format_xor
-      BEFORE INSERT ON finished_goods
-      FOR EACH ROW EXECUTE FUNCTION pg_temp.shim_fg_format_xor();
-  `);
 
   return { brandId, formatId, batchAId, batchBId, sessionId, lineAId, lineBId };
 }
@@ -155,9 +121,9 @@ describe("create_finished_goods_from_packaging via on_packaging_session_completi
       );
       await client.query(
         `INSERT INTO session_line_items
-           (id, session_id, brand_id, selling_format_id, package_type_id, batch_id,
+           (id, session_id, brand_id, selling_format_id, batch_id,
             planned_quantity, actual_quantity)
-         SELECT $1, $2, brand_id, selling_format_id, package_type_id, $3, 10, 0
+         SELECT $1, $2, brand_id, selling_format_id, $3, 10, 0
          FROM session_line_items WHERE id = $4`,
         [lineCId, fx.sessionId, batchCId, fx.lineAId]
       );
