@@ -11,15 +11,10 @@ import {
   getDefaultPaymentTermsDays,
   createQBORequestId,
   reconciliationRequiredError,
+  addDays,
 } from "./sync-utils";
 import { syncCustomer } from "./sync-customer";
 import type { QBOInvoice, QBOInvoiceLine, QBOEntityResponse } from "./types";
-
-function addDays(dateStr: string, days: number): string {
-  const date = new Date(dateStr);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split("T")[0];
-}
 
 export async function syncInvoice(orderId: string): Promise<{ qboId: string; action: "create" | "update" }> {
   const admin = await createAdminClient();
