@@ -19,11 +19,9 @@
  * module mocks for the QBO HTTP client and syncCustomer. Assertions are on
  * posted payloads and rows written to qbo_sync_mappings / qbo_sync_log.
  *
- * NOTE on DueDate strings: vitest.config pins TZ=America/New_York; addDays
- * parses date-only strings as UTC midnight but adds days in LOCAL time, so
- * "2026-03-01" + N days lands one calendar day earlier than naive UTC
- * arithmetic (e.g. +14 → "2026-03-14"). Hardcoded expectations characterize
- * that existing behavior under the pinned TZ.
+ * NOTE on DueDate strings: addDays (sync-utils) does pure UTC calendar
+ * arithmetic, so expectations are plain date math ("2026-03-01" + 14 →
+ * "2026-03-15") and hold in any host timezone.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -170,7 +168,7 @@ describe("syncInvoice — happy paths (characterization)", () => {
       DocNumber: "SO-100",
       CustomerRef: { value: "C-55" },
       TxnDate: "2026-03-01",
-      DueDate: "2026-03-14", // customer payment_terms_days = 14 (see TZ note)
+      DueDate: "2026-03-15", // customer payment_terms_days = 14
     });
     expect(invoice.Line).toEqual([
       {
@@ -266,7 +264,7 @@ describe("syncInvoice — failed reads are not treated as empty", () => {
 
     expect(result).toEqual({ qboId: "I-9", action: "create" });
     // Default terms from system_settings ("10" days), not the customer's 14.
-    expect(postedInvoice().DueDate).toBe("2026-03-10");
+    expect(postedInvoice().DueDate).toBe("2026-03-11");
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ err: "customer read failed", customerId: CUSTOMER_ID }),
       expect.stringContaining("failed to read customer payment terms")
