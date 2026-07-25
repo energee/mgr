@@ -46,7 +46,6 @@ export const sellingFormatCore: EntityCoreInput<SellingFormat> = {
   name: "selling_format",
   table: "selling_formats",
   displayName: "Selling Format",
-  description: "How a container is grouped for sale — single, 4-pack, case, per keg.",
   domain: "inventory",
   basePath: "/settings/selling-formats",
 
@@ -69,12 +68,6 @@ export const sellingFormatCore: EntityCoreInput<SellingFormat> = {
       // The `component` (BOMRelation) is supplied by presentation.tsx via
       // `relationComponents` so this module stays free of React imports.
     },
-  ],
-
-  queryExamples: [
-    "Show all selling formats",
-    "What formats are available for 12oz cans?",
-    "List active selling formats with unit counts",
   ],
 
   keyFields: ["name", "container_id", "unit_count", "is_active"],

@@ -57,12 +57,10 @@ export const customerPresentation: EntityPresentation<Customer> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "customer_type",
       header: "Type",
-      sortable: true,
       render: (value) => {
         const display = getValueDisplay(customerCore, "customer_type", value as string);
         return (
@@ -76,30 +74,25 @@ export const customerPresentation: EntityPresentation<Customer> = {
     {
       accessorKey: "sales_channel_name",
       header: "Channel",
-      sortable: true,
     },
     {
       accessorKey: "total_orders",
       header: "Orders",
-      sortable: true,
       format: "number",
     },
     {
       accessorKey: "total_revenue",
       header: "Revenue",
-      sortable: true,
       format: "currency",
     },
     {
       accessorKey: "last_order_date",
       header: "Last Order",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => value ? "Yes" : "No",
     },
   ],

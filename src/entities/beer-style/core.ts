@@ -47,7 +47,6 @@ export const beerStyleCore: EntityCoreInput<BeerStyle> = {
   name: "beer_style",
   table: "beer_styles",
   displayName: "Beer Style",
-  description: "BJCP style guidelines and custom brewery styles",
   domain: "production",
   basePath: "/settings/beer-styles",
 
@@ -61,13 +60,6 @@ export const beerStyleCore: EntityCoreInput<BeerStyle> = {
   },
 
   formSchema: beerStyleSchema,
-
-  queryExamples: [
-    "List all IPA styles",
-    "What are the vital stats for American Pale Ale?",
-    "Show BJCP lager styles",
-    "What styles have ABV over 8%?",
-  ],
 
   keyFields: ["name", "category", "abv_min", "abv_max", "ibu_min", "ibu_max"],
 };

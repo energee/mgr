@@ -35,12 +35,10 @@ export const purchaseOrderPresentation: EntityPresentation<PurchaseOrder> = {
     {
       accessorKey: "po_number",
       header: "PO #",
-      sortable: true,
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -51,13 +49,11 @@ export const purchaseOrderPresentation: EntityPresentation<PurchaseOrder> = {
     {
       accessorKey: "order_date",
       header: "Order Date",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "expected_date",
       header: "Expected",
-      sortable: true,
       format: "date",
     },
   ],

@@ -59,7 +59,6 @@ export const kegOwnerCore: EntityCoreInput<KegOwner> = {
   table: "keg_owners",
   displayName: "Keg Owner",
   defaultSort: { column: "name", direction: "asc" },
-  description: "Fleet providers that own kegs (e.g., Owned, Microstar, KegFleet)",
   domain: "inventory",
   basePath: "/inventory/kegs/owners",
 
@@ -83,12 +82,6 @@ export const kegOwnerCore: EntityCoreInput<KegOwner> = {
       // presentation.tsx via `relationComponents` so this module stays
       // free of React imports.
     },
-  ],
-
-  queryExamples: [
-    "List all keg owners",
-    "Show active fleet providers",
-    "Which fleet does Microstar provide?",
   ],
 
   keyFields: ["name", "code", "is_active"],

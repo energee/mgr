@@ -24,17 +24,14 @@ export const binPresentation: EntityPresentation<Bin> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "location_name",
       header: "Location",
-      sortable: true,
     },
     {
       accessorKey: "bin_type",
       header: "Type",
-      sortable: true,
       render: (value) => (
         <Badge variant="outline">
           {getValueLabel(binCore, "bin_type", value as string)}
@@ -44,13 +41,11 @@ export const binPresentation: EntityPresentation<Bin> = {
     {
       accessorKey: "capacity",
       header: "Capacity",
-      sortable: true,
       format: "number",
     },
     {
       accessorKey: "total_item_count",
       header: "Items",
-      sortable: true,
       format: "number",
     },
   ],

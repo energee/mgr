@@ -43,7 +43,6 @@ export const pricingTierCore: EntityCoreInput<PricingTier> = {
   name: "pricing_tier",
   table: "pricing_tiers",
   displayName: "Pricing Tier",
-  description: "Tier definitions for the pricing matrix",
   domain: "sales",
   basePath: "/settings/pricing/tiers",
 
@@ -73,12 +72,6 @@ export const pricingTierCore: EntityCoreInput<PricingTier> = {
       showInDetail: true,
       detailTab: "Recipes",
     },
-  ],
-
-  queryExamples: [
-    "Show me all pricing tiers",
-    "What tier covers COGS up to $8?",
-    "List tiers by COGS upper bound",
   ],
 
   keyFields: ["name", "cogs_max"],

@@ -128,8 +128,6 @@ export const allocationCore: EntityCoreInput<Allocation> = {
   name: "allocation",
   table: "allocations",
   displayName: "Allocation",
-  description:
-    "Unified allocation table for all inventory movements. Tracks raw materials, batches, and finished goods.",
   domain: "inventory",
 
   // Explicit: sort by most-recent first, not by name.
@@ -148,14 +146,6 @@ export const allocationCore: EntityCoreInput<Allocation> = {
   relations: [
     // Note: Polymorphic relations are handled specially in the application
     // These are placeholders for documentation purposes
-  ],
-
-  queryExamples: [
-    "Show me all pending allocations",
-    "What allocations are awaiting approval?",
-    "List allocations for a specific batch",
-    "Find all sample allocations this month",
-    "Get TTB-relevant allocations for reporting",
   ],
 
   keyFields: [

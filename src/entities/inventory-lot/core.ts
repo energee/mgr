@@ -46,13 +46,6 @@ export const inventoryLotCore: EntityCoreInput<InventoryLot> = {
   table: "inventory_lots",
   viewTable: "inventory_lots_with_quantities",
   displayName: "Inventory Lot",
-  // displayNamePlural omitted — "Inventory Lots" is not displayName+"s" but
-  // the pattern is: displayName="Inventory Lot", plural="Inventory Lots" — the
-  // "s" is appended to "Lot" not to the full string; the rule says omit when
-  // plural equals displayName+"s" exactly. "Inventory Lot"+"s"="Inventory Lots"
-  // which matches, so we OMIT.
-  description:
-    "Lot-level inventory tracking for raw materials with FIFO costing",
   domain: "inventory",
   basePath: "/inventory/lots",
 
@@ -80,13 +73,6 @@ export const inventoryLotCore: EntityCoreInput<InventoryLot> = {
       foreignKey: "po_receive_id",
       showInDetail: true,
     },
-  ],
-
-  queryExamples: [
-    "Show lots expiring this month",
-    "Get available lots for Cascade hops (FIFO order)",
-    "Find lots with remaining quantity",
-    "Calculate COGS for batch using FIFO",
   ],
 
   keyFields: [

@@ -689,8 +689,8 @@ interface EntityConfig<T> {
   // Relations
   relations: RelationDef[];
 
-  // AI context
-  queryExamples: string[];
+  // AI context. Natural-language query examples live in
+  // `_schema_registry.query_examples` (read by get_ai_schema_context), not here.
   keyFields: string[];
 }
 ```

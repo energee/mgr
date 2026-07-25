@@ -125,7 +125,6 @@ export const vesselCore: EntityCoreInput<Vessel> = {
   table: "vessels",
   viewTable: "vessels_with_batch",
   displayName: "Vessel",
-  description: "Brewing vessels including fermenters, brites, kettles, and more",
   domain: "production",
 
   // defaultSort: { column: "name", direction: "asc" } — omitted (matches default)
@@ -165,15 +164,6 @@ export const vesselCore: EntityCoreInput<Vessel> = {
       showInDetail: true,
       detailTab: "Transfer History",
     },
-  ],
-
-  queryExamples: [
-    "Show me all available fermenters",
-    "Which vessels are currently in use?",
-    "What's in FV-1?",
-    "List dirty vessels that need cleaning",
-    "Find vessels under maintenance",
-    "What's the total fermenter capacity?",
   ],
 
   keyFields: ["name", "vessel_type", "capacity_bbl", "status"],

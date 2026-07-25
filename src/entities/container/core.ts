@@ -54,7 +54,6 @@ export const containerCore: EntityCoreInput<Container> = {
   name: "container",
   table: "containers",
   displayName: "Container",
-  description: "Physical vessels — cans, bottles, kegs. Parent of selling formats.",
   domain: "inventory",
   basePath: "/settings/containers",
 
@@ -73,12 +72,6 @@ export const containerCore: EntityCoreInput<Container> = {
       foreignKey: "container_id",
       type: "hasMany",
     },
-  ],
-
-  queryExamples: [
-    "Show all containers",
-    "What keg sizes do we have?",
-    "List active can and bottle containers",
   ],
 
   keyFields: ["name", "type", "volume_oz", "volume_bbl", "deposit_amount", "is_active"],

@@ -60,9 +60,6 @@ export type EntityCore<T = Record<string, unknown>> = {
   /** Plural display name (e.g., 'Batches', 'Recipes') */
   displayNamePlural: string;
 
-  /** Brief description for AI context */
-  description: string;
-
   /** Domain this entity belongs to */
   domain: EntityDomain;
 
@@ -125,9 +122,6 @@ export type EntityCore<T = Record<string, unknown>> = {
 
   /** Relationships to other entities */
   relations?: EntityRelationDef[];
-
-  /** Example natural language queries for AI */
-  queryExamples?: string[];
 
   /** Key fields for AI to understand */
   keyFields?: (keyof T & string)[];

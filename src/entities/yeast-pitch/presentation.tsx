@@ -23,7 +23,6 @@ export const yeastPitchPresentation: EntityPresentation<YeastPitch> = {
     {
       accessorKey: "strain_name",
       header: "Strain",
-      sortable: true,
       render: (value, row) => {
         const pitch = row as YeastPitch;
         return (
@@ -39,7 +38,6 @@ export const yeastPitchPresentation: EntityPresentation<YeastPitch> = {
     {
       accessorKey: "source_type",
       header: "Source",
-      sortable: true,
       render: (value) => {
         const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === value);
         return option?.label || String(value);
@@ -48,13 +46,11 @@ export const yeastPitchPresentation: EntityPresentation<YeastPitch> = {
     {
       accessorKey: "generation",
       header: "Gen",
-      sortable: true,
       render: (value) => `G${value || 1}`,
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -65,7 +61,6 @@ export const yeastPitchPresentation: EntityPresentation<YeastPitch> = {
     {
       accessorKey: "estimated_viability",
       header: "Viability",
-      sortable: true,
       render: (value, row) => {
         const pitch = row as YeastPitch;
         if (value == null) return "—";
@@ -82,13 +77,11 @@ export const yeastPitchPresentation: EntityPresentation<YeastPitch> = {
     {
       accessorKey: "days_old",
       header: "Age",
-      sortable: true,
       render: (value) => (value != null ? `${value}d` : "—"),
     },
     {
       accessorKey: "quantity_remaining_lbs",
       header: "Remaining (lbs)",
-      sortable: true,
       render: (value) => (value != null ? `${Number(value).toFixed(1)}` : "—"),
     },
   ],

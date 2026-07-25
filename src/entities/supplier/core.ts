@@ -41,7 +41,6 @@ export const supplierCore: EntityCore<Supplier> = {
   table: "suppliers",
   displayName: "Supplier",
   displayNamePlural: "Suppliers",
-  description: "Ingredient and material suppliers",
   domain: "purchasing",
 
   defaultSort: { column: "name", direction: "asc" },
@@ -74,13 +73,6 @@ export const supplierCore: EntityCore<Supplier> = {
       // presentation.tsx via `relationComponents` so this module stays
       // free of React imports.
     },
-  ],
-
-  queryExamples: [
-    "List all active suppliers",
-    "Find suppliers with lead time under 7 days",
-    "Show suppliers for malt ingredients",
-    "Which suppliers have Net 30 terms?",
   ],
 
   keyFields: ["name", "is_active", "payment_terms", "default_lead_time_days"],

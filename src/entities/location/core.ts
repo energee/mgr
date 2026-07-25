@@ -63,7 +63,6 @@ export const locationCore: EntityCore<Location> = {
   table: "locations",
   displayName: "Location",
   displayNamePlural: "Locations",
-  description: "Physical facilities for production, storage, and sales",
   domain: "system",
   basePath: "/settings/locations",
 
@@ -78,12 +77,6 @@ export const locationCore: EntityCore<Location> = {
   formSchema: locationSchema,
 
   valueDisplay: [locationTypeDisplayConfig],
-
-  queryExamples: [
-    "List all locations",
-    "Which location is the primary?",
-    "Show all warehouses",
-  ],
 
   keyFields: ["name", "location_type", "is_primary", "is_active"],
 };

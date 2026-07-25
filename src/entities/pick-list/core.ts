@@ -90,8 +90,6 @@ export const pickListCore: EntityCoreInput<PickListView> = {
   table: "pick_lists",
   viewTable: "pick_list_details",
   displayName: "Pick List",
-  // displayNamePlural omitted — "Pick List"+"s" = "Pick Lists" matches exactly.
-  description: "Warehouse pick lists for order fulfillment",
   domain: "sales",
 
   defaultSort: { column: "generated_at" as keyof PickListView & string, direction: "desc" },
@@ -114,13 +112,6 @@ export const pickListCore: EntityCoreInput<PickListView> = {
       foreignKey: "order_id",
       showInDetail: true,
     },
-  ],
-
-  queryExamples: [
-    "Show me all active pick lists",
-    "What pick lists are assigned to John?",
-    "Find incomplete pick lists for today",
-    "Show pick lists for order ORD-2025-001",
   ],
 
   keyFields: ["order_number" as keyof PickListView & string, "status", "assigned_to_name" as keyof PickListView & string, "generated_at"],

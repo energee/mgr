@@ -92,7 +92,6 @@ export const deliveryCore: EntityCoreInput<DeliveryView> = {
   viewTable: "deliveries_with_summary",
   displayName: "Delivery",
   displayNamePlural: "Deliveries",
-  description: "Groups transfers and order fulfillments into delivery runs",
   domain: "inventory",
   basePath: "/inventory/deliveries",
 
@@ -124,13 +123,6 @@ export const deliveryCore: EntityCoreInput<DeliveryView> = {
       showInDetail: true,
       detailTab: "Orders",
     },
-  ],
-
-  queryExamples: [
-    "Show planned deliveries",
-    "List deliveries for this week",
-    "Find deliveries by driver",
-    "Show in-transit deliveries",
   ],
 
   keyFields: ["delivery_number", "status", "scheduled_date", "driver_name"],

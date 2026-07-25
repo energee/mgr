@@ -42,7 +42,6 @@ const fakeEntity = {
   table: "fakes",
   displayName: "Fake",
   displayNamePlural: "Fakes",
-  description: "test entity",
   domain: "inventory",
   listColumns: [],
   formSchema: {} as EntityConfig<FakeRecord>["formSchema"],

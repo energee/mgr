@@ -17,12 +17,10 @@ export const pricingTierPresentation: EntityPresentation<PricingTier> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "cogs_max",
       header: "COGS Upper Bound",
-      sortable: true,
       render: (value) => (value != null ? `$${Number(value).toFixed(2)}` : "—"),
     },
     {

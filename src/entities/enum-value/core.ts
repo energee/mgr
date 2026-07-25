@@ -88,7 +88,6 @@ export const enumValueCore: EntityCoreInput<EnumValue> = {
   name: "enum_value",
   table: "enum_values",
   displayName: "Status & Option",
-  description: "Values that appear in dropdowns and status fields throughout the app",
   domain: "system",
   basePath: "/settings/status-options",
 
@@ -101,13 +100,6 @@ export const enumValueCore: EntityCoreInput<EnumValue> = {
   },
 
   formSchema: enumValueSchema,
-
-  queryExamples: [
-    "List all batch statuses",
-    "Get valid vessel types",
-    "What user roles exist?",
-    "Show dropdown options with colors",
-  ],
 
   keyFields: ["enum_type", "value", "label", "is_active"],
 };

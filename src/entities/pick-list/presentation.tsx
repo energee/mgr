@@ -19,17 +19,14 @@ export const pickListPresentation: EntityPresentation<PickListView> = {
     {
       accessorKey: "order_number",
       header: "Order #",
-      sortable: true,
     },
     {
       accessorKey: "customer_name",
       header: "Customer",
-      sortable: true,
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -40,7 +37,6 @@ export const pickListPresentation: EntityPresentation<PickListView> = {
     {
       accessorKey: "total_items",
       header: "Items",
-      sortable: true,
       render: (value, row) => {
         const data = row as PickListView;
         return `${data.items_picked}/${data.total_items}`;
@@ -49,12 +45,10 @@ export const pickListPresentation: EntityPresentation<PickListView> = {
     {
       accessorKey: "assigned_to_name",
       header: "Assigned To",
-      sortable: true,
     },
     {
       accessorKey: "generated_at",
       header: "Generated",
-      sortable: true,
       format: "datetime",
     },
   ],

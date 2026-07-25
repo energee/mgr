@@ -103,7 +103,6 @@ export const userProfileCore: EntityCoreInput<UserProfile> = {
   table: "user_profiles",
   viewTable: "user_profiles_with_details",
   displayName: "User",
-  description: "Team members with role assignments and activity tracking",
   domain: "system",
   basePath: "/settings/users",
 
@@ -135,14 +134,6 @@ export const userProfileCore: EntityCoreInput<UserProfile> = {
     },
     stateDisplay: STATUS_DISPLAY,
   },
-
-  queryExamples: [
-    "List all users",
-    "Show admin users",
-    "Who has been inactive?",
-    "Find brewers",
-    "Show pending invitations",
-  ],
 
   keyFields: ["display_name", "email", "roles", "status", "last_active_at"],
 };

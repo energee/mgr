@@ -58,7 +58,6 @@ export const inventoryItemCore: EntityCoreInput<InventoryItem> = {
   name: "inventory_item",
   table: "inventory_items",
   displayName: "Inventory Item",
-  description: "Raw materials, packaging, and supplies",
   domain: "inventory",
   basePath: "/inventory/items",
 
@@ -73,13 +72,6 @@ export const inventoryItemCore: EntityCoreInput<InventoryItem> = {
   formSchema: inventoryItemSchema,
 
   valueDisplay: [categoryDisplayConfig],
-
-  queryExamples: [
-    "Show me all hops in inventory",
-    "What grain items are below reorder point?",
-    "List active packaging supplies",
-    "Find items from Yakima Valley Hops",
-  ],
 
   keyFields: ["name", "category", "unit", "reorder_point", "is_active"],
 };

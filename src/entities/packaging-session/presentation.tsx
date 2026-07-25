@@ -22,13 +22,11 @@ export const packagingSessionPresentation: EntityPresentation<PackagingSession> 
     {
       accessorKey: "session_date",
       header: "Date",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -44,19 +42,16 @@ export const packagingSessionPresentation: EntityPresentation<PackagingSession> 
     {
       accessorKey: "total_planned",
       header: "Planned",
-      sortable: true,
       render: (value) => (value && Number(value) > 0) ? String(value) : "—",
     },
     {
       accessorKey: "total_actual",
       header: "Actual",
-      sortable: true,
       render: (value) => (value && Number(value) > 0) ? String(value) : "—",
     },
     {
       accessorKey: "total_variance",
       header: "Var %",
-      sortable: true,
       render: (_value, row) => {
         const session = row as PackagingSession;
         if (session.status !== "completed" && session.status !== "revised") return "—";
@@ -70,7 +65,6 @@ export const packagingSessionPresentation: EntityPresentation<PackagingSession> 
     {
       accessorKey: "line_count",
       header: "Items",
-      sortable: true,
     },
   ],
 

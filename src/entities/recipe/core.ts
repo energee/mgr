@@ -58,7 +58,6 @@ export const recipeCore: EntityCoreInput<Recipe> = {
   name: "recipe",
   table: "recipes",
   displayName: "Recipe",
-  description: "Brewing recipes with ingredients and process parameters",
   domain: "production",
 
   viewTable: "recipes_with_estimates",
@@ -82,15 +81,6 @@ export const recipeCore: EntityCoreInput<Recipe> = {
       showInDetail: true,
       detailTab: "Batches",
     },
-  ],
-
-  queryExamples: [
-    "Show me all IPA recipes",
-    "What recipes have estimated ABV over 7%?",
-    "List active recipes sorted by style",
-    "Find recipes with estimated IBU over 50",
-    "What recipes use Citra hops?",
-    "Show grain bill for recipe X",
   ],
 
   keyFields: ["name", "style_id", "volume_bbl", "mash_efficiency", "is_active", "status"],

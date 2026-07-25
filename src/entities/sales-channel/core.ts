@@ -42,7 +42,6 @@ export const salesChannelCore: EntityCoreInput<SalesChannel> = {
   table: "sales_channels",
   displayName: "Sales Channel",
   defaultSort: { column: "name", direction: "asc" },
-  description: "Sales channel categories for customer pricing",
   domain: "sales",
   basePath: "/settings/sales-channels",
 
@@ -71,12 +70,6 @@ export const salesChannelCore: EntityCoreInput<SalesChannel> = {
       showInDetail: true,
       detailTab: "Customers",
     },
-  ],
-
-  queryExamples: [
-    "Show me all active sales channels",
-    "What customers are in the distributor channel?",
-    "List price tiers for retail channel",
   ],
 
   keyFields: ["name", "code", "is_active"],

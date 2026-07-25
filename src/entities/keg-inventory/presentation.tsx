@@ -16,18 +16,15 @@ export const kegInventoryPresentation: EntityPresentation<KegInventory> = {
     {
       accessorKey: "keg_type_name",
       header: "Keg Type",
-      sortable: true,
     },
     {
       accessorKey: "keg_owner_name",
       header: "Owner",
-      sortable: true,
       render: (value: unknown) => (value ? String(value) : "—"),
     },
     {
       accessorKey: "state",
       header: "State",
-      sortable: true,
       render: (value: unknown) => {
         const state = KEG_STATES.find((s) => s.value === value);
         return state?.label || String(value);
@@ -36,12 +33,10 @@ export const kegInventoryPresentation: EntityPresentation<KegInventory> = {
     {
       accessorKey: "quantity",
       header: "Quantity",
-      sortable: true,
     },
     {
       accessorKey: "location_name",
       header: "Location",
-      sortable: true,
       render: (value: unknown) => (value ? String(value) : "—"),
     },
   ],

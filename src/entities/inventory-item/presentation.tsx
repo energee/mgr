@@ -21,12 +21,10 @@ export const inventoryItemPresentation: EntityPresentation<InventoryItem> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "category",
       header: "Category",
-      sortable: true,
       render: (value) => {
         const display = categoryDisplayConfig.display[value as string];
         return (
@@ -40,12 +38,10 @@ export const inventoryItemPresentation: EntityPresentation<InventoryItem> = {
     {
       accessorKey: "sku",
       header: "SKU",
-      sortable: true,
     },
     {
       accessorKey: "unit",
       header: "Unit",
-      sortable: true,
     },
     {
       // Synthetic column: on-hand is aggregated from inventory_lots at render
@@ -59,12 +55,10 @@ export const inventoryItemPresentation: EntityPresentation<InventoryItem> = {
     {
       accessorKey: "reorder_point",
       header: "Reorder Point",
-      sortable: true,
     },
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => value ? "Yes" : "No",
     },
   ],

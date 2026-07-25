@@ -100,7 +100,6 @@ export const orderCore: EntityCoreInput<Order> = {
   // List/detail read from the view (joins customer_name for display + search).
   viewTable: "order_list_details",
   displayName: "Order",
-  description: "Sales orders from draft through fulfillment",
   domain: "sales",
 
   // Explicit: sorted by most-recent order first.
@@ -152,13 +151,6 @@ export const orderCore: EntityCoreInput<Order> = {
       foreignKey: "delivery_id",
       showInDetail: true,
     },
-  ],
-
-  queryExamples: [
-    "Show me all pending orders",
-    "What orders are scheduled for this week?",
-    "List orders for Downtown Distributors",
-    "Find orders that need to be picked",
   ],
 
   keyFields: ["order_number", "status", "order_date", "customer_id"],

@@ -27,12 +27,10 @@ export const vesselPresentation: EntityPresentation<Vessel> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "vessel_type",
       header: "Type",
-      sortable: true,
       render: (value) => (
         <Badge variant="outline">
           {getValueLabel(vesselCore, "vessel_type", value as string)}
@@ -42,14 +40,12 @@ export const vesselPresentation: EntityPresentation<Vessel> = {
     {
       accessorKey: "capacity_bbl",
       header: "Capacity",
-      sortable: true,
       format: "unit",
       unitType: "volume",
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -76,7 +72,6 @@ export const vesselPresentation: EntityPresentation<Vessel> = {
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => value ? "Yes" : "No",
     },
   ],

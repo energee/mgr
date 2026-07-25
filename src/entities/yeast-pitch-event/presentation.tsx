@@ -16,23 +16,19 @@ export const yeastPitchEventPresentation: EntityPresentation<YeastPitchEvent> = 
     {
       accessorKey: "pitched_at",
       header: "Pitched",
-      sortable: true,
     },
     {
       accessorKey: "batch_id",
       header: "Batch",
-      sortable: true,
     },
     {
       accessorKey: "quantity_lbs",
       header: "Qty (lbs)",
-      sortable: true,
       render: (value) => (value != null ? `${Number(value).toFixed(1)}` : "—"),
     },
     {
       accessorKey: "viability_at_pitch",
       header: "Viability",
-      sortable: true,
       render: (value) => (value != null ? `${Math.round(Number(value))}%` : "—"),
     },
   ],

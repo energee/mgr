@@ -46,18 +46,15 @@ export const orderPresentation: EntityPresentation<Order> = {
     {
       accessorKey: "order_number",
       header: "Order #",
-      sortable: true,
     },
     {
       // Server-side sortable/searchable via the order_list_details view.
       accessorKey: "customer_name",
       header: "Customer",
-      sortable: true,
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -68,26 +65,22 @@ export const orderPresentation: EntityPresentation<Order> = {
     {
       accessorKey: "order_date",
       header: "Order Date",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "requested_date",
       header: "Requested",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "scheduled_date",
       header: "Scheduled",
-      sortable: true,
       format: "date",
     },
     {
       // Computed by the order_list_details view (sum of line items).
       accessorKey: "total_amount",
       header: "Total",
-      sortable: true,
       format: "currency",
     },
   ],

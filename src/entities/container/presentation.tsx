@@ -18,12 +18,10 @@ export const containerPresentation: EntityPresentation<Container> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "type",
       header: "Type",
-      sortable: true,
       render: (value) => {
         const option = CONTAINER_TYPE_OPTIONS.find((o) => o.value === value);
         return option?.label || String(value);
@@ -32,26 +30,22 @@ export const containerPresentation: EntityPresentation<Container> = {
     {
       accessorKey: "volume_oz",
       header: "Volume (oz)",
-      sortable: true,
       render: (value) => (value != null ? String(value) : "—"),
     },
     {
       accessorKey: "volume_bbl",
       header: "Volume",
-      sortable: true,
       format: "unit",
       unitType: "volume",
     },
     {
       accessorKey: "deposit_amount",
       header: "Deposit",
-      sortable: true,
       format: "currency",
     },
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => (value ? "Yes" : "No"),
     },
   ],

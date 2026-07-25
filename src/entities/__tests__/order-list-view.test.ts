@@ -84,7 +84,8 @@ describe("order entity: order_list_details view sync", () => {
       (c) => c.accessorKey === "customer_name"
     );
     expect(customerCol, "Customer column missing from listColumns").toBeDefined();
-    expect(customerCol?.sortable).toBe(true);
+    // `sortable` is opt-out: adapter.tsx sets enableSorting = sortable !== false.
+    expect(customerCol?.sortable).not.toBe(false);
     for (const col of orderEntity.listColumns) {
       if (!col.accessorKey || col.relation) continue;
       expect(

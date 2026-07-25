@@ -39,7 +39,6 @@ export const waterProfilePresentation: EntityPresentation<WaterProfile> = {
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => (value ? "Yes" : "No"),
     },
   ],

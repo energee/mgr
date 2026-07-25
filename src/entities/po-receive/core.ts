@@ -42,7 +42,6 @@ export const poReceiveCore: EntityCoreInput<POReceive> = {
   name: "po_receive",
   table: "po_receives",
   displayName: "PO Receive",
-  description: "Partial receipts against purchase order line items",
   domain: "purchasing",
   // Inline-only: receipts are recorded through the PO accept-inventory flow.
   basePath: null,
@@ -62,12 +61,6 @@ export const poReceiveCore: EntityCoreInput<POReceive> = {
       foreignKey: "po_line_item_id",
       showInDetail: true,
     },
-  ],
-
-  queryExamples: [
-    "Show receives for PO-2025-001",
-    "Find recent receipts",
-    "List receives with expiration dates",
   ],
 
   keyFields: ["po_line_item_id", "quantity", "lot_number", "received_date"],

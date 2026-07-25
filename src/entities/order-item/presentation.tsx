@@ -46,7 +46,6 @@ export const orderItemPresentation: EntityPresentation<OrderItem> = {
     {
       accessorKey: "quantity",
       header: "Qty",
-      sortable: true,
     },
     {
       accessorKey: "unit_price",

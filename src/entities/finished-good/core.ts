@@ -53,7 +53,6 @@ export const finishedGoodCore: EntityCoreInput<FinishedGoodView> = {
   table: "finished_goods",
   viewTable: "finished_goods_with_availability",
   displayName: "Finished Good",
-  description: "Packaged products ready for sale",
   domain: "inventory",
 
   // Explicit: sorted by most-recent production date first.
@@ -82,13 +81,6 @@ export const finishedGoodCore: EntityCoreInput<FinishedGoodView> = {
       showInDetail: true,
       detailTab: "Allocations",
     },
-  ],
-
-  queryExamples: [
-    "Show all finished goods for brand X",
-    "What FG has available inventory?",
-    "List finished goods expiring this month",
-    "Show allocation history for lot Y",
   ],
 
   keyFields: ["lot_number", "brand_id", "selling_format_id", "quantity", "available_quantity"],

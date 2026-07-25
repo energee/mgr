@@ -21,7 +21,6 @@ export const supplierPresentation: EntityPresentation<Supplier> = {
     {
       accessorKey: "name",
       header: "Supplier",
-      sortable: true,
     },
     {
       accessorKey: "contact_name",
