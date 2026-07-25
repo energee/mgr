@@ -30,10 +30,24 @@ real money, so AI-driven jobs stay bounded (caps on fixes/PRs per run).
 | Job | Schedule | What it does | Output | Kill / rollback |
 |---|---|---|---|---|
 | `check-low-inventory` (migration 00174) | daily 06:00 UTC | `check_low_inventory()` scans items below reorder point, notifies users (24h dedupe per item) | `notifications` rows | `SELECT cron.unschedule('check-low-inventory');` on live |
-| `check-data-integrity` (migration 00272) | daily 05:30 UTC | `check_data_integrity()` sweeps cheap invariants — negative on-hand (allocation sums), negative `bin_inventory.quantity`, negative `inventory_lots.quantity` — and upserts violations into `data_integrity_findings`, stamping `resolved_at` when they clear | `data_integrity_findings` rows (staff-readable with `inventory:read`) | `SELECT cron.unschedule('check-data-integrity');` on live; table can stay |
+| `check-data-integrity` (migrations 00272 + 00273) | daily 05:30 UTC | `check_data_integrity()` sweeps cheap invariants — over-allocated lots (`inventory_lots_with_quantities.remaining_quantity < 0`), negative `bin_inventory.quantity`, negative `inventory_lots.quantity` — and upserts violations into `data_integrity_findings`, stamping `resolved_at` when they clear | `data_integrity_findings` rows (staff-readable with `inventory:read`) | `SELECT cron.unschedule('check-data-integrity');` on live; table can stay |
 
 Both jobs tolerate environments without `pg_cron` (CI replays) — the
 migrations skip scheduling with a NOTICE there.
+
+**A cron job's SQL is not verified by the migration applying.** PL/pgSQL plans
+statements on first *execution*, so a function body referencing a dropped
+column still creates fine and then fails on every scheduled run, silently —
+that is exactly how 00272's original `negative_on_hand` check (it read
+`allocations.inventory_item_id`, gone since 00010) went unnoticed until 00273.
+When adding or editing a scheduled DB function:
+
+1. End the migration with a `DO $$ BEGIN PERFORM <fn>(); EXCEPTION WHEN OTHERS
+   THEN RAISE EXCEPTION ... END $$;` self-check, so a bad plan rolls the
+   migration back instead of scheduling a broken job (00273 does this).
+2. Add an integration test that actually calls it
+   (`src/__tests__/integration/data-integrity-check.test.ts`) — replaying the
+   chain proves nothing about a function nobody executes.
 
 ## Claude scheduled agents (not in-repo)
 
