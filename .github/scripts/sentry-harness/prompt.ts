@@ -148,6 +148,14 @@ If — and only if — the root cause genuinely lies in app code, proceed:
 
 ## Guardrails
 
+- **Whatever the outcome, end by writing \`sentry-outcome.md\` at the repo root
+  (do NOT commit it).** If you opened or commented on a PR/issue, it must
+  contain \`Outcome: <the full GitHub URL>\`. If you exited with no artifact (a
+  stale event — culprit route deleted and no matching issue), it must contain a
+  one-line reason and an \`Evidence:\` section quoting the commands you ran
+  (the \`git log --diff-filter=D\` output, the issue-list grep) and their key
+  output. A deterministic workflow step verifies this file; a run that ends
+  without a PR, an issue update, or this file fails red.
 - Follow AGENTS.md conventions strictly. Do not invent new patterns.
 - Do not modify unrelated code. No opportunistic refactors.
 - Do not skip hooks (\`--no-verify\`) or bypass validation.

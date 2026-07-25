@@ -109,6 +109,7 @@ jobs:
           git checkout --detach "$sha"
 
       - name: Run Claude Code Action
+        id: fix
         uses: anthropics/claude-code-action@e0cf66d1d257526b5d07f141838c338921cb8455 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -146,3 +147,14 @@ jobs:
           claude_args: '--model claude-sonnet-5 --allowed-tools "Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue:*),Bash(gh run list:*),Bash(gh label list:*),Bash(bun:*),Bash(bunx:*),Bash(make:*),Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task,WebFetch"'
           additional_permissions: |
             actions: read
+
+      # Every triage path ends in a PR, an issue, a comment on an existing
+      # issue, or a stale-event exit (see prompt.ts) — this gate makes each of
+      # those checkable, so a fix job that dies silently goes red instead of
+      # green (the historical failure mode of this workflow).
+      - name: Require durable outcome
+        uses: ./.github/actions/require-durable-outcome
+        with:
+          match: SENTRY-${{ matrix.error.issueId }}
+          outcome-file: sentry-outcome.md
+          execution-file: ${{ steps.fix.outputs.execution_file }}

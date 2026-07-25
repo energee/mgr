@@ -1,5 +1,10 @@
 name: Claude Code
 
+# durable-state: exempt — interactive, human-triggered runs; the mention
+# thread (and the action's comment reply) is the durable record, and the
+# requesting human is watching the outcome. Scheduled agentic loops instead
+# end with .github/actions/require-durable-outcome (contract-tested).
+
 on:
   issue_comment:
     types: [created]

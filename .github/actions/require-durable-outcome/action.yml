@@ -1,0 +1,120 @@
+# Deterministic durable-outcome gate for agentic (claude-code-action) jobs.
+#
+# An agent step that dies silently (tool-permission denial, empty run) is
+# otherwise indistinguishable from a healthy quiet night — that failure mode
+# recurred three times (quality-regrade's 10 empty runs, sentry's silent
+# --allowed-tools denials, the never-running E2E job). This step makes every
+# agentic job end in one of the durable states docs/agents/improvement-loop.md
+# requires: artifact produced, evidence-cited quiet run, or RED.
+#
+# Acceptance ladder (first hit wins):
+#   1. A PR carrying `label` was created after this run started.
+#   2. A PR whose head branch contains `match` was created after this run
+#      started (matrix jobs, where a shared label cannot discriminate).
+#   3. `outcome-file` cites an issue/PR URL in this repo that was updated
+#      after this run started (covers comment-on-existing-issue outcomes).
+#   4. `outcome-file` exists with an `Evidence:` line — an explicit quiet run.
+#      The file is surfaced in the step summary so the claim is reviewable;
+#      it must cite the queries the agent actually ran, not a bare assertion.
+# With neither `label` nor `match` set, the gate is skipped (echo-only mode
+# for jobs whose durable state is owned elsewhere, e.g. health-audit's
+# deterministic publisher).
+#
+# Always appended to the step summary: `worker-epoch: model=<id>` extracted
+# from the agent's execution file. A changed model id = a new worker epoch
+# (see improvement-loop.md) — dependabot bumps of claude-code-action are the
+# usual trigger.
+#
+# Caveat: re-running a job after its PR already landed fails ladder rungs 1-2
+# (creation time predates the re-run); that red is informative, not a defect.
+name: Require durable outcome
+description: Fail the job unless the preceding agent step left a durable, checkable state
+inputs:
+  label:
+    description: PR label that identifies this loop's output
+    default: ""
+  match:
+    description: Substring of the expected PR head branch (matrix jobs)
+    default: ""
+  outcome-file:
+    description: File the agent writes when it produced no PR
+    default: quiet-run.md
+  execution-file:
+    description: claude-code-action execution_file output, for the worker-epoch echo
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Verify durable state
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        LABEL: ${{ inputs.label }}
+        MATCH: ${{ inputs.match }}
+        OUTCOME_FILE: ${{ inputs.outcome-file }}
+        EXECUTION_FILE: ${{ inputs.execution-file }}
+      run: |
+        set -euo pipefail
+
+        # Worker-epoch echo first — wanted even when the gate fails.
+        model="unknown"
+        if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ]; then
+          model="$(jq -r '[.. | objects | .model? | select(type == "string")] | first // "unknown"' "$EXECUTION_FILE" 2>/dev/null || echo unknown)"
+        fi
+        echo "worker-epoch: model=$model" >> "$GITHUB_STEP_SUMMARY"
+
+        if [ -z "$LABEL" ] && [ -z "$MATCH" ]; then
+          echo "DURABLE-STATE: gate skipped (echo-only mode)" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        started="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .run_started_at)"
+        outcome=""
+
+        # gh pr list --search/--label are unreliable under GITHUB_TOKEN
+        # (return empty; bit the sentry harness in PR #331) — list plainly
+        # and filter in jq.
+        prs="$(gh pr list --state all --limit 100 --json url,createdAt,headRefName,labels)"
+
+        if [ -n "$LABEL" ]; then
+          outcome="$(jq -r --arg s "$started" --arg l "$LABEL" \
+            '[.[] | select(.createdAt >= $s and ([.labels[].name] | index($l)))][0].url // empty' <<<"$prs")"
+        fi
+        if [ -z "$outcome" ] && [ -n "$MATCH" ]; then
+          outcome="$(jq -r --arg s "$started" --arg m "$MATCH" \
+            '[.[] | select(.createdAt >= $s and (.headRefName | contains($m)))][0].url // empty' <<<"$prs")"
+        fi
+
+        quiet=false
+        if [ -z "$outcome" ] && [ -f "$OUTCOME_FILE" ]; then
+          cited="$(grep -oE "https://github.com/$GITHUB_REPOSITORY/(issues|pull)/[0-9]+" "$OUTCOME_FILE" | head -1 || true)"
+          if [ -n "$cited" ]; then
+            updated="$(gh api "repos/$GITHUB_REPOSITORY/issues/${cited##*/}" --jq .updated_at || true)"
+            if [ -n "$updated" ] && [ "$updated" \> "$started" ]; then
+              outcome="$cited"
+            fi
+          fi
+          if [ -z "$outcome" ] && grep -qiE '^evidence:' "$OUTCOME_FILE"; then
+            quiet=true
+          fi
+          {
+            echo ""
+            echo "### Agent outcome file ($OUTCOME_FILE)"
+            cat "$OUTCOME_FILE"
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        if [ -n "$outcome" ]; then
+          echo "DURABLE-STATE: $outcome" >> "$GITHUB_STEP_SUMMARY"
+        elif [ "$quiet" = true ]; then
+          echo "DURABLE-STATE: quiet run (evidence above)" >> "$GITHUB_STEP_SUMMARY"
+        else
+          {
+            echo "DURABLE-STATE: NONE — failing the run"
+            echo "No PR since $started (label='$LABEL', match='$MATCH'), no verifiable"
+            echo "citation, and no evidence-citing $OUTCOME_FILE. Either the agent died"
+            echo "silently (check its step log for permission_denials) or it skipped the"
+            echo "quiet-run contract in its prompt."
+          } | tee -a "$GITHUB_STEP_SUMMARY" >&2
+          exit 1
+        fi

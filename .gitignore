@@ -104,3 +104,8 @@ autoharness.onboarding.json
 __pycache__/
 *.pyc
 /.agents/worktrees/
+
+# Agentic-workflow outcome markers (read by require-durable-outcome, never committed)
+/quiet-run.md
+/sentry-outcome.md
+/loop-scoreboard.md

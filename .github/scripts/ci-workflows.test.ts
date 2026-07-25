@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -7,11 +7,16 @@ function read(relativePath: string): string {
 }
 
 const workflows = [
+  ".github/workflows/bug-patrol.yml",
   ".github/workflows/claude.yml",
   ".github/workflows/db-lint.yml",
+  ".github/workflows/feedback-distill.yml",
   ".github/workflows/health-audit.yml",
+  ".github/workflows/hygiene.yml",
   ".github/workflows/live-drift.yml",
+  ".github/workflows/nightly-watch.yml",
   ".github/workflows/progress.yml",
+  ".github/workflows/quality-regrade.yml",
   ".github/workflows/sentry-harness.yml",
   ".github/workflows/shell-lint.yml",
   ".github/workflows/test.yml",
@@ -110,7 +115,9 @@ describe("GitHub Actions performance contracts", () => {
         const match = line.match(/^\s*(?:- )?uses:\s*(\S+)/);
         if (!match) continue;
         const [, ref] = match;
-        if (ref.startsWith("actions/")) continue;
+        // Repo-local composite actions (./.github/actions/*) are pinned by
+        // the commit that references them — no SHA to record.
+        if (ref.startsWith("actions/") || ref.startsWith("./")) continue;
         expect(ref, `${path}: ${ref} must be pinned to a 40-char commit SHA`).toMatch(
           /@[0-9a-f]{40}$/,
         );
@@ -165,5 +172,60 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).toMatch(/create_issues:\n[\s\S]*?default: false/);
     expect(workflow).toContain("cancel-in-progress: false");
     expect(workflow).not.toContain('show_full_output: "true"');
+  });
+
+  // Durable-outcome contract (2026-07-24): an agentic job that dies silently
+  // (tool-permission denial, empty run) must go red, not green. Three loops
+  // failed exactly this way — quality-regrade's 10 empty runs, sentry's
+  // silent --allowed-tools denials, the never-running E2E job — so every
+  // workflow that invokes claude-code-action must end in the
+  // require-durable-outcome gate or carry an explicit `durable-state: exempt`
+  // comment naming which deterministic step owns its outcome instead.
+  it("ends every agentic workflow in a durable-outcome gate or an explicit exemption", () => {
+    for (const path of workflows) {
+      const contents = read(path);
+      if (!contents.includes("claude-code-action")) continue;
+      expect(
+        contents,
+        `${path} invokes claude-code-action but has neither the require-durable-outcome gate nor a durable-state: exempt rationale`,
+      ).toMatch(/require-durable-outcome|durable-state: exempt/);
+    }
+  });
+
+  // The rebuilt quality-regrade must never regress to its predecessor's
+  // failure mode: no --allowedTools meant 10 green runs that produced nothing.
+  it("rebuilds quality-regrade with the explicit allowlist its predecessor lacked", () => {
+    const workflow = read(".github/workflows/quality-regrade.yml");
+
+    expect(workflow).toContain("--allowedTools");
+    expect(workflow).toContain("--model claude-sonnet-5");
+    expect(workflow).toContain('cron: "0 6 * * 1"');
+    expect(workflow).toContain("cancel-in-progress: false");
+    expect(workflow).toContain("github.repository == 'energee/mgr'");
+    expect(workflow).toContain("gh label create quality-regrade");
+    expect(workflow).toContain("label: quality-regrade");
+    expect(workflow).toContain("docs/agents/quality.md");
+  });
+
+  // The weekly distillation is the loop that gardens the other loops: it must
+  // see deterministic acceptance data (loop-scoreboard), propose retirements
+  // (not only additions), and make every promotion falsifiable.
+  it("feeds deterministic scoreboard data and a retirement mandate into distillation", () => {
+    const workflow = read(".github/workflows/feedback-distill.yml");
+
+    expect(workflow).toContain("loop-scoreboard.ts");
+    expect(workflow).toContain("Propose retirements");
+    expect(workflow).toContain("recurrence signal");
+    expect(workflow).toContain("quiet-run.md");
+  });
+
+  // Routing freshness: docs/agents/ci.md's workflow table went stale in the
+  // same commit that added new workflows. Every workflow file must appear in
+  // ci.md (forward ratchet; the table itself is the backward migration).
+  it("keeps docs/agents/ci.md covering every workflow file", () => {
+    const doc = read("docs/agents/ci.md");
+    for (const file of readdirSync(resolve(process.cwd(), ".github/workflows"))) {
+      expect(doc, `${file} is missing from docs/agents/ci.md`).toContain(file);
+    }
   });
 });

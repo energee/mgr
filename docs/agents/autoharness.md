@@ -14,6 +14,8 @@ contract.
 ## Prerequisites
 
 - `pipx install autoharness` (one time). Verify with `autoharness --version`.
+- `scripts/autoharness-setup.sh` — **mandatory after every install or
+  upgrade**; applies/verifies the local venv patches below.
 - `claude` CLI on `PATH` (the shim shells out to it). Logged in to a
   subscription that allows `--print` mode.
 
@@ -76,8 +78,11 @@ surface without also tightening protections.
 ## Local autoharness patches (READ THIS)
 
 `pipx`'s install of autoharness has two upstream bugs that prevent the
-campaign loop from working out of the box. We have two local patches to
-`campaign_handlers.py` inside the pipx venv:
+campaign loop from working out of the box. **Run
+`scripts/autoharness-setup.sh`** — it applies both patches idempotently (or
+verifies they are present) and fails loudly if upstream code shifted, so the
+repo owns this knowledge instead of one machine's venv state. The patches it
+manages, to `campaign_handlers.py` inside the pipx venv:
 
 1. **`staging_mode="auto"` → `staging_mode="off"`** (line ~1867). The
    default copies the whole repo into `.autoharness/workspaces/.../staging/
@@ -93,9 +98,9 @@ campaign loop from working out of the box. We have two local patches to
 Both live at:
 `~/.local/pipx/venvs/autoharness/lib/python3.14/site-packages/autoharness/campaign_handlers.py`
 
-**`pipx upgrade autoharness` reverts both.** After upgrade, re-apply or the
-loop breaks. If you see a `UnboundLocalError` or a runaway staging copy,
-check these first.
+**`pipx upgrade autoharness` reverts both.** After upgrade, rerun
+`scripts/autoharness-setup.sh` or the loop breaks. If you see an
+`UnboundLocalError` or a runaway staging copy, run it first.
 
 ## OAuth shim
 
