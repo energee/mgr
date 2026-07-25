@@ -18,27 +18,22 @@ export const inventoryLotPresentation: EntityPresentation<InventoryLot> = {
     {
       accessorKey: "lot_number",
       header: "Lot #",
-      sortable: true,
     },
     {
       accessorKey: "item_name",
       header: "Item",
-      sortable: true,
     },
     {
       accessorKey: "quantity",
       header: "Quantity",
-      sortable: true,
     },
     {
       accessorKey: "remaining_quantity",
       header: "Remaining",
-      sortable: true,
     },
     {
       accessorKey: "allocated_quantity",
       header: "Allocated",
-      sortable: true,
     },
     {
       accessorKey: "unit",
@@ -47,25 +42,21 @@ export const inventoryLotPresentation: EntityPresentation<InventoryLot> = {
     {
       accessorKey: "expiration_date",
       header: "Expires",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "unit_cost",
       header: "Unit Cost",
-      sortable: true,
       format: "currency",
     },
     {
       accessorKey: "landed_cost",
       header: "Landed Cost",
-      sortable: true,
       format: "currency",
     },
     {
       accessorKey: "received_date",
       header: "Received",
-      sortable: true,
       format: "date",
     },
   ],

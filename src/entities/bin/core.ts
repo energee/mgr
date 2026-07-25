@@ -102,7 +102,6 @@ export const binCore: EntityCore<Bin> = {
   viewTable: "bins_with_summary",
   displayName: "Bin",
   displayNamePlural: "Bins",
-  description: "Physical storage locations within a facility for inventory items",
   domain: "inventory",
 
   defaultSort: { column: "name", direction: "asc" },
@@ -126,14 +125,6 @@ export const binCore: EntityCore<Bin> = {
       foreignKey: "location_id",
       showInDetail: true,
     },
-  ],
-
-  queryExamples: [
-    "Show me all bins in the cold room",
-    "Which bins have items in them?",
-    "List all quarantine bins",
-    "What bins are available at the warehouse?",
-    "Find empty bins for staging",
   ],
 
   keyFields: ["name", "bin_type", "capacity", "is_active"],

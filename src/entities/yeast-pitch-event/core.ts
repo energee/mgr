@@ -44,7 +44,6 @@ export const yeastPitchEventCore: EntityCoreInput<YeastPitchEvent> = {
   name: "yeast_pitch_event",
   table: "yeast_pitch_events",
   displayName: "Pitch Event",
-  description: "Records of yeast being pitched to batches",
   domain: "production",
   basePath: null,
 

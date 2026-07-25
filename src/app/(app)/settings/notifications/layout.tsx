@@ -1,19 +1,8 @@
-/**
- * Notification Settings Layout
- *
- * Provides page metadata so browser tabs display "Notification Settings | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Notification Settings",
-};
+/** Page metadata for the notifications route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Notification Settings" };
 
-export default function NotificationSettingsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

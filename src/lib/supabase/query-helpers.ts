@@ -24,8 +24,8 @@ import type { PostgrestError } from "@supabase/supabase-js";
  *   syntax for it; pre-escaping yields a literal-`%` pattern, so values
  *   containing `*` fail CLOSED (no match) instead of wildcard-matching.
  *
- * Do not use the returned pattern for substring/prefix searches — it matches
- * the whole value only.
+ * The returned string adds no wildcards of its own: for a substring search,
+ * wrap it yourself (`` `%${escapeIlikePattern(v)}%` ``).
  */
 export function escapeIlikePattern(value: string): string {
   return value.replace(/[\\%_*]/g, (ch) => `\\${ch}`);

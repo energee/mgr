@@ -71,7 +71,6 @@ export const purchaseOrderCore: EntityCoreInput<PurchaseOrder> = {
   name: "purchase_order",
   table: "purchase_orders",
   displayName: "Purchase Order",
-  description: "Purchase orders to suppliers for ingredients and materials",
   domain: "purchasing",
   basePath: "/purchasing/pos",
 
@@ -103,13 +102,6 @@ export const purchaseOrderCore: EntityCoreInput<PurchaseOrder> = {
       showInDetail: true,
       detailTab: "Line Items",
     },
-  ],
-
-  queryExamples: [
-    "Show me all pending purchase orders",
-    "What POs are expected this week?",
-    "List purchase orders for BSG",
-    "Find POs that need to be received",
   ],
 
   keyFields: ["po_number", "status", "supplier_id", "order_date", "expected_date"],

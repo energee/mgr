@@ -8,33 +8,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
-import { type ServiceResult, ok, err, parseSupabaseError, dynamicRpc, dynamicFrom } from "./types";
-
-/**
- * Result from the get_inventory_overview RPC function.
- * Shape matches the SQL function (00208) and the UI consumer
- * (src/components/domain/inventory/inventory-alerts.tsx).
- */
-export type InventoryOverview = {
-  finished_goods: Array<{
-    brand: string;
-    package_type: string;
-    total_quantity: number;
-    available_quantity: number;
-  }>;
-  raw_materials: Array<{
-    item_name: string;
-    item_type: string;
-    quantity_available: number;
-    unit: string;
-  }>;
-  batches_in_progress: Array<{
-    batch_code: string;
-    recipe_name: string;
-    status: string;
-    planned_start: string | null;
-  }>;
-}
+import { type ServiceResult, ok, err, parseSupabaseError, dynamicFrom } from "./types";
 
 /** An inventory lot approaching expiration. */
 export type ExpiringLot = {
@@ -49,31 +23,6 @@ export type ExpiringLot = {
 }
 
 export const inventoryService = {
-  /**
-   * Get a comprehensive inventory overview including finished goods,
-   * batches in progress, and low stock items.
-   * Wraps the `get_inventory_overview` RPC function.
-   */
-  async getOverview(
-    supabase: SupabaseClient<Database>
-  ): Promise<ServiceResult<InventoryOverview>> {
-    try {
-      const { data, error } = await dynamicRpc(supabase, "get_inventory_overview");
-
-      if (error) {
-        return err(parseSupabaseError(error));
-      }
-
-      return ok(data as InventoryOverview);
-    } catch (e) {
-      return err({
-        code: "UNKNOWN",
-        message: `Failed to get inventory overview: ${e instanceof Error ? e.message : String(e)}`,
-        cause: e,
-      });
-    }
-  },
-
   /**
    * Get inventory lots expiring within the specified number of days.
    * Uses the `inventory_lots_with_quantities` view for remaining_quantity

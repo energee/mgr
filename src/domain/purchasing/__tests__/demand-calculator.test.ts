@@ -20,7 +20,6 @@ import {
   formatQuantityWithUnit,
   calculateIngredientDemand,
   calculateIngredientShortfalls,
-  getDemandSummary,
   type IngredientDemand,
 } from "../demand-calculator";
 import { makeShortfall } from "./fixtures";
@@ -220,81 +219,3 @@ describe("calculateIngredientShortfalls", () => {
   });
 });
 
-describe("getDemandSummary", () => {
-  beforeEach(() => {
-    vi.mocked(dynamicRpc).mockReset();
-  });
-
-  it("aggregates totals, shortfall/urgent counts, and ingredient count", async () => {
-    // getDemandSummary calls calculateIngredientShortfalls first, then
-    // calculateIngredientDemand — mockResolvedValueOnce ordering below relies
-    // on that call order (both RPCs go through the same mocked dynamicRpc).
-    vi.mocked(dynamicRpc)
-      .mockResolvedValueOnce({
-        data: [
-          makeShortfall({ shortfall_qty: 30, is_urgent: true }),
-          makeShortfall({ catalog_id: "id-2", shortfall_qty: 20, is_urgent: false }),
-        ],
-        error: null,
-      })
-      .mockResolvedValueOnce({
-        data: [
-          makeDemand({ total_required: 100 }),
-          makeDemand({ catalog_id: "id-2", total_required: 50 }),
-        ],
-        error: null,
-      });
-
-    const summary = await getDemandSummary();
-
-    expect(summary).toEqual({
-      totalDemand: 150,
-      coveredByInventory: 100, // 150 - (30 + 20)
-      shortfallCount: 2,
-      urgentCount: 1,
-      totalIngredients: 2,
-    });
-  });
-
-  it("returns all-zero summary when both RPCs return empty data", async () => {
-    vi.mocked(dynamicRpc)
-      .mockResolvedValueOnce({ data: [], error: null })
-      .mockResolvedValueOnce({ data: [], error: null });
-
-    const summary = await getDemandSummary();
-
-    expect(summary).toEqual({
-      totalDemand: 0,
-      coveredByInventory: 0,
-      shortfallCount: 0,
-      urgentCount: 0,
-      totalIngredients: 0,
-    });
-  });
-
-  it("passes the horizonWeeks argument through to both underlying RPCs", async () => {
-    vi.mocked(dynamicRpc)
-      .mockResolvedValueOnce({ data: [], error: null })
-      .mockResolvedValueOnce({ data: [], error: null });
-
-    await getDemandSummary(3);
-
-    expect(dynamicRpc).toHaveBeenCalledWith(
-      expect.anything(),
-      "calculate_ingredient_shortfalls",
-      { p_horizon_weeks: 3 }
-    );
-    expect(dynamicRpc).toHaveBeenCalledWith(
-      expect.anything(),
-      "calculate_ingredient_demand",
-      { p_horizon_weeks: 3, p_include_planned: true, p_include_fermenting: true }
-    );
-  });
-
-  it("propagates an error from calculateIngredientShortfalls", async () => {
-    const rpcError = new Error("shortfall failure");
-    vi.mocked(dynamicRpc).mockResolvedValueOnce({ data: null, error: rpcError });
-
-    await expect(getDemandSummary()).rejects.toThrow("shortfall failure");
-  });
-});

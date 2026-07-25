@@ -17,8 +17,6 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 type EntityErrorBoundaryProps = {
   children: ReactNode;
   entity: EntityConfig<Record<string, unknown>>;
-  /** Called when user clicks retry */
-  onRetry?: () => void;
 }
 
 type State = {
@@ -46,7 +44,6 @@ export class EntityErrorBoundary extends Component<EntityErrorBoundaryProps, Sta
 
   handleRetry = () => {
     this.setState({ hasError: false, error: undefined });
-    this.props.onRetry?.();
   };
 
   render() {
@@ -98,21 +95,4 @@ export class EntityErrorBoundary extends Component<EntityErrorBoundaryProps, Sta
 
     return this.props.children;
   }
-}
-
-/**
- * Hook-friendly wrapper for EntityErrorBoundary.
- * Use this when you need to wrap a component that uses hooks.
- */
-export function withEntityErrorBoundary<T extends Record<string, unknown>>(
-  WrappedComponent: React.ComponentType<{ entity: EntityConfig<T> } & Record<string, unknown>>,
-  entity: EntityConfig<T>
-) {
-  return function EntityErrorBoundaryWrapper(props: Record<string, unknown>) {
-    return (
-      <EntityErrorBoundary entity={entity as EntityConfig<Record<string, unknown>>}>
-        <WrappedComponent entity={entity} {...props} />
-      </EntityErrorBoundary>
-    );
-  };
 }

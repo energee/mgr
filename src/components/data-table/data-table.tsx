@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getColumnPinningStyle } from "@/lib/data-table";
+import { getColumnStyle } from "@/lib/data-table";
 import { NON_NAVIGABLE_COLUMN_IDS } from "@/components/data-table/adapter";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +58,7 @@ export function DataTable<TData>({
                   <TableHead
                     key={header.id}
                     colSpan={header.colSpan}
-                    style={getColumnPinningStyle({ column: header.column })}
+                    style={getColumnStyle({ column: header.column })}
                   >
                     {header.isPlaceholder
                       ? null
@@ -104,7 +104,7 @@ export function DataTable<TData>({
                       return (
                         <TableCell
                           key={cell.id}
-                          style={getColumnPinningStyle({ column: cell.column })}
+                          style={getColumnStyle({ column: cell.column })}
                           onClick={
                             onRowClick && !isExcluded
                               ? (e) => {

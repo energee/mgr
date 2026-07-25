@@ -30,12 +30,10 @@ export const batchPresentation: EntityPresentation<Batch> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -46,20 +44,17 @@ export const batchPresentation: EntityPresentation<Batch> = {
     {
       accessorKey: "planned_start_date",
       header: "Planned Start",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "volume_bbl",
       header: "Volume",
-      sortable: true,
       format: "unit",
       unitType: "volume",
     },
     {
       accessorKey: "current_vessel_name",
       header: "Vessel",
-      sortable: true,
       render: (value, row) => {
         if (!value) return null;
         const batch = row as Batch;

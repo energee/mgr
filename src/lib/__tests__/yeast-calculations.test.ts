@@ -3,14 +3,10 @@ import {
   calculateViabilityDecay,
   getViabilityStatus,
   daysUntilViabilityThreshold,
-  estimateCellsFromPackage,
-  estimateCellsFromSlurry,
   calculatePitchingRate,
   calculatePitchWeightLbs,
   formatCellCount,
   shouldReplaceYeast,
-  estimateHarvestVolume,
-  estimatePostHarvestViability,
 } from "\@/domain/yeast-calculations";
 
 // =============================================================================
@@ -106,57 +102,7 @@ describe("daysUntilViabilityThreshold", () => {
 // Cell Count Estimation
 // =============================================================================
 
-describe("estimateCellsFromPackage", () => {
-  it("estimates 100B (100,000,000 thousand) cells for fresh liquid pack", () => {
-    const result = estimateCellsFromPackage("liquid", 1, 100);
-    expect(result.cellsThousand).toBe(100_000_000);
-  });
 
-  it("estimates 200B (200,000,000 thousand) cells for fresh dry packet", () => {
-    const result = estimateCellsFromPackage("dry", 1, 100);
-    expect(result.cellsThousand).toBe(200_000_000);
-  });
-
-  it("scales with package count", () => {
-    const one = estimateCellsFromPackage("liquid", 1, 95);
-    const two = estimateCellsFromPackage("liquid", 2, 95);
-    expect(two.cellsThousand).toBeCloseTo(one.cellsThousand * 2, 1);
-  });
-
-  it("reduces cells with lower viability", () => {
-    const high = estimateCellsFromPackage("liquid", 1, 95);
-    const low = estimateCellsFromPackage("liquid", 1, 50);
-    expect(low.cellsThousand).toBeLessThan(high.cellsThousand);
-  });
-
-  it("confidence is high for good viability", () => {
-    expect(estimateCellsFromPackage("liquid", 1, 90).confidence).toBe("high");
-  });
-
-  it("confidence is medium for moderate viability", () => {
-    expect(estimateCellsFromPackage("liquid", 1, 60).confidence).toBe(
-      "medium"
-    );
-  });
-
-  it("confidence is low for poor viability", () => {
-    expect(estimateCellsFromPackage("liquid", 1, 40).confidence).toBe("low");
-  });
-});
-
-describe("estimateCellsFromSlurry", () => {
-  it("dense slurry has more cells per mL", () => {
-    const dense = estimateCellsFromSlurry(100, "dense", 85);
-    const thin = estimateCellsFromSlurry(100, "thin", 85);
-    expect(dense.cellsThousand).toBeGreaterThan(thin.cellsThousand);
-  });
-
-  it("scales with volume", () => {
-    const small = estimateCellsFromSlurry(100, "medium", 85);
-    const large = estimateCellsFromSlurry(200, "medium", 85);
-    expect(large.cellsThousand).toBeCloseTo(small.cellsThousand * 2, 1);
-  });
-});
 
 // =============================================================================
 // Pitching Rate
@@ -307,61 +253,8 @@ describe("shouldReplaceYeast", () => {
 // Harvest Estimation
 // =============================================================================
 
-describe("estimateHarvestVolume", () => {
-  it("cone fermenters yield more than flat-bottom", () => {
-    const cone = estimateHarvestVolume(7, "medium", "cone");
-    const flat = estimateHarvestVolume(7, "medium", "flat");
-    expect(cone.volumeMlMax).toBeGreaterThan(flat.volumeMlMax);
-  });
-
-  it("high flocculation yields more", () => {
-    const high = estimateHarvestVolume(7, "high", "cone");
-    const low = estimateHarvestVolume(7, "low", "cone");
-    expect(high.volumeMlMax).toBeGreaterThan(low.volumeMlMax);
-  });
-
-  it("scales with batch volume", () => {
-    const small = estimateHarvestVolume(3, "medium", "cone");
-    const large = estimateHarvestVolume(6, "medium", "cone");
-    expect(large.volumeMlMin).toBeCloseTo(small.volumeMlMin * 2, -1);
-  });
-});
 
 // =============================================================================
 // Post-Harvest Viability
 // =============================================================================
 
-describe("estimatePostHarvestViability", () => {
-  it("returns ~95% for ideal conditions", () => {
-    const viability = estimatePostHarvestViability(66, 5, 7);
-    expect(viability).toBe(95);
-  });
-
-  it("reduces viability for high temp", () => {
-    const normal = estimatePostHarvestViability(66, 5, 7);
-    const hot = estimatePostHarvestViability(80, 5, 7);
-    expect(hot).toBeLessThan(normal);
-  });
-
-  it("reduces viability for high alcohol", () => {
-    const low = estimatePostHarvestViability(66, 5, 7);
-    const high = estimatePostHarvestViability(66, 10, 7);
-    expect(high).toBeLessThan(low);
-  });
-
-  it("reduces viability for extended contact time", () => {
-    const short = estimatePostHarvestViability(66, 5, 7);
-    const long = estimatePostHarvestViability(66, 5, 30);
-    expect(long).toBeLessThan(short);
-  });
-
-  it("never goes below 50%", () => {
-    const viability = estimatePostHarvestViability(100, 15, 60);
-    expect(viability).toBeGreaterThanOrEqual(50);
-  });
-
-  it("never exceeds 95%", () => {
-    const viability = estimatePostHarvestViability(60, 3, 5);
-    expect(viability).toBeLessThanOrEqual(95);
-  });
-});

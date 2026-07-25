@@ -18,7 +18,6 @@ export const kegTransactionPresentation: EntityPresentation<KegTransaction> = {
     {
       accessorKey: "created_at",
       header: "Date",
-      sortable: true,
       render: (value: unknown) => {
         if (!value) return "—";
         return new Date(value as string).toLocaleDateString("en-US", {
@@ -33,7 +32,6 @@ export const kegTransactionPresentation: EntityPresentation<KegTransaction> = {
     {
       accessorKey: "transaction_type",
       header: "Type",
-      sortable: true,
       render: (value: unknown) => {
         const type = TRANSACTION_TYPES.find((t) => t.value === value);
         return type?.label || String(value);
@@ -42,18 +40,15 @@ export const kegTransactionPresentation: EntityPresentation<KegTransaction> = {
     {
       accessorKey: "keg_type_name",
       header: "Keg Type",
-      sortable: true,
     },
     {
       accessorKey: "keg_owner_name",
       header: "Owner",
-      sortable: true,
       render: (value: unknown) => (value ? String(value) : "—"),
     },
     {
       accessorKey: "quantity",
       header: "Qty",
-      sortable: true,
     },
     {
       accessorKey: "from_state",
@@ -78,7 +73,6 @@ export const kegTransactionPresentation: EntityPresentation<KegTransaction> = {
     {
       accessorKey: "customer_name",
       header: "Customer",
-      sortable: true,
       render: (value: unknown) => (value ? String(value) : "—"),
     },
   ],

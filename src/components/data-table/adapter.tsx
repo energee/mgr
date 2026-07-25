@@ -21,7 +21,7 @@ import type {
 import type { FilterVariant, Option, ExtendedColumnFilter } from "@/types/data-table";
 import type { DynamicQueryBuilder } from "@/services/types";
 import { formatValue } from "@/lib/format";
-import { escapeLike } from "@/lib/utils";
+import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -366,9 +366,9 @@ function applyFilterToQuery<T>(query: DynamicQueryBuilder, filter: ExtendedColum
 
   switch (operator) {
     case "iLike":
-      return query.ilike(id, `%${escapeLike(String(value))}%`);
+      return query.ilike(id, `%${escapeIlikePattern(String(value))}%`);
     case "notILike":
-      return query.not(id, "ilike", `%${escapeLike(String(value))}%`);
+      return query.not(id, "ilike", `%${escapeIlikePattern(String(value))}%`);
     case "eq":
       return query.eq(id, value);
     case "ne":

@@ -23,17 +23,14 @@ export const kegOwnerPresentation: EntityPresentation<KegOwner> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "code",
       header: "Code",
-      sortable: true,
     },
     {
       accessorKey: "contact_name",
       header: "Contact",
-      sortable: true,
       render: (value: unknown) => (value ? String(value) : "—"),
     },
     {
@@ -45,7 +42,6 @@ export const kegOwnerPresentation: EntityPresentation<KegOwner> = {
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value: unknown) => (value ? "Yes" : "No"),
     },
   ],

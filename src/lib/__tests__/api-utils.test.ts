@@ -10,36 +10,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { rateLimit, getClientIp } from "../api/rate-limit";
 import { ApiError, handleApiError } from "../api/errors";
 import {
-  parsePostgresError,
-  isUniqueViolation,
-  isCheckViolation,
-  isForeignKeyViolation,
-  isValidationError,
-  isConstraintError,
-  isNotFoundError,
-  isConcurrentModificationError,
-  ValidationError,
-  ConstraintError,
-  NotFoundError,
-  ConcurrentModificationError,
-  PermissionError,
   PG_ERROR_CODES,
 } from "../errors";
-import type { PostgrestError } from "@supabase/supabase-js";
 
 // =============================================================================
 // Helpers
 // =============================================================================
-
-/** Create a minimal PostgrestError object for testing. */
-function makePostgresError(
-  code: string,
-  message = "test error",
-  details = "",
-  hint = ""
-): PostgrestError {
-  return { code, message, details, hint, name: "PostgrestError" };
-}
 
 // =============================================================================
 // Rate Limiter Tests
@@ -170,189 +146,13 @@ describe("getClientIp", () => {
 // parsePostgresError Tests (from src/lib/errors.ts)
 // =============================================================================
 
-describe("parsePostgresError", () => {
-  it("handles unique violations (code 23505)", () => {
-    const error = makePostgresError("23505", "duplicate key value");
-    const message = parsePostgresError(error);
-    expect(message).toBe("A record with this value already exists");
-  });
-
-  it("handles foreign key violations (code 23503)", () => {
-    const error = makePostgresError("23503", "violates foreign key constraint");
-    const message = parsePostgresError(error);
-    expect(message).toBe(
-      "Cannot delete: this record is referenced by other data"
-    );
-  });
-
-  it("handles check constraint violations (code 23514)", () => {
-    const error = makePostgresError("23514", "violates check constraint");
-    const message = parsePostgresError(error);
-    expect(message).toBe("Value does not meet requirements");
-  });
-
-  it("handles not-null violations (code 23502)", () => {
-    const error = makePostgresError("23502", "null value in column");
-    const message = parsePostgresError(error);
-    expect(message).toBe("Required field cannot be empty");
-  });
-
-  it("returns constraint-specific message when constraint name is recognized", () => {
-    const error = makePostgresError(
-      "23514",
-      'violates check constraint "chk_quantity_positive"'
-    );
-    const message = parsePostgresError(error);
-    expect(message).toBe("Quantity must be greater than zero");
-  });
-
-  it("returns standard PG message for unknown constraint names", () => {
-    const error = makePostgresError(
-      "23514",
-      'violates check constraint "chk_unknown_thing"'
-    );
-    const message = parsePostgresError(error);
-    // Falls through to PG_ERROR_MESSAGES since constraint name is not in CONSTRAINT_MESSAGES
-    expect(message).toBe("Value does not meet requirements");
-  });
-
-  it("returns generic message for unknown error codes", () => {
-    const error = makePostgresError("99999", "Something unusual");
-    const message = parsePostgresError(error);
-    expect(message).toBe("Something unusual");
-  });
-
-  it("handles insufficient privilege errors", () => {
-    const error = makePostgresError("42501", "permission denied");
-    const message = parsePostgresError(error);
-    expect(message).toBe(
-      "You don't have permission to perform this action"
-    );
-  });
-
-  it("handles RLS-related errors in the message", () => {
-    const error = makePostgresError(
-      "99999",
-      "new row violates row-level security policy"
-    );
-    const message = parsePostgresError(error);
-    expect(message).toBe(
-      "You don't have permission to perform this action"
-    );
-  });
-});
-
 // =============================================================================
 // Type Guard Tests (from src/lib/errors.ts)
 // =============================================================================
 
-describe("PostgrestError type guards", () => {
-  it("isUniqueViolation returns true for code 23505", () => {
-    const error = makePostgresError("23505");
-    expect(isUniqueViolation(error)).toBe(true);
-  });
-
-  it("isUniqueViolation returns false for other codes", () => {
-    const error = makePostgresError("23503");
-    expect(isUniqueViolation(error)).toBe(false);
-  });
-
-  it("isForeignKeyViolation returns true for code 23503", () => {
-    const error = makePostgresError("23503");
-    expect(isForeignKeyViolation(error)).toBe(true);
-  });
-
-  it("isForeignKeyViolation returns false for other codes", () => {
-    const error = makePostgresError("23505");
-    expect(isForeignKeyViolation(error)).toBe(false);
-  });
-
-  it("isCheckViolation returns true for code 23514", () => {
-    const error = makePostgresError("23514");
-    expect(isCheckViolation(error)).toBe(true);
-  });
-
-  it("isCheckViolation returns false for other codes", () => {
-    const error = makePostgresError("23505");
-    expect(isCheckViolation(error)).toBe(false);
-  });
-});
-
-describe("Custom error type guards", () => {
-  it("isValidationError identifies ValidationError instances", () => {
-    const err = new ValidationError("name", "Name is required");
-    expect(isValidationError(err)).toBe(true);
-    expect(isValidationError(new Error("not a validation error"))).toBe(false);
-  });
-
-  it("isConstraintError identifies ConstraintError instances", () => {
-    const err = new ConstraintError("chk_quantity_positive", "Must be positive");
-    expect(isConstraintError(err)).toBe(true);
-    expect(isConstraintError(new Error("not a constraint error"))).toBe(false);
-  });
-
-  it("isNotFoundError identifies NotFoundError instances", () => {
-    const err = new NotFoundError("Batch", "abc-123");
-    expect(isNotFoundError(err)).toBe(true);
-    expect(isNotFoundError(new Error("not found"))).toBe(false);
-  });
-
-  it("isConcurrentModificationError identifies ConcurrentModificationError instances", () => {
-    const err = new ConcurrentModificationError();
-    expect(isConcurrentModificationError(err)).toBe(true);
-    expect(
-      isConcurrentModificationError(new Error("concurrent mod"))
-    ).toBe(false);
-  });
-});
-
 // =============================================================================
 // Custom Error Classes (from src/lib/errors.ts)
 // =============================================================================
-
-describe("Custom error classes", () => {
-  it("ValidationError stores field and message", () => {
-    const err = new ValidationError("email", "Invalid email format");
-    expect(err.name).toBe("ValidationError");
-    expect(err.field).toBe("email");
-    expect(err.message).toBe("Invalid email format");
-    expect(err).toBeInstanceOf(Error);
-  });
-
-  it("ConstraintError stores constraint name and message", () => {
-    const err = new ConstraintError(
-      "chk_quantity_positive",
-      "Quantity must be positive"
-    );
-    expect(err.name).toBe("ConstraintError");
-    expect(err.constraint).toBe("chk_quantity_positive");
-    expect(err.message).toBe("Quantity must be positive");
-    expect(err).toBeInstanceOf(Error);
-  });
-
-  it("ConcurrentModificationError has a fixed message", () => {
-    const err = new ConcurrentModificationError();
-    expect(err.name).toBe("ConcurrentModificationError");
-    expect(err.message).toContain("modified by another user");
-    expect(err).toBeInstanceOf(Error);
-  });
-
-  it("NotFoundError includes entity type and optional id", () => {
-    const withId = new NotFoundError("Batch", "abc-123");
-    expect(withId.name).toBe("NotFoundError");
-    expect(withId.message).toBe("Batch not found: abc-123");
-
-    const withoutId = new NotFoundError("Recipe");
-    expect(withoutId.message).toBe("Recipe not found");
-  });
-
-  it("PermissionError includes action description", () => {
-    const err = new PermissionError("delete this batch");
-    expect(err.name).toBe("PermissionError");
-    expect(err.message).toBe("You don't have permission to delete this batch");
-    expect(err).toBeInstanceOf(Error);
-  });
-});
 
 // =============================================================================
 // ApiError Tests (from src/lib/api/errors.ts)

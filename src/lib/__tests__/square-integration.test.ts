@@ -13,8 +13,6 @@ import {
 } from "@/integrations/square/webhook";
 import {
   dollarsToCents,
-  calculateVolumeOz,
-  STANDARD_POUR_OZ,
 } from "@/integrations/square/utils";
 
 // =============================================================================
@@ -214,36 +212,3 @@ describe("dollarsToCents", () => {
 // Draft Volume Calculation
 // =============================================================================
 
-describe("calculateVolumeOz", () => {
-  it("calculates volume for a single pour", () => {
-    expect(calculateVolumeOz(1)).toBe(STANDARD_POUR_OZ);
-    expect(calculateVolumeOz(1)).toBe(16);
-  });
-
-  it("calculates volume for multiple pours", () => {
-    expect(calculateVolumeOz(3)).toBe(48);
-    expect(calculateVolumeOz(10)).toBe(160);
-  });
-
-  it("returns 0 for zero quantity", () => {
-    expect(calculateVolumeOz(0)).toBe(0);
-  });
-
-  it("handles fractional quantities", () => {
-    // Half a pour (e.g., taster)
-    expect(calculateVolumeOz(0.5)).toBe(8);
-  });
-
-  it("uses the per-variation pour size when provided (BD-3)", () => {
-    // square_catalog_map.pour_size_oz (00243): a 10 oz tulip, a 32 oz crowler.
-    expect(calculateVolumeOz(3, 10)).toBe(30);
-    expect(calculateVolumeOz(2, 32)).toBe(64);
-  });
-
-  it("falls back to STANDARD_POUR_OZ when pour size is null or undefined", () => {
-    // NULL pour_size_oz means "the 16 oz default", not zero.
-    expect(calculateVolumeOz(3, null)).toBe(48);
-    expect(calculateVolumeOz(3, undefined)).toBe(48);
-    expect(calculateVolumeOz(3, null)).toBe(3 * STANDARD_POUR_OZ);
-  });
-});

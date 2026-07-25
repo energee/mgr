@@ -60,9 +60,6 @@ export type EntityCore<T = Record<string, unknown>> = {
   /** Plural display name (e.g., 'Batches', 'Recipes') */
   displayNamePlural: string;
 
-  /** Brief description for AI context */
-  description: string;
-
   /** Domain this entity belongs to */
   domain: EntityDomain;
 
@@ -125,9 +122,6 @@ export type EntityCore<T = Record<string, unknown>> = {
 
   /** Relationships to other entities */
   relations?: EntityRelationDef[];
-
-  /** Example natural language queries for AI */
-  queryExamples?: string[];
 
   /** Key fields for AI to understand */
   keyFields?: (keyof T & string)[];
@@ -357,9 +351,6 @@ export type EntityColumnDef<T> = Omit<ColumnDef<T, unknown>, "accessorKey"> & {
 
   /** Whether this column is sortable */
   sortable?: boolean;
-
-  /** Whether this column is filterable */
-  filterable?: boolean;
 
   /** Custom render function */
   render?: (value: unknown, row: T) => ReactNode;
@@ -866,7 +857,7 @@ export function statesAsOptions<T>(
  * lifecycle at `initialState` — creating a record directly in a later state
  * would bypass both server-side transition validation (the 00143/00205
  * triggers fire on UPDATE only, never INSERT) and the transition side-effect
- * registry (src/services/transition-side-effects.ts), e.g. a packaging
+ * registry (`transition_entity_atomic`, migration 00256), e.g. a packaging
  * session created as "Completed" would never deplete materials or create
  * finished goods. Consumed by the universal form layer (unified-field.tsx,
  * quick-create-dialog.tsx); authored option labels win when provided,
@@ -893,7 +884,7 @@ export function createModeStateOptions<T>(
  * initial state (audit EA-1). New records must enter their lifecycle at
  * `initialState`: an INSERT is invisible to the server-side transition
  * triggers (migrations 00143/00205 fire on UPDATE only) and to the
- * transition side-effect registry (src/services/transition-side-effects.ts),
+ * transition side-effect registry (`transition_entity_atomic`, migration 00256),
  * so a record created directly in a later state (e.g. a packaging session
  * created "Completed") would skip material depletion, FG creation, and every
  * other transition effect. Create forms only offer the initial state
@@ -954,19 +945,6 @@ export function getTransitionFieldsAction<T>(
   return entity.actions?.find(
     (a) => a.toState === toState && !!a.transitionFields?.length
   );
-}
-
-/**
- * Get the display color for a state from an entity config.
- * Falls back to "default" if not defined.
- */
-export function getStateColor<T>(
-  entity: EntityCoreInput<T>,
-  state: string | null | undefined
-): string {
-  if (!state) return "default";
-  const display = entity.stateMachine?.stateDisplay?.[state];
-  return display?.color || "default";
 }
 
 // =============================================================================

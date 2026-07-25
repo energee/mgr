@@ -45,7 +45,6 @@ export const sessionLineItemCore: EntityCoreInput<SessionLineItem> = {
   table: "session_line_items",
   displayName: "Line Item",
   defaultSort: { column: "created_at", direction: "desc" },
-  description: "Products packaged in a session",
   domain: "production",
   // Inline-only: line items are managed on the packaging session detail page.
   basePath: null,
@@ -72,12 +71,6 @@ export const sessionLineItemCore: EntityCoreInput<SessionLineItem> = {
       type: "belongsTo",
       foreignKey: "selling_format_id",
     },
-  ],
-
-  queryExamples: [
-    "Show line items for session X",
-    "What was packaged in the last session?",
-    "Total units packaged by brand",
   ],
 
   keyFields: ["brand_id", "batch_id", "selling_format_id", "planned_quantity", "actual_quantity"],

@@ -1,19 +1,8 @@
-/**
- * Sales Channels Layout
- *
- * Provides page metadata so browser tabs display "Sales Channels | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Sales Channels",
-};
+/** Page metadata for the sales-channels route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Sales Channels" };
 
-export default function SalesChannelsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

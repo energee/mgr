@@ -138,69 +138,6 @@ export async function generateNextPONumber(): Promise<string> {
 }
 
 /**
- * Create a draft purchase order from a shortfall
- */
-export async function createDraftPOFromShortfall(
-  shortfall: IngredientShortfall,
-  poNumber?: string
-): Promise<string> {
-  const supabase = await getSupabase();
-
-  // Generate PO number if not provided
-  const finalPONumber = poNumber || await generateNextPONumber();
-
-  // Calculate order quantity respecting MOQ
-  const orderQty = shortfall.min_order_qty
-    ? Math.max(shortfall.shortfall_qty, shortfall.min_order_qty)
-    : shortfall.shortfall_qty;
-
-  // Calculate expected date from order_by_date + lead_time
-  const orderByDate = new Date(shortfall.order_by_date);
-  const expectedDate = new Date(orderByDate);
-  expectedDate.setDate(expectedDate.getDate() + shortfall.lead_time_days);
-
-  // Create the PO
-  const { data: po, error: poError } = await supabase
-    .from("purchase_orders")
-    .insert({
-      po_number: finalPONumber,
-      supplier_id: shortfall.preferred_supplier_id,
-      status: "draft",
-      order_date: orderByDate.toISOString().split("T")[0],
-      expected_date: expectedDate.toISOString().split("T")[0],
-      notes: `Created from ingredient demand - shortfall of ${shortfall.shortfall_qty} ${shortfall.unit} ${shortfall.catalog_name}`,
-    })
-    .select()
-    .single();
-
-  if (poError) {
-    log.error("Error creating PO:", poError);
-    throw poError;
-  }
-
-  // Create the line item
-  const { error: lineError } = await supabase
-    .from("po_line_items")
-    .insert({
-      po_id: po.id,
-      catalog_type: shortfall.catalog_type,
-      catalog_id: shortfall.catalog_id,
-      quantity: orderQty,
-      unit: shortfall.unit,
-      unit_price: shortfall.unit_price,
-    });
-
-  if (lineError) {
-    log.error("Error creating PO line item:", lineError);
-    // Delete the PO if line item creation fails
-    await supabase.from("purchase_orders").delete().eq("id", po.id);
-    throw lineError;
-  }
-
-  return po.id;
-}
-
-/**
  * Create a draft PO from a PODraft object (multiple line items)
  */
 export async function createDraftPO(draft: PODraft): Promise<string> {

@@ -83,7 +83,6 @@ export const kegInventoryCore: EntityCoreInput<KegInventory> = {
   displayName: "Keg Inventory",
   // Explicit: identical singular and plural — not the default +s pattern.
   displayNamePlural: "Keg Inventory",
-  description: "Calculated view of keg quantities by type, state, and location (derived from transactions)",
   domain: "inventory",
   basePath: "/inventory/kegs",
 
@@ -97,13 +96,6 @@ export const kegInventoryCore: EntityCoreInput<KegInventory> = {
   },
 
   formSchema: kegInventorySchema,
-
-  queryExamples: [
-    "How many empty kegs do we have?",
-    "Show keg inventory by type",
-    "Which kegs are shipped out?",
-    "What's the total keg count by state?",
-  ],
 
   keyFields: ["selling_format_id", "keg_owner_id", "state", "quantity", "location_id"],
 };

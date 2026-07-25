@@ -48,14 +48,6 @@ export type IngredientShortfall = {
   batch_count: number;
 }
 
-export type DemandSummary = {
-  totalDemand: number;
-  coveredByInventory: number;
-  shortfallCount: number;
-  urgentCount: number;
-  totalIngredients: number;
-}
-
 // =============================================================================
 // Functions
 // =============================================================================
@@ -102,26 +94,6 @@ export async function calculateIngredientShortfalls(
   }
 
   return (data || []) as IngredientShortfall[];
-}
-
-/**
- * Get demand summary statistics
- */
-export async function getDemandSummary(horizonWeeks = 8): Promise<DemandSummary> {
-  const shortfalls = await calculateIngredientShortfalls(horizonWeeks);
-  const demand = await calculateIngredientDemand(horizonWeeks);
-
-  const totalDemand = demand.reduce((sum, d) => sum + d.total_required, 0);
-  const shortfallTotal = shortfalls.reduce((sum, s) => sum + s.shortfall_qty, 0);
-  const coveredByInventory = totalDemand - shortfallTotal;
-
-  return {
-    totalDemand,
-    coveredByInventory,
-    shortfallCount: shortfalls.length,
-    urgentCount: shortfalls.filter((s) => s.is_urgent).length,
-    totalIngredients: demand.length,
-  };
 }
 
 /**

@@ -167,7 +167,6 @@ const widgetCore: EntityCore<Widget> = {
   table: "widgets",
   displayName: "Widget",
   displayNamePlural: "Widgets",
-  description: "test widget entity",
   domain: "production",
   formSchema: widgetFormSchema,
   searchableFields: ["name", "sku"],

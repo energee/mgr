@@ -19,32 +19,26 @@ export const finishedGoodPresentation: EntityPresentation<FinishedGoodView> = {
     {
       accessorKey: "lot_number",
       header: "Lot Code",
-      sortable: true,
     },
     {
       accessorKey: "brand_name",
       header: "Brand",
-      sortable: true,
     },
     {
       accessorKey: "selling_format_name",
       header: "Format",
-      sortable: true,
     },
     {
       accessorKey: "quantity",
       header: "Total",
-      sortable: true,
     },
     {
       accessorKey: "available_quantity",
       header: "Available",
-      sortable: true,
     },
     {
       accessorKey: "production_date",
       header: "Packaged",
-      sortable: true,
     },
   ],
 

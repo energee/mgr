@@ -24,7 +24,6 @@ export const allocationPresentation: EntityPresentation<Allocation> = {
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -35,7 +34,6 @@ export const allocationPresentation: EntityPresentation<Allocation> = {
     {
       accessorKey: "source_type",
       header: "Source",
-      sortable: true,
       render: (value) => {
         const sourceType = SOURCE_TYPES.find((s) => s.value === value);
         return sourceType?.label || String(value);
@@ -44,7 +42,6 @@ export const allocationPresentation: EntityPresentation<Allocation> = {
     {
       accessorKey: "destination_type",
       header: "Destination",
-      sortable: true,
       render: (value) => {
         const destType = DESTINATION_TYPES.find((d) => d.value === value);
         return destType?.label || String(value);
@@ -53,13 +50,11 @@ export const allocationPresentation: EntityPresentation<Allocation> = {
     {
       accessorKey: "quantity",
       header: "Quantity",
-      sortable: true,
       format: "number",
     },
     {
       accessorKey: "created_at",
       header: "Created",
-      sortable: true,
       format: "datetime",
     },
   ],

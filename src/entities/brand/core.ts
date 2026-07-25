@@ -50,7 +50,6 @@ export const brandCore: EntityCoreInput<Brand> = {
   table: "brands",
   displayName: "Brand",
   defaultSort: { column: "name", direction: "asc" },
-  description: "Beer brands and products",
 
   // Server-safe mirror of the FK relation column in presentation.listColumns
   // (style_id → beer_style.name), so the server-prefetched brands list resolves
@@ -79,14 +78,6 @@ export const brandCore: EntityCoreInput<Brand> = {
       type: "belongsTo",
       foreignKey: "style_id",
     },
-  ],
-
-  queryExamples: [
-    "List all brands",
-    "What IPAs do we make?",
-    "Show brands over 7% ABV",
-    "What's the most popular brand on Untappd?",
-    "Which brands are discontinued?",
   ],
 
   // NOTE: add "is_active" here once 00244 is applied live and the Supabase

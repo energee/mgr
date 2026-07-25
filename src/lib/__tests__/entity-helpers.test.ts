@@ -100,7 +100,6 @@ const mockEntity: EntityConfig<Record<string, unknown>> = {
   table: "mocks",
   displayName: "Mock",
   displayNamePlural: "Mocks",
-  description: "Test entity",
   domain: "production",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
@@ -114,7 +113,6 @@ const bareEntity: EntityConfig<Record<string, unknown>> = {
   table: "bares",
   displayName: "Bare",
   displayNamePlural: "Bares",
-  description: "Entity with no state machine or value display",
   domain: "inventory",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
@@ -126,7 +124,6 @@ const noDisplayEntity: EntityConfig<Record<string, unknown>> = {
   table: "no_displays",
   displayName: "No Display",
   displayNamePlural: "No Displays",
-  description: "Entity with state machine lacking stateDisplay",
   domain: "production",
   listColumns: [],
   formSchema: {} as EntityConfig<Record<string, unknown>>["formSchema"],
@@ -457,7 +454,6 @@ describe("resolveServerCore", () => {
     name: "widget",
     table: "widgets",
     displayName: "Widget",
-    description: "test fixture",
     domain: "production",
     formSchema: z.object({}),
   };
@@ -532,7 +528,6 @@ describe("resolveServerCore state-field guard", () => {
     name: "widget",
     table: "widgets",
     displayName: "Widget",
-    description: "test fixture",
     domain: "production",
     // Deliberately a bare z.string() status — the pre-EA-9 shape several
     // cores still author; the guard must reject non-machine states anyway.

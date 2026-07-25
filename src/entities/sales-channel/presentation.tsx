@@ -24,12 +24,10 @@ export const salesChannelPresentation: EntityPresentation<SalesChannel> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "code",
       header: "Code",
-      sortable: true,
     },
     {
       accessorKey: "description",
@@ -38,7 +36,6 @@ export const salesChannelPresentation: EntityPresentation<SalesChannel> = {
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => (value ? "Yes" : "No"),
     },
   ],

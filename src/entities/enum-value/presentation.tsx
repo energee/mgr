@@ -19,7 +19,6 @@ export const enumValuePresentation: EntityPresentation<EnumValue> = {
     {
       accessorKey: "enum_type",
       header: "Category",
-      sortable: true,
       render: (value: unknown) => {
         // Convert snake_case to Title Case
         const str = String(value);
@@ -32,12 +31,10 @@ export const enumValuePresentation: EntityPresentation<EnumValue> = {
     {
       accessorKey: "value",
       header: "Stored Value",
-      sortable: true,
     },
     {
       accessorKey: "label",
       header: "Label",
-      sortable: true,
     },
     {
       accessorKey: "color",
@@ -52,18 +49,15 @@ export const enumValuePresentation: EntityPresentation<EnumValue> = {
     {
       accessorKey: "sort_order",
       header: "Sort Order",
-      sortable: true,
     },
     {
       accessorKey: "is_default",
       header: "Default?",
-      sortable: true,
       render: (value: unknown) => (value ? "Yes" : "-"),
     },
     {
       accessorKey: "is_active",
       header: "Enabled",
-      sortable: true,
       render: (value: unknown) => (value ? "Yes" : "No"),
     },
   ],

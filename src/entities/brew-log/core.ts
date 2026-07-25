@@ -96,7 +96,6 @@ export const brewLogCore: EntityCoreInput<BrewLog> = {
   table: "brew_logs",
   viewTable: "brew_logs_with_batches",
   displayName: "Brew Log",
-  description: "Brew day records capturing the hot-side process from mash through knockout",
   domain: "production",
 
   // Explicit: sorted by most-recent brew date first.
@@ -121,13 +120,6 @@ export const brewLogCore: EntityCoreInput<BrewLog> = {
       foreignKey: "brewer_id",
       showInDetail: true,
     },
-  ],
-
-  queryExamples: [
-    "Show me all brews from this week",
-    "What brews are currently in progress?",
-    "Find brews linked to batch B-20240115-01",
-    "Which brewer did BRW-2024-015?",
   ],
 
   keyFields: ["brew_number", "brew_date", "status"],

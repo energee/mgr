@@ -250,7 +250,7 @@ export default function TTBReportPage() {
             disabled={!reportData || reportData.length === 0}
             onClick={() => {
               if (reportData && reportData.length > 0) {
-                openTTBPrintView(reportData as TTBReportData[], totals, year, month);
+                openTTBPrintView(reportData as TTBReportData[], year, month);
               }
             }}
           >

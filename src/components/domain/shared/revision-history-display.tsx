@@ -15,12 +15,6 @@
 
 import { RevisionHistory } from "./revision-history";
 
-type RevisionHistoryDisplayProps = {
-  data: { id: string | null };
-  /** Table name to query revisions for */
-  entityType: string;
-}
-
 /**
  * Factory function to create a revision history display component
  * for a specific entity type.
@@ -49,29 +43,4 @@ export function createRevisionHistoryDisplay(entityType: string) {
       />
     );
   };
-}
-
-/**
- * Generic revision history display that requires entityType in props.
- * Use createRevisionHistoryDisplay() for entity config sections.
- */
-export function RevisionHistoryDisplay({
-  data,
-  entityType,
-}: RevisionHistoryDisplayProps) {
-  if (!data.id) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No revision history available (missing ID)
-      </p>
-    );
-  }
-
-  return (
-    <RevisionHistory
-      entityType={entityType}
-      entityId={data.id}
-      maxInitial={5}
-    />
-  );
 }

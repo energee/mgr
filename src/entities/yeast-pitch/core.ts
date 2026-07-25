@@ -105,7 +105,6 @@ export const yeastPitchCore: EntityCoreInput<YeastPitch> = {
   displayName: "Yeast Pitch",
   // Explicit: irregular plural (Pitch → Pitches, not +s).
   displayNamePlural: "Yeast Pitches",
-  description: "Individual yeast pitches tracking lineage, viability, and usage",
   domain: "production",
   basePath: "/production/yeast-pitches",
 
@@ -139,16 +138,6 @@ export const yeastPitchCore: EntityCoreInput<YeastPitch> = {
       hideAdd: true,
       detailTab: "Usage History",
     },
-  ],
-
-  queryExamples: [
-    "Show available yeast pitches",
-    "What's the viability of our lager yeast?",
-    "List pitches from WLP001",
-    "Show yeast in stock",
-    "What generation is our house yeast at?",
-    "How much yeast is remaining in the brink?",
-    "Show pitch usage history",
   ],
 
   keyFields: ["strain_id", "source_type", "status", "generation", "estimated_viability", "vessel_id", "quantity_remaining_lbs"],

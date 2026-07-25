@@ -1,9 +1,8 @@
-/** Metadata for the Beer Orders spreadsheet integration. */
-
 import type { Metadata } from "next";
 
+/** Page metadata for the beer-orders route; the layout itself is a pass-through. */
 export const metadata: Metadata = { title: "Beer Orders Spreadsheet" };
 
-export default function BeerOrdersIntegrationLayout({ children }: { children: React.ReactNode }) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

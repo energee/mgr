@@ -78,7 +78,6 @@ export const customerCore: EntityCoreInput<Customer> = {
   table: "customers",
   viewTable: "customers_with_order_summary",
   displayName: "Customer",
-  description: "Distributors, retailers, and direct customers",
   domain: "sales",
 
   // defaultSort: { column: "name", direction: "asc" } — omitted (matches default)
@@ -102,13 +101,6 @@ export const customerCore: EntityCoreInput<Customer> = {
       showInDetail: true,
       detailTab: "Orders",
     },
-  ],
-
-  queryExamples: [
-    "Show me all distributors",
-    "List active retail accounts",
-    "Find customer by email",
-    "What customers are in Seattle?",
   ],
 
   keyFields: ["name", "customer_type", "contact_name", "email", "is_active"],

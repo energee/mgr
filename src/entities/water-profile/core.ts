@@ -28,7 +28,6 @@ export const waterProfileCore: EntityCoreInput<WaterProfile> = {
   table: "water_profiles",
   displayName: "Water Profile",
   defaultSort: { column: "name", direction: "asc" },
-  description: "Source water chemistry profiles with mineral content",
   domain: "system",
   basePath: "/settings/water-profiles",
 
@@ -41,9 +40,4 @@ export const waterProfileCore: EntityCoreInput<WaterProfile> = {
   formSchema: waterProfileSchema,
 
   keyFields: ["name", "is_active"],
-  queryExamples: [
-    "Show all water profiles",
-    "What is the mineral content of our tap water?",
-    "Which water profiles have high sulfate?",
-  ],
 };

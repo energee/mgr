@@ -19,58 +19,12 @@ export { PG_ERROR_CODES, PG_ERROR_MESSAGES };
 // =============================================================================
 
 /**
- * Validation error for form field validation failures.
- */
-export class ValidationError extends Error {
-  public readonly field: string;
-
-  constructor(field: string, message: string) {
-    super(message);
-    this.name = "ValidationError";
-    this.field = field;
-  }
-}
-
-/**
- * Database constraint violation error.
- */
-export class ConstraintError extends Error {
-  public readonly constraint: string;
-
-  constructor(constraint: string, message: string) {
-    super(message);
-    this.name = "ConstraintError";
-    this.constraint = constraint;
-  }
-}
-
-/**
  * Optimistic locking conflict error.
  */
 export class ConcurrentModificationError extends Error {
   constructor() {
     super("Record was modified by another user. Please refresh and try again.");
     this.name = "ConcurrentModificationError";
-  }
-}
-
-/**
- * Record not found error.
- */
-export class NotFoundError extends Error {
-  constructor(entityType: string, id?: string) {
-    super(id ? `${entityType} not found: ${id}` : `${entityType} not found`);
-    this.name = "NotFoundError";
-  }
-}
-
-/**
- * Authorization/permission error.
- */
-export class PermissionError extends Error {
-  constructor(action: string) {
-    super(`You don't have permission to ${action}`);
-    this.name = "PermissionError";
   }
 }
 
@@ -221,13 +175,6 @@ export function parsePostgresErrorDetailed(
 }
 
 /**
- * Parse a PostgreSQL/Postgrest error into a user-friendly message.
- */
-export function parsePostgresError(error: PostgrestError): string {
-  return parsePostgresErrorDetailed(error).message;
-}
-
-/**
  * Parse an unknown caught value (typed `unknown` in catch blocks / mutation
  * onError) into a friendly message + optional field. Handles Postgres errors
  * (objects carrying a `code`), plain `Error` instances (hand-written guard
@@ -254,46 +201,4 @@ export function parseUnknownError(err: unknown): ParsedPostgresError {
     if (typeof message === "string" && message) return { message };
   }
   return { message: "An unexpected error occurred" };
-}
-
-/**
- * Check if an error is a specific type.
- */
-export function isValidationError(error: unknown): error is ValidationError {
-  return error instanceof ValidationError;
-}
-
-export function isConstraintError(error: unknown): error is ConstraintError {
-  return error instanceof ConstraintError;
-}
-
-export function isConcurrentModificationError(
-  error: unknown
-): error is ConcurrentModificationError {
-  return error instanceof ConcurrentModificationError;
-}
-
-export function isNotFoundError(error: unknown): error is NotFoundError {
-  return error instanceof NotFoundError;
-}
-
-/**
- * Check if a Postgrest error indicates a unique constraint violation.
- */
-export function isUniqueViolation(error: PostgrestError): boolean {
-  return error.code === PG_ERROR_CODES.UNIQUE_VIOLATION;
-}
-
-/**
- * Check if a Postgrest error indicates a foreign key violation.
- */
-export function isForeignKeyViolation(error: PostgrestError): boolean {
-  return error.code === PG_ERROR_CODES.FOREIGN_KEY_VIOLATION;
-}
-
-/**
- * Check if a Postgrest error indicates a check constraint violation.
- */
-export function isCheckViolation(error: PostgrestError): boolean {
-  return error.code === PG_ERROR_CODES.CHECK_VIOLATION;
 }

@@ -38,7 +38,6 @@ export const userProfilePresentation: EntityPresentation<UserProfile> = {
     {
       accessorKey: "display_name",
       header: "Name",
-      sortable: true,
       render: (value, row) => {
         const user = row as UserProfile;
         return (
@@ -75,7 +74,6 @@ export const userProfilePresentation: EntityPresentation<UserProfile> = {
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge status={String(value)} config={STATUS_DISPLAY} />
       ),
@@ -83,7 +81,6 @@ export const userProfilePresentation: EntityPresentation<UserProfile> = {
     {
       accessorKey: "last_active_at",
       header: "Last Active",
-      sortable: true,
       render: (value, row) => {
         const user = row as UserProfile;
         if (!value) return <span className="text-muted-foreground">Never</span>;
@@ -96,7 +93,6 @@ export const userProfilePresentation: EntityPresentation<UserProfile> = {
     {
       accessorKey: "created_at",
       header: "Joined",
-      sortable: true,
       render: (value) => value ? new Date(String(value)).toLocaleDateString("en-US") : "—",
     },
   ],

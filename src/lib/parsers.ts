@@ -75,6 +75,14 @@ const filterItemSchema = z.object({
 
 export type FilterItemSchema = z.infer<typeof filterItemSchema>;
 
+/**
+ * nuqs parser for URL-synced table filter state.
+ *
+ * Validates each filter INDIVIDUALLY and drops only the bad ones: a saved or
+ * bookmarked URL holding a filter whose column no longer exists, or whose
+ * `variant`/`operator` has since been removed from `dataTableConfig`, keeps its
+ * remaining still-valid filters instead of silently losing all of them.
+ */
 export const getFiltersStateParser = <TData>(
   columnIds?: string[] | Set<string>,
 ) => {
@@ -88,15 +96,16 @@ export const getFiltersStateParser = <TData>(
     parse: (value) => {
       try {
         const parsed = JSON.parse(value);
-        const result = z.array(filterItemSchema).safeParse(parsed);
+        if (!Array.isArray(parsed)) return null;
 
-        if (!result.success) return null;
+        const kept = parsed.flatMap((item) => {
+          const result = filterItemSchema.safeParse(item);
+          if (!result.success) return [];
+          if (validKeys && !validKeys.has(result.data.id)) return [];
+          return [result.data];
+        });
 
-        if (validKeys && result.data.some((item) => !validKeys.has(item.id))) {
-          return null;
-        }
-
-        return result.data as ExtendedColumnFilter<TData>[];
+        return kept as ExtendedColumnFilter<TData>[];
       } catch {
         return null;
       }

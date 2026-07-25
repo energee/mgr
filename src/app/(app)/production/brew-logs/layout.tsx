@@ -1,19 +1,8 @@
-/**
- * Brew Logs Layout
- *
- * Provides page metadata so browser tabs display "Brew Logs | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Brew Logs",
-};
+/** Page metadata for the brew-logs route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Brew Logs" };
 
-export default function BrewLogsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

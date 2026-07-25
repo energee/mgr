@@ -16,7 +16,6 @@ export const sessionLineItemPresentation: EntityPresentation<SessionLineItem> = 
     {
       accessorKey: "brand_id",
       header: "Brand",
-      sortable: true,
       relation: {
         entity: "brand",
         displayField: "name",
@@ -25,7 +24,6 @@ export const sessionLineItemPresentation: EntityPresentation<SessionLineItem> = 
     {
       accessorKey: "selling_format_id",
       header: "Selling Format",
-      sortable: true,
       relation: {
         entity: "selling_format",
         displayField: "name",
@@ -34,13 +32,11 @@ export const sessionLineItemPresentation: EntityPresentation<SessionLineItem> = 
     {
       accessorKey: "planned_quantity",
       header: "Planned",
-      sortable: true,
       render: (value) => value ? `${value}` : "—",
     },
     {
       accessorKey: "actual_quantity",
       header: "Actual",
-      sortable: true,
       render: (value) => value ? `${value}` : "—",
     },
   ],

@@ -20,23 +20,19 @@ export const poReceivePresentation: EntityPresentation<POReceive> = {
     {
       accessorKey: "quantity",
       header: "Qty Received",
-      sortable: true,
     },
     {
       accessorKey: "lot_number",
       header: "Lot #",
-      sortable: true,
     },
     {
       accessorKey: "received_date",
       header: "Received",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "expiration_date",
       header: "Expires",
-      sortable: true,
       format: "date",
     },
   ],

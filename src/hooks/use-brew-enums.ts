@@ -10,9 +10,12 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { settingsKeys } from "@/lib/query-keys";
-import { ENUM_TYPES } from "@/lib/enums";
 import type { Json } from "@/types/supabase";
 import type { UnitType } from "@/domain/units";
+
+/** The two `enum_values.enum_type` keys this hook reads. */
+const BREW_PHASE = "brew_phase";
+const BREW_METRIC = "brew_metric";
 
 // =============================================================================
 // Types
@@ -44,14 +47,14 @@ export type BrewPhaseGroup = {
 
 export function useBrewPhases() {
   return useQuery({
-    queryKey: settingsKeys.enumValues(ENUM_TYPES.BREW_PHASE),
+    queryKey: settingsKeys.enumValues(BREW_PHASE),
     queryFn: async () => {
       const supabase = createClient();
       const data = await unwrap(
         supabase
           .from("enum_values")
           .select("value, label, icon, group_name, sort_order")
-          .eq("enum_type", ENUM_TYPES.BREW_PHASE)
+          .eq("enum_type", BREW_PHASE)
           .eq("is_active", true)
           .order("sort_order")
       );
@@ -90,14 +93,14 @@ export function useBrewPhases() {
 
 export function useBrewMetrics() {
   return useQuery({
-    queryKey: settingsKeys.enumValues(ENUM_TYPES.BREW_METRIC),
+    queryKey: settingsKeys.enumValues(BREW_METRIC),
     queryFn: async () => {
       const supabase = createClient();
       const data = await unwrap(
         supabase
           .from("enum_values")
           .select("value, label, description, sort_order, metadata")
-          .eq("enum_type", ENUM_TYPES.BREW_METRIC)
+          .eq("enum_type", BREW_METRIC)
           .eq("is_active", true)
           .order("sort_order")
       );

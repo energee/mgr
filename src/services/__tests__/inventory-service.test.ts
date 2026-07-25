@@ -85,14 +85,6 @@ function createRejectingSupabase(reason: unknown) {
   };
 }
 
-/** A client whose `rpc()` resolves (or rejects) with the supplied value. */
-function createRpcSupabase(result: { data: unknown; error: unknown } | { rejectWith: unknown }) {
-  const rpc = vi.fn(() =>
-    "rejectWith" in result ? Promise.reject(result.rejectWith) : Promise.resolve(result)
-  );
-  return { client: { rpc } as unknown as SupabaseClient<Database>, rpc };
-}
-
 describe("inventoryService.getExpiringLots", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -250,77 +242,6 @@ describe("inventoryService.getExpiringLots", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toHaveProperty("message", "Failed to get expiring lots: socket hang up");
-    }
-  });
-});
-
-// =============================================================================
-// getOverview — wraps the get_inventory_overview RPC (00208)
-// =============================================================================
-
-describe("inventoryService.getOverview", () => {
-  const overview = {
-    finished_goods: [
-      { brand: "Pale Ale", package_type: "can", total_quantity: 100, available_quantity: 80 },
-    ],
-    raw_materials: [
-      { item_name: "Cascade", item_type: "hop", quantity_available: 12, unit: "lb" },
-    ],
-    batches_in_progress: [
-      { batch_code: "B-001", recipe_name: "Pale Ale", status: "fermenting", planned_start: null },
-    ],
-  };
-
-  it("calls the get_inventory_overview RPC and returns its payload", async () => {
-    const { client, rpc } = createRpcSupabase({ data: overview, error: null });
-
-    const result = await inventoryService.getOverview(client);
-
-    expect(rpc).toHaveBeenCalledWith("get_inventory_overview", undefined);
-    expect(result.success).toBe(true);
-    expect(result.success && result.data).toEqual(overview);
-  });
-
-  it("maps an RPC error payload to a typed ServiceError (RLS denial stays RLS_DENIED)", async () => {
-    const { client } = createRpcSupabase({
-      data: null,
-      error: { code: "42501", message: "permission denied for function get_inventory_overview" },
-    });
-
-    const result = await inventoryService.getOverview(client);
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.code).toBe("RLS_DENIED");
-    }
-  });
-
-  it("converts a thrown Error into an UNKNOWN ServiceError instead of propagating", async () => {
-    const { client } = createRpcSupabase({ rejectWith: new Error("rpc timeout") });
-
-    const result = await inventoryService.getOverview(client);
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.code).toBe("UNKNOWN");
-      expect(result.error).toHaveProperty(
-        "message",
-        "Failed to get inventory overview: rpc timeout"
-      );
-    }
-  });
-
-  it("stringifies a non-Error rejection", async () => {
-    const { client } = createRpcSupabase({ rejectWith: "gateway closed" });
-
-    const result = await inventoryService.getOverview(client);
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toHaveProperty(
-        "message",
-        "Failed to get inventory overview: gateway closed"
-      );
     }
   });
 });

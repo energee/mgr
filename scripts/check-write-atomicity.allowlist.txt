@@ -33,4 +33,3 @@ src/integrations/quickbooks/token-manager.ts
 src/integrations/square/catalog.ts
 src/services/consumption-service.ts
 src/services/inventory-count-service.ts
-src/services/transition-side-effects.ts

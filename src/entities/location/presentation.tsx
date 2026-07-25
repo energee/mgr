@@ -17,24 +17,20 @@ export const locationPresentation: EntityPresentation<Location> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "location_type",
       header: "Type",
-      sortable: true,
       render: (value: unknown) => getValueLabel(locationCore, "location_type", value as string),
     },
     {
       accessorKey: "is_primary",
       header: "Primary",
-      sortable: true,
       render: (value: unknown) => (value ? "Yes" : "No"),
     },
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value: unknown) => (value ? "Yes" : "No"),
     },
   ],

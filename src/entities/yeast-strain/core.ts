@@ -82,7 +82,6 @@ export const yeastStrainCore: EntityCoreInput<Yeast> = {
   table: "yeasts",
   displayName: "Yeast Strain",
   defaultSort: { column: "name", direction: "asc" },
-  description: "Yeast strains catalog with fermentation characteristics",
   domain: "production",
   basePath: "/settings/yeasts",
 
@@ -96,14 +95,6 @@ export const yeastStrainCore: EntityCoreInput<Yeast> = {
   formSchema: yeastStrainSchema,
 
   valueDisplay: [typeDisplayConfig, formDisplayConfig, flocculationDisplayConfig],
-
-  queryExamples: [
-    "Show all yeast strains",
-    "What ale yeasts do we have?",
-    "Find yeasts with high attenuation",
-    "List dry yeasts",
-    "What yeasts work at 60°F?",
-  ],
 
   keyFields: ["name", "manufacturer", "type", "form", "attenuation_typical", "is_active"],
 };

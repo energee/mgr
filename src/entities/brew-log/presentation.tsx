@@ -23,23 +23,19 @@ export const brewLogPresentation: EntityPresentation<BrewLog> = {
     {
       accessorKey: "brew_number",
       header: "Brew #",
-      sortable: true,
     },
     {
       accessorKey: "recipe_name",
       header: "Recipe",
-      sortable: true,
     },
     {
       accessorKey: "brew_date",
       header: "Brew Date",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}

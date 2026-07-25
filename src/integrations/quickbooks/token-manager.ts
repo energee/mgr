@@ -89,12 +89,6 @@ export async function clearTokens(): Promise<void> {
   if (error) throw new Error(`Failed to clear QBO tokens: ${error.message}`);
 }
 
-export async function isTokenExpired(): Promise<boolean> {
-  const tokens = await getTokens();
-  if (!tokens || !tokens.expiresAt) return true;
-  return new Date(tokens.expiresAt) <= new Date();
-}
-
 export async function getAutoSyncEnabled(): Promise<boolean> {
   const admin = await createAdminClient();
   const { data } = await admin
@@ -103,63 +97,4 @@ export async function getAutoSyncEnabled(): Promise<boolean> {
     .eq("key", "qbo_auto_sync_enabled")
     .single();
   return data?.value === "true";
-}
-
-/** Save QBO OAuth client credentials */
-export async function saveClientCredentials(clientId: string, clientSecret: string): Promise<void> {
-  const admin = await createAdminClient();
-  const rows = [
-    { key: SETTINGS_KEYS.clientId, value: clientId },
-    { key: SETTINGS_KEYS.clientSecret, value: clientSecret },
-  ];
-  const { error } = await admin
-    .from("system_settings")
-    .upsert(rows, { onConflict: "key" });
-  if (error) throw new Error(`Failed to save QBO client credentials: ${error.message}`);
-}
-
-/** Refresh the QBO access token using the refresh token */
-export async function refreshAccessToken(): Promise<{ accessToken: string; refreshToken: string }> {
-  const tokens = await getTokens();
-  const creds = await getClientCredentials();
-
-  if (!tokens || !creds) {
-    throw new Error("Missing QBO credentials for token refresh");
-  }
-
-  const basicAuth = Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString("base64");
-
-  const response = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${basicAuth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Accept": "application/json",
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: tokens.refreshToken,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Token refresh failed (${response.status}): ${errorText}`);
-  }
-
-  const data: { access_token: string; refresh_token: string; expires_in: number } =
-    await response.json();
-  const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
-  await saveTokens({
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    realmId: tokens.realmId,
-    expiresAt,
-  });
-
-  return {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-  };
 }

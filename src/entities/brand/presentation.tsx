@@ -16,17 +16,14 @@ export const brandPresentation: EntityPresentation<Brand> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "variant",
       header: "Variant",
-      sortable: true,
     },
     {
       accessorKey: "style_id",
       header: "Style",
-      sortable: true,
       relation: {
         entity: "beer_style",
         displayField: "name",
@@ -35,13 +32,11 @@ export const brandPresentation: EntityPresentation<Brand> = {
     {
       accessorKey: "abv",
       header: "ABV",
-      sortable: true,
       render: (value) => (value ? `${value}%` : "—"),
     },
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       // Absent-safe until 00244 is applied + types regenerated: only an
       // explicit false is discontinued (the column defaults true).
       render: (value) => (value === false ? "No" : "Yes"),

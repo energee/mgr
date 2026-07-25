@@ -26,7 +26,7 @@ import { entityService } from "@/services/entity-service";
 import { inventoryService } from "@/services/inventory-service";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
 import { coreRegistry } from "@/entities/cores";
-import { escapeLike } from "@/lib/utils";
+import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 
 /** Execute an RPC call and throw on error. */
 async function rpc<T>(
@@ -67,7 +67,7 @@ async function resolveBatch(
     const { data, error } = await supabase
       .from("batches")
       .select("id, batch_code, status")
-      .ilike("batch_code", `%${escapeLike(batchNumber)}%`)
+      .ilike("batch_code", `%${escapeIlikePattern(batchNumber)}%`)
       .limit(1);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0)
@@ -371,7 +371,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           .eq("is_active", true);
         if (category) itemsQ = itemsQ.eq("category", category);
         if (itemName)
-          itemsQ = itemsQ.ilike("name", `%${escapeLike(itemName)}%`);
+          itemsQ = itemsQ.ilike("name", `%${escapeIlikePattern(itemName)}%`);
 
         const items = await query<{ id: string; name: string; category: string; unit: string; reorder_point: number | null }[]>(itemsQ);
         if (!items?.length) return [];
@@ -520,7 +520,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           .limit(limit);
 
         if (brandId) q = q.eq("brand_id", brandId);
-        if (searchQuery) q = q.ilike("brand_name", `%${escapeLike(searchQuery)}%`);
+        if (searchQuery) q = q.ilike("brand_name", `%${escapeIlikePattern(searchQuery)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -542,7 +542,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
       }),
       execute: async ({ query: searchQuery, entityType }) => {
         type Result = { type: string; id: string; display: string };
-        const escaped = escapeLike(searchQuery);
+        const escaped = escapeIlikePattern(searchQuery);
         const should = (t: string) => !entityType || entityType === t;
 
         const queries: PromiseLike<Result[]>[] = [];
@@ -678,7 +678,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         if (startDate) q = q.gte("order_date", startDate);
         if (endDate) q = q.lte("order_date", endDate);
         if (customerName)
-          q = q.ilike("customers.name", `%${escapeLike(customerName)}%`);
+          q = q.ilike("customers.name", `%${escapeIlikePattern(customerName)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -724,7 +724,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           .order("name")
           .limit(limit);
 
-        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
+        if (searchQuery) q = q.ilike("name", `%${escapeIlikePattern(searchQuery)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -765,7 +765,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
         if (status) q = q.eq("status", status);
         if (brewNumber)
-          q = q.ilike("brew_number", `%${escapeLike(brewNumber)}%`);
+          q = q.ilike("brew_number", `%${escapeIlikePattern(brewNumber)}%`);
         if (startDate) q = q.gte("brew_date", startDate);
         if (endDate) q = q.lte("brew_date", endDate);
 
@@ -815,7 +815,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         if (startDate) q = q.gte("order_date", startDate);
         if (endDate) q = q.lte("order_date", endDate);
         if (supplierName)
-          q = q.ilike("suppliers.name", `%${escapeLike(supplierName)}%`);
+          q = q.ilike("suppliers.name", `%${escapeIlikePattern(supplierName)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -845,7 +845,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           .limit(limit);
 
         if (isActive !== undefined) q = q.eq("is_active", isActive);
-        if (searchQuery) q = q.ilike("name", `%${escapeLike(searchQuery)}%`);
+        if (searchQuery) q = q.ilike("name", `%${escapeIlikePattern(searchQuery)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -888,7 +888,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         if (startDate) q = q.gte("generated_at", startDate);
         if (endDate) q = q.lte("generated_at", endDate);
         if (customerName)
-          q = q.ilike("customer_name", `%${escapeLike(customerName)}%`);
+          q = q.ilike("customer_name", `%${escapeIlikePattern(customerName)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -923,7 +923,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
         if (status) q = q.eq("status", status);
         if (strainName)
-          q = q.ilike("strain_name", `%${escapeLike(strainName)}%`);
+          q = q.ilike("strain_name", `%${escapeIlikePattern(strainName)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -996,9 +996,9 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
         if (state) q = q.eq("state", state);
         if (kegTypeName)
-          q = q.ilike("keg_type_name", `%${escapeLike(kegTypeName)}%`);
+          q = q.ilike("keg_type_name", `%${escapeIlikePattern(kegTypeName)}%`);
         if (locationName)
-          q = q.ilike("location_name", `%${escapeLike(locationName)}%`);
+          q = q.ilike("location_name", `%${escapeIlikePattern(locationName)}%`);
 
         const { data, error } = await q;
         if (error) throw new Error(error.message);
@@ -1059,7 +1059,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           const { data, error } = await supabase
             .from("recipes")
             .select("id, name, volume_bbl")
-            .ilike("name", `%${escapeLike(recipeName)}%`)
+            .ilike("name", `%${escapeIlikePattern(recipeName)}%`)
             .limit(1);
           if (error) throw new Error(error.message);
           if (!data || data.length === 0) {

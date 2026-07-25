@@ -96,8 +96,6 @@ export const locationTransferCore: EntityCoreInput<LocationTransferView> = {
   table: "location_transfers",
   viewTable: "location_transfers_with_details",
   displayName: "Location Transfer",
-  description:
-    "Inventory movements between bins and locations for multi-site operations",
   domain: "inventory",
   basePath: "/inventory/transfers",
 
@@ -138,13 +136,6 @@ export const locationTransferCore: EntityCoreInput<LocationTransferView> = {
       // Lines are managed inline on the transfer detail page, not via a route.
       hideAdd: true,
     },
-  ],
-
-  queryExamples: [
-    "Show me all planned location transfers",
-    "What transfers are currently in transit?",
-    "Find transfers from the main warehouse",
-    "List completed transfers for this week",
   ],
 
   keyFields: [

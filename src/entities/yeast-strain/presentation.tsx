@@ -23,42 +23,35 @@ export const yeastStrainPresentation: EntityPresentation<Yeast> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "manufacturer",
       header: "Manufacturer",
-      sortable: true,
       render: (value) => (value ? String(value) : "—"),
     },
     {
       accessorKey: "product_code",
       header: "Code",
-      sortable: true,
       render: (value) => (value ? String(value) : "—"),
     },
     {
       accessorKey: "type",
       header: "Type",
-      sortable: true,
       render: (value) => getValueLabel(yeastStrainCore, "type", value as string),
     },
     {
       accessorKey: "form",
       header: "Form",
-      sortable: true,
       render: (value) => getValueLabel(yeastStrainCore, "form", value as string),
     },
     {
       accessorKey: "attenuation_typical",
       header: "Attenuation",
-      sortable: true,
       render: (value) => (value != null ? `${value}%` : "—"),
     },
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => (value ? "Yes" : "No"),
     },
   ],

@@ -29,12 +29,10 @@ export const beerStylePresentation: EntityPresentation<BeerStyle> = {
     {
       accessorKey: "name",
       header: "Style",
-      sortable: true,
     },
     {
       accessorKey: "category",
       header: "Category",
-      sortable: true,
     },
     {
       accessorKey: "abv_min",

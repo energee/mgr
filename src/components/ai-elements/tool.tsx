@@ -54,7 +54,7 @@ export type ToolHeaderProps = {
     }
 );
 
-export const getStatusBadge = (status: ToolPart["state"]) => {
+const getStatusBadge = (status: ToolPart["state"]) => {
   const labels: Record<ToolPart["state"], string> = {
     "approval-requested": "Awaiting Approval",
     "approval-responded": "Responded",

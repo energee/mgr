@@ -43,7 +43,7 @@ type SectionProps = {
  * Material, Needed, On Hand, and Shortfall. A destructive Badge is shown when shortfall > 0.
  * Includes an alert and link to material planning if any shortfalls are found.
  */
-export function PackagingSessionMaterials({ sessionId }: PackagingSessionMaterialsProps) {
+function PackagingSessionMaterials({ sessionId }: PackagingSessionMaterialsProps) {
   const { data: materials, isLoading } = useSessionMaterialPreview(sessionId);
 
   if (isLoading) {

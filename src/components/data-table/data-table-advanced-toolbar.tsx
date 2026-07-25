@@ -4,10 +4,7 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-type DataTableAdvancedToolbarProps = React.ComponentProps<"div"> & {
-  /** Table instance — reserved for future use (e.g., column visibility) */
-  table?: unknown;
-}
+type DataTableAdvancedToolbarProps = React.ComponentProps<"div">;
 
 export function DataTableAdvancedToolbar({
   children,

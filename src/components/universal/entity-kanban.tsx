@@ -42,6 +42,9 @@ function getRecordId(item: Record<string, unknown>): string {
 // Helpers
 // =============================================================================
 
+// Deliberately NOT `lib/format`'s `formatValue`: cards use a compact
+// "MMM d, yyyy" date and "-" for blanks, where formatValue renders "1/5/2026"
+// and "—". Same shape, different output — merging would change every card.
 function formatCardFieldValue(
   value: unknown,
   fieldFormat?: KanbanCardField<Record<string, unknown>>["format"],

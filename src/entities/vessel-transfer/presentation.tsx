@@ -16,12 +16,10 @@ export const vesselTransferPresentation: EntityPresentation<VesselTransfer> = {
     {
       accessorKey: "batch_code",
       header: "Batch",
-      sortable: true,
     },
     {
       accessorKey: "transferred_at",
       header: "Date/Time",
-      sortable: true,
       format: "datetime",
     },
     {
@@ -39,7 +37,6 @@ export const vesselTransferPresentation: EntityPresentation<VesselTransfer> = {
     {
       accessorKey: "volume_bbl",
       header: "Volume",
-      sortable: true,
       format: "unit",
       unitType: "volume",
     },

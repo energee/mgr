@@ -84,7 +84,6 @@ export const batchCore: EntityCoreInput<Batch> = {
   viewTable: "batches_with_brew_info", // Includes brew stats (brew_date, actual_og, brew_count) + current vessel info (id, name, type)
   displayName: "Batch",
   displayNamePlural: "Batches",
-  description: "Production batches from brewing through packaging",
   domain: "production",
   basePath: "/production/batches",
 
@@ -142,13 +141,6 @@ export const batchCore: EntityCoreInput<Batch> = {
       foreignKey: "batch_id",
       showInDetail: false, // shown via custom BatchYeastSection
     },
-  ],
-
-  queryExamples: [
-    "Show me all batches currently fermenting",
-    "What batches are planned for this week?",
-    "Which batches are in FV-1?",
-    "What's the total volume in fermentation?",
   ],
 
   keyFields: ["batch_code", "name", "status", "planned_start_date", "current_vessel_name"],

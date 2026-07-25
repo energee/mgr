@@ -236,7 +236,6 @@ export const kegTransactionCore: EntityCoreInput<KegTransaction> = {
   // Use the view for list display (includes joined names)
   viewTable: "keg_transactions_with_details",
   displayName: "Keg Transaction",
-  description: "Immutable audit log for keg state transitions (inventory calculated from these records)",
   domain: "inventory",
   basePath: "/inventory/kegs/transactions",
 
@@ -250,13 +249,6 @@ export const kegTransactionCore: EntityCoreInput<KegTransaction> = {
   },
 
   formSchema: kegTransactionSchema,
-
-  queryExamples: [
-    "Show recent keg transactions",
-    "How many kegs were shipped this month?",
-    "List all keg returns from customer X",
-    "Show fill transactions for batch Y",
-  ],
 
   keyFields: ["transaction_type", "selling_format_id", "keg_owner_id", "quantity", "from_state", "to_state", "created_at"],
 };

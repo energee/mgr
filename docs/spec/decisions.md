@@ -1052,14 +1052,16 @@ Atomic upsert semantics provide a single 10/minute allowance across serverless
 instances. The limiter runs after `ai:use` authorization and before either the
 personal or brewery Anthropic key is read.
 
-**Remaining affected endpoints:** `/api/customers/[id]/invite` (sends emails)
-and `/api/email/send` (sends emails) retain the module-level, per-instance
-limiter. It provides best-effort burst protection, while the endpoints'
-authorization gates bound access.
+**Remaining affected endpoint:** `/api/customers/[id]/invite` (sends emails)
+retains the module-level, per-instance limiter. It provides best-effort burst
+protection, while the endpoint's authorization gates bound access.
+(`/api/email/send` was deleted in the 2026-07-24 over-engineering sweep — it
+had no caller; production email is dispatched by `dispatch_email_notification`
+via pg_net to the `send-email` edge function.)
 
-**Future solution:** Move the remaining email-related endpoints to a durable
+**Future solution:** Move the remaining email-related endpoint to a durable
 database bucket or a managed cross-instance limiter such as Redis/Upstash when
-their traffic and retry semantics justify it.
+its traffic and retry semantics justify it.
 
 ---
 

@@ -136,7 +136,6 @@ export const poLineItemCore: EntityCoreInput<POLineItem> = {
   viewTable: "po_line_items_with_quantities",
   displayName: "PO Line Item",
   defaultSort: { column: "created_at", direction: "desc" },
-  description: "Purchase order line items for ingredients and materials",
   domain: "purchasing",
   basePath: null,
 
@@ -166,12 +165,6 @@ export const poLineItemCore: EntityCoreInput<POLineItem> = {
       // po_receive is route-less (created via the PO receiving dialog).
       hideAdd: true,
     },
-  ],
-
-  queryExamples: [
-    "Show line items for PO-2025-001",
-    "List all malt orders this month",
-    "Find hop purchases by price",
   ],
 
   keyFields: ["po_id", "catalog_type", "catalog_id", "quantity", "unit"],

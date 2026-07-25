@@ -1,19 +1,8 @@
-/**
- * Locations Layout
- *
- * Provides page metadata so browser tabs display "Locations | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Locations",
-};
+/** Page metadata for the locations route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Locations" };
 
-export default function LocationsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

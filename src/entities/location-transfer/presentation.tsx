@@ -38,7 +38,6 @@ export const locationTransferPresentation: EntityPresentation<LocationTransferVi
     {
       accessorKey: "from_location_name",
       header: "From",
-      sortable: true,
       render: (_value, row) => {
         const data = row as LocationTransferView;
         if (data.from_location_name && data.from_bin_name) {
@@ -50,7 +49,6 @@ export const locationTransferPresentation: EntityPresentation<LocationTransferVi
     {
       accessorKey: "to_location_name",
       header: "To",
-      sortable: true,
       render: (_value, row) => {
         const data = row as LocationTransferView;
         if (data.to_location_name && data.to_bin_name) {
@@ -62,12 +60,10 @@ export const locationTransferPresentation: EntityPresentation<LocationTransferVi
     {
       accessorKey: "lines_count",
       header: "Lines",
-      sortable: true,
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -78,13 +74,11 @@ export const locationTransferPresentation: EntityPresentation<LocationTransferVi
     {
       accessorKey: "ship_date",
       header: "Ship Date",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "delivery_number",
       header: "Delivery",
-      sortable: true,
     },
   ],
 

@@ -16,7 +16,6 @@ export const pricingTierPricePresentation: EntityPresentation<PricingTierPrice> 
     {
       accessorKey: "pricing_tier_id",
       header: "Tier",
-      sortable: true,
       relation: {
         entity: "pricing_tier",
         displayField: "name",
@@ -25,7 +24,6 @@ export const pricingTierPricePresentation: EntityPresentation<PricingTierPrice> 
     {
       accessorKey: "format_id",
       header: "Format",
-      sortable: true,
       relation: {
         entity: "selling_format",
         displayField: "name",
@@ -34,7 +32,6 @@ export const pricingTierPricePresentation: EntityPresentation<PricingTierPrice> 
     {
       accessorKey: "sales_channel_id",
       header: "Channel",
-      sortable: true,
       relation: {
         entity: "sales_channel",
         displayField: "name",
@@ -43,7 +40,6 @@ export const pricingTierPricePresentation: EntityPresentation<PricingTierPrice> 
     {
       accessorKey: "price",
       header: "Price",
-      sortable: true,
       render: (value) => (value != null ? `$${Number(value).toFixed(2)}` : "—"),
     },
   ],

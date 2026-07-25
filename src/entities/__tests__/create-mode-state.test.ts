@@ -4,7 +4,7 @@
  * New records must enter their lifecycle at the state machine's initial
  * state. An INSERT is invisible to the server-side transition triggers
  * (migrations 00143/00205 fire on UPDATE only) and to the transition
- * side-effect registry (src/services/transition-side-effects.ts), so a
+ * side-effect registry (`transition_entity_atomic`, migration 00256), so a
  * record created directly in a later state — e.g. a packaging session
  * created as "Completed" — would skip material depletion, FG creation, and
  * every other transition effect, then sit read-only and inconsistent.

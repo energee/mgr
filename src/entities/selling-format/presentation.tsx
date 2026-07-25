@@ -23,12 +23,10 @@ export const sellingFormatPresentation: EntityPresentation<SellingFormat> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "container_id",
       header: "Container",
-      sortable: true,
       relation: {
         entity: "container",
         displayField: "name",
@@ -37,12 +35,10 @@ export const sellingFormatPresentation: EntityPresentation<SellingFormat> = {
     {
       accessorKey: "unit_count",
       header: "Units",
-      sortable: true,
     },
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => (value ? "Yes" : "No"),
     },
   ],

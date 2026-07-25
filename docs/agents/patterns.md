@@ -17,7 +17,6 @@ export const entityEntity: EntityConfig<EntityType> = {
   viewTable: "view_name",            // Optional: for computed fields
   displayName: "Entity",
   displayNamePlural: "Entities",
-  description: "...",
   domain: "production" | "inventory" | "sales" | "purchasing",
 
   // List view
@@ -41,8 +40,7 @@ export const entityEntity: EntityConfig<EntityType> = {
   actions: [...],
   relations: [...],
 
-  // AI context
-  queryExamples: [...],
+  // AI context (read by /api/chat)
   keyFields: [...],
 };
 ```

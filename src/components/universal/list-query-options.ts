@@ -93,11 +93,10 @@ export function configColumnIds<T>(entity: ListQueryEntity<T>): Set<string> {
  *   back to reading `record.name`, which we can't prove exists)
  *
  * Otherwise projects configColumnIds ∪ stateField ∪ detailHeader.title
- * ∪ searchableFields ∪ quickFilter filter columns ∪ prop-filter keys.
+ * ∪ searchableFields ∪ quickFilter filter columns.
  */
 export function buildSelectList<T>(
   entity: ListQueryEntity<T>,
-  propFilters: Record<string, unknown> | undefined,
   hasOnAction: boolean
 ): string {
   if (hasOnAction) return "*";
@@ -112,7 +111,6 @@ export function buildSelectList<T>(
   for (const qf of entity.quickFilters ?? []) {
     for (const f of qf.filters) cols.add(f.column);
   }
-  for (const k of Object.keys(propFilters ?? {})) cols.add(k);
   return [...cols].join(",");
 }
 
@@ -124,8 +122,6 @@ export function buildSelectList<T>(
 export type ResolvedListParams<T = Record<string, unknown>> = {
   /** Table/view actually queried (entity.viewTable ?? entity.table). */
   fetchTable: string;
-  /** Prop-level equality filters (the `filters` prop on EntityDataTable). */
-  propFilters?: Record<string, unknown>;
   /** URL filters from DataTableFilterList. */
   urlFilters: ExtendedColumnFilter<T>[];
   joinOperator: "and" | "or";
@@ -151,7 +147,7 @@ export type PagedListData<T = Record<string, unknown>> = {
  * match, and so server prefetch + client first render hit the same key.
  */
 export function listQueryKey<T>(params: ResolvedListParams<T>) {
-  const { fetchTable, propFilters, urlFilters, joinOperator, search, mode, from, to, order, select } =
+  const { fetchTable, urlFilters, joinOperator, search, mode, from, to, order, select } =
     params;
   const filterKey =
     urlFilters.length > 0
@@ -166,13 +162,13 @@ export function listQueryKey<T>(params: ResolvedListParams<T>) {
       : {};
   return entityKeys.pagedList(
     fetchTable,
-    { ...propFilters, ...filterKey, search: search || undefined },
+    { ...filterKey, search: search || undefined },
     { mode, from, to, order, select }
   );
 }
 
 /**
- * Run the list query: main Supabase select (filters + search + server sort +
+ * Run the list query: main Supabase select (URL filters + search + server sort +
  * fetch window) followed by the per-relation FK-resolution loop that populates
  * `__rel_<key>` display values on each row. Extracted verbatim from the
  * previous entity-data-table queryFn.
@@ -182,19 +178,12 @@ export async function runListQuery<T>(
   entity: ListQueryEntity<T>,
   params: ResolvedListParams<T>
 ): Promise<PagedListData<T>> {
-  const { fetchTable, propFilters, urlFilters, joinOperator, search, order, from, to, select } =
+  const { fetchTable, urlFilters, joinOperator, search, order, from, to, select } =
     params;
 
   let query = dynamicFrom(supabase, fetchTable).select(select, {
     count: "estimated",
   });
-
-  // Apply prop-level filters
-  if (propFilters) {
-    Object.entries(propFilters).forEach(([key, value]) => {
-      query = query.eq(key, value);
-    });
-  }
 
   // Apply URL filters from DataTableFilterList (translated to Supabase ops)
   const applyFilters = buildSupabaseFiltersFromUrl(urlFilters, joinOperator);
@@ -288,12 +277,10 @@ export function defaultListParams<T>(
   entity: ListQueryEntity<T>,
   {
     hasOnAction = false,
-    propFilters,
     pageSize = 10,
     select,
   }: {
     hasOnAction?: boolean;
-    propFilters?: Record<string, unknown>;
     pageSize?: number;
     /**
      * Explicit projection override. buildSelectList returns "*" whenever a list
@@ -319,7 +306,6 @@ export function defaultListParams<T>(
 
   return {
     fetchTable: entity.viewTable || entity.table,
-    propFilters,
     urlFilters: [],
     joinOperator: "and",
     search: undefined,
@@ -327,6 +313,6 @@ export function defaultListParams<T>(
     from: 0,
     to: pageSize - 1,
     order,
-    select: select ?? buildSelectList(entity, propFilters, hasOnAction),
+    select: select ?? buildSelectList(entity, hasOnAction),
   };
 }

@@ -36,7 +36,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn, escapeLike } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 import { formatRelativeDate } from "@/lib/format";
 import { dynamicFrom } from "@/services/types";
 import { unwrap } from "@/lib/supabase/query-helpers";
@@ -131,7 +132,7 @@ export default function NotificationsPage() {
         query = query.eq("priority", filterPriority);
       }
       if (search) {
-        const escaped = escapeLike(search);
+        const escaped = escapeIlikePattern(search);
         query = query.or(`title.ilike.%${escaped}%,message.ilike.%${escaped}%`);
       }
 

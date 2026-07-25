@@ -6,15 +6,6 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 /**
- * Escape SQL LIKE/ILIKE wildcard characters so they match literally.
- * Handles `%`, `_`, and `\` which have special meaning in LIKE patterns.
- * Use this when interpolating user input into `.ilike()` or `.like()` queries.
- */
-export function escapeLike(value: string): string {
-  return value.replace(/[%_\\]/g, "\\$&");
-}
-
-/**
  * Get current date/time formatted for datetime-local input.
  * Returns ISO string trimmed to minute precision (YYYY-MM-DDTHH:MM).
  */

@@ -23,42 +23,35 @@ export const recipePresentation: EntityPresentation<Recipe> = {
     {
       accessorKey: "name",
       header: "Name",
-      sortable: true,
     },
     {
       accessorKey: "style_name",
       header: "Style",
-      sortable: true,
     },
     {
       accessorKey: "volume_bbl",
       header: "Volume",
-      sortable: true,
       format: "unit",
       unitType: "volume",
     },
     {
       accessorKey: "mash_efficiency",
       header: "Efficiency %",
-      sortable: true,
       render: (value) => value ? `${value}%` : "—",
     },
     {
       accessorKey: "boil_time_min",
       header: "Boil Time",
-      sortable: true,
       render: (value) => value ? `${value} min` : "—",
     },
     {
       accessorKey: "batch_count",
       header: "Batches",
-      sortable: true,
       render: (value) => (value as number) || 0,
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}
@@ -69,13 +62,11 @@ export const recipePresentation: EntityPresentation<Recipe> = {
     {
       accessorKey: "is_active",
       header: "Active",
-      sortable: true,
       render: (value) => value ? "Yes" : "No",
     },
     {
       accessorKey: "created_at",
       header: "Created",
-      sortable: true,
       format: "datetime",
     },
   ],

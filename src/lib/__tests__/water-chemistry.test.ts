@@ -4,10 +4,6 @@ import {
   getRatioDescription,
   calculateIonContribution,
   calculateResultingProfile,
-  calculateResidualAlkalinity,
-  estimateMashPH,
-  getIonRecommendations,
-  COMMON_PROFILES,
   SALT_ADDITIVE_MAP,
   mapSaltAdditionsToItems,
   type WaterProfile,
@@ -147,146 +143,21 @@ describe("calculateResultingProfile", () => {
 // calculateResidualAlkalinity
 // =============================================================================
 
-describe("calculateResidualAlkalinity", () => {
-  it("returns 0 for distilled water", () => {
-    expect(
-      calculateResidualAlkalinity({
-        calcium_ppm: 0,
-        magnesium_ppm: 0,
-        sodium_ppm: 0,
-        sulfate_ppm: 0,
-        chloride_ppm: 0,
-        bicarbonate_ppm: 0,
-      })
-    ).toBe(0);
-  });
-
-  it("returns positive RA for high bicarbonate water", () => {
-    const ra = calculateResidualAlkalinity({
-      calcium_ppm: 50,
-      magnesium_ppm: 5,
-      sodium_ppm: 10,
-      sulfate_ppm: 50,
-      chloride_ppm: 50,
-      bicarbonate_ppm: 300,
-    });
-    expect(ra).toBeGreaterThan(0);
-  });
-
-  it("returns negative RA for high calcium, low bicarbonate", () => {
-    const ra = calculateResidualAlkalinity({
-      calcium_ppm: 200,
-      magnesium_ppm: 30,
-      sodium_ppm: 10,
-      sulfate_ppm: 200,
-      chloride_ppm: 50,
-      bicarbonate_ppm: 20,
-    });
-    expect(ra).toBeLessThan(0);
-  });
-});
 
 // =============================================================================
 // estimateMashPH
 // =============================================================================
 
-describe("estimateMashPH", () => {
-  const distilledWater: WaterProfile = {
-    calcium_ppm: 0,
-    magnesium_ppm: 0,
-    sodium_ppm: 0,
-    sulfate_ppm: 0,
-    chloride_ppm: 0,
-    bicarbonate_ppm: 0,
-  };
-
-  it("returns base pH for distilled water with pale malt", () => {
-    const grainBill = [{ name: "Pale Malt", color_srm: 2, weight_lb: 10 }];
-    const ph = estimateMashPH(distilledWater, grainBill, 4);
-    expect(ph).toBeCloseTo(5.78, 1);
-  });
-
-  it("returns base pH for empty grain bill", () => {
-    const ph = estimateMashPH(distilledWater, [], 4);
-    expect(ph).toBe(5.8);
-  });
-
-  it("returns lower pH for darker grains", () => {
-    const paleGrain = [{ name: "Pale", color_srm: 2, weight_lb: 10 }];
-    const darkGrain = [{ name: "Roast", color_srm: 500, weight_lb: 10 }];
-    const phPale = estimateMashPH(distilledWater, paleGrain, 4);
-    const phDark = estimateMashPH(distilledWater, darkGrain, 4);
-    expect(phDark).toBeLessThan(phPale);
-  });
-
-  it("returns higher pH for high RA water", () => {
-    const highRA: WaterProfile = {
-      ...distilledWater,
-      bicarbonate_ppm: 300,
-    };
-    const grainBill = [{ name: "Pale", color_srm: 2, weight_lb: 10 }];
-    const phLow = estimateMashPH(distilledWater, grainBill, 4);
-    const phHigh = estimateMashPH(highRA, grainBill, 4);
-    expect(phHigh).toBeGreaterThan(phLow);
-  });
-
-  it("clamps pH to reasonable range", () => {
-    // Extremely dark grains should not go below 4.5
-    const darkGrain = [{ name: "Roast", color_srm: 1000, weight_lb: 10 }];
-    const ph = estimateMashPH(distilledWater, darkGrain, 4);
-    expect(ph).toBeGreaterThanOrEqual(4.5);
-    expect(ph).toBeLessThanOrEqual(6.5);
-  });
-});
 
 // =============================================================================
 // getIonRecommendations
 // =============================================================================
 
-describe("getIonRecommendations", () => {
-  it("returns hoppy ranges for IPA", () => {
-    const recs = getIonRecommendations("American IPA");
-    expect(recs.sulfate[0]).toBeGreaterThanOrEqual(150);
-  });
-
-  it("returns malty ranges for stout", () => {
-    const recs = getIonRecommendations("Irish Stout");
-    expect(recs.chloride[0]).toBeGreaterThanOrEqual(75);
-  });
-
-  it("returns lager ranges for pilsner", () => {
-    const recs = getIonRecommendations("Czech Pilsner");
-    expect(recs.calcium[1]).toBeLessThanOrEqual(75);
-  });
-
-  it("returns default ranges for unknown style", () => {
-    const recs = getIonRecommendations("Mystery Beer");
-    expect(recs.calcium).toBeDefined();
-    expect(recs.sulfate).toBeDefined();
-  });
-});
 
 // =============================================================================
 // COMMON_PROFILES
 // =============================================================================
 
-describe("COMMON_PROFILES", () => {
-  it("distilled water has all zeros", () => {
-    const d = COMMON_PROFILES.distilled;
-    expect(d.calcium_ppm).toBe(0);
-    expect(d.magnesium_ppm).toBe(0);
-    expect(d.sulfate_ppm).toBe(0);
-    expect(d.chloride_ppm).toBe(0);
-  });
-
-  it("Burton has very high sulfate", () => {
-    expect(COMMON_PROFILES.burton.sulfate_ppm).toBeGreaterThan(700);
-  });
-
-  it("Pilsen has very low mineral content", () => {
-    expect(COMMON_PROFILES.pilsen.calcium_ppm).toBeLessThan(10);
-  });
-});
 
 // =============================================================================
 // SALT_ADDITIVE_MAP

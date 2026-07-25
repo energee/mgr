@@ -18,7 +18,6 @@ export const poLineItemPresentation: EntityPresentation<POLineItem> = {
     {
       accessorKey: "catalog_type",
       header: "Type",
-      sortable: true,
     },
     {
       accessorKey: "catalog_id",
@@ -27,17 +26,14 @@ export const poLineItemPresentation: EntityPresentation<POLineItem> = {
     {
       accessorKey: "quantity",
       header: "Qty",
-      sortable: true,
     },
     {
       accessorKey: "received_quantity",
       header: "Received",
-      sortable: true,
     },
     {
       accessorKey: "outstanding_quantity",
       header: "Outstanding",
-      sortable: true,
     },
     {
       accessorKey: "unit",

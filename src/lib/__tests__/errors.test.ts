@@ -12,7 +12,6 @@
 import { describe, it, expect } from "vitest";
 
 import {
-  parsePostgresError,
   parsePostgresErrorDetailed,
   parseUnknownError,
   CONSTRAINT_MESSAGES,
@@ -97,28 +96,6 @@ describe("parsePostgresErrorDetailed", () => {
 // =============================================================================
 // parsePostgresError (string variant) stays consistent with detailed parsing
 // =============================================================================
-
-describe("parsePostgresError (with unique-violation details)", () => {
-  it("names the colliding value for unknown unique constraints", () => {
-    const error = makePostgresError(
-      "23505",
-      'duplicate key value violates unique constraint "recipes_name_key"',
-      "Key (name)=(West Coast IPA) already exists."
-    );
-    expect(parsePostgresError(error)).toBe(
-      '"West Coast IPA" is already in use'
-    );
-  });
-
-  it("returns the curated message for orders_order_number_key", () => {
-    const error = makePostgresError(
-      "23505",
-      'duplicate key value violates unique constraint "orders_order_number_key"',
-      "Key (order_number)=(ORD-001) already exists."
-    );
-    expect(parsePostgresError(error)).toBe("This order number is already in use");
-  });
-});
 
 // =============================================================================
 // parseUnknownError

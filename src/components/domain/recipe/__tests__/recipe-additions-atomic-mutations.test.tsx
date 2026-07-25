@@ -217,7 +217,7 @@ describe("atomic recipe-additions mutation call sites", () => {
       (button) => button.textContent?.includes("Save Changes"),
     );
     expect(save).toBeDefined();
-    expect(save).not.toBeDisabled();
+    expect(save?.disabled).toBe(false);
     await act(async () => save!.click());
     await flushUpdates();
 
@@ -239,6 +239,6 @@ describe("atomic recipe-additions mutation call sites", () => {
     );
     expect(mocks.toastSuccess).not.toHaveBeenCalled();
     expect(invalidate).not.toHaveBeenCalled();
-    expect(save).not.toBeDisabled();
+    expect(save?.disabled).toBe(false);
   });
 });

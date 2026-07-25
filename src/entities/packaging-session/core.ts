@@ -90,7 +90,6 @@ export const packagingSessionCore: EntityCoreInput<PackagingSession> = {
   table: "packaging_sessions",
   viewTable: "packaging_sessions_with_summary",
   displayName: "Packaging Session",
-  description: "Track kegging, canning, and bottling runs",
   domain: "production",
   basePath: "/production/packaging",
 
@@ -117,13 +116,6 @@ export const packagingSessionCore: EntityCoreInput<PackagingSession> = {
       foreignKey: "session_id",
       showInDetail: false, // Using custom component instead
     },
-  ],
-
-  queryExamples: [
-    "Show all packaging sessions this week",
-    "What sessions are in progress?",
-    "List completed sessions for January",
-    "Show sessions with line items for brand X",
   ],
 
   keyFields: ["session_date", "status"],

@@ -18,28 +18,23 @@ export const deliveryPresentation: EntityPresentation<DeliveryView> = {
     {
       accessorKey: "delivery_number",
       header: "Delivery #",
-      sortable: true,
     },
     {
       accessorKey: "scheduled_date",
       header: "Scheduled",
-      sortable: true,
       format: "date",
     },
     {
       accessorKey: "driver_name",
       header: "Driver",
-      sortable: true,
     },
     {
       accessorKey: "total_stops",
       header: "Stops",
-      sortable: true,
     },
     {
       accessorKey: "status",
       header: "Status",
-      sortable: true,
       render: (value) => (
         <StatusBadge
           status={value as string}

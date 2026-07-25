@@ -47,7 +47,6 @@ export const pricingTierPriceCore: EntityCoreInput<PricingTierPrice> = {
   name: "pricing_tier_price",
   table: "pricing_tier_prices",
   displayName: "Pricing Tier Price",
-  description: "Pricing matrix cells: one price per tier x format x channel",
   domain: "sales",
   // Inline-only: prices are managed via the pricing matrix at /settings/pricing.
   basePath: null,
@@ -82,12 +81,6 @@ export const pricingTierPriceCore: EntityCoreInput<PricingTierPrice> = {
       type: "belongsTo",
       foreignKey: "sales_channel_id",
     },
-  ],
-
-  queryExamples: [
-    "What is the retail price for cases in Tier 1?",
-    "Show all prices for the distributor channel",
-    "List prices for half barrel kegs across all tiers",
   ],
 
   keyFields: ["pricing_tier_id", "format_id", "sales_channel_id", "price"],

@@ -122,6 +122,6 @@ describe("BeerOrderSyncPanel", () => {
       (button) => button.textContent?.includes("Re-run preview with mappings"),
     );
     expect(repreviewButton).toBeDefined();
-    expect(repreviewButton).toBeDisabled();
+    expect(repreviewButton?.disabled).toBe(true);
   });
 });

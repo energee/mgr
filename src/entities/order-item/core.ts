@@ -49,7 +49,6 @@ export const orderItemCore: EntityCoreInput<OrderItem> = {
   table: "order_items",
   displayName: "Order Item",
   defaultSort: { column: "created_at", direction: "desc" },
-  description: "Line items on a sales order",
   domain: "sales",
   basePath: null,
 
@@ -77,12 +76,6 @@ export const orderItemCore: EntityCoreInput<OrderItem> = {
       foreignKey: "batch_id",
       showInDetail: false,
     },
-  ],
-
-  queryExamples: [
-    "Show items for order ORD-2025-001",
-    "List all line items with unit price over $10",
-    "Find items for IPA brand",
   ],
 
   keyFields: ["order_id", "brand_id", "style_id", "selling_format_id", "quantity", "unit_price", "keg_owner_id"],
