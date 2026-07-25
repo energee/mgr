@@ -14,7 +14,7 @@
  *   ingredient allocations (inventory_lot -> batch, status planned).
  * - The Complete action is intercepted so those planned allocations are
  *   flipped to completed alongside the status change (shared registry:
- *   services/transition-side-effects.ts).
+ *   the transition_entity_atomic RPC).
  */
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -266,7 +266,7 @@ export function BatchDetailClient({ id }: { id: string }) {
    * transitions status to completed (guarded on the loaded status so a
    * concurrent change by another user matches 0 rows instead of clobbering),
    * then runs the shared transition side effects
-   * (services/transition-side-effects.ts), which flip planned
+   * (the transition_entity_atomic RPC), which flip planned
    * inventory_lot→batch allocations to completed so ingredient inventory is
    * actually depleted.
    */

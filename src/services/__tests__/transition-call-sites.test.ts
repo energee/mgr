@@ -6,13 +6,13 @@
  * effects uses the shared transactional service. Mirrors the source-walking
  * idiom of entity-configs.test.ts (which walks the app router tree).
  *
- * Why: client-side `UPDATE` followed by `runTransitionSideEffects` can commit
+ * Why: client-side `UPDATE` followed by separate side-effect writes can commit
  * only half the operation. The shared service invokes transition_entity_atomic
  * so PostgreSQL owns rollback and retry safety.
  *
- * The side-effect table list is parsed from transition-side-effects.ts itself
- * (`table === "<name>"` matches), so registering a new effect automatically
- * extends enforcement to routes touching that table.
+ * The side-effect table list is the set of tables `transition_entity_atomic`
+ * (migration 00256) registers effects for; extend it when the RPC gains a new
+ * (table, toState) effect so enforcement covers routes touching that table.
  */
 
 import { readFileSync, readdirSync } from "node:fs";

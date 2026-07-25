@@ -185,7 +185,7 @@ export function OrderAllocation({
   // availability views subtract planned + completed allocations) until the
   // order transitions — `orders → fulfilled` completes them and stamps the
   // removed volume for TTB, `orders → cancelled` releases them (see
-  // src/services/transition-side-effects.ts).
+  // the transition_entity_atomic RPC).
   const allocateMutation = useMutation({
     mutationFn: async (entries: AllocationEntry[]) => {
       const validEntries = entries.filter((e) => e.quantity > 0);

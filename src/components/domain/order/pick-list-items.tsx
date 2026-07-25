@@ -8,7 +8,7 @@
  * Supports marking items as picked with quantity tracking, and once every
  * line is fully picked on an in-progress list, offers a "Complete Pick List"
  * button that transitions the list and runs the shared transition side
- * effects (services/transition-side-effects.ts), which also move the parent
+ * effects (the transition_entity_atomic RPC), which also move the parent
  * order picking → packed.
  *
  * Built for hands-on warehouse use (audit F-38):
