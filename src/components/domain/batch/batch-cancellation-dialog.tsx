@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BatchTerminationDialog - Cancel or Archive a batch
+ * BatchCancellationDialog - Cancel or Archive a batch
  *
  * Supports two modes based on batch status:
  * - Cancel: For planned batches that never started (no loss)
@@ -372,4 +372,3 @@ export function BatchCancellationDialog({
 }
 
 // Re-export with alias for backwards compatibility
-export { BatchCancellationDialog as BatchTerminationDialog };

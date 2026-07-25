@@ -71,24 +71,3 @@ export function DetailSkeleton({ sections = 3 }: { sections?: number }) {
     </div>
   );
 }
-
-/** Form loading shape: `fields` label+input pairs plus an actions row. */
-export function FormSkeleton({ fields = 6 }: { fields?: number }) {
-  return (
-    <div className="flex flex-1 flex-col gap-4">
-      <Skeleton className="h-8 w-56" />
-      <div className="grid gap-4">
-        {Array.from({ length: fields }).map((_, i) => (
-          <div key={i} className="space-y-1.5">
-            <Skeleton className="h-3 w-28" />
-            <Skeleton className="h-9 w-full" />
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-end gap-2">
-        <Skeleton className="h-9 w-20" />
-        <Skeleton className="h-9 w-24" />
-      </div>
-    </div>
-  );
-}

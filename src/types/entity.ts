@@ -950,19 +950,6 @@ export function getTransitionFieldsAction<T>(
   );
 }
 
-/**
- * Get the display color for a state from an entity config.
- * Falls back to "default" if not defined.
- */
-export function getStateColor<T>(
-  entity: EntityCoreInput<T>,
-  state: string | null | undefined
-): string {
-  if (!state) return "default";
-  const display = entity.stateMachine?.stateDisplay?.[state];
-  return display?.color || "default";
-}
-
 // =============================================================================
 // Value Display Helpers
 // =============================================================================
