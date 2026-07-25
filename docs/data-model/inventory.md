@@ -524,6 +524,32 @@ The allocations table provides data for TTB Form 5130.9 - Brewer's Report of Ope
 | Line 17 | Ending inventory | Calculated from movements |
 | Line 19 | Offsite premises | `destination_type='transfer'` to offsite location |
 
+### Removal Sources and Tax Class
+
+`get_ttb_removals_summary` (latest definition: migration 00274) reads completed
+allocations from **both** beer sources, and the source decides the tax class:
+
+| source_type | Tax class | Notes |
+|-------------|-----------|-------|
+| `finished_good` | `keg` / `bottled` | Derived from the container via `get_ttb_tax_class` |
+| `batch` | `cellar` | In-process beer; has no container, so the class is assigned explicitly |
+| `inventory_lot`, `external` | — | Raw materials and packaging components, never beer — excluded |
+
+Batch-sourced rows are only removals when the beer left the brewery. Rows with
+`destination_type` `finished_good` (packaging), `transfer` (inter-vessel move)
+or `batch` (blend) are internal movements and are excluded, so packaged volume
+is not deducted twice — once here and once by the production/packaging terms.
+
+Cellar losses are always written as `source_type='batch'`,
+`destination_type='loss'` — by `recordBatchLoss`
+(`src/services/consumption-service.ts`), by `archive_batch` (00069), and by the
+automatic completion reconciliation inside `transition_entity_atomic` (00256).
+Before 00274 the reader narrowed to `source_type='finished_good'`, so Line 14
+read 0.00 for all in-process beer (issue #603).
+
+Removals bucket into a month by `COALESCE(completed_at, created_at)` (00237),
+not `created_at` — see "Date Boundary Handling" below.
+
 ### Monthly Report Query
 
 ```sql
@@ -614,7 +640,10 @@ FROM inventory_as_of;
 
 TTB reports use calendar months. For allocations that span month boundaries:
 
-- Use `created_at` as the reporting date (when allocation was completed)
+- Use `COALESCE(completed_at, created_at)` as the reporting date — `completed_at`
+  is stamped at fulfillment, so a reservation created in June and fulfilled in
+  July reports in July (migration 00237); `created_at` is the fallback for
+  legacy rows completed before the stamp existed
 - For multi-day packaging sessions, each FG record has its own `created_at`
 - Transfers in-transit at month end: report when completed, not when started
 

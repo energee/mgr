@@ -21,7 +21,10 @@
  *   with destination_type='batch').
  * - Losses: source_type='batch', destination_type='loss', volume_bbl set —
  *   the same shape archive_batch_with_loss (00069) writes and the TTB report
- *   (00041) reads.
+ *   reads. That reader is get_ttb_removals_summary, which classifies
+ *   batch-sourced removals as the 'cellar' tax class (migration 00274; before
+ *   it the reader was narrowed to source_type='finished_good' and every cellar
+ *   loss was silently dropped from Form 5130.9 — issue #603).
  * - Recipe catalog items (malts/hops/...) have no FK to inventory_items;
  *   matching is best-effort by name (case-insensitive) + category, the same
  *   convention as calculate_material_shortfalls (migration 00163).
@@ -535,7 +538,9 @@ export async function consumePackagingMaterials(
 
 /**
  * Record a completed loss allocation against a batch
- * (source_type='batch', destination_type='loss'). Feeds the TTB losses line.
+ * (source_type='batch', destination_type='loss'). Feeds the TTB losses line
+ * (Form 5130.9 Line 14) under the `cellar` tax class — see
+ * get_ttb_removals_summary, migration 00274.
  */
 export async function recordBatchLoss(
   supabase: Client,
