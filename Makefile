@@ -18,7 +18,7 @@ SHELL := /bin/bash
         check-fast check check-all check-db check-wip check-coverage check-agent-config \
         verify-feature feature-mark \
         worktree worktree-list worktree-doctor \
-        db-generate db-generate-local db-migrate db-seed db-dry-run \
+        db-generate db-generate-local db-migrate db-seed db-dry-run db-local \
         clean
 
 help: ## List available targets
@@ -120,6 +120,9 @@ db-seed: ## Apply seed data
 
 db-dry-run: ## Boot fresh local Supabase, replay all migrations from scratch
 	@bash scripts/migration-dry-run.sh
+
+db-local: ## Zero-to-running local DB: reset + migrations + RLS role fixtures + demo data
+	@bash scripts/db-local.sh
 
 # Hygiene
 

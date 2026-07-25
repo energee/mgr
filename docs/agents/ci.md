@@ -23,6 +23,39 @@ There is no per-merge CI on main — the nightly build/E2E lane covers it.
 after 10 runs that never produced output (missing `--allowed-tools`); its
 replacement will be a scheduled agent, not a workflow.
 
+## Live apply and rollback
+
+CI never touches the live database. Migrations reach live only when a human
+runs `scripts/db-push.sh` (see [`gotchas.md`](gotchas.md)), so "merged" and
+"applied" are two separate events and can drift apart for days — issue #440
+is exactly that. When you merge a migration, say in the PR whether live has
+it yet.
+
+**There are no down migrations.** Rolling back means writing a new forward
+migration that reverses the change, numbered above the bad one, pushed the
+same way. Never edit or delete an applied migration file: the chain replayed
+by `db-lint.yml` and the `schema_migrations` version rows on live both key
+off the filename.
+
+Order of operations when a live migration goes bad:
+
+1. Confirm the damage against the catalog, not against intent — run
+   `scripts/check-live-drift.sh` (needs `SUPABASE_DB_URL`).
+2. Write the reversing migration; verify it with `make db-local` and
+   `make db-dry-run` before it goes anywhere near live.
+3. Push with `scripts/db-push.sh`, which refreshes the snapshot in the same
+   step. Commit the snapshot with the migration.
+4. Re-run `live-drift.yml` (`gh workflow run live-drift.yml`) and confirm it
+   is green before closing anything out.
+
+**The watchdog is only as live as its secret.** `SUPABASE_DB_URL` is a
+read-only connection string held as a repository secret; when it is rotated
+or expires, `live-drift.yml` fails with `password authentication failed`
+rather than reporting drift, and the repo has *no* net for out-of-band schema
+changes until it is restored. A failing live-drift run is therefore urgent
+even when the failure looks like plumbing. Scheduled runs fail loudly on a
+missing secret by design (a green cron with no secret would be worse).
+
 ## Rules when changing workflows
 
 1. Update `.github/scripts/ci-workflows.test.ts` in the same commit — it
