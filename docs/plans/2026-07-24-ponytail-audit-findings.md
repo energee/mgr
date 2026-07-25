@@ -4,6 +4,18 @@ Repo-wide "what can we delete / de-over-engineer" sweep. 10 area-hunter agents +
 knip completed; the **adversarial verification pass did not run** (hit the Fable 5
 usage limit). So every item below is a HUNTER CANDIDATE, not yet confirmed.
 
+> **STATUS 2026-07-25: verification pass complete.** See
+> `docs/progress/2026-07-25-ponytail-audit-cuts.md` and the twelve commits on
+> `chore/harness-gaps` (−6,147 lines, −4 deps). Items 1–4, 6, 7, 10–14, 25–29,
+> 32–36, 38, 39, 40 (nanoid half), 42 and 43 were confirmed and cut. Rejected on
+> verification: 35's `getYearOptions`, 11's `ConcurrentModificationError`, 28's
+> `InventoryOverview` type, 38's `isTokenExpired` class, 41 (radix umbrella —
+> `react-slot` resolves to two versions, so the swap is not behaviour-neutral),
+> 44 (the streamdown plugins are capabilities, not bloat), 45 (the
+> `src/lib/__tests__` suites are supersets of the `src/domain/__tests__` ones,
+> not copies) and 37's gravity half (different formulas — documented in place).
+> Not attempted: 5, 8, 9, 15–24, 30, 31, 36.
+
 **Next session: verify each candidate before cutting.** For each, ref-count with
 `rg` and check the registry (`src/entities/index.ts`, `src/entities/cores.ts`),
 entity presentation configs, `z.infer` usage, `Makefile`, `.github/workflows`,
