@@ -123,7 +123,6 @@ export type EntityDataTableProps<T = Record<string, unknown>> = {
   /** Base path for detail links (defaults to /{domain}/{table}) */
   basePath?: string;
   /** Additional query filters */
-  filters?: Record<string, unknown>;
   /** Whether to show create button */
   showCreate?: boolean;
   /** Custom create handler (instead of link) */
@@ -189,7 +188,6 @@ export function syncSelectionSnapshots<T>(
 export function EntityDataTable<T = Record<string, unknown>>({
   entity,
   basePath,
-  filters,
   showCreate = true,
   onCreateClick,
   onAction,
@@ -591,7 +589,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // set (selection itself is id-keyed and survives page flips, so there is
   // deliberately NO reset on pageIndex changes). JSON key avoids re-runs from
   // unstable array/object identities.
-  const filterResetKey = JSON.stringify({ urlFilters, debouncedSearch, filters });
+  const filterResetKey = JSON.stringify({ urlFilters, debouncedSearch });
   useEffect(() => {
     setRowSelection({});
     setMobilePages(1);
@@ -737,8 +735,8 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // Column projection — board view always fetches "*" (kanban card renderers
   // may read arbitrary fields); see buildSelectList for the safety rules.
   const selectList = useMemo(
-    () => (isBoardView ? "*" : buildSelectList(entity, filters, !!onAction)),
-    [entity, filters, onAction, isBoardView]
+    () => (isBoardView ? "*" : buildSelectList(entity, !!onAction)),
+    [entity, onAction, isBoardView]
   );
 
   // Fetch window for the current mode
@@ -757,7 +755,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const resolvedParams = useMemo<ResolvedListParams<T>>(
     () => ({
       fetchTable,
-      propFilters: filters,
       urlFilters: urlFilters as ExtendedColumnFilter<T>[],
       joinOperator,
       search: debouncedSearch || undefined,
@@ -767,7 +764,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       order: orderSpec,
       select: selectList,
     }),
-    [fetchTable, filters, urlFilters, joinOperator, debouncedSearch, fetchMode, rangeFrom, rangeTo, orderSpec, selectList]
+    [fetchTable, urlFilters, joinOperator, debouncedSearch, fetchMode, rangeFrom, rangeTo, orderSpec, selectList]
   );
 
   const { queryKey: listQueryKey, queryFn: listQueryFn } = listQueryOptions(
@@ -1243,7 +1240,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
               </div>
             }
           >
-            <DataTableAdvancedToolbar table={table}>
+            <DataTableAdvancedToolbar>
               {/* Global search */}
               {entity.searchableFields &&
                 entity.searchableFields.length > 0 && (
