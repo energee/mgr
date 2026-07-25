@@ -9,10 +9,15 @@ This is the single source of truth for agent instructions, shared by every harne
 
 ```bash
 make setup    # bun install + environment checks (one time, or whenever deps change)
+make db-local # local Supabase: reset + migrations + RLS role fixtures + demo data
 make dev      # start Next.js dev server
 ```
 
 If `make` is unavailable, fall back to `bun install && bun run dev`.
+
+`make db-local` is the zero-to-running path — it is what makes both the dev
+server and `bun run test:integration` work from a fresh clone. Skip it only
+if a local database is already seeded.
 
 ## Verification gate (Definition of Done)
 
@@ -66,6 +71,7 @@ Agent-facing quick-references (must-follow rules, code examples):
 | [`docs/agents/db-security.md`](docs/agents/db-security.md) | Writing SQL migrations |
 | [`docs/agents/ui-rules.md`](docs/agents/ui-rules.md) | Building or reviewing UI components |
 | [`docs/agents/debugging.md`](docs/agents/debugging.md) | Investigating any bug |
+| [`docs/agents/gotchas.md`](docs/agents/gotchas.md) | **Session start**, and whenever a command fails in a way that makes no sense |
 | [`docs/agents/process.md`](docs/agents/process.md) | Bug RGR, feature two-phase, worktrees, docs gate, guardrails |
 | [`docs/agents/dispatching-agents.md`](docs/agents/dispatching-agents.md) | Deciding when to spawn subagents and how to brief them |
 | [`PROGRESS.md`](PROGRESS.md) | **Session start** — current state, next steps (generated on main) |

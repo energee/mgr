@@ -119,9 +119,11 @@ DATABASE_URL=postgresql://… bun run test:integration
 
 The integration tests require a Postgres database with all migrations
 applied and `src/__tests__/integration/_fixtures/seed-roles.sql` seeded.
-CI provisions this automatically; for local runs use
-`supabase start` (full local stack) or any plain Postgres 15/16 instance
-with the bootstrapping that `.github/workflows/test.yml` performs.
+CI provisions this automatically; locally, `make db-local` does the same —
+it boots the local stack, replays the migration chain, and loads the role
+fixtures plus demo data, then prints the `DATABASE_URL` to use. Any plain
+Postgres 15/16 instance also works with the bootstrapping that
+`.github/workflows/db-lint.yml` performs.
 
 ---
 
