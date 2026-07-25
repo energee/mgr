@@ -87,13 +87,17 @@ export function QBOSyncSection({ entityType, entityId }: QBOSyncSectionProps) {
     staleTime: CACHE_DURATIONS.DYNAMIC_DATA,
   });
 
-  // Check sync status for this entity
-  const { data: syncLog, isLoading } = useQuery({
+  // Check sync status for this entity.
+  // A failed read must surface as `isError`, never as an empty log — reporting
+  // "Not Synced" for an entity that is already in QuickBooks invites a
+  // needless re-sync and hides the outage.
+  const { data: syncLog, isLoading, isError } = useQuery({
     queryKey: qboKeys.syncStatus(entityType, entityId),
     queryFn: async () => {
       const res = await fetch(
         `/api/integrations/quickbooks/sync-log?entityType=${entityType}&entityId=${entityId}&limit=1`
       );
+      if (!res.ok) throw new Error("Failed to read QuickBooks sync log");
       const json = await res.json();
       const logs = json.data?.logs || [];
       return logs[0] || null;
@@ -148,6 +152,11 @@ export function QBOSyncSection({ entityType, entityId }: QBOSyncSectionProps) {
           <div className="text-sm font-medium">QuickBooks</div>
           {isLoading ? (
             <Badge variant="outline">Checking...</Badge>
+          ) : isError ? (
+            <Badge variant="outline" className="gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Status unavailable
+            </Badge>
           ) : isSynced ? (
             <Badge variant="default" className="gap-1">
               <Check className="h-3 w-3" />
@@ -177,7 +186,11 @@ export function QBOSyncSection({ entityType, entityId }: QBOSyncSectionProps) {
           <RefreshCw
             className={`h-3.5 w-3.5 mr-1.5 ${syncMutation.isPending ? "animate-spin" : ""}`}
           />
-          {syncMutation.isPending ? "Syncing..." : isSynced ? "Re-sync" : "Sync"}
+          {syncMutation.isPending
+            ? "Syncing..."
+            : isSynced || isError
+              ? "Re-sync"
+              : "Sync"}
         </Button>
       </div>
 

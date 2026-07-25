@@ -4,7 +4,7 @@ import {
   errorResponse,
   validateBody,
 } from "@/lib/api";
-import { batchSchema } from "@/lib/schemas/batch";
+import { batchUpdateSchema } from "@/lib/schemas/batch";
 
 export const GET = withPermission("batches:read", async (request, { supabase, params }) => {
   const id = params?.id;
@@ -26,11 +26,31 @@ export const GET = withPermission("batches:read", async (request, { supabase, pa
   return successResponse(data);
 });
 
+/**
+ * Field-update surface only. A batch state change must go through
+ * `POST /api/batches/[id]/transfer`, which runs `transition_entity_atomic` so
+ * the status write and its side effects (vessel release, ingredient-allocation
+ * completion, loss reconciliation) commit or roll back together.
+ */
 export const PATCH = withPermission("batches:write", async (request, { supabase, params }) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Batch ID required", undefined, 400);
 
-  const body = await validateBody(batchSchema.partial(), request);
+  // Read the raw payload to tell a caller-supplied `status` apart from the
+  // schema's own default, then reject rather than silently dropping it — an
+  // explicit 400 tells an integrator its state change did not happen.
+  const submitted: unknown = await request.clone().json().catch(() => null);
+  if (submitted !== null && typeof submitted === "object" && "status" in submitted) {
+    return errorResponse(
+      "VALIDATION_ERROR",
+      "Batch status cannot be changed here. Use POST /api/batches/[id]/transfer, " +
+        "which runs the atomic transition and its side effects.",
+      undefined,
+      400
+    );
+  }
+
+  const body = await validateBody(batchUpdateSchema, request);
 
   const { data, error } = await supabase
     .from("batches")

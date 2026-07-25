@@ -62,6 +62,20 @@ Only **batches** and **recipes** have full REST API routes. All other entities u
 | Batches | GET `/api/batches` | POST `/api/batches` | GET `/api/batches/[id]` | PATCH `/api/batches/[id]` | DELETE `/api/batches/[id]` | `batches:read/write` |
 | Recipes | GET `/api/recipes` | POST `/api/recipes` | GET `/api/recipes/[id]` | PATCH `/api/recipes/[id]` | DELETE `/api/recipes/[id]` | `recipes:read/write` |
 
+PATCH and DELETE contracts:
+
+- **PATCH is a field-update surface only.** `PATCH /api/batches/[id]` rejects a
+  `status` field with `400 VALIDATION_ERROR`; batch state changes must go
+  through `POST /api/batches/[id]/transfer`, which runs
+  `transition_entity_atomic` so the status write and its side effects (vessel
+  release, ingredient-allocation completion, loss reconciliation) share one
+  transaction. Both PATCH routes apply only the fields the caller submitted —
+  the request schemas drop the `.default()`s that would otherwise reset
+  `batches.status`, `recipes.status`, and `recipes.is_active`.
+- **DELETE returns `204 No Content`** with an empty body. `DELETE
+  /api/recipes/[id]` still returns `409 CONFLICT` when batches reference the
+  recipe.
+
 ### Specialized Operations
 
 | Route | Method | Auth | Purpose |
@@ -100,7 +114,7 @@ Only **batches** and **recipes** have full REST API routes. All other entities u
 | `/api/integrations/quickbooks/accounts` | GET/PUT | `integrations:manage` | QBO account mappings |
 | `/api/integrations/quickbooks/sync` | POST | `integrations:manage` | Single entity sync |
 | `/api/integrations/quickbooks/sync/retry` | POST | `integrations:manage` | Retry failed sync |
-| `/api/integrations/quickbooks/sync-log` | GET | `integrations:manage` | Query sync log |
+| `/api/integrations/quickbooks/sync-log` | GET | `integrations:manage` | Query sync log (500 `DB_ERROR` on a failed read — never an empty list) |
 
 ### System
 

@@ -3,11 +3,17 @@
  *
  * GET: Query sync log with optional filters.
  * Query params: entityType, entityId, status, limit, offset
+ *
+ * Responses: 200 `{ logs, total }` on success (including a genuinely empty
+ * result), 500 `DB_ERROR` when the read fails. A failed read must never be
+ * reported as an empty log — consumers would render an already-synced entity
+ * as "Not Synced" and the outage would look like an empty table.
  */
 
 import { withPermission } from "@/lib/api/auth";
-import { successResponse } from "@/lib/api/response";
+import { successResponse, errorResponse } from "@/lib/api/response";
 import { createAdminClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 
 export const GET = withPermission("integrations:manage", async (request) => {
   const { searchParams } = new URL(request.url);
@@ -31,7 +37,16 @@ export const GET = withPermission("integrations:manage", async (request) => {
   const { data, error, count } = await query;
 
   if (error) {
-    return successResponse({ logs: [], total: 0 });
+    logger.error(
+      { err: error.message, entityType, entityId, status },
+      "Failed to read qbo_sync_log"
+    );
+    return errorResponse(
+      "DB_ERROR",
+      `Failed to read sync log: ${error.message}`,
+      undefined,
+      500
+    );
   }
 
   return successResponse({ logs: data || [], total: count || 0 });

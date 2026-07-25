@@ -221,6 +221,17 @@ describe("successResponse", () => {
     const response = successResponse({ id: "new-batch" }, undefined, 201);
     expect(response.status).toBe(201);
   });
+
+  // Null-body statuses reject a body at the Response-constructor level, so
+  // serializing one throws a TypeError that withAuth then reports as a 500 —
+  // after the handler's write already committed. DELETE routes rely on 204.
+  it.each([204, 205, 304])("builds a bodyless %i response", async (status) => {
+    const response = successResponse(null, undefined, status);
+
+    expect(response.status).toBe(status);
+    expect(response.body).toBeNull();
+    expect(await response.text()).toBe("");
+  });
 });
 
 describe("errorResponse", () => {
