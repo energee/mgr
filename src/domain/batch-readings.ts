@@ -5,6 +5,8 @@
  * for fermentation metrics (gravity, temp, pH, pressure, DO, diacetyl, clarity).
  */
 
+import { convertTemperature } from "@/domain/units";
+
 /**
  * Type of fermentation reading/measurement
  */
@@ -195,28 +197,18 @@ export function convertGravity(value: number, from: "sg" | "plato", to: "sg" | "
   return 259 / (259 - value);
 }
 
+// NOTE: this is the "259" approximation, NOT the ASBC cubic that
+// `@/domain/units` uses (sgToPlato / platoToSg). The two disagree by roughly
+// 0.06 Plato at SG 1.050, so they are deliberately NOT merged — picking one is
+// a brewing-data decision, not a refactor.
+
 /**
- * Convert temperature between Fahrenheit and Celsius
+ * Fahrenheit <-> Celsius conversion.
  *
- * @param value - The temperature value to convert
- * @param from - The source unit ("f" or "c")
- * @param to - The target unit ("f" or "c")
- * @returns The converted temperature value
- * @example
- * ```ts
- * convertTemperature(68, "f", "c")
- * // Returns: 20°C
- * ```
+ * Re-exported from `@/domain/units`, which owns the canonical implementation;
+ * this module used to carry a second, arithmetically identical copy.
  */
-export function convertTemperature(value: number, from: "f" | "c", to: "f" | "c"): number {
-  if (from === to) return value;
-
-  if (from === "f" && to === "c") {
-    return (value - 32) * (5 / 9);
-  }
-
-  return value * (9 / 5) + 32;
-}
+export { convertTemperature };
 
 /**
  * Format a reading value for display with appropriate precision and units.
