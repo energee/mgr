@@ -10,9 +10,10 @@
  * only half the operation. The shared service invokes transition_entity_atomic
  * so PostgreSQL owns rollback and retry safety.
  *
- * The side-effect table list is the set of tables `transition_entity_atomic`
- * (migration 00256) registers effects for; extend it when the RPC gains a new
- * (table, toState) effect so enforcement covers routes touching that table.
+ * The side-effect table list is PARSED out of migration 00256, so registering a
+ * new (table, toState) effect in `transition_entity_atomic` automatically
+ * extends enforcement to API routes touching that table — no list to update
+ * here, and no way for a new effect to slip past unenforced.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -23,9 +24,14 @@ const ROOT = resolve(__dirname, "../../..");
 const MIGRATION_PATH = join(ROOT, "supabase/migrations/00256_atomic_entity_transitions.sql");
 const API_ROOT = join(ROOT, "src/app/api");
 
-/** Tables with registered (table, toState) side effects, parsed from source. */
+/**
+ * Tables with registered (table, toState) side effects, parsed from migration
+ * 00256's `p_table_name = '<table>'` guards.
+ */
 function sideEffectTables(): string[] {
-  return ["batches", "packaging_sessions", "pick_lists", "orders", "deliveries"];
+  const migration = readFileSync(MIGRATION_PATH, "utf8");
+  const matches = migration.matchAll(/p_table_name\s*=\s*'([a-z_]+)'/g);
+  return [...new Set([...matches].map((m) => m[1]))];
 }
 
 /** All route.ts files under src/app/api, recursively. */
@@ -59,8 +65,16 @@ describe("Atomic transition call sites", () => {
   const routes = apiRouteFiles();
 
   it("sanity: registry tables parsed and API routes found", () => {
+    // Guards the parse itself — a regex regression would silently yield [] and
+    // make the enforcement test below pass vacuously.
     expect(tables).toEqual(
-      expect.arrayContaining(["batches", "packaging_sessions", "pick_lists", "orders"])
+      expect.arrayContaining([
+        "batches",
+        "packaging_sessions",
+        "pick_lists",
+        "orders",
+        "deliveries",
+      ])
     );
     expect(routes.length).toBeGreaterThan(0);
   });
@@ -99,9 +113,6 @@ describe("Atomic transition call sites", () => {
     expect(migration).toContain("CREATE OR REPLACE FUNCTION transition_entity_atomic");
     expect(migration).toContain("SECURITY INVOKER");
     expect(migration).toContain("SET search_path = public");
-    for (const table of tables) {
-      expect(migration, table).toContain(`p_table_name = '${table}'`);
-    }
     expect(migration).toContain("UPDATE vessels");
     expect(migration).toContain("UPDATE allocations");
     expect(migration).toContain("PERFORM transition_entity_atomic(");

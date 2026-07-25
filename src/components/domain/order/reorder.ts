@@ -30,7 +30,6 @@ import { orderKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
 import { localDateString } from "@/lib/format";
 import { log } from "@/lib/client-logger";
-import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 
 type Client = SupabaseClient<Database>;
 
@@ -49,6 +48,21 @@ const UNIQUE_VIOLATION = "23505";
 
 /** Matches the `-R{n}` suffix appended to duplicated order numbers. */
 const REORDER_SUFFIX_RE = /-R(\d+)$/;
+
+/**
+ * Escapes an order-number prefix for a PostgREST `.like()` probe.
+ *
+ * Unlike `escapeIlikePattern`, `*` is deliberately left alone: PostgREST
+ * rewrites `*` to `%` with no escape syntax, so escaping it would yield a
+ * literal-`%` pattern that matches nothing. Here "no match" is NOT a safe
+ * default — an empty `taken` list makes `nextDuplicateOrderNumber` hand back an
+ * order number that already exists. Letting `*` widen to `%` over-matches
+ * instead, which is harmless because `nextDuplicateOrderNumber` re-checks each
+ * row with `startsWith(base)`.
+ */
+function escapeLikePrefix(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
 
 /** Max header-insert attempts when racing another duplicate for a suffix. */
 const MAX_NUMBER_ATTEMPTS = 3;
@@ -164,7 +178,7 @@ export async function duplicateOrder(
   const { data: takenRows, error: takenError } = await supabase
     .from("orders")
     .select("order_number")
-    .like("order_number", `${escapeIlikePattern(base)}-R%`);
+    .like("order_number", `${escapeLikePrefix(base)}-R%`);
   if (takenError) throw takenError;
   const taken = (takenRows ?? []).map((r) => r.order_number);
 

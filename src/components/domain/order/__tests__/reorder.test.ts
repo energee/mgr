@@ -53,6 +53,7 @@ function createMockClient(script: MockScript) {
     itemInsertPayloads: [] as Record<string, unknown>[][],
     deletedOrderIds: [] as string[],
     rpcArgs: [] as Record<string, unknown>[],
+    takenPatterns: [] as string[],
   };
   let headerAttempt = 0;
 
@@ -64,7 +65,10 @@ function createMockClient(script: MockScript) {
             if (cols === "order_number") {
               // taken-suffix LIKE query
               return {
-                like: async () => script.taken ?? { data: [], error: null },
+                like: async (_col: string, pattern: string) => {
+                  calls.takenPatterns.push(pattern);
+                  return script.taken ?? { data: [], error: null };
+                },
               };
             }
             // source header lookup
@@ -317,6 +321,20 @@ describe("duplicateOrder", () => {
     const result = await duplicateOrder(client, "src-1");
     expect(result.id).toBe("new-order-1");
     expect(calls.itemInsertPayloads).toHaveLength(0);
+  });
+
+  it("escapes LIKE metacharacters in the taken-suffix probe but lets `*` widen", async () => {
+    // PostgREST rewrites `*` to `%` with no escape syntax: escaping it would
+    // make the probe match nothing, and an empty `taken` list hands back an
+    // order number that already exists (unique violation on insert).
+    const { client, calls } = createMockClient({
+      sourceOrder: {
+        data: { ...SOURCE_ORDER.data, order_number: "ORD_1*x%2" },
+        error: null,
+      },
+    });
+    await duplicateOrder(client, "src-1");
+    expect(calls.takenPatterns).toEqual(["ORD\\_1*x\\%2-R%"]);
   });
 });
 

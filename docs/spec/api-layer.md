@@ -99,7 +99,6 @@ Only **batches** and **recipes** have full REST API routes. All other entities u
 | `/api/integrations/quickbooks/status` | GET/POST | `integrations:manage` | QBO connection status |
 | `/api/integrations/quickbooks/accounts` | GET/PUT | `integrations:manage` | QBO account mappings |
 | `/api/integrations/quickbooks/sync` | POST | `integrations:manage` | Single entity sync |
-| `/api/integrations/quickbooks/sync/batch` | POST | `integrations:manage` | Bulk entity sync |
 | `/api/integrations/quickbooks/sync/retry` | POST | `integrations:manage` | Retry failed sync |
 | `/api/integrations/quickbooks/sync-log` | GET | `integrations:manage` | Query sync log |
 
@@ -110,7 +109,6 @@ Only **batches** and **recipes** have full REST API routes. All other entities u
 | `/api/auth/callback` | GET | None (public) | Supabase PKCE auth-code exchange |
 | `/api/auth/confirm` | GET | None (public) | Supabase email token-hash exchange with same-origin redirect |
 | `/api/health` | GET | None (public) | Health check |
-| `/api/dev/confirm-user` | POST | Env-gated | Dev-only: confirm user email |
 
 ## Known Inconsistencies
 

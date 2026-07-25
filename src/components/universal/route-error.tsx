@@ -19,9 +19,11 @@ type RouteErrorProps = {
   reset: () => void;
   /** Domain label shown in the error message, e.g. "production" */
   domain: string;
+  /** Target of the "Go Home" button. Defaults to the staff app root. */
+  homeHref?: string;
 }
 
-export function RouteError({ error, reset, domain }: RouteErrorProps) {
+export function RouteError({ error, reset, domain, homeHref = "/" }: RouteErrorProps) {
   const router = useRouter();
   useEffect(() => {
     Sentry.captureException(error);
@@ -39,7 +41,7 @@ export function RouteError({ error, reset, domain }: RouteErrorProps) {
         <p className="text-xs text-muted-foreground">Error ID: {error.digest}</p>
       )}
       <div className="flex gap-2">
-        <Button variant="outline" onClick={() => router.push("/")}>
+        <Button variant="outline" onClick={() => router.push(homeHref)}>
           Go Home
         </Button>
         <Button onClick={reset}>
