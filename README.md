@@ -1,5 +1,10 @@
 # MGR
 
+[![Test](https://github.com/energee/mgr/actions/workflows/test.yml/badge.svg)](https://github.com/energee/mgr/actions/workflows/test.yml)
+[![DB Lint](https://github.com/energee/mgr/actions/workflows/db-lint.yml/badge.svg)](https://github.com/energee/mgr/actions/workflows/db-lint.yml)
+[![last commit](https://img.shields.io/github/last-commit/energee/mgr)](https://github.com/energee/mgr/commits/main)
+[![open issues](https://img.shields.io/github/issues/energee/mgr)](https://github.com/energee/mgr/issues)
+
 A full-stack operations management system covering production, inventory, purchasing, sales, and compliance reporting. Built with an AI-first, config-driven architecture.
 
 ## Tech Stack
