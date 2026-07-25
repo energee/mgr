@@ -44,20 +44,25 @@ export default async function PortalLayout({
     redirect("/portal/login?error=account_disabled");
   }
 
-  // Find linked customers via junction table
+  // Find linked customers via junction table. Revoked links (revoked_at
+  // stamped by DELETE /api/customers/[id]/portal-users/[userId]) are not
+  // access — migration 00276 filters them out of the RLS predicates too.
   const { data: links, error: linksError } = await dynamicFrom(
     supabase,
     "customer_portal_users",
   )
     .select("customer_id, customers(id, name, email)")
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .is("revoked_at", null);
   if (linksError) throw linksError;
 
   let customers: PortalCustomer[] = (links ?? [])
     .map((l: { customers: PortalCustomer | null }) => l.customers)
     .filter((c: PortalCustomer | null): c is PortalCustomer => c != null);
 
-  // Auto-link by email on first login (no existing links).
+  // Auto-link by email on FIRST login only — a user with no junction row at
+  // all for a matching customer. A revoked row counts as a row, so revocation
+  // survives the next page load (issue #605).
   // Case-insensitive to match migration 00201's lower()=lower() role
   // assignment (audit DL-6): Supabase lowercases auth emails, so an exact
   // .eq() match misses customers stored with a mixed-case email — the user
@@ -70,6 +75,10 @@ export default async function PortalLayout({
       "customers",
     )
       .select("id, name, email")
+      // COALESCE(is_active, true), matching create_user_profile() (00201), the
+      // 00253 backfill, and the invite route's 409 for a deactivated customer.
+      // `not.is.false` is PostgREST's spelling: NULL still counts as active.
+      .not("is_active", "is", false)
       .ilike("email", escapeIlikePattern(user.email));
     if (candidatesError) throw candidatesError;
 
@@ -77,8 +86,22 @@ export default async function PortalLayout({
     // case-insensitive equality in JS: a pattern-escaping edge case must
     // never link the wrong customer.
     const authEmail = user.email.toLowerCase();
-    const matched = ((candidates ?? []) as Array<PortalCustomer & { email: string | null }>)
+    const emailMatched = ((candidates ?? []) as Array<PortalCustomer & { email: string | null }>)
       .filter((c) => c.email?.toLowerCase() === authEmail);
+
+    // Auto-link is provisioning, never re-provisioning: any existing row for
+    // this pair — including a revoked one, which the read above cannot see —
+    // is a decision already recorded, so leave it alone (issue #605).
+    const knownLinks = emailMatched.length === 0
+      ? []
+      : (await unwrap(
+          dynamicFrom(adminDb, "customer_portal_users")
+            .select("customer_id")
+            .eq("user_id", user.id)
+            .in("customer_id", emailMatched.map((c) => c.id)),
+        ) ?? []) as Array<{ customer_id: string }>;
+    const knownCustomerIds = new Set(knownLinks.map((link) => link.customer_id));
+    const matched = emailMatched.filter((c) => !knownCustomerIds.has(c.id));
 
     if (matched.length > 0) {
       const expectedLinks = matched.map((cust) => ({

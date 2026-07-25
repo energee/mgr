@@ -196,6 +196,9 @@ Portal users are linked to customers via `customer_portal_users` (junction table
 - One customer can have multiple portal users
 - Staff can invite, resend, and remove individual contacts from the customer's **Portal Access** section
 - Removing one link leaves that user's links to other customers unchanged
+- Removing access stamps `revoked_at` instead of deleting the row (migration `00276`, issue #605). The tombstone is what distinguishes "never linked" from "deliberately unlinked": the portal layout auto-links a matching email only when NO row exists for that customer/user pair, and every RLS policy derived from the junction requires `revoked_at IS NULL`
+- The auto-link ignores customers with `is_active = false`, matching the invite route's 409
+- Re-granting through the invite route clears `revoked_at`; it is the only path that does
 
 ### Change Request Cutoff
 

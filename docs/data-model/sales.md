@@ -29,6 +29,7 @@ Many-to-many junction linking auth users to customers for portal access.
 | customer_id | UUID | FK to customers (PK part 1) |
 | user_id | UUID | FK to auth.users (PK part 2) |
 | created_at | TIMESTAMPTZ | Created timestamp |
+| revoked_at | TIMESTAMPTZ | When staff revoked access; NULL = access granted |
 
 **Primary key:** (customer_id, user_id)
 
@@ -36,6 +37,24 @@ One customer can have multiple independently authenticated portal users, and
 one portal user can be linked to multiple customers. Staff manage these links
 from the customer's **Portal Access** section. Removing a link revokes access
 to that customer without deleting the user's other customer links.
+
+Revocation is a **tombstone, not a delete** (issue #605, migration `00276`):
+`DELETE /api/customers/[id]/portal-users/[userId]` stamps `revoked_at` and the
+row stays. A hard delete was silently undone — the portal layout's service-role
+auto-link reads "no row" as "first login" and re-created the link on the
+revoked user's next page load whenever their auth email matched
+`customers.email`. Consequences of the tombstone:
+
+- Every read filters `revoked_at IS NULL`: the portal layout, the Portal Access
+  list route, and the RLS policies `customer_portal_users_customer_select`,
+  `customer_orders_select`, `customer_order_items_select`,
+  `change_requests_customer_insert`, `customers_customer_select` and
+  `orders_customer_lock`.
+- The auto-link only provisions a customer with **no row at all** for that user,
+  and only when `COALESCE(is_active, true)` — matching `create_user_profile()`
+  and the invite route's 409 for a deactivated customer.
+- `POST /api/customers/[id]/invite` is the only path that clears `revoked_at`.
+  Revoking twice is idempotent (the update matches no un-revoked row).
 
 Portal provisioning verifies the returned active customer profile and this
 junction row before it sends a login OTP or reports success. First-login

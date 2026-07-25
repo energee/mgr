@@ -1,8 +1,11 @@
 /**
  * GET /api/customers/[id]/portal-users
  *
- * Lists the independently authenticated users linked to one customer. Email
- * and display data come from user_profiles, never auth.users.
+ * Lists the independently authenticated users who currently have access to one
+ * customer. Email and display data come from user_profiles, never auth.users.
+ * Revoked links keep their row as a tombstone (`revoked_at`, migration 00276)
+ * and are excluded here — the Portal Access panel must show granted access
+ * only.
  */
 import { withPermission } from "@/lib/api/auth";
 import { successResponse } from "@/lib/api/response";
@@ -36,6 +39,7 @@ export const GET = withPermission("customers:read", async (_request, { params })
   )
     .select("user_id, created_at")
     .eq("customer_id", customerId)
+    .is("revoked_at", null)
     .order("created_at", { ascending: true });
   if (linksError) throw linksError;
 
