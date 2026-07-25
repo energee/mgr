@@ -107,6 +107,55 @@ jobs:
           See the run log for the exact missing/changed objects. Maintained by \`.github/workflows/live-drift.yml\`; closed automatically on the next clean run."
           fi
 
+      # A watchdog that can only report "drift" has no way to say "I am blind".
+      # 19 of the last 20 scheduled runs failed this way (billing block, then
+      # connection failures) and produced no issue at all — the outage was
+      # visible only as a red run nobody opens. Infra failures now get their
+      # own tracking issue, distinct from real drift.
+      - name: Upsert watchdog-down issue on infra failure
+        if: failure() && steps.drift.outputs.drift != 'true' && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create watchdog-down --repo "$REPO" \
+            --color FBCA04 --description "A scheduled watchdog could not run" \
+            2>/dev/null || true
+          existing="$(gh issue list --repo "$REPO" --label watchdog-down --state open \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" \
+              --body "Still unable to check live drift: ${RUN_URL}"
+          else
+            gh issue create --repo "$REPO" \
+              --title "Live-drift watchdog is down (cannot reach the live catalog)" \
+              --label watchdog-down \
+              --body "The scheduled live-drift check failed before it could compare anything — a missing/rotated \`SUPABASE_DB_URL\`, a billing-blocked job, or a connection error: ${RUN_URL}
+
+          While this is open the repo has NO live-schema drift detection. Maintained by \`.github/workflows/live-drift.yml\`; closed automatically on the next run that completes a comparison."
+          fi
+
+      # Any run that produced a drift verdict (true OR false) proves the
+      # watchdog reached the database, so the outage issue closes even when
+      # the run is red for real drift.
+      - name: Close watchdog-down issue once a comparison completes
+        if: always() && steps.drift.outputs.drift != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          existing="$(gh issue list --repo "$REPO" --label watchdog-down --state open \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" \
+              --body "Drift comparison completed again: ${RUN_URL}. Closing."
+            gh issue close "$existing" --repo "$REPO"
+          fi
+
       - name: Close drift issue on clean run
         if: success() && steps.drift.outputs.drift == 'false'
         env:
