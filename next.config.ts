@@ -55,6 +55,10 @@ const nextConfig: NextConfig = {
   /** Disable the X-Powered-By: Next.js header to reduce fingerprinting surface. */
   poweredByHeader: false,
 
+  /** Pin the workspace root to this checkout so Turbopack stops guessing when
+   * multiple lockfiles exist (main repo + .agents/worktrees checkouts). */
+  turbopack: { root: __dirname },
+
   /** The Node XLSX reader includes an optional S3 adapter. Keep it external so
    * Turbopack does not require that unused AWS SDK path while bundling routes. */
   serverExternalPackages: ["read-excel-file"],
