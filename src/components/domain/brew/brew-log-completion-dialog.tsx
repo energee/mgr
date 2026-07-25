@@ -4,8 +4,18 @@
  * BrewLogCompletionDialog - 3-step wizard for completing a brew log
  *
  * Step 1: Review Measurements - shows key measurements from brew day events
- * Step 2: Assign Vessels - vessel assignment for each linked batch
- * Step 3: Confirm & Complete - review summary before finalizing
+ * Step 2: Assign Vessels - vessel assignment for each linked batch; a batch
+ *   already fermenting in a vessel is shown as such (no action pending)
+ * Step 3: Confirm & Complete - review summary before finalizing; each batch
+ *   is labelled with the action it will actually receive ("→ Fermenting in X"
+ *   vs. "Already fermenting in X")
+ *
+ * Submission is retry-safe (#600): each linked batch is handled independently,
+ * a batch already in `fermenting` is skipped instead of being re-transitioned
+ * (the state machine rejects fermenting -> fermenting), and per-batch failures
+ * are collected so one bad batch cannot skip the ones after it. The brew log is
+ * only marked `completed` once every batch succeeded, so a failed attempt can
+ * be re-run and will converge, processing only the outstanding batches.
  *
  * After completion, navigates to the first batch detail page.
  */
@@ -54,6 +64,7 @@ import { extractBrewMeasurements } from "@/domain/brew-events";
 import { useBrewMeasurementUnits } from "@/hooks/use-unit-preferences";
 import type { BrewEvent } from "@/types/domain";
 import { log } from "@/lib/client-logger";
+import { parseUnknownError } from "@/lib/errors";
 import { unwrap } from "@/lib/supabase/query-helpers";
 
 // =============================================================================
@@ -285,39 +296,68 @@ export function BrewLogCompletionDialog({
     setIsSubmitting(true);
 
     try {
-      // For each batch: assign vessel (if needed) + transition to fermenting
+      // For each batch: assign vessel (if needed) + transition to fermenting.
+      //
+      // Retry safety (#600): batches are handled independently and their
+      // failures collected, so one bad batch cannot skip the ones after it,
+      // and a batch already knocked out is a no-op rather than an error. That
+      // is what lets a re-run after a partial failure converge on completion
+      // instead of failing on whatever attempt #1 already committed.
+      const failures: string[] = [];
+      let movedCount = 0;
+
       for (const batch of linkedBatches) {
         const needsVesselAssignment = !batch.current_vessel_id;
         const assignedVesselId = vesselAssignments[batch.id];
+        // Already in the target state (knocked out earlier, or moved from the
+        // batch detail page) — nothing to do; a fermenting -> fermenting
+        // transition is rejected by the state machine.
+        const alreadyFermenting = batch.status === "fermenting";
 
-        if (needsVesselAssignment && assignedVesselId) {
-          // Find vessel name for the fermenter field
-          const vessel = availableVessels.find(
-            (v) => v.id === assignedVesselId
-          );
-          const vesselName = vessel?.name ?? "Unknown";
-          const volume = batch.link_volume_bbl ?? batch.volume_bbl ?? 0;
+        try {
+          if (needsVesselAssignment && assignedVesselId) {
+            // Find vessel name for the fermenter field
+            const vessel = availableVessels.find(
+              (v) => v.id === assignedVesselId
+            );
+            const vesselName = vessel?.name ?? "Unknown";
+            const volume = batch.link_volume_bbl ?? batch.volume_bbl ?? 0;
 
-          // Use the atomic RPC function that creates transfer + updates batch
-          await unwrap(
-            dynamicRpc(supabase, "start_batch_fermentation", {
-              p_batch_id: batch.id,
-              p_vessel_id: assignedVesselId,
-              p_volume_bbl: volume,
-              p_vessel_name: vesselName,
-            })
-          );
-        } else if (batch.current_vessel_id) {
-          const transition = await entityService.transition(
-            supabase,
-            batchEntity,
-            batch.id,
-            "fermenting"
-          );
-          if (!transition.success) {
-            throw new Error(formatServiceError(transition.error));
+            // Use the atomic RPC function that creates transfer + updates batch
+            await unwrap(
+              dynamicRpc(supabase, "start_batch_fermentation", {
+                p_batch_id: batch.id,
+                p_vessel_id: assignedVesselId,
+                p_volume_bbl: volume,
+                p_vessel_name: vesselName,
+              })
+            );
+            movedCount += 1;
+          } else if (batch.current_vessel_id && !alreadyFermenting) {
+            // Genuinely illegal targets (e.g. a conditioning batch) still fail
+            // loudly — the guard above only skips the already-in-target case.
+            const transition = await entityService.transition(
+              supabase,
+              batchEntity,
+              batch.id,
+              "fermenting"
+            );
+            if (!transition.success) {
+              throw new Error(formatServiceError(transition.error));
+            }
+            movedCount += 1;
           }
+        } catch (error) {
+          failures.push(
+            `${batch.batch_code}: ${parseUnknownError(error).message}`
+          );
         }
+      }
+
+      // Any outstanding batch keeps the brew log in_progress so the wizard can
+      // be re-run; the batches that did land are skipped on the next attempt.
+      if (failures.length > 0) {
+        throw new Error(failures.join("; "));
       }
 
       // Mark brew log as completed
@@ -342,8 +382,12 @@ export function BrewLogCompletionDialog({
       queryClient.invalidateQueries({ queryKey: vesselKeys.all() });
       queryClient.invalidateQueries({ queryKey: vesselKeys.transfers() });
 
+      // Report only the batches this run actually moved — already-fermenting
+      // ones were left untouched (#600).
       toast.success(
-        `Brew ${brewNumber} completed. ${linkedBatches.length} batch${linkedBatches.length !== 1 ? "es" : ""} moved to fermentation.`
+        movedCount === 0
+          ? `Brew ${brewNumber} completed.`
+          : `Brew ${brewNumber} completed. ${movedCount} batch${movedCount !== 1 ? "es" : ""} moved to fermentation.`
       );
 
       onOpenChange(false);
@@ -406,6 +450,9 @@ export function BrewLogCompletionDialog({
       <div className="space-y-3">
         {linkedBatches.map((batch) => {
           const hasVessel = !!batch.current_vessel_id;
+          // Already knocked out — the wizard will leave this batch alone, so
+          // say so rather than implying a pending transition (#600).
+          const alreadyFermenting = batch.status === "fermenting";
           const assignedVesselId = vesselAssignments[batch.id];
           const batchVessels = getAvailableVesselsForBatch(batch.id);
           const targetVolume =
@@ -436,7 +483,9 @@ export function BrewLogCompletionDialog({
                 {hasVessel ? (
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-muted-foreground">Vessel:</span>
+                    <span className="text-muted-foreground">
+                      {alreadyFermenting ? "Already fermenting in:" : "Vessel:"}
+                    </span>
                     <span className="font-medium">
                       {batch.current_vessel_name}
                     </span>
@@ -511,13 +560,22 @@ export function BrewLogCompletionDialog({
             : null;
           const vesselName =
             vessel?.name || batch.current_vessel_name || "\u2014";
+          // Mirrors the submit branches: a batch that is knocked out here gets
+          // a transition, one already fermenting is left untouched \u2014 so don't
+          // promise a transition that will not happen (#600).
+          const willKnockOut =
+            !batch.current_vessel_id && !!vesselAssignments[batch.id];
+          const alreadyFermenting =
+            batch.status === "fermenting" && !willKnockOut;
           return (
             <div key={batch.id} className="flex justify-between text-sm">
               <span className="text-muted-foreground">
                 {batch.batch_code}
               </span>
               <span className="font-medium">
-                &rarr; Fermenting in {vesselName}
+                {alreadyFermenting
+                  ? `Already fermenting in ${vesselName}`
+                  : `\u2192 Fermenting in ${vesselName}`}
               </span>
             </div>
           );
