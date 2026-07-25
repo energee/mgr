@@ -13,8 +13,11 @@ usage limit). So every item below is a HUNTER CANDIDATE, not yet confirmed.
 > `react-slot` resolves to two versions, so the swap is not behaviour-neutral),
 > 44 (the streamdown plugins are capabilities, not bloat), 45 (the
 > `src/lib/__tests__` suites are supersets of the `src/domain/__tests__` ones,
-> not copies) and 37's gravity half (different formulas — documented in place).
-> Not attempted: 5, 8, 9, 15–24, 30, 31, 36.
+> not copies), 37's gravity half (different formulas — documented in place), 5
+> (documented REST surface in docs/spec/api-layer.md, not accidental
+> duplication), 30, 31 and 36 (all have live consumers, or are the tested seam
+> for unit conversion). Also cut in the second pass: 8, 9, 16, 17, 20 and 31's
+> `filterable`. Still open: 15, 18, 19, 21–24.
 
 **Next session: verify each candidate before cutting.** For each, ref-count with
 `rg` and check the registry (`src/entities/index.ts`, `src/entities/cores.ts`),
