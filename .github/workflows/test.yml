@@ -183,6 +183,14 @@ jobs:
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
 
+      # Built here, after the local stack is up, because NEXT_PUBLIC_* values
+      # are inlined at build time — the `build` job's artifact is compiled
+      # against the hosted project and cannot serve this isolated database.
+      # Playwright then runs `bun start` against this build (playwright.config
+      # .ts) instead of dev-compiling every route on first hit.
+      - name: Build against the local stack
+        run: bun run build
+
       - name: Run E2E tests
         run: bun e2e
 

@@ -52,7 +52,11 @@ export default defineConfig({
   // already serving and must not trigger a local `bun dev` on :3000.
   ...(IS_LOCAL_TARGET && {
     webServer: {
-      command: "bun dev",
+      // CI serves the production build (test.yml builds it against the local
+      // Supabase stack first) so E2E exercises the artifact that ships, not a
+      // dev server compiling each route on first hit. Locally `bun dev` keeps
+      // the fast edit loop.
+      command: process.env.CI ? "bun start" : "bun dev",
       // Probe a lightweight route that also confirms the isolated database is
       // ready. Compiling the full root page exceeded Playwright's implicit
       // 60-second startup limit on a cold GitHub Actions runner.

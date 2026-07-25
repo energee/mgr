@@ -23,6 +23,19 @@ on:
   workflow_run:
     workflows: ["Test"]
     types: [completed]
+  # Testability: a watchdog whose only trigger is "a scheduled run went red"
+  # cannot be exercised on demand — it sat at 12/12 skipped runs having never
+  # once executed its real path. Dispatch drives the same logic with a
+  # supplied conclusion (default `success`, which is a no-op when no tracking
+  # issue is open).
+  workflow_dispatch:
+    inputs:
+      conclusion:
+        description: Simulated conclusion of the scheduled Test run
+        required: true
+        default: success
+        type: choice
+        options: [success, failure]
 
 permissions:
   issues: write
@@ -33,15 +46,18 @@ jobs:
     name: Track nightly result
     # Only scheduled runs matter: PR/dispatch failures already have an owner
     # (the PR author / the person who clicked run).
-    if: github.event.workflow_run.event == 'schedule'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       REPO: ${{ github.repository }}
-      WF_NAME: ${{ github.event.workflow_run.name }}
-      RUN_URL: ${{ github.event.workflow_run.html_url }}
-      CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      # Dispatch has no workflow_run context; fall back to the workflow this
+      # watchdog covers and to this run's own URL so the issue body still
+      # points at something real.
+      WF_NAME: ${{ github.event.workflow_run.name || 'Test' }}
+      RUN_URL: ${{ github.event.workflow_run.html_url || format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}
+      CONCLUSION: ${{ github.event.workflow_run.conclusion || inputs.conclusion }}
       LABEL: nightly-red
     steps:
       - name: Upsert or resolve tracking issue
