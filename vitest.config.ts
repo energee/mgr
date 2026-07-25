@@ -2,6 +2,13 @@ import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+// Deterministic timezone for the whole vitest process. Assigned here (config
+// module scope, main process, before any worker spawns) because Node re-runs
+// tzset() on a main-thread process.env.TZ assignment and the timezone is
+// process-global — worker threads therefore inherit it. See `test.env` below.
+const TEST_TZ = "America/New_York";
+process.env.TZ = TEST_TZ;
+
 // Shared exclude list for both projects (see `projects` below).
 const sharedExclude = [
   // Spread the defaults: a bare `exclude` REPLACES them, un-ignoring
@@ -38,16 +45,14 @@ export default defineConfig({
     // "date-only string renders a day early" behavior, which does not
     // reproduce under UTC.
     //
-    // WARNING: this pin is currently INERT under `pool: "threads"` (since
-    // PR #538) — Node worker threads share the parent process's timezone,
-    // and assigning process.env.TZ inside a worker does not re-run tzset(),
-    // so Date keeps the host zone (UTC in CI). Tracked in issue #568. Fix
-    // options: set TZ before any Date use in a context where it takes
-    // effect (a setupFiles/globalSetup assignment on the launching process,
-    // or TZ=America/New_York in the vitest invocation), or move the
-    // TZ-sensitive project to `pool: "forks"`. Kept as documentation of
-    // intent until #568 lands.
-    env: { TZ: "America/New_York" },
+    // This `env` entry alone is INERT under `pool: "threads"` (worker threads
+    // share the parent process's timezone, and assigning process.env.TZ
+    // inside a worker does not re-run tzset()). The load-bearing part is the
+    // TEST_TZ assignment at the top of this file, which runs on the main
+    // process before any worker spawns — timezone is process-global, so the
+    // threads inherit it. `env` is kept so the value is also correct under a
+    // fork/child-process runner. (issue #568)
+    env: { TZ: TEST_TZ },
     globals: true,
     // Worker threads instead of child-process forks: same isolation per test
     // file, but far cheaper worker startup and module transfer. Nothing in
