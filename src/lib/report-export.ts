@@ -272,19 +272,6 @@ function escapeHTML(input: string): string {
  */
 export function generateTTBPrintHTML(
   reportData: TTBReportData[],
-  totals: {
-    beginningInventory: number;
-    beerProduced: number;
-    totalAvailable: number;
-    taxpaidDomestic: number;
-    taxpaidExport: number;
-    taxFreeSamples: number;
-    losses: number;
-    destroyed: number;
-    totalRemovals: number;
-    endingInventory: number;
-    inProcessEnding: number;
-  },
   year: number,
   month: number,
   breweryName?: string
@@ -384,24 +371,11 @@ export function generateTTBPrintHTML(
  */
 export function openTTBPrintView(
   reportData: TTBReportData[],
-  totals: {
-    beginningInventory: number;
-    beerProduced: number;
-    totalAvailable: number;
-    taxpaidDomestic: number;
-    taxpaidExport: number;
-    taxFreeSamples: number;
-    losses: number;
-    destroyed: number;
-    totalRemovals: number;
-    endingInventory: number;
-    inProcessEnding: number;
-  },
   year: number,
   month: number,
   breweryName?: string
 ): void {
-  const html = generateTTBPrintHTML(reportData, totals, year, month, breweryName);
+  const html = generateTTBPrintHTML(reportData, year, month, breweryName);
   const printWindow = window.open("", "_blank");
   if (printWindow) {
     printWindow.document.write(html);
