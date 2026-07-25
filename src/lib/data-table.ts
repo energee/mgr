@@ -5,34 +5,22 @@ import type {
   FilterVariant,
 } from "@/types/data-table";
 
-export function getColumnPinningStyle<TData>({
+/**
+ * Inline style for a table header/cell.
+ *
+ * Column pinning is never enabled on any table, so this is just the sizing and
+ * stacking context TanStack expects: `width` from the column's measured size,
+ * plus an opaque background so sticky rows don't bleed through.
+ */
+export function getColumnStyle<TData>({
   column,
-  withBorder = false,
 }: {
   column: Column<TData>;
-  withBorder?: boolean;
 }): React.CSSProperties {
-  const isPinned = column.getIsPinned();
-  const isLastLeftPinnedColumn =
-    isPinned === "left" && column.getIsLastColumn("left");
-  const isFirstRightPinnedColumn =
-    isPinned === "right" && column.getIsFirstColumn("right");
-
   return {
-    boxShadow: withBorder
-      ? isLastLeftPinnedColumn
-        ? "-4px 0 4px -4px var(--border) inset"
-        : isFirstRightPinnedColumn
-          ? "4px 0 4px -4px var(--border) inset"
-          : undefined
-      : undefined,
-    left: isPinned === "left" ? `${column.getStart("left")}px` : undefined,
-    right: isPinned === "right" ? `${column.getAfter("right")}px` : undefined,
-    opacity: isPinned ? 0.97 : 1,
-    position: isPinned ? "sticky" : "relative",
+    position: "relative",
     background: "var(--background)",
     width: column.getSize(),
-    zIndex: isPinned ? 1 : undefined,
   };
 }
 
@@ -42,8 +30,6 @@ export function getFilterOperators(filterVariant: FilterVariant) {
     { label: string; value: FilterOperator }[]
   > = {
     text: dataTableConfig.textOperators,
-    number: dataTableConfig.numericOperators,
-    range: dataTableConfig.numericOperators,
     date: dataTableConfig.dateOperators,
     dateRange: dataTableConfig.dateOperators,
     boolean: dataTableConfig.booleanOperators,

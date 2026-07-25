@@ -12,7 +12,6 @@ import {
 import { parseAsStringEnum, useQueryState } from "nuqs";
 import * as React from "react";
 
-import { DataTableRangeFilter } from "@/components/data-table/data-table-range-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -528,7 +527,6 @@ function DataTableFilterItem<TData>({
           {onFilterInputRender({
             filter,
             inputId,
-            column,
             columnMeta,
             onFilterUpdate,
             showValueSelector,
@@ -558,7 +556,6 @@ function DataTableFilterItem<TData>({
 function onFilterInputRender<TData>({
   filter,
   inputId,
-  column,
   columnMeta,
   onFilterUpdate,
   showValueSelector,
@@ -566,7 +563,6 @@ function onFilterInputRender<TData>({
 }: {
   filter: ExtendedColumnFilter<TData>;
   inputId: string;
-  column: Column<TData>;
   columnMeta?: ColumnMeta<TData, unknown>;
   onFilterUpdate: (
     filterId: string,
@@ -590,33 +586,13 @@ function onFilterInputRender<TData>({
   }
 
   switch (filter.variant) {
-    case "text":
-    case "number":
-    case "range": {
-      if (
-        (filter.variant === "range" && filter.operator === "isBetween") ||
-        filter.operator === "isBetween"
-      ) {
-        return (
-          <DataTableRangeFilter
-            filter={filter}
-            column={column}
-            inputId={inputId}
-            onFilterUpdate={onFilterUpdate}
-          />
-        );
-      }
-
-      const isNumber =
-        filter.variant === "number" || filter.variant === "range";
-
+    case "text": {
       return (
         <Input
           id={inputId}
-          type={isNumber ? "number" : filter.variant}
+          type="text"
           aria-label={`${columnMeta?.label} filter value`}
           aria-describedby={`${inputId}-description`}
-          inputMode={isNumber ? "numeric" : undefined}
           placeholder={columnMeta?.placeholder ?? "Enter a value..."}
           className="h-8 w-full rounded"
           defaultValue={

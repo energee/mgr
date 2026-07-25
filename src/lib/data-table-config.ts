@@ -9,17 +9,6 @@ export const dataTableConfig = {
     { label: "Is empty", value: "isEmpty" as const },
     { label: "Is not empty", value: "isNotEmpty" as const },
   ],
-  numericOperators: [
-    { label: "Is", value: "eq" as const },
-    { label: "Is not", value: "ne" as const },
-    { label: "Is less than", value: "lt" as const },
-    { label: "Is less than or equal to", value: "lte" as const },
-    { label: "Is greater than", value: "gt" as const },
-    { label: "Is greater than or equal to", value: "gte" as const },
-    { label: "Is between", value: "isBetween" as const },
-    { label: "Is empty", value: "isEmpty" as const },
-    { label: "Is not empty", value: "isNotEmpty" as const },
-  ],
   dateOperators: [
     { label: "Is", value: "eq" as const },
     { label: "Is not", value: "ne" as const },
@@ -28,7 +17,6 @@ export const dataTableConfig = {
     { label: "Is on or before", value: "lte" as const },
     { label: "Is on or after", value: "gte" as const },
     { label: "Is between", value: "isBetween" as const },
-    { label: "Is relative to today", value: "isRelativeToToday" as const },
     { label: "Is empty", value: "isEmpty" as const },
     { label: "Is not empty", value: "isNotEmpty" as const },
   ],
@@ -54,8 +42,6 @@ export const dataTableConfig = {
   ],
   filterVariants: [
     "text",
-    "number",
-    "range",
     "date",
     "dateRange",
     "boolean",
@@ -76,7 +62,6 @@ export const dataTableConfig = {
     "gt",
     "gte",
     "isBetween",
-    "isRelativeToToday",
   ] as const,
   joinOperators: ["and", "or"] as const,
 };
