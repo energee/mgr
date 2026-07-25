@@ -1,19 +1,8 @@
-/**
- * Pricing Layout
- *
- * Provides page metadata so browser tabs display "Pricing | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Pricing",
-};
+/** Page metadata for the pricing route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Pricing" };
 
-export default function PricingLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

@@ -1,19 +1,8 @@
-/**
- * Status Options Layout
- *
- * Provides page metadata so browser tabs display "Status Options | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Status Options",
-};
+/** Page metadata for the status-options route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Status Options" };
 
-export default function StatusOptionsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

@@ -1,19 +1,8 @@
-/**
- * Recipes Layout
- *
- * Provides page metadata so browser tabs display "Recipes | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Recipes",
-};
+/** Page metadata for the recipes route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Recipes" };
 
-export default function RecipesLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

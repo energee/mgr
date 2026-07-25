@@ -1,19 +1,8 @@
-/**
- * Deliveries Layout
- *
- * Provides page metadata so browser tabs display "Deliveries | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Deliveries",
-};
+/** Page metadata for the deliveries route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Deliveries" };
 
-export default function DeliveriesLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

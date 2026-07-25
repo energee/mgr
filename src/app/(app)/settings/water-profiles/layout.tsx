@@ -1,19 +1,8 @@
-/**
- * Water Profiles Layout
- *
- * Provides page metadata so browser tabs display "Water Profiles | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Water Profiles",
-};
+/** Page metadata for the water-profiles route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Water Profiles" };
 
-export default function WaterProfilesLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

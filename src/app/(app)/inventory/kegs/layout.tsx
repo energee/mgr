@@ -1,19 +1,8 @@
-/**
- * Kegs Layout
- *
- * Provides page metadata so browser tabs display "Kegs | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Kegs",
-};
+/** Page metadata for the kegs route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Kegs" };
 
-export default function KegsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

@@ -1,19 +1,8 @@
-/**
- * TTB Report Layout
- *
- * Provides page metadata so browser tabs display "TTB Report | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "TTB Report",
-};
+/** Page metadata for the ttb route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "TTB Report" };
 
-export default function TtbReportLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

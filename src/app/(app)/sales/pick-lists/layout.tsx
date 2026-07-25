@@ -1,19 +1,8 @@
-/**
- * Pick Lists Layout
- *
- * Provides page metadata so browser tabs display "Pick Lists | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Pick Lists",
-};
+/** Page metadata for the pick-lists route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Pick Lists" };
 
-export default function PickListsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

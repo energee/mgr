@@ -1,19 +1,8 @@
-/**
- * Finished Goods Layout
- *
- * Provides page metadata so browser tabs display "Finished Goods | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Finished Goods",
-};
+/** Page metadata for the finished-goods route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Finished Goods" };
 
-export default function FinishedGoodsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

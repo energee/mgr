@@ -1,19 +1,8 @@
-/**
- * Allocations Layout
- *
- * Provides page metadata so browser tabs display "Allocations | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Allocations",
-};
+/** Page metadata for the allocations route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Allocations" };
 
-export default function AllocationsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }

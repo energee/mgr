@@ -1,19 +1,8 @@
-/**
- * Suppliers Layout
- *
- * Provides page metadata so browser tabs display "Suppliers | MGR".
- */
-
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Suppliers",
-};
+/** Page metadata for the suppliers route; the layout itself is a pass-through. */
+export const metadata: Metadata = { title: "Suppliers" };
 
-export default function SuppliersLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }
