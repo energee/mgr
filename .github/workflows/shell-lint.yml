@@ -1,17 +1,13 @@
 name: Shell Lint
 
+# PR-only, matching db-lint.yml's rationale: squash merge lands the tree the
+# PR run already validated, so a push-to-main re-run adds no signal.
 on:
   pull_request:
     paths:
-      - "scripts/*.sh"
+      - "scripts/**"
       - ".github/workflows/shell-lint.yml"
-      - ".github/workflows/live-drift.yml"
-  push:
-    branches: [main]
-    paths:
-      - "scripts/*.sh"
-      - ".github/workflows/shell-lint.yml"
-      - ".github/workflows/live-drift.yml"
+  workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,6 +20,7 @@ jobs:
   shell-lint:
     name: Shell Syntax and ShellCheck
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -34,7 +31,21 @@ jobs:
       - name: Lint shell scripts
         run: |
           set -euo pipefail
-          for script in scripts/*.sh; do
+          # Select by shebang, not by extension: the sanctioned worktree tool
+          # `scripts/agent-worktree` is extensionless bash, and the old
+          # `scripts/*.sh` glob also missed scripts/__tests__/*.sh.
+          mapfile -t files < <(
+            git ls-files -z -- scripts \
+              | xargs -0 grep -lE '^#!.*\b(bash|sh)\b' 2>/dev/null \
+              | sort
+          )
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::No shell scripts found — the selection is broken, not the tree."
+            exit 1
+          fi
+          printf 'Linting %d script(s):\n' "${#files[@]}"
+          printf '  %s\n' "${files[@]}"
+          for script in "${files[@]}"; do
             bash -n "$script"
           done
-          shellcheck -S warning scripts/*.sh
+          shellcheck -S warning "${files[@]}"

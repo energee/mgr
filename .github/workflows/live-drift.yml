@@ -35,6 +35,9 @@ jobs:
   live-drift:
     name: Live catalog vs migration chain
     runs-on: ubuntu-latest
+    # Opens a network connection to the live database; a hung psql must not
+    # sit on the 6-hour job default.
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

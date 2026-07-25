@@ -11,7 +11,7 @@ workflow change, or the unit suite fails.
 |---|---|---|
 | `test.yml` | Every PR to main (docs-only included — required checks must always report) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-agent-config` + dependency audit. Build + Playwright E2E run only on the weekday-nightly schedule / `workflow_dispatch`, not per-PR. |
 | `db-lint.yml` | PR touching `supabase/migrations/**` or `supabase/config.toml` | Replays the full migration chain from scratch (`ON_ERROR_STOP`) and runs the RLS integration tests against it. |
-| `shell-lint.yml` | PR touching `scripts/*.sh` | shellcheck. No database, no build. |
+| `shell-lint.yml` | PR touching `scripts/**` | `bash -n` + shellcheck over every shebang-bearing file under `scripts/` (selection is by shebang, not extension, so extensionless scripts like `scripts/agent-worktree` are covered). No database, no build. |
 | `live-drift.yml` | Daily schedule + dispatch | Watchdog comparing the live database catalog to `supabase/live-catalog.snapshot.txt` — catches out-of-band drift no PR would surface. Missing/changed objects FAIL; additions WARN. |
 | `nightly-watch.yml` | `workflow_run` completion of scheduled Test runs | Opens/updates ONE `nightly-red` tracking issue when the nightly fails; closes it on the next green run. |
 | `progress.yml` | Push to main touching `docs/progress/**` | Regenerates `PROGRESS.md` via `scripts/build-progress.sh` and lands it through an auto-merged bot PR. This is why PROGRESS.md must never be edited on a branch (AGENTS.md constraint 18). |
@@ -21,7 +21,7 @@ workflow change, or the unit suite fails.
 | `bug-patrol.yml` | Nightly schedule + dispatch | Finds ONE small high-confidence bug in recent changes, fixes it, opens one `bug-patrol` PR. |
 | `feedback-distill.yml` | Weekly schedule + dispatch | Deterministic loop scoreboard (`loop-scoreboard.ts`), then harvests recurring corrections into ONE docs-only `feedback-distill` PR proposing promotions AND retirements. |
 | `quality-regrade.yml` | Weekly schedule (Mon) + dispatch | Re-grades `docs/agents/quality.md` from measured evidence into ONE docs-only `quality-regrade` PR — the improvement loop's steering signal. |
-| `claude.yml` | `@claude` mention in issue/PR comments | On-demand Claude runs against the repo. |
+| `claude.yml` | `@claude` mention in issue/PR comments | On-demand Claude runs against the repo. Needs `contents`/`pull-requests`/`issues: write` — the action posts a tracking comment before doing any work, so read-only permissions fail it on the first API call. Safety comes from the insider gate (`OWNER`/`MEMBER`/`COLLABORATOR`), not from withholding write. |
 
 There is no per-merge CI on main — the nightly build/E2E lane covers it.
 

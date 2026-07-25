@@ -29,10 +29,16 @@ jobs:
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # claude-code-action posts a tracking comment before it does any work, so
+    # issues/pull-requests must be `write` — with `read` the action fails on
+    # its first API call. The read-only variant shipped in #572 was never
+    # exercised (no @claude mention has triggered a non-skipped run since),
+    # which is why the breakage went unnoticed. The insider gate above is what
+    # keeps these writes safe on a public repo.
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write
+      pull-requests: write
+      issues: write
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:

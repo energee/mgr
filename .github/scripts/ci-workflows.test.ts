@@ -6,21 +6,15 @@ function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
 }
 
-const workflows = [
-  ".github/workflows/bug-patrol.yml",
-  ".github/workflows/claude.yml",
-  ".github/workflows/db-lint.yml",
-  ".github/workflows/feedback-distill.yml",
-  ".github/workflows/health-audit.yml",
-  ".github/workflows/hygiene.yml",
-  ".github/workflows/live-drift.yml",
-  ".github/workflows/nightly-watch.yml",
-  ".github/workflows/progress.yml",
-  ".github/workflows/quality-regrade.yml",
-  ".github/workflows/sentry-harness.yml",
-  ".github/workflows/shell-lint.yml",
-  ".github/workflows/test.yml",
-];
+// Derived, not hardcoded: the SHA-pinning and durable-outcome contracts below
+// iterate this list, so a hand-maintained array silently exempts every workflow
+// added after it was last updated — the two contracts that most need to cover
+// new files were the two that wouldn't have.
+const WORKFLOW_DIR = ".github/workflows";
+const workflows = readdirSync(resolve(process.cwd(), WORKFLOW_DIR))
+  .filter((file) => file.endsWith(".yml") || file.endsWith(".yaml"))
+  .map((file) => `${WORKFLOW_DIR}/${file}`)
+  .sort();
 
 describe("GitHub Actions performance contracts", () => {
   it("uses the current checkout and artifact action generations", () => {
@@ -109,6 +103,10 @@ describe("GitHub Actions performance contracts", () => {
   // full 40-hex commit SHA (tag recorded as a trailing comment). Dependabot
   // keeps the SHAs current.
   it("pins all non-actions/* actions to full commit SHAs", () => {
+    // Guard the derivation itself: a bad cwd would make every loop below
+    // vacuously pass.
+    expect(workflows.length).toBeGreaterThanOrEqual(13);
+
     for (const path of workflows) {
       const lines = read(path).split("\n");
       for (const line of lines) {
@@ -224,7 +222,8 @@ describe("GitHub Actions performance contracts", () => {
   // ci.md (forward ratchet; the table itself is the backward migration).
   it("keeps docs/agents/ci.md covering every workflow file", () => {
     const doc = read("docs/agents/ci.md");
-    for (const file of readdirSync(resolve(process.cwd(), ".github/workflows"))) {
+    for (const path of workflows) {
+      const file = path.slice(WORKFLOW_DIR.length + 1);
       expect(doc, `${file} is missing from docs/agents/ci.md`).toContain(file);
     }
   });
