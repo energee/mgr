@@ -29,6 +29,9 @@ jobs:
   supabase-reset:
     name: Fresh Supabase Migration Replay
     runs-on: ubuntu-latest
+    # Docker-backed; a wedged `supabase start` would otherwise hold a PR check
+    # open for the 6-hour job default.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -48,6 +51,7 @@ jobs:
   db-lint:
     name: Database Lint and Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     services:
       postgres:
