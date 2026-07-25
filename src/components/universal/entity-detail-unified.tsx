@@ -183,12 +183,9 @@ export type EntityDetailUnifiedProps<T = Record<string, unknown>> = {
   entity: EntityConfig<T>;
   id?: string; // undefined = create mode
   basePath?: string;
-  backUrl?: string;
-  showEdit?: boolean; // default true
   onAction?: (actionName: string, data: T) => boolean;
   defaultValues?: Partial<T>; // For create mode
   /** Field names that should be rendered as disabled (read-only) */
-  disabledFields?: string[];
   /** Callback when any form field value changes. Use setFieldValue to update other fields. */
   onFieldChange?: (
     fieldName: string,
@@ -519,11 +516,8 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
   entity,
   id,
   basePath,
-  backUrl,
-  showEdit = true,
   onAction,
   defaultValues,
-  disabledFields,
   onFieldChange,
   storePrefill,
 }: EntityDetailUnifiedProps<T> & {
@@ -544,7 +538,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
     ? DOMAIN_WRITE_PERMISSIONS[entity.domain]
     : undefined;
   const hasWritePermission = writePermission ? can(writePermission) : true;
-  const canEdit = showEdit && !!entity.formSchema && hasWritePermission;
+  const canEdit = !!entity.formSchema && hasWritePermission;
 
   const fetchTable = entity.viewTable || entity.table;
   const sections = useMemo(() => {
@@ -885,7 +879,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
     if (form.formState.isDirty) {
       pendingDiscardRef.current = () => {
         if (isCreateMode) {
-          router.push(backUrl || path);
+          router.push(path);
         } else {
           form.reset();
           setEditing(false);
@@ -895,12 +889,12 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
       return;
     }
     if (isCreateMode) {
-      router.push(backUrl || path);
+      router.push(path);
       return;
     }
     form.reset();
     setEditing(false);
-  }, [form, isCreateMode, router, backUrl, path]);
+  }, [form, isCreateMode, router, path]);
 
   // ---------------------------------------------------------------------------
   // Save handler
@@ -1127,8 +1121,8 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
       switch (e.key) {
         case "Backspace":
           e.preventDefault();
-          if (confirmDirtyNavigation(() => router.push(backUrl || path))) {
-            router.push(backUrl || path);
+          if (confirmDirtyNavigation(() => router.push(path))) {
+            router.push(path);
           }
           break;
 
@@ -1151,7 +1145,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [editing, router, path, backUrl, handleCancel, startEditing, form.formState.isDirty]);
+  }, [editing, router, path, handleCancel, startEditing, form.formState.isDirty]);
 
   // ---------------------------------------------------------------------------
   // Rendering guards
@@ -1424,7 +1418,6 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
           isCreateMode={isCreateMode}
           form={form}
           optionsMap={optionsMap}
-          disabledFields={disabledFields}
         />
       ) : (
         <div className="space-y-4">
@@ -1436,7 +1429,6 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
             isCreateMode={isCreateMode}
             form={form}
             optionsMap={optionsMap}
-            disabledFields={disabledFields}
           />
         </div>
       )}
@@ -1561,7 +1553,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
             });
             // `path` already factors in the basePath prop, the entity
             // config's basePath, and the conventional derivation.
-            router.push(backUrl ?? path);
+            router.push(path);
           }}
         />
       )}
@@ -1584,7 +1576,6 @@ function UnifiedTabsWithRelations<T>({
   isCreateMode,
   form,
   optionsMap,
-  disabledFields,
 }: {
   tabs: [string, UnifiedSectionDef<T>[]][];
   relationTabs: EntityRelationDef[];
@@ -1596,7 +1587,6 @@ function UnifiedTabsWithRelations<T>({
   isCreateMode: boolean;
   form: UseFormReturn<Record<string, unknown>>;
   optionsMap: Record<string, { value: string; label: string }[]>;
-  disabledFields?: string[];
 }) {
   // Deep-linking: `?tab=` selects the initial tab (a section tab name or a
   // relation name, e.g. ?tab=order_items); unknown values fall back to
@@ -1649,7 +1639,6 @@ function UnifiedTabsWithRelations<T>({
           isCreateMode={isCreateMode}
           form={form}
           optionsMap={optionsMap}
-          disabledFields={disabledFields}
         />
       </TabsContent>
 
@@ -1663,7 +1652,6 @@ function UnifiedTabsWithRelations<T>({
             isCreateMode={isCreateMode}
             form={form}
             optionsMap={optionsMap}
-            disabledFields={disabledFields}
           />
         </TabsContent>
       ))}
@@ -1701,7 +1689,6 @@ function UnifiedSectionCard<T>({
   isCreateMode = false,
   form,
   optionsMap = {},
-  disabledFields,
 }: {
   section: UnifiedSectionDef<T>;
   data: T;
@@ -1710,7 +1697,6 @@ function UnifiedSectionCard<T>({
   isCreateMode?: boolean;
   form?: UseFormReturn<Record<string, unknown>>;
   optionsMap?: Record<string, { value: string; label: string }[]>;
-  disabledFields?: string[];
 }) {
   const relationDisplayValues = useRelationDisplayValues(section.fields, data);
 
@@ -1787,7 +1773,6 @@ function UnifiedSectionCard<T>({
           isCreateMode={isCreateMode}
           form={form}
           optionsMap={optionsMap}
-          disabledFields={disabledFields}
           relationDisplayValues={relationDisplayValues}
         />
       </CardContent>
@@ -1807,7 +1792,6 @@ type FieldGridProps<T> = {
   isCreateMode: boolean;
   form?: UseFormReturn<Record<string, unknown>>;
   optionsMap?: Record<string, { value: string; label: string }[]>;
-  disabledFields?: string[];
   relationDisplayValues: Record<string, string>;
 };
 
@@ -1858,19 +1842,15 @@ function FieldGridDl<T>({
   isCreateMode,
   form,
   optionsMap = {},
-  disabledFields,
   relationDisplayValues,
 }: FieldGridProps<T>) {
   return (
     <dl className="grid grid-cols-12 gap-4">
       {fields?.map((field) => {
-        const effectiveField = disabledFields?.includes(field.name)
-          ? { ...field, disabled: true }
-          : field;
         return (
           <UnifiedField
             key={field.name}
-            field={effectiveField as UnifiedFieldDef<Record<string, unknown>>}
+            field={field as UnifiedFieldDef<Record<string, unknown>>}
             editing={editing}
             isCreateMode={isCreateMode}
             form={editing ? (form as UseFormReturn<Record<string, unknown>>) : undefined}
@@ -1897,7 +1877,6 @@ type SectionRenderProps<T> = {
   isCreateMode: boolean;
   form?: UseFormReturn<Record<string, unknown>>;
   optionsMap?: Record<string, { value: string; label: string }[]>;
-  disabledFields?: string[];
 }
 
 /**
@@ -1952,7 +1931,6 @@ function FieldSectionGroup<T>({
   isCreateMode,
   form,
   optionsMap = {},
-  disabledFields,
 }: SectionRenderProps<T> & { sections: UnifiedSectionDef<T>[] }) {
   return (
     <Card>
@@ -1968,7 +1946,6 @@ function FieldSectionGroup<T>({
               isCreateMode={isCreateMode}
               form={form}
               optionsMap={optionsMap}
-              disabledFields={disabledFields}
               showDivider={idx > 0}
             />
           ))}
@@ -1991,7 +1968,6 @@ function InlineFieldSection<T>({
   isCreateMode,
   form,
   optionsMap = {},
-  disabledFields,
   showDivider,
 }: SectionRenderProps<T> & {
   section: UnifiedSectionDef<T>;
@@ -2008,7 +1984,6 @@ function InlineFieldSection<T>({
       isCreateMode={isCreateMode}
       form={form}
       optionsMap={optionsMap}
-      disabledFields={disabledFields}
       relationDisplayValues={relationDisplayValues}
     />
   );

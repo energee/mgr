@@ -352,9 +352,6 @@ export type EntityColumnDef<T> = Omit<ColumnDef<T, unknown>, "accessorKey"> & {
   /** Whether this column is sortable */
   sortable?: boolean;
 
-  /** Whether this column is filterable */
-  filterable?: boolean;
-
   /** Custom render function */
   render?: (value: unknown, row: T) => ReactNode;
 
