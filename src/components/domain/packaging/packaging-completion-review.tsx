@@ -14,7 +14,12 @@
  * 2. Transition the session to "completed" (DB trigger creates finished goods).
  * 3. Material depletion (9.2): consume selling_format_materials BOM lines x
  *    actual quantity from inventory lots (FIFO, completed allocations,
- *    destination = the line item's batch) via consumePackagingMaterials.
+ *    destination = the line item's batch). This happens inside the same
+ *    transaction as step 2 — `transition_entity_atomic` (00256) does it, keyed
+ *    'pkg_session:<id>' for idempotency; the client makes no separate
+ *    depletion call. Whole-unit (each/case) demand recovers the exact BOM
+ *    ratio and ceils the per-(batch, item) group total once, matching the
+ *    preview shown above (00279 / issue #616).
  * 4. Source-batch follow-up (audit Q4, findings 14 + 20): completing the
  *    session does NOT complete its source batches — they can be packaged
  *    across multiple sessions, so batch completion stays opt-in. After the

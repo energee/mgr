@@ -9154,6 +9154,7 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           created_by: string | null
+          default_bin_id: string | null
           id: string | null
           line_count: number | null
           notes: string | null

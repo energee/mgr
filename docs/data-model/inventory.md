@@ -110,6 +110,17 @@ Bill-of-materials (BOM) for selling formats. Each row defines how much of a give
 
 **Usage:** Used by `calculate_packaging_material_demand()` and `calculate_material_shortfalls()` to project how much packaging material will be consumed by planned packaging sessions.
 
+**Whole-unit consumption (`each` / `case` items):** `quantity_per_unit` is `DECIMAL(10,4)`, so the "1 per 24" a user enters in the BOM editor is stored as `0.0417` — strictly larger than 1/24. Multiplying the raw decimal and ceiling the product over-draws (`ceil(240 * 0.0417) = 11` cases against a true 10), so every implementation must recover the exact integer ratio first and ceil the **per-(batch, inventory_item) group total once**:
+
+| Layer | Function |
+|-------|----------|
+| TypeScript (reference) | `computeBomConsumption` — `src/domain/consumption-planning.ts` (ratio via `ratioFromDecimal`) |
+| SQL, unceiled core | `exact_material_qty(qpu, units)` — migration 00279 |
+| SQL, ceiled | `whole_unit_material_qty(qpu, units)` = `ceil(exact_material_qty(...) - 1e-9)` — 00217, rebuilt on the core in 00279 |
+| Completion depletion | `transition_entity_atomic` sums `exact_material_qty` per line and ceils the group total — 00279 (issue #616; 00256 ceiled the raw decimal) |
+
+Parity across the layers is pinned by the shared fixture table `src/test/whole-unit-parity-fixtures.ts`, asserted on the TS side in `src/domain/__tests__/consumption-planning.test.ts` and on the SQL side in `src/__tests__/integration/packaging-material-consumption.test.ts`. Bulk (mass/volume) materials stay unceiled and proportional.
+
 ---
 
 ## `allocations`

@@ -28,8 +28,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import fs from "node:fs";
-import path from "node:path";
+import { parseSchemaColumns } from "@/test/schema-columns";
 
 // Mirrors core-registry.test.ts: a few cores transitively touch the Supabase
 // browser client (enum-value/core.ts → @/lib/supabase/client). Stub it at
@@ -49,28 +48,12 @@ import { coreRegistry } from "@/entities/cores";
 // =============================================================================
 
 /**
- * Parses src/types/supabase.ts and returns relation name → set of Row column
- * names, covering both Tables and Views. Used to verify that the columns each
- * core sorts/reads on actually exist on the queried relation.
+ * Relation name → set of Row column names, parsed from the generated
+ * src/types/supabase.ts (Tables and Views). Used to verify that the columns
+ * each core sorts/reads on actually exist on the queried relation. The parser
+ * is shared with src/entities/__tests__/section-fields-schema-sync.test.ts,
+ * which runs the same class of check over editable section fields (#612).
  */
-function parseSchemaColumns(): Map<string, Set<string>> {
-  const schemaPath = path.resolve(process.cwd(), "src/types/supabase.ts");
-  const src = fs.readFileSync(schemaPath, "utf8");
-  const relations = new Map<string, Set<string>>();
-
-  // Matches `      relation_name: {\n        Row: { ...columns... }`
-  const relationRe = /\n {6}(\w+): \{\n {8}Row: \{([\s\S]*?)\n {8}\}/g;
-  let match: RegExpExecArray | null;
-  while ((match = relationRe.exec(src)) !== null) {
-    const cols = new Set<string>();
-    for (const line of match[2].split("\n")) {
-      const colMatch = line.match(/^ {10}(\w+)\??:/);
-      if (colMatch) cols.add(colMatch[1]);
-    }
-    relations.set(match[1], cols);
-  }
-  return relations;
-}
 
 const schemaColumns = parseSchemaColumns();
 
