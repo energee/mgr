@@ -913,4 +913,75 @@ describe("inventory sync (bin-driven)", () => {
       expect.objectContaining({ itemId: "brand-1/fmt-1" }),
     ]);
   });
+
+  // #610: the timestamp is the operator's "the push landed" signal. Stamping it
+  // at a fixed point in the happy path recorded "the handler reached step 6"
+  // instead — an expired Square token produced a fresh "Inventory: <now>" while
+  // nothing reached the POS.
+  it("withholds last_inventory_sync_at when the push to Square failed (#610)", async () => {
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1", location_id: "loc-1" }],
+        error: null,
+      },
+      square_catalog_map: {
+        data: [{ brand_id: "brand-1", selling_format_id: "fmt-1", square_catalog_id: "SQ-VAR-1" }],
+        error: null,
+      },
+      selling_formats: { data: [{ id: "fmt-1" }], error: null },
+      sellable_inventory: {
+        data: [
+          { bin_id: "bin-1", location_id: "loc-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5, source: "packaged" },
+        ],
+        error: null,
+      },
+      square_sync_log: { data: null, error: null },
+    });
+    // pushInventoryCounts never throws on a Square API error — it catches per
+    // chunk and reports success: false.
+    mockedPushInventoryCounts.mockResolvedValue({
+      success: false,
+      itemsSynced: 0,
+      itemsFailed: 1,
+      errors: [{ itemId: "SQ-VAR-1", error: "UNAUTHORIZED" }],
+    });
+
+    const res = await inventoryPOST(req());
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.success).toBe(false);
+    expect(mockedUpdateSquareSettings).not.toHaveBeenCalled();
+  });
+
+  it("records a hard inventory failure distinguishably from a clean no-op run (#610)", async () => {
+    useTables({
+      bins: {
+        data: [{ id: "bin-1", name: "Bin 1", square_location_id: "SQ-LOC-1", location_id: "loc-1" }],
+        error: null,
+      },
+      square_catalog_map: {
+        data: [{ brand_id: "brand-1", selling_format_id: "fmt-1", square_catalog_id: "SQ-VAR-1" }],
+        error: null,
+      },
+      selling_formats: { data: [{ id: "fmt-1" }], error: null },
+      sellable_inventory: {
+        data: [
+          { bin_id: "bin-1", location_id: "loc-1", brand_id: "brand-1", selling_format_id: "fmt-1", quantity: 5, source: "packaged" },
+        ],
+        error: null,
+      },
+      square_sync_log: { data: null, error: null },
+    });
+    mockedPushInventoryCounts.mockRejectedValue(new Error("square exploded"));
+
+    const res = await inventoryPOST(req());
+    expect(res.status).toBe(500);
+    const logRow = inserted().find((i) => i.table === "square_sync_log")!.row as {
+      items_failed: number;
+      details: { error: string };
+    };
+    // items_failed: 0 made this row read as a clean no-op in Recent Activity.
+    expect(logRow.items_failed).toBeGreaterThan(0);
+    expect(logRow.details.error).toBe("square exploded");
+    expect(mockedUpdateSquareSettings).not.toHaveBeenCalled();
+  });
 });

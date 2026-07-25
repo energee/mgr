@@ -62,7 +62,19 @@ type OversoldLine = {
 };
 
 type AtomicIngestResult = {
-  kind: "processed" | "duplicate" | "in_flight" | "manual_reconcile" | "ignored";
+  // `sale_missing` (#607): a COMPLETED refund whose sale_ingest claim does not
+  // exist YET. The RPC records it durably and this route asks Square to
+  // redeliver, so a sale that lands later still gets its reversal.
+  // `ignored` is legacy — the pre-00277 refund function returned it for the
+  // same situation and dropped the event; it is kept so a deployment running
+  // an older function body is still acknowledged rather than 503-looped.
+  kind:
+    | "processed"
+    | "duplicate"
+    | "in_flight"
+    | "manual_reconcile"
+    | "sale_missing"
+    | "ignored";
   retry_after_seconds?: number;
   oversold_lines?: OversoldLine[];
   items_synced?: number;
@@ -71,7 +83,8 @@ type AtomicIngestResult = {
 
 type PaymentIngestResult =
   | { kind: "processed"; oversoldLines: OversoldLine[] }
-  | { kind: "in_flight"; retryAfterSeconds: number };
+  | { kind: "in_flight"; retryAfterSeconds: number }
+  | { kind: "sale_missing"; retryAfterSeconds: number };
 
 function resolveNotificationUrl(): string {
   const explicit = process.env.SQUARE_WEBHOOK_URL;
@@ -93,6 +106,19 @@ function handlerResult(
     return {
       kind: "in_flight",
       retryAfterSeconds: Math.max(1, result.retry_after_seconds ?? 1),
+    };
+  }
+  if (result.kind === "sale_missing") {
+    // Durable on the RPC side (a completed refund_ingest row flagged
+    // state=sale_missing), retryable on this side. Never a bare 200 — that is
+    // what permanently dropped the reversal before #607.
+    log.warn(
+      { order_id: context.orderId, claim_id: context.claimId },
+      "Square refund arrived before its sale was ingested; recorded and asking Square to redeliver",
+    );
+    return {
+      kind: "sale_missing",
+      retryAfterSeconds: Math.max(1, result.retry_after_seconds ?? 900),
     };
   }
   if (result.kind === "manual_reconcile") {
@@ -180,15 +206,25 @@ export async function POST(request: NextRequest) {
             },
           );
         }
-        oversoldLines = result?.oversoldLines ?? [];
+        oversoldLines = result?.kind === "processed" ? result.oversoldLines : [];
         break;
       }
       case "refund.created":
       case "refund.updated": {
         const result = await handleCompletedRefund(event);
-        if (result?.kind === "in_flight") {
+        if (result?.kind === "in_flight" || result?.kind === "sale_missing") {
+          // 503 + Retry-After keeps the event on Square's redelivery schedule.
+          // The horizon is bounded by the replay-window check above: once the
+          // event is older than PAYMENT_REPLAY_WINDOW_MS it is acknowledged
+          // 200 instead of looping, and the RPC's durable sale_missing log row
+          // is the operator's reconciliation trace from then on (#607).
           return NextResponse.json(
-            { error: "refund_claim_in_flight" },
+            {
+              error:
+                result.kind === "in_flight"
+                  ? "refund_claim_in_flight"
+                  : "refund_sale_missing",
+            },
             {
               status: 503,
               headers: { "Retry-After": String(result.retryAfterSeconds) },

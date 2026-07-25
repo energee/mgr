@@ -27,6 +27,10 @@ import { ClaudeIcon } from "@/components/ui/claude-icon";
 import { SquareIcon } from "@/components/ui/square-icon";
 import { QuickBooksIcon } from "@/components/ui/quickbooks-icon";
 import { SlackIntegrationCard } from "@/components/domain/shared/slack-integration-card";
+import {
+  squareSyncOutcome,
+  type SquareCombinedSyncData,
+} from "@/integrations/square/sync-outcome";
 import { mongodbKeys, qboKeys, squareKeys } from "@/lib/query-keys";
 import { CACHE_DURATIONS } from "@/lib/constants";
 
@@ -240,18 +244,27 @@ function SquareIntegrationCard() {
     },
   });
 
-  // Sync mutation
+  // Sync mutation. The combined route reports a partial sync as 200 with
+  // `data.inventory.success === false`, so `res.ok` is NOT the outcome — an
+  // expired Square token used to produce a green "Square sync completed" toast
+  // over an inventory push that landed nothing (#610). squareSyncOutcome owns
+  // the branch; this mirrors the reconcileDraftSales pattern below.
   const syncMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/square/sync", { method: "POST" });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error?.message || "Sync failed");
       }
-      return res.json();
+      return data.data as SquareCombinedSyncData;
     },
-    onSuccess: () => {
-      toast.success("Square sync completed");
+    onSuccess: (data) => {
+      const outcome = squareSyncOutcome(data);
+      if (outcome.level === "warning") {
+        toast.warning(outcome.message);
+      } else {
+        toast.success(outcome.message);
+      }
       queryClient.invalidateQueries({ queryKey: squareKeys.all() });
     },
     onError: (err: Error) => {

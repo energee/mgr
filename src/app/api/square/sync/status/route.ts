@@ -42,9 +42,16 @@ export const GET = withPermission("integrations:manage", async () => {
   // 3b. Staged keg pours not yet converted into TTB removals (BD-2). Drives
   //     the "Reconcile draft sales" badge. dynamicFrom: reconciled_at (00243)
   //     is not in the generated types yet.
+  //     BOTH predicates are load-bearing and must stay identical to the
+  //     reconciler's driving query (api/square/reconcile-draft-sales,
+  //     `.is("reconciled_at", null).is("voided_at", null)`). A refund-voided
+  //     pour is terminal — nothing ever stamps its reconciled_at — so counting
+  //     it left the badge permanently on with no admin action able to clear it
+  //     (#608).
   const { count: unreconciledDraftSales } = await dynamicFrom(admin, "square_draft_sales")
     .select("id", { count: "exact", head: true })
-    .is("reconciled_at", null);
+    .is("reconciled_at", null)
+    .is("voided_at", null);
 
   // 4. POS-config surface: bins that are outbound Square sync targets (both
   //    square_location_id and pos_sales_channel_id set), with their Square

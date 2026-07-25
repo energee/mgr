@@ -314,9 +314,17 @@ export const POST = withPermission("integrations:manage", async (_request, { use
       allErrors.push(...br.errors);
     }
 
-    // 6. Update last_inventory_sync_at
+    // 6. Update last_inventory_sync_at — ONLY when the push actually landed
+    //    (#610). pushInventoryCounts never throws on a Square API error; it
+    //    catches per chunk and reports success: false, so this used to stamp a
+    //    fresh "Inventory: <now>" on the settings card while an expired token
+    //    meant nothing reached the POS. The timestamp now records "counts
+    //    reached Square", not "the handler got this far"; a no-work run
+    //    (totalFailed 0, nothing to push) still counts as landed.
     const completedAt = new Date().toISOString();
-    await updateSquareSettings({ last_inventory_sync_at: completedAt });
+    if (totalFailed === 0) {
+      await updateSquareSettings({ last_inventory_sync_at: completedAt });
+    }
 
     // 7. Log to square_sync_log — ONE batched insert of the per-bin rows (E2).
     //    A failed log write must not fail the sync (the push to Square already
