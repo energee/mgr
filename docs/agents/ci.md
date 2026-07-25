@@ -9,19 +9,32 @@ workflow change, or the unit suite fails.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `test.yml` | PR to main (skips docs-only diffs) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-agent-config` + dependency audit. Build + Playwright E2E run only on the weekday-nightly schedule / `workflow_dispatch`, not per-PR. |
+| `test.yml` | Every PR to main (docs-only included — required checks must always report) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-agent-config` + dependency audit. Build + Playwright E2E run only on the weekday-nightly schedule / `workflow_dispatch`, not per-PR. |
 | `db-lint.yml` | PR touching `supabase/migrations/**` or `supabase/config.toml` | Replays the full migration chain from scratch (`ON_ERROR_STOP`) and runs the RLS integration tests against it. |
 | `shell-lint.yml` | PR touching `scripts/*.sh` | shellcheck. No database, no build. |
 | `live-drift.yml` | Daily schedule + dispatch | Watchdog comparing the live database catalog to `supabase/live-catalog.snapshot.txt` — catches out-of-band drift no PR would surface. Missing/changed objects FAIL; additions WARN. |
+| `nightly-watch.yml` | `workflow_run` completion of scheduled Test runs | Opens/updates ONE `nightly-red` tracking issue when the nightly fails; closes it on the next green run. |
 | `progress.yml` | Push to main touching `docs/progress/**` | Regenerates `PROGRESS.md` via `scripts/build-progress.sh` and lands it through an auto-merged bot PR. This is why PROGRESS.md must never be edited on a branch (AGENTS.md constraint 18). |
+| `hygiene.yml` | Weekly schedule | Report-only branch hygiene summary (merged/stale branches). Never deletes anything. |
 | `sentry-harness.yml` | Weekday schedule + dispatch | Scores recent Sentry errors and dispatches up to 3 Claude fix jobs (45-min cap each). |
 | `health-audit.yml` | Weekly schedule + dispatch | Read-only Claude audit job → separate publisher job with `issues: write` files deduplicated issues. See [`health-audit-and-issue-triage.md`](health-audit-and-issue-triage.md). |
+| `bug-patrol.yml` | Nightly schedule + dispatch | Finds ONE small high-confidence bug in recent changes, fixes it, opens one `bug-patrol` PR. |
+| `feedback-distill.yml` | Weekly schedule + dispatch | Deterministic loop scoreboard (`loop-scoreboard.ts`), then harvests recurring corrections into ONE docs-only `feedback-distill` PR proposing promotions AND retirements. |
+| `quality-regrade.yml` | Weekly schedule (Mon) + dispatch | Re-grades `docs/agents/quality.md` from measured evidence into ONE docs-only `quality-regrade` PR — the improvement loop's steering signal. |
 | `claude.yml` | `@claude` mention in issue/PR comments | On-demand Claude runs against the repo. |
 
 There is no per-merge CI on main — the nightly build/E2E lane covers it.
-`quality-regrade.yml` (weekly quality.md regrade) was removed 2026-07-24
-after 10 runs that never produced output (missing `--allowed-tools`); its
-replacement will be a scheduled agent, not a workflow.
+
+**Durable-outcome gate.** Every workflow that invokes `claude-code-action` on
+a schedule must end in `.github/actions/require-durable-outcome` (PR produced,
+evidence-cited quiet run, or the job goes red) or carry a `durable-state:
+exempt` comment naming the deterministic step that owns its outcome instead.
+Contract-tested. This exists because a silently dead agent run is otherwise
+indistinguishable from a quiet night: `quality-regrade.yml` v1 ran 10 times
+producing nothing (missing `--allowed-tools`) before anyone noticed, and the
+sentry harness once failed the same way. The gate also echoes
+`worker-epoch: model=<id>` into each run's step summary — see
+[`improvement-loop.md`](improvement-loop.md) for what to do when it changes.
 
 ## Live apply and rollback
 
@@ -60,12 +73,13 @@ missing secret by design (a green cron with no secret would be worse).
 
 1. Update `.github/scripts/ci-workflows.test.ts` in the same commit — it
    asserts action versions, trigger shapes, and job structure per workflow.
-2. **Prefer a scheduled agent or local cron over a new Actions workflow when
-   the job is generative or iterative** (LLM-driven grading, fix loops,
-   report writing). Actions workflows suit deterministic gates with crisp
-   pass/fail output; generative jobs are hard to observe and debug in
-   Actions, fail silently when tool permissions are wrong, and are better
-   run where a human or coordinating agent sees the transcript.
+2. **Generative jobs may run as Actions workflows only with the full harness:**
+   bounded turns + timeout, an explicit `--allowedTools` list (the missing
+   allowlist is what silently killed quality-regrade v1), never merging, and
+   the `require-durable-outcome` gate so a dead run goes red. Reserve local
+   scheduled agents for work that genuinely needs local state (autoharness's
+   pipx/OAuth shim); everything else belongs in the repo where the operating
+   knowledge is versioned and any agent can repair it.
 3. Keep write permissions out of analysis jobs: follow `health-audit.yml`'s
    split (read-only audit job → minimal publisher job).
 4. Scheduled prompts must not interpolate event-derived text (PR titles,

@@ -111,6 +111,18 @@ jobs:
             --disallowedTools "Edit,Write,MultiEdit,NotebookEditCell,WebFetch,WebSearch"
             --json-schema '{"type":"object","additionalProperties":false,"properties":{"executive_verdict":{"type":"string","minLength":10,"maxLength":2000},"focus":{"type":"string","minLength":3,"maxLength":500},"findings":{"type":"array","maxItems":8,"items":{"type":"object","additionalProperties":false,"properties":{"dedupe_key":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$","minLength":5,"maxLength":100},"title":{"type":"string","minLength":12,"maxLength":160},"severity":{"type":"string","enum":["critical","high","medium"]},"type":{"type":"string","enum":["account-provisioning","authorization","data-lifecycle","dependency-security","deployment-drift","dev-artifact","documentation","maintenance","migration-drift","production-runtime","quality-gate","silent-failure","test-infrastructure","transaction-integrity","upstream-tooling"]},"summary":{"type":"string","minLength":20,"maxLength":3000},"root_cause":{"type":"string","minLength":20,"maxLength":5000},"evidence":{"type":"array","minItems":1,"maxItems":12,"items":{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","minLength":1,"maxLength":300},"line":{"type":"integer","minimum":1},"explanation":{"type":"string","minLength":10,"maxLength":2000}},"required":["path","line","explanation"]}},"impact":{"type":"string","minLength":20,"maxLength":3000},"failure_scenario":{"type":"string","minLength":20,"maxLength":4000},"tests_miss":{"type":"string","minLength":20,"maxLength":3000},"duplicate_search":{"type":"string","minLength":10,"maxLength":2000},"confidence":{"type":"string","enum":["high","medium"]},"assumptions":{"type":"array","maxItems":10,"items":{"type":"string","minLength":1,"maxLength":2000}},"remediation":{"type":"array","minItems":2,"maxItems":2,"items":{"type":"string","minLength":10,"maxLength":3000}}},"required":["dedupe_key","title","severity","type","summary","root_cause","evidence","impact","failure_scenario","tests_miss","duplicate_search","confidence","assumptions","remediation"]}},"investigated_but_rejected":{"type":"array","maxItems":30,"items":{"type":"string","minLength":1,"maxLength":2000}},"notable_strengths":{"type":"array","maxItems":30,"items":{"type":"string","minLength":1,"maxLength":2000}}},"required":["executive_verdict","focus","findings","investigated_but_rejected","notable_strengths"]}'
 
+      # durable-state: exempt — the deterministic publish job is this loop's
+      # durable-outcome gate: it consumes the schema-validated report
+      # (publish-health-audit.ts throws on a missing/malformed
+      # HEALTH_AUDIT_REPORT), so a silent audit fails the publisher red.
+      # Echo-only call records the worker epoch (this loop rides the
+      # action-default model; a changed id here = new epoch).
+      - name: Record worker epoch
+        if: steps.plan.outputs.should_run == 'true'
+        uses: ./.github/actions/require-durable-outcome
+        with:
+          execution-file: ${{ steps.audit.outputs.execution_file }}
+
   publish:
     name: Validate and publish findings
     needs: audit

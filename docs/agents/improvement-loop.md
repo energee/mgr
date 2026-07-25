@@ -11,8 +11,14 @@ workflow — extend one of these loops instead if it fits.
 | [Sentry harness](../sentry-harness-setup.md) | Weekdays (17:00 UTC) | Production/runtime bugs → fix PRs | Sonnet |
 | [Scheduled health audit](health-audit-and-issue-triage.md#scheduled-automation) | Weekly (Wed 13:37 UTC) | Static correctness audit → deduplicated issues | Default |
 | [autoharness](autoharness.md) | On demand (`autoharness optimize`) | Mechanical `src/lib` refactors | Sonnet |
-| Quality re-grade | Removed 2026-07-24 (`quality-regrade.yml` never produced output — no `--allowed-tools`; a scheduled agent will replace it) | [quality.md](quality.md) scorecard + trend log | — |
+| Quality re-grade (`quality-regrade.yml`) | Weekly (Mon 06:00 UTC) | [quality.md](quality.md) scorecard + trend log → docs-only PR | Sonnet |
 | CI gates (`test.yml`, `db-lint.yml`, `make check`) | Every PR (static+unit); weekday nightly (build+E2E) | Coverage ratchets, DB lint, type/lint/test | none |
+
+(The re-grade was rebuilt 2026-07-24: v1 was removed the same day after 10
+runs that produced nothing — it lacked `--allowedTools`. The rebuild pins the
+allowlist explicitly and, like every scheduled agentic workflow, ends in the
+`require-durable-outcome` gate; the once-promised scheduled-agent replacement
+was never built and that route is retired.)
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
@@ -35,6 +41,34 @@ Rule of thumb: **the stronger the external gate, the lighter the model.**
   pushing, or comment `@claude review this` on a PR for an on-demand pass.
   The scheduled health audit also stays on the default model because a schema
   can validate finding shape but cannot mechanically prove the diagnosis.
+
+## Durable outcomes
+
+Every scheduled agentic workflow ends in
+`.github/actions/require-durable-outcome`: it must leave a PR, a verifiable
+citation, or an evidence-citing `quiet-run.md` — otherwise the run goes red.
+Quiet no-op runs are healthy; an *undetectable* no-op run is the failure mode
+that killed re-grade v1. The weekly distillation reads a deterministic loop
+scoreboard (4-week PR acceptance per loop) so a loop whose output stops being
+merged becomes a visible retire/revise candidate instead of silent API spend.
+
+Distillation itself is two-directional: every promotion must name the
+observable behavior it should change and the recurrence signal that would mark
+it failed, and every weekly PR must also propose retirements (gotchas entries
+now enforced by gates, routes to removed things, promotions that changed
+nothing). Enforced knowledge accumulates; prose must not.
+
+## Worker epochs
+
+Two loops (health audit, feedback distillation) deliberately ride the
+claude-code-action **default** model; the others pin Sonnet. The durable-
+outcome gate echoes `worker-epoch: model=<id>` into every run's step summary.
+When that id changes — usually via a dependabot bump of the pinned
+claude-code-action SHA, or Anthropic moving the action default — treat it as a
+**new worker epoch**: requalify the affected prompts against a recent run or
+two, and ask the subtraction question (is any scaffolding now redundant?)
+before adding anything new. Current epoch at last review (2026-07-24):
+Sonnet loops on `claude-sonnet-5`, default loops on the action default.
 
 ## Weekly rhythm
 

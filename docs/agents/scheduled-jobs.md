@@ -20,7 +20,8 @@ real money, so AI-driven jobs stay bounded (caps on fixes/PRs per run).
 | Sentry Error Harness (`sentry-harness.yml`) | cron `0 17 * * 1-5` (weekdays 17:00 UTC) | Scores recent Sentry errors, AI-fixes at most 3 per run (45-min cap), opens PRs | Fix PRs | Disable workflow; close its PRs. Bounded per run to cap API spend |
 | Build PROGRESS.md (`progress.yml`) | push to main touching `docs/progress/**` | Regenerates PROGRESS.md via bot PR (main ruleset blocks direct push) | Bot PR updating PROGRESS.md | Disable workflow; PROGRESS.md just goes stale |
 | Nightly Bug Patrol (`bug-patrol.yml`) | cron `0 7 * * *` (daily 07:00 UTC) + dispatch | Finds ONE small, high-confidence bug in recently changed code, fixes it minimally, opens a single `bug-patrol` PR. Never merges; PR + required CI + human are the gate. Bounded by `--max-turns 60` and a 40-min timeout | `bug-patrol` PR (for review) | Disable workflow; close its PRs. One PR/run caps API spend |
-| Weekly Feedback Distillation (`feedback-distill.yml`) | cron `0 8 * * 0` (Sun 08:00 UTC) + dispatch | Harvests recurring corrections (merged-PR review comments, needs-human issues, failed runs) into ONE docs-only `feedback-distill` PR proposing durable owners. Edits only AGENTS.md/docs; never code; never merges | `feedback-distill` PR (docs only) | Disable workflow; it writes docs proposals only |
+| Weekly Feedback Distillation (`feedback-distill.yml`) | cron `0 8 * * 0` (Sun 08:00 UTC) + dispatch | Deterministic loop scoreboard first (`loop-scoreboard.ts` — 4-week PR acceptance per loop), then harvests recurring corrections (merged-PR review comments, needs-human issues, failed runs) into ONE docs-only `feedback-distill` PR proposing promotions AND retirements. Edits only AGENTS.md/docs; never code; never merges | `feedback-distill` PR (docs only) + scoreboard in step summary | Disable workflow; it writes docs proposals only |
+| Weekly Quality Re-grade (`quality-regrade.yml`) | cron `0 6 * * 1` (Mon 06:00 UTC) + dispatch | Re-grades `docs/agents/quality.md` from measured evidence (coverage run, git log, merge activity) into ONE docs-only `quality-regrade` PR — the improvement loop's steering signal. Explicit `--allowedTools` (v1 died silently without it) + durable-outcome gate | `quality-regrade` PR (docs only) | Disable workflow; the trend log just goes stale |
 | Branch Hygiene (`hygiene.yml`) | cron `23 7 * * 1` (Mon 07:23 UTC) | Prunes remote-tracking refs in its checkout, lists commit-merged branches and 30-day-stale branches (cross-referenced with open PRs). **Report-only — never deletes anything** | Job summary of the run | Disable workflow; nothing depends on it |
 | db-lint (`db-lint.yml`) | pull_request only (not scheduled; listed for completeness) | Replays the full migration chain with `ON_ERROR_STOP` as the PR gate | PR check | It is the PR-time drift gate — do not remove without a replacement |
 
@@ -36,14 +37,18 @@ migrations skip scheduling with a NOTICE there.
 
 ## Claude scheduled agents (not in-repo)
 
-The nightly bug hunt and weekly feedback distillation now run as committed
-Actions workflows (`bug-patrol.yml`, `feedback-distill.yml`) — both open bounded
-PRs for human review rather than merging, so a repo cron owns them safely.
+None exist, by design. Every recurring generative loop (bug patrol, feedback
+distillation, quality re-grade) runs as a committed Actions workflow — bounded,
+never merging, ending in the `require-durable-outcome` gate — so the repo, not
+someone's machine, carries the operating knowledge. (An earlier plan to run
+the quality re-grade as a scheduled agent was retired 2026-07-24 when
+`quality-regrade.yml` was rebuilt.)
 
-The one loop still worth running as a local scheduled agent is **`autoharness`**
+The one loop still worth running locally is **`autoharness`**
 (`docs/agents/autoharness.md`): it needs the local pipx/OAuth shim and a
 long interactive campaign, so it stays off Actions. Run it monthly (or when a
-falling quality grade points at a `src/lib` area) from the user's machine.
+falling quality grade points at a `src/lib` area) from the user's machine,
+after `scripts/autoharness-setup.sh` verifies the local venv patches.
 
 ## Adding a new scheduled job
 
