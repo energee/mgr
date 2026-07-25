@@ -25,12 +25,6 @@ export type PitchingRateResult = {
   lbsNeeded?: number;
 }
 
-export type CellCountEstimate = {
-  cellsThousand: number;
-  confidence: "high" | "medium" | "low";
-  notes: string;
-}
-
 // =============================================================================
 // Viability Decay
 // =============================================================================
@@ -103,68 +97,6 @@ export function daysUntilViabilityThreshold(
 // =============================================================================
 // Cell Count Estimation
 // =============================================================================
-
-/**
- * Estimate cell count from liquid yeast package.
- *
- * Fresh liquid yeast pack: ~100 billion cells = 100,000,000 thousand cells
- * Dry yeast packet (11g): ~200 billion cells = 200,000,000 thousand cells
- *
- * @returns Cell count in thousands
- */
-export function estimateCellsFromPackage(
-  form: YeastForm,
-  packageCount: number = 1,
-  viability: number = 95
-): CellCountEstimate {
-  // Base cells in billions, then convert to thousands (* 1,000,000)
-  const baseCellsBillion = form === "liquid" ? 100 : 200;
-  const viableCellsBillion =
-    baseCellsBillion * (viability / 100) * packageCount;
-  const viableCellsThousand = viableCellsBillion * 1_000_000;
-
-  return {
-    cellsThousand: Math.round(viableCellsThousand * 10) / 10,
-    confidence: viability > 80 ? "high" : viability > 50 ? "medium" : "low",
-    notes:
-      form === "liquid"
-        ? `Based on ${packageCount} pack(s) at ${viability}% viability`
-        : `Based on ${packageCount} packet(s) at ${viability}% viability`,
-  };
-}
-
-const SLURRY_CELLS_BILLION_PER_ML: Record<"dense" | "medium" | "thin", number> = {
-  dense: 1.0,
-  medium: 0.5,
-  thin: 0.25,
-};
-
-/**
- * Estimate cell count from harvested slurry.
- *
- * Dense slurry: ~1 billion cells per mL = 1,000,000 thousand per mL
- * Medium slurry: ~0.5 billion cells per mL = 500,000 thousand per mL
- * Thin slurry: ~0.25 billion cells per mL = 250,000 thousand per mL
- *
- * @returns Cell count in thousands
- */
-export function estimateCellsFromSlurry(
-  volumeMl: number,
-  density: "dense" | "medium" | "thin" = "medium",
-  viability: number = 85
-): CellCountEstimate {
-  // Cells per mL in billions, then convert result to thousands (* 1,000,000)
-  const cellsPerMlBillion = SLURRY_CELLS_BILLION_PER_ML[density];
-  const viableCellsBillion =
-    volumeMl * cellsPerMlBillion * (viability / 100);
-  const viableCellsThousand = viableCellsBillion * 1_000_000;
-
-  return {
-    cellsThousand: Math.round(viableCellsThousand * 10) / 10,
-    confidence: "medium",
-    notes: `Based on ${volumeMl}mL ${density} slurry at ${viability}% viability`,
-  };
-}
 
 // =============================================================================
 // Pitching Rate Calculations
@@ -303,33 +235,6 @@ export function shouldReplaceYeast(
 // Harvest Estimation
 // =============================================================================
 
-/**
- * Estimate harvestable yeast from a fermentation.
- *
- * Typical recovery rates:
- * - Cone fermenters: 1-2L per BBL of wort
- * - Flat-bottom: 0.5-1L per BBL
- * - High flocculation strains yield more
- */
-export function estimateHarvestVolume(
-  batchVolumeBbl: number,
-  flocculation: "low" | "medium" | "high" = "medium",
-  vesselType: "cone" | "flat" = "cone"
-): { volumeMlMin: number; volumeMlMax: number } {
-  const baseRates =
-    vesselType === "cone"
-      ? { min: 1000, max: 2000 } // mL per BBL
-      : { min: 500, max: 1000 };
-
-  const flocMultiplier =
-    flocculation === "high" ? 1.3 : flocculation === "low" ? 0.7 : 1.0;
-
-  return {
-    volumeMlMin: Math.round(batchVolumeBbl * baseRates.min * flocMultiplier),
-    volumeMlMax: Math.round(batchVolumeBbl * baseRates.max * flocMultiplier),
-  };
-}
-
 // =============================================================================
 // Weight-Based Pitching
 // =============================================================================
@@ -382,34 +287,3 @@ export function formatCellCount(thousand: number): string {
 // =============================================================================
 // Post-Harvest Viability
 // =============================================================================
-
-/**
- * Estimate post-harvest viability.
- *
- * Harvested yeast typically starts at 85-95% viability
- * depending on fermentation conditions and handling.
- */
-export function estimatePostHarvestViability(
-  fermentationTempF: number,
-  alcoholPercent: number,
-  daysInFermenter: number
-): number {
-  let viability = 95;
-
-  // High temp stress (above 72°F for ales, above 55°F for lagers)
-  if (fermentationTempF > 72) {
-    viability -= (fermentationTempF - 72) * 0.5;
-  }
-
-  // Alcohol toxicity (above 6% starts affecting viability)
-  if (alcoholPercent > 6) {
-    viability -= (alcoholPercent - 6) * 2;
-  }
-
-  // Extended contact time (beyond 14 days)
-  if (daysInFermenter > 14) {
-    viability -= (daysInFermenter - 14) * 0.5;
-  }
-
-  return Math.max(50, Math.min(95, Math.round(viability)));
-}

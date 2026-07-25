@@ -29,16 +29,6 @@ export const MONTHS = [
 // Conversion Functions
 // =============================================================================
 
-/** Convert barrels to gallons using the TTB standard (1 BBL = 31 gal). */
-export function bblToGallons(bbl: number): number {
-  return bbl * GALLONS_PER_BARREL;
-}
-
-/** Convert gallons to barrels using the TTB standard (1 BBL = 31 gal). */
-export function gallonsToBbl(gallons: number): number {
-  return gallons / GALLONS_PER_BARREL;
-}
-
 // =============================================================================
 // Formatting Functions
 // =============================================================================
@@ -184,14 +174,4 @@ export function validateRowBalance(row: TTBReportRow): boolean {
 export function validateEndingInventory(row: TTBReportRow): boolean {
   const expected = (row.total_available_bbl || 0) - (row.total_removals_bbl || 0);
   return Math.abs((row.ending_inventory_bbl || 0) - expected) < 0.005;
-}
-
-/**
- * Calculate the volume of completed batches from an array of batch records.
- * Sums volume_bbl, treating null volumes as zero.
- */
-export function sumBatchVolumes(
-  batches: { volume_bbl: number | null }[]
-): number {
-  return batches.reduce((sum, b) => sum + (b.volume_bbl || 0), 0);
 }

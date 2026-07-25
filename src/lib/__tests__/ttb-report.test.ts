@@ -9,15 +9,12 @@ import { describe, it, expect } from "vitest";
 import {
   GALLONS_PER_BARREL,
   MONTHS,
-  bblToGallons,
-  gallonsToBbl,
   formatTtbBbl,
   getTaxClassLabel,
   getYearOptions,
   calculateTotals,
   validateRowBalance,
   validateEndingInventory,
-  sumBatchVolumes,
   EMPTY_TOTALS,
   type TTBReportRow,
 } from "@/domain/ttb-utils";
@@ -59,25 +56,6 @@ function makeRow(overrides: Partial<TTBReportRow> = {}): TTBReportRow {
 describe("Barrel/Gallon Conversions", () => {
   it("uses the TTB standard of 31 gallons per barrel", () => {
     expect(GALLONS_PER_BARREL).toBe(31);
-  });
-
-  it("converts BBL to gallons correctly", () => {
-    expect(bblToGallons(1)).toBe(31);
-    expect(bblToGallons(0)).toBe(0);
-    expect(bblToGallons(10)).toBe(310);
-    expect(bblToGallons(0.5)).toBeCloseTo(15.5);
-  });
-
-  it("converts gallons to BBL correctly", () => {
-    expect(gallonsToBbl(31)).toBe(1);
-    expect(gallonsToBbl(0)).toBe(0);
-    expect(gallonsToBbl(310)).toBe(10);
-    expect(gallonsToBbl(15.5)).toBeCloseTo(0.5);
-  });
-
-  it("round-trips BBL -> gallons -> BBL", () => {
-    const original = 7.25;
-    expect(gallonsToBbl(bblToGallons(original))).toBeCloseTo(original);
   });
 });
 
@@ -285,29 +263,6 @@ describe("validateEndingInventory", () => {
 // Batch Volume Summation
 // =============================================================================
 
-describe("sumBatchVolumes", () => {
-  it("sums volumes from multiple batches", () => {
-    const batches = [
-      { volume_bbl: 7 },
-      { volume_bbl: 3.5 },
-      { volume_bbl: 10 },
-    ];
-    expect(sumBatchVolumes(batches)).toBeCloseTo(20.5);
-  });
-
-  it("treats null volumes as zero", () => {
-    const batches = [
-      { volume_bbl: 5 },
-      { volume_bbl: null },
-      { volume_bbl: 3 },
-    ];
-    expect(sumBatchVolumes(batches)).toBe(8);
-  });
-
-  it("returns 0 for empty array", () => {
-    expect(sumBatchVolumes([])).toBe(0);
-  });
-});
 
 // =============================================================================
 // CSV Export (toCSV from report-export)

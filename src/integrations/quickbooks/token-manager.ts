@@ -105,19 +105,6 @@ export async function getAutoSyncEnabled(): Promise<boolean> {
   return data?.value === "true";
 }
 
-/** Save QBO OAuth client credentials */
-export async function saveClientCredentials(clientId: string, clientSecret: string): Promise<void> {
-  const admin = await createAdminClient();
-  const rows = [
-    { key: SETTINGS_KEYS.clientId, value: clientId },
-    { key: SETTINGS_KEYS.clientSecret, value: clientSecret },
-  ];
-  const { error } = await admin
-    .from("system_settings")
-    .upsert(rows, { onConflict: "key" });
-  if (error) throw new Error(`Failed to save QBO client credentials: ${error.message}`);
-}
-
 /** Refresh the QBO access token using the refresh token */
 export async function refreshAccessToken(): Promise<{ accessToken: string; refreshToken: string }> {
   const tokens = await getTokens();

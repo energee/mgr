@@ -7,8 +7,6 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
-  bblToGallons,
-  gallonsToBbl,
   formatTtbBbl,
   getTaxClassLabel,
   getYearOptions,
@@ -18,21 +16,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("bblToGallons / gallonsToBbl", () => {
-  it("converts barrels to gallons using the 31 gal/bbl standard", () => {
-    expect(bblToGallons(1)).toBe(31);
-    expect(bblToGallons(2)).toBe(62);
-  });
-
-  it("converts gallons to barrels using the 31 gal/bbl standard", () => {
-    expect(gallonsToBbl(31)).toBe(1);
-    expect(gallonsToBbl(62)).toBe(2);
-  });
-
-  it("round-trips bbl -> gal -> bbl", () => {
-    expect(gallonsToBbl(bblToGallons(4.5))).toBeCloseTo(4.5, 10);
-  });
-});
 
 describe("formatTtbBbl", () => {
   it("formats null/undefined as '0.00', not '--' (TTB forms must show zero, not blank)", () => {

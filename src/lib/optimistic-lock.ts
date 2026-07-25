@@ -8,7 +8,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { dynamicFrom } from "@/services/types";
-import { ConcurrentModificationError } from "./errors";
 
 // =============================================================================
 // Types
@@ -94,34 +93,4 @@ export async function updateWithOptimisticLock<T extends VersionedRecord>(
     success: true,
     data: updated as T,
   };
-}
-
-/**
- * Update a record with optimistic locking, throwing on conflict.
- *
- * @throws ConcurrentModificationError if the record was modified
- */
-export async function updateWithOptimisticLockOrThrow<T extends VersionedRecord>(
-  supabase: SupabaseClient<Database>,
-  table: string,
-  id: string,
-  data: Partial<Omit<T, "id" | "version">>,
-  currentVersion: number
-): Promise<T> {
-  const result = await updateWithOptimisticLock<T>(
-    supabase,
-    table,
-    id,
-    data,
-    currentVersion
-  );
-
-  if (!result.success) {
-    if (result.conflicted) {
-      throw new ConcurrentModificationError();
-    }
-    throw new Error(result.error);
-  }
-
-  return result.data!;
 }
