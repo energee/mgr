@@ -198,12 +198,26 @@ export type EntityDetailUnifiedProps<T = Record<string, unknown>> = {
 // Helper: Extract editable fields from sections
 // =============================================================================
 
-function getEditableFieldsFromSections<T>(
+/**
+ * The user-editable form-input fields of a section list: anything with a
+ * `type` (fields without one are display-only renderers) that is not marked
+ * `editable: false`.
+ *
+ * `editable: false` fields MUST stay out of this list. It feeds
+ * `makeFormResolver`, whose `""`→`null` pass would otherwise null an
+ * auto-generated field seeded with `""` by buildDefaultValues — and a schema
+ * field that is `.optional()` without `.nullable()` (e.g. batch `batch_code`)
+ * then rejects the create form with an error the user cannot clear, because
+ * the field is not editable.
+ *
+ * Exported for the resolver test (__tests__/noneditable-field-null.test.ts).
+ */
+export function getEditableFieldsFromSections<T>(
   sections: UnifiedSectionDef<T>[]
 ): UnifiedFieldDef<T>[] {
   return sections
     .flatMap((s) => s.fields ?? [])
-    .filter((f) => f.type);
+    .filter((f) => f.type && f.editable !== false);
 }
 
 // =============================================================================
