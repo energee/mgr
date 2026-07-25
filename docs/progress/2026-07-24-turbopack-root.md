@@ -1,0 +1,1 @@
+- **2026-07-24 (turbopack root pin).** Pinned `turbopack.root` to `__dirname` in `next.config.ts` so Next.js stops warning about multiple lockfiles when `.agents/worktrees/` checkouts have their own `bun.lock`; correct in main and every worktree.
