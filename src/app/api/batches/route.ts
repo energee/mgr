@@ -7,7 +7,7 @@ import {
 } from "@/lib/api";
 import { batchSchema } from "@/lib/schemas/batch";
 import { successResponse } from "@/lib/api/response";
-import { escapeLike } from "@/lib/utils";
+import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 import { unwrap } from "@/lib/supabase/query-helpers";
 
 const listParamsSchema = z.object({
@@ -45,7 +45,7 @@ export const GET = withPermission("batches:read", async (request, { supabase }) 
     // Strip PostgREST filter metacharacters (dots, commas, parens, backslashes)
     // to prevent filter injection via the .or() string, then escape LIKE
     // wildcards so user input like "%" or "_" matches literally.
-    const sanitized = escapeLike(search.replace(/[.,()\\]/g, ""));
+    const sanitized = escapeIlikePattern(search.replace(/[.,()\\]/g, ""));
     query = query.or(`batch_code.ilike.%${sanitized}%,name.ilike.%${sanitized}%`);
   }
 

@@ -30,6 +30,7 @@ import { orderKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
 import { localDateString } from "@/lib/format";
 import { log } from "@/lib/client-logger";
+import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 
 type Client = SupabaseClient<Database>;
 
@@ -70,11 +71,6 @@ export function nextDuplicateOrderNumber(
     if (match) max = Math.max(max, parseInt(match[1], 10));
   }
   return `${base}-R${max + 1}`;
-}
-
-/** Escape LIKE wildcards so an order number is matched literally. */
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
 
@@ -168,7 +164,7 @@ export async function duplicateOrder(
   const { data: takenRows, error: takenError } = await supabase
     .from("orders")
     .select("order_number")
-    .like("order_number", `${escapeLikePattern(base)}-R%`);
+    .like("order_number", `${escapeIlikePattern(base)}-R%`);
   if (takenError) throw takenError;
   const taken = (takenRows ?? []).map((r) => r.order_number);
 
