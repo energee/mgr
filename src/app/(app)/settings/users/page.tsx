@@ -55,7 +55,10 @@ export default function UsersSettingsPage() {
     onSuccess: () => {
       toast.success(`User "${deleteTarget?.name}" deleted`);
       setDeleteTarget(null);
-      queryClient.invalidateQueries({ queryKey: entityKeys.list("user_profile") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("user_profiles") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("user_profiles_with_details"),
+      });
     },
     onError: (err: Error) => {
       toast.error(err.message);

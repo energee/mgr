@@ -171,8 +171,11 @@ export function BatchCancellationDialog({
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("batches_with_brew_info") });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("vessels") });
-      queryClient.invalidateQueries({ queryKey: entityKeys.all("vessels_with_current_batch") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("vessels_with_batch") });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("vessel_transfers") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("vessel_transfers_with_details"),
+      });
       queryClient.invalidateQueries({ queryKey: inventoryKeys.allocations() });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all() });
 

@@ -58,7 +58,10 @@ function ProfileSection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.current() });
-      queryClient.invalidateQueries({ queryKey: entityKeys.all("user_profile") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("user_profiles") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("user_profiles_with_details"),
+      });
       toast.success("Display name updated");
     },
     onError: () => {

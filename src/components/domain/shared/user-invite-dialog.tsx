@@ -80,7 +80,10 @@ export function UserInviteDialog({ open, onOpenChange }: UserInviteDialogProps) 
     },
     onSuccess: () => {
       toast.success(`Invitation sent to ${email}`);
-      queryClient.invalidateQueries({ queryKey: entityKeys.list("user_profile") });
+      queryClient.invalidateQueries({ queryKey: entityKeys.all("user_profiles") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("user_profiles_with_details"),
+      });
       setEmail("");
       setDisplayName("");
       setRole("viewer");

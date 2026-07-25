@@ -338,7 +338,13 @@ export function BrewLogCompletionDialog({
         queryKey: entityKeys.all("brew_logs"),
       });
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("brew_logs_with_batches"),
+      });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("batches") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("batches_with_brew_info"),
+      });
       queryClient.invalidateQueries({ queryKey: vesselKeys.all() });
       queryClient.invalidateQueries({ queryKey: vesselKeys.transfers() });
 

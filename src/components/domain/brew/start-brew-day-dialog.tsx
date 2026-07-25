@@ -136,7 +136,13 @@ export function StartBrewDayDialog({
       queryClient.invalidateQueries({ queryKey: brewLogKeys.all() });
       queryClient.invalidateQueries({ queryKey: batchKeys.all() });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("brew_logs") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("brew_logs_with_batches"),
+      });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("batches") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("batches_with_brew_info"),
+      });
 
       toast.success(`Brew day started for ${batchNumber}`);
       onOpenChange(false);
