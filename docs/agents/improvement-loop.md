@@ -4,14 +4,16 @@ How this repo improves itself, which automation owns which kind of change,
 and which model tier each one runs. Read this before adding a new automated
 workflow — extend one of these loops instead if it fits.
 
-## The five loops
+## The loops
 
 | Loop | Cadence | Owns | Model |
 |------|---------|------|-------|
 | [Sentry harness](../sentry-harness-setup.md) | Weekdays (17:00 UTC) | Production/runtime bugs → fix PRs | Sonnet |
 | [Scheduled health audit](health-audit-and-issue-triage.md#scheduled-automation) | Weekly (Wed 13:37 UTC) | Static correctness audit → deduplicated issues | Default |
+| Nightly Bug Patrol (`bug-patrol.yml`) | Daily (07:00 UTC) | One small, high-confidence bug fix → single PR | Sonnet |
 | [autoharness](autoharness.md) | On demand (`autoharness optimize`) | Mechanical `src/lib` refactors | Sonnet |
 | Quality re-grade (`quality-regrade.yml`) | Weekly (Mon 06:00 UTC) | [quality.md](quality.md) scorecard + trend log → docs-only PR | Sonnet |
+| Weekly Feedback Distillation (`feedback-distill.yml`) | Weekly (Sun 08:00 UTC) | Recurring corrections → docs-only PR (this loop) | Default |
 | CI gates (`test.yml`, `db-lint.yml`, `make check`) | Every PR (static+unit); weekday nightly (build+E2E) | Coverage ratchets, DB lint, type/lint/test | none |
 
 (The re-grade was rebuilt 2026-07-24: v1 was removed the same day after 10
@@ -19,6 +21,18 @@ runs that produced nothing — it lacked `--allowedTools`. The rebuild pins the
 allowlist explicitly and, like every scheduled agentic workflow, ends in the
 `require-durable-outcome` gate; the once-promised scheduled-agent replacement
 was never built and that route is retired.)
+
+(Bug Patrol is a 2026-07-26 revise candidate per the loop scoreboard: both
+scheduled runs since it was added ended `error_max_turns` with zero PRs —
+07-25 hit the then-cap at 60 turns / 9 permission denials, so #598 raised the
+cap to 80, and the very next run on 07-26 hit *that* cap too, at 81 turns / 20
+permission denials. Denials rose faster than the turn budget did, so the
+ceiling is not the bottleneck — something in the task keeps reaching for a
+tool outside `--allowedTools` in `bug-patrol.yml` and burning turns on the
+retry. Next attempt should audit which tool that is before raising
+`--max-turns` a third time. Falsifies if a future run merges a PR or a
+quiet-run.md without another `error_max_turns`; stays failed if the scoreboard
+still shows 0 PRs / repeated `error_max_turns` after two more scheduled runs.)
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether

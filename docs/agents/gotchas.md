@@ -56,9 +56,11 @@ contradict the file in front of you usually mean a stale
 `tsconfig.tsbuildinfo` or `.next/`. Run `make clean` before investigating a
 type error you cannot reproduce by reading the code.
 
-**Two lockfiles, one warning.** Worktrees produce a nested `bun.lock`, so the
-Next.js build prints a lockfile-ambiguity warning. Expected; not a
-misconfiguration to fix.
+~~Two lockfiles, one warning~~ — removed 2026-07-26. Fixed 2026-07-24 by
+pinning `turbopack.root` to `__dirname` in `next.config.ts` (PR #585,
+`docs/progress/2026-07-24-turbopack-root.md`); the workspace-root warning no
+longer fires in main or any worktree. The failure mode is gone, not just
+worked around, so the entry goes with it per the rule above (b).
 
 **knip and depcheck produce false positives here.** The entity registry and
 `z.infer` types keep symbols alive in ways static analysis misses. AGENTS.md

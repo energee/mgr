@@ -19,7 +19,7 @@ real money, so AI-driven jobs stay bounded (caps on fixes/PRs per run).
 | Scheduled Health Audit (`health-audit.yml`) | cron `37 13 * * 3` (Wed 13:37 UTC) | Read-only AI audit of recent commits + rotating focus; deterministic publisher opens deduped issues | GitHub issues (publisher job) | Disable workflow; publisher is the only job with issue write |
 | Sentry Error Harness (`sentry-harness.yml`) | cron `0 17 * * 1-5` (weekdays 17:00 UTC) | Scores recent Sentry errors, AI-fixes at most 3 per run (45-min cap), opens PRs | Fix PRs | Disable workflow; close its PRs. Bounded per run to cap API spend |
 | Build PROGRESS.md (`progress.yml`) | push to main touching `docs/progress/**` | Regenerates PROGRESS.md via bot PR (main ruleset blocks direct push) | Bot PR updating PROGRESS.md | Disable workflow; PROGRESS.md just goes stale |
-| Nightly Bug Patrol (`bug-patrol.yml`) | cron `0 7 * * *` (daily 07:00 UTC) + dispatch | Finds ONE small, high-confidence bug in recently changed code, fixes it minimally, opens a single `bug-patrol` PR. Never merges; PR + required CI + human are the gate. Bounded by `--max-turns 60` and a 40-min timeout | `bug-patrol` PR (for review) | Disable workflow; close its PRs. One PR/run caps API spend |
+| Nightly Bug Patrol (`bug-patrol.yml`) | cron `0 7 * * *` (daily 07:00 UTC) + dispatch | Finds ONE small, high-confidence bug in recently changed code, fixes it minimally, opens a single `bug-patrol` PR. Never merges; PR + required CI + human are the gate. Bounded by `--max-turns 80` (raised from 60 in #598) and a 40-min timeout — see [`improvement-loop.md`](improvement-loop.md) for the 2026-07-26 failure streak at that cap | `bug-patrol` PR (for review) | Disable workflow; close its PRs. One PR/run caps API spend |
 | Weekly Feedback Distillation (`feedback-distill.yml`) | cron `0 8 * * 0` (Sun 08:00 UTC) + dispatch | Deterministic loop scoreboard first (`loop-scoreboard.ts` — 4-week PR acceptance per loop), then harvests recurring corrections (merged-PR review comments, needs-human issues, failed runs) into ONE docs-only `feedback-distill` PR proposing promotions AND retirements. Edits only AGENTS.md/docs; never code; never merges | `feedback-distill` PR (docs only) + scoreboard in step summary | Disable workflow; it writes docs proposals only |
 | Weekly Quality Re-grade (`quality-regrade.yml`) | cron `0 6 * * 1` (Mon 06:00 UTC) + dispatch | Re-grades `docs/agents/quality.md` from measured evidence (coverage run, git log, merge activity) into ONE docs-only `quality-regrade` PR — the improvement loop's steering signal. Explicit `--allowedTools` (v1 died silently without it) + durable-outcome gate | `quality-regrade` PR (docs only) | Disable workflow; the trend log just goes stale |
 | Branch Hygiene (`hygiene.yml`) | cron `23 7 * * 1` (Mon 07:23 UTC) | Prunes remote-tracking refs in its checkout, lists commit-merged branches and 30-day-stale branches (cross-referenced with open PRs). **Report-only — never deletes anything** | Job summary of the run | Disable workflow; nothing depends on it |
@@ -73,5 +73,13 @@ after `scripts/autoharness-setup.sh` verifies the local venv patches.
 2. Every job must have: a stable single output channel (one deduped issue, a
    findings table, or a job summary — never unbounded issue creation), and a
    documented kill/rollback step in this file.
-3. AI-driven jobs must cap work per run (fixes, PRs, or turns).
-4. Add the job to the tables above in the same PR.
+3. That output channel must have a *named consumer* — a UI surface, a
+   notification path, or a report that a human or another job actually reads
+   — confirmed before merge, not assumed. `check-data-integrity` (migration
+   00272) shipped a findings table with no reader for months before issue
+   #586 caught it; a job nobody reads is indistinguishable from a disabled
+   one, and the API/compute cost is spent for zero signal either way. If no
+   consumer exists yet, add the minimal one (e.g. reuse the `notifications`
+   path from `check-low-inventory`, migration 00174) in the same PR.
+4. AI-driven jobs must cap work per run (fixes, PRs, or turns).
+5. Add the job to the tables above in the same PR.
