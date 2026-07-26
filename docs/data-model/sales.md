@@ -668,6 +668,19 @@ the legacy required `keg_type_id` column was retired by migration 00254.
 | reconciled_at | TIMESTAMPTZ | When the staged pour was converted into TTB-removal allocations |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
+The pending queue is `reconciled_at IS NULL AND voided_at IS NULL` — both
+predicates, everywhere. `POST /api/square/reconcile-draft-sales` drains it,
+`GET /api/square/sync/status` counts it for the settings badge, and the partial
+index `idx_square_draft_sales_unreconciled` (narrowed by 00277) indexes it. A
+refund-voided row is terminal: nothing ever stamps its `reconciled_at`, so a
+reader that filters on `reconciled_at` alone counts it forever (#608).
+
+`voided_at` is only stamped for a cumulatively FULL refund, and — since 00277
+(#606) — only for rows whose effects were actually neutralized: an
+un-reconciled row (nothing was ever posted) or a reconciled row whose
+`square_draft_sale:<id>` allocation that refund reversed. A partial refund
+deliberately leaves rows un-voided for manual review.
+
 **Deduplication index:** `(square_order_id, brand_id, selling_format_id)`.
 
 ---

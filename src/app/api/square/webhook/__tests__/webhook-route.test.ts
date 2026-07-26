@@ -364,7 +364,7 @@ describe("completed refund ingestion", () => {
     expect(await response.json()).toEqual({ error: "refund_claim_in_flight" });
   });
 
-  it.each(["duplicate", "ignored", "manual_reconcile"] as const)(
+  it.each(["duplicate", "manual_reconcile"] as const)(
     "acknowledges a %s refund result",
     async (kind) => {
       rpc.mockResolvedValue({ data: { kind }, error: null });
@@ -372,6 +372,42 @@ describe("completed refund ingestion", () => {
       expect(response.status).toBe(200);
     },
   );
+
+  // `ignored` used to share the group above with `duplicate`, which encoded the
+  // assumption that "no sale here" and "no sale here YET" are equally terminal
+  // (#607). The RPC no longer returns it — a missing sale is now sale_missing —
+  // but a deployment whose function body predates 00277 still can, and that
+  // legacy result must stay acknowledged rather than 503-looping.
+  it("still acknowledges a legacy pre-00277 ignored refund result", async () => {
+    rpc.mockResolvedValue({ data: { kind: "ignored" }, error: null });
+    const response = await post(refundEvent());
+    expect(response.status).toBe(200);
+  });
+
+  it("asks Square to redeliver a refund whose sale has not been ingested yet (#607)", async () => {
+    rpc.mockResolvedValue({
+      data: { kind: "sale_missing", retry_after_seconds: 900 },
+      error: null,
+    });
+    const response = await post(refundEvent());
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("900");
+    expect(await response.json()).toEqual({ error: "refund_sale_missing" });
+  });
+
+  it("acknowledges a sale-missing refund once it is past Square's redelivery horizon", async () => {
+    rpc.mockResolvedValue({
+      data: { kind: "sale_missing", retry_after_seconds: 900 },
+      error: null,
+    });
+    const event = refundEvent();
+    event.created_at = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
+    const response = await post(event);
+    expect(response.status).toBe(200);
+    // The durable sale_missing log row written by the RPC is the operator's
+    // reconciliation trace from here on; nothing is silently dropped.
+    expect(rpc).not.toHaveBeenCalled();
+  });
 
   it("ignores a pending or unidentified refund before any side effect", async () => {
     const pending = await post(refundEvent({ status: "PENDING" }));

@@ -22,10 +22,16 @@ type Fixture = {
 };
 
 type AtomicResult = {
-  kind: "processed" | "duplicate" | "in_flight" | "manual_reconcile";
+  kind:
+    | "processed"
+    | "duplicate"
+    | "in_flight"
+    | "manual_reconcile"
+    | "sale_missing";
   items_failed?: number;
   items_synced?: number;
   log_id?: string;
+  retry_after_seconds?: number;
 };
 
 afterAll(async () => {
@@ -211,6 +217,72 @@ async function ingestRefund(
     ],
   );
   return rows[0]!.result;
+}
+
+/**
+ * Replays what POST /api/square/reconcile-draft-sales writes for one staged
+ * keg pour (#606): a keg-format finished-good lot, a completed
+ * finished_good -> taproom_sale allocation in FRACTIONAL kegs carrying the
+ * reconciler's descriptive note plus its stable `square_draft_sale:<id>`
+ * idempotency key, and the `reconciled_at` stamp. The route itself is not
+ * importable here (it is a Next handler over PostgREST), so the exact payload
+ * from reconcile-draft-sales/route.ts is reproduced instead.
+ */
+async function reconcileDraftSale(
+  db: PoolClient,
+  orderId: string,
+  suffix: string,
+) {
+  const { rows: drafts } = await db.query<{
+    id: string;
+    brand_id: string;
+    selling_format_id: string;
+    volume_oz: string;
+    sold_at: Date;
+  }>(
+    `SELECT id, brand_id, selling_format_id, volume_oz, sold_at
+     FROM square_draft_sales WHERE square_order_id = $1`,
+    [orderId],
+  );
+  const draft = drafts[0]!;
+
+  const { rows: lots } = await db.query<{ id: string }>(
+    `INSERT INTO finished_goods (
+       brand_id, selling_format_id, quantity, lot_number, production_date
+     ) VALUES ($1, $2, 1, $3, CURRENT_DATE - 3)
+     RETURNING id`,
+    [draft.brand_id, draft.selling_format_id, `KEG-LOT-${suffix}`],
+  );
+  const kegLotId = lots[0]!.id;
+
+  // The fixture's keg container is 0.5 bbl; 1 bbl = 3968 oz.
+  const OZ_PER_BBL = 3968;
+  const oz = Number(draft.volume_oz);
+  const kegs = Number((oz / (0.5 * OZ_PER_BBL)).toFixed(4));
+  const bbl = Number((oz / OZ_PER_BBL).toFixed(4));
+
+  await db.query(
+    `INSERT INTO allocations (
+       source_type, source_id, destination_type, destination_id, quantity,
+       volume_bbl, reason_code, status, completed_at, notes, idempotency_key
+     ) VALUES (
+       'finished_good', $1, 'taproom_sale', NULL, $2, $3, 'other', 'completed',
+       $4, $5, $6
+     )`,
+    [
+      kegLotId,
+      kegs,
+      bbl,
+      draft.sold_at,
+      `Square draft sale reconciliation (order ${orderId})`,
+      `square_draft_sale:${draft.id}`,
+    ],
+  );
+  await db.query("UPDATE square_draft_sales SET reconciled_at = now() WHERE id = $1", [
+    draft.id,
+  ]);
+
+  return { bbl, draftId: draft.id, kegLotId, kegs };
 }
 
 async function installFinalizeFailure(
@@ -855,6 +927,168 @@ describe("atomic Square refund ingestion", () => {
       // Neither the poison row's 1300 total counted as a mismatch nor its 625
       // counted as prior refunded money.
       expect(logs[0]!.details).toMatchObject({ prior_refund_amount: 0 });
+    });
+  });
+});
+
+describe("refund of an already-reconciled draft keg pour (#606)", () => {
+  it("reverses the fractional keg draw and credits no bin", async () => {
+    await withTransaction(async (db) => {
+      const suffix = randomUUID();
+      const fixture = await createFixture(db, suffix);
+      const orderId = `reconciled-draft-order-${suffix}`;
+      const refundId = `reconciled-draft-refund-${suffix}`;
+      await ingestSale(db, fixture, orderId, `reconciled-draft-sale-${suffix}`, true);
+
+      // The operator reconciles the staged pour into a TTB removal BEFORE the
+      // refund arrives — the ordering the reversal predicate never covered.
+      const recon = await reconcileDraftSale(db, orderId, suffix);
+      expect(recon.kegs).toBeGreaterThan(0);
+      expect(recon.kegs).toBeLessThan(1);
+
+      const result = await ingestRefund(db, fixture, orderId, refundId, 2500, 2500);
+      expect(result).toMatchObject({ kind: "processed", items_failed: 0 });
+
+      // A negative finished_good -> adjustment row neutralizes the removal.
+      const { rows: reversals } = await db.query<{
+        quantity: string;
+        volume_bbl: string;
+      }>(
+        `SELECT quantity::text AS quantity, volume_bbl::text AS volume_bbl
+         FROM allocations
+         WHERE source_id = $1
+           AND destination_type = 'adjustment'
+           AND reason_code = 'refund'`,
+        [recon.kegLotId],
+      );
+      expect(reversals).toEqual([
+        {
+          quantity: (-recon.kegs).toFixed(4),
+          volume_bbl: (-recon.bbl).toFixed(4),
+        },
+      ]);
+
+      // The keg sale never debited a bin, so the reversal must not credit one.
+      const { rows: kegBinRows } = await db.query(
+        "SELECT quantity FROM bin_inventory WHERE finished_good_id = $1",
+        [recon.kegLotId],
+      );
+      expect(kegBinRows).toEqual([]);
+
+      // ...and no "unmapped POS bin" warning is emitted for the draft row.
+      const { rows: logs } = await db.query<{ details: Record<string, unknown> }>(
+        "SELECT details FROM square_sync_log WHERE square_payment_id = $1",
+        [refundId],
+      );
+      expect(JSON.stringify(logs[0]!.details)).not.toContain("no bin credited");
+
+      // The packaged leg still reverses exactly as before (#477 unchanged).
+      expect(await readEffects(db, fixture, orderId)).toMatchObject({
+        binQuantity: 20,
+        draftRows: [{ voided_at: expect.any(Date) }],
+        saleCount: 1,
+      });
+    });
+  });
+
+  it("reverses a reconciled pour proportionally across sequential partial refunds", async () => {
+    await withTransaction(async (db) => {
+      const suffix = randomUUID();
+      const fixture = await createFixture(db, suffix);
+      const orderId = `partial-draft-order-${suffix}`;
+      await ingestSale(db, fixture, orderId, `partial-draft-sale-${suffix}`, true);
+      const recon = await reconcileDraftSale(db, orderId, suffix);
+
+      const first = await ingestRefund(
+        db,
+        fixture,
+        orderId,
+        `partial-draft-refund-a-${suffix}`,
+        1250,
+        2500,
+      );
+      const second = await ingestRefund(
+        db,
+        fixture,
+        orderId,
+        `partial-draft-refund-b-${suffix}`,
+        1250,
+        2500,
+      );
+      expect(first).toMatchObject({ kind: "processed", items_failed: 0 });
+      expect(second).toMatchObject({ kind: "processed", items_failed: 0 });
+
+      // Two events, and together they reverse the original draw exactly once —
+      // no double credit (the #477 property, now on the fractional path).
+      const { rows } = await db.query<{ total: string; n: string }>(
+        `SELECT COALESCE(SUM(quantity), 0)::text AS total, count(*)::text AS n
+         FROM allocations
+         WHERE source_id = $1
+           AND destination_type = 'adjustment'
+           AND reason_code = 'refund'`,
+        [recon.kegLotId],
+      );
+      expect(rows[0]!.n).toBe("2");
+      expect(Number(rows[0]!.total)).toBeCloseTo(-recon.kegs, 4);
+    });
+  });
+});
+
+describe("refund delivered before its sale (#607)", () => {
+  it("records a durable deferred claim, asks for a retry, and applies on redelivery", async () => {
+    await withTransaction(async (db) => {
+      const suffix = randomUUID();
+      const fixture = await createFixture(db, suffix);
+      const orderId = `early-refund-order-${suffix}`;
+      const refundId = `early-refund-${suffix}`;
+
+      const deferred = await ingestRefund(db, fixture, orderId, refundId, 2500, 2500);
+      expect(deferred).toMatchObject({ kind: "sale_missing" });
+      expect(deferred.retry_after_seconds).toBeGreaterThan(0);
+
+      const { rows: claims } = await db.query<{
+        items_failed: number;
+        state: string | null;
+        completed_at: Date | null;
+      }>(
+        `SELECT items_failed, completed_at, details->>'state' AS state
+         FROM square_sync_log WHERE square_payment_id = $1`,
+        [refundId],
+      );
+      expect(claims).toHaveLength(1);
+      expect(claims[0]).toMatchObject({ items_failed: 1, state: "sale_missing" });
+
+      // A second delivery while the sale is still missing stays deferred and
+      // does not accumulate claim rows.
+      const stillDeferred = await ingestRefund(db, fixture, orderId, refundId, 2500, 2500);
+      expect(stillDeferred).toMatchObject({ kind: "sale_missing" });
+
+      // The payment retry finally lands...
+      await ingestSale(db, fixture, orderId, `early-sale-${suffix}`);
+      expect((await readEffects(db, fixture, orderId)).binQuantity).toBe(17);
+
+      // ...and Square's next refund delivery applies the reversal.
+      const applied = await ingestRefund(db, fixture, orderId, refundId, 2500, 2500);
+      expect(applied).toMatchObject({ kind: "processed", items_failed: 0 });
+      expect(await readEffects(db, fixture, orderId)).toMatchObject({
+        binQuantity: 20,
+        reversalCount: 1,
+        saleCount: 1,
+      });
+
+      const { rows: afterRows } = await db.query<{ n: string }>(
+        "SELECT count(*)::text AS n FROM square_sync_log WHERE square_payment_id = $1",
+        [refundId],
+      );
+      expect(afterRows[0]!.n).toBe("1");
+
+      // One more delivery must not double-reverse.
+      const replay = await ingestRefund(db, fixture, orderId, refundId, 2500, 2500);
+      expect(replay.kind).toBe("duplicate");
+      expect(await readEffects(db, fixture, orderId)).toMatchObject({
+        binQuantity: 20,
+        reversalCount: 1,
+      });
     });
   });
 });

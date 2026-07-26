@@ -97,6 +97,9 @@ export async function requireSquareClient(): Promise<SquareClientGuard> {
  * Extracts the catch block shared by the catalog and inventory sync routes (they
  * differed only in sync_type).
  *
+ * @param opts.itemsFailed how many items the abort took down. Defaults to 1 so
+ *   the row is never indistinguishable from a clean no-op run in the settings
+ *   page's "Recent Activity" list, which renders `items_failed` (#610).
  * @returns the errorResponse the route should return.
  */
 export async function logSyncFailure(
@@ -106,6 +109,7 @@ export async function logSyncFailure(
     startedAt: string;
     userId: string;
     err: unknown;
+    itemsFailed?: number;
   }
 ): Promise<NextResponse> {
   const message =
@@ -116,8 +120,8 @@ export async function logSyncFailure(
   const { error: logError } = await admin.from("square_sync_log").insert({
     sync_type: opts.syncType,
     items_synced: 0,
-    items_failed: 0,
-    details: { error: message, triggeredBy: opts.userId },
+    items_failed: opts.itemsFailed ?? 1,
+    details: { error: message, triggeredBy: opts.userId, hardFailure: true },
     started_at: opts.startedAt,
     completed_at: new Date().toISOString(),
   });
