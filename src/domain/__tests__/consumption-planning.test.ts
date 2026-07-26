@@ -22,6 +22,7 @@ import {
   type ConsumptionLineItem,
   type PackagingLossLine,
 } from "../consumption-planning";
+import { WHOLE_UNIT_PARITY_CASES } from "@/test/whole-unit-parity-fixtures";
 
 function makeLot(overrides: Partial<FifoLot>): FifoLot {
   return {
@@ -383,23 +384,15 @@ describe("computeBomConsumption", () => {
     expect(result.has("free-item")).toBe(false);
   });
 
-  // Parity contract with the SQL whole_unit_material_qty helper (migration
-  // 00217): revise_packaging_session ceils whole-unit materials in SQL, so it
-  // must agree with this TS ceiling. These exact (quantity_per_unit, units)
-  // fixtures are asserted identically in the helper's live rollback test —
-  // keep both sides in sync if either formula changes.
-  it("matches the SQL whole_unit_material_qty fixtures (migration 00217 parity)", () => {
-    const cases: Array<[number, number, number]> = [
-      [0.0417, 24, 1],
-      [0.0417, 25, 2],
-      [0.0417, 30, 2],
-      [0.0417, 48, 2],
-      [0.25, 10, 3],
-      [2.0, 5, 10],
-      [1.0, 7, 7],
-      [0.1667, 6, 1],
-    ];
-    for (const [qpu, units, expected] of cases) {
+  // Parity contract with the SQL helpers whole_unit_material_qty (00217) and
+  // exact_material_qty (00279): the revise RPC and transition_entity_atomic's
+  // packaging depletion both ceil whole-unit materials in SQL, so they must
+  // agree with this TS ceiling — computeBomConsumption is the reference
+  // implementation. The fixture table is shared with the SQL-side assertions in
+  // src/__tests__/integration/packaging-material-consumption.test.ts, so the
+  // two sides cannot drift (#616).
+  it("matches the SQL whole-unit ceiling fixtures (00217 / 00279 parity)", () => {
+    for (const [qpu, units, expected] of WHOLE_UNIT_PARITY_CASES) {
       const result = computeBomConsumption(
         [{ selling_format_id: "fmt-1", actual_quantity: units }],
         [{ selling_format_id: "fmt-1", inventory_item_id: "wu", quantity_per_unit: qpu, unit: "each" }],

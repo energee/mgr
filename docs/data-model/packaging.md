@@ -227,7 +227,9 @@ See [inventory.md](./inventory.md#allocations) for complete allocation documenta
 
 Packaging sessions with aggregated line item counts, brand names, and quantity totals.
 
-Includes computed fields: `line_count`, `brands`, `total_planned`, `total_actual`, `total_variance` (actual - planned).
+Body is `SELECT ps.*, <aggregates>`, so the view carries every `packaging_sessions` column (including `default_bin_id`) plus the computed fields `line_count`, `brands`, `total_planned`, `total_actual`, `total_variance` (actual - planned).
+
+> **Adding a column to `packaging_sessions` requires recreating this view.** Postgres expands `*` once, at `CREATE VIEW` time, and freezes the resulting column list. `default_bin_id` (added by 00219) was therefore missing from the view until 00278 recreated it — and because the `packaging_session` entity reads the view but writes the base table, the detail form seeded the field with `""` and nulled the stored bin on every save (issue #612). The guard against a repeat is `src/entities/__tests__/section-fields-schema-sync.test.ts`, which fails when an editable section field is absent from the Row of `viewTable ?? table`.
 
 ### `brand_packaging_summary`
 
