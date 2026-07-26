@@ -51,6 +51,8 @@ type BreweryNameSetting = {
 type PortalLink = {
   customer_id: string;
   user_id: string;
+  /** Set while access is revoked; this route is the only path that clears it. */
+  revoked_at?: string | null;
 };
 
 function assertCustomerProfile(
@@ -185,6 +187,11 @@ async function ensureCustomerProfile(
   assertCustomerProfile(provisionedProfile, input.userId);
 }
 
+/**
+ * Grant (or re-grant) access. `revoked_at: null` clears any tombstone left by
+ * DELETE /api/customers/[id]/portal-users/[userId] — a deliberate staff
+ * re-grant is the ONLY path allowed to restore a revoked link (issue #605).
+ */
 async function linkPortalUser(
   adminDb: AdminClient,
   customerId: string,
@@ -193,7 +200,7 @@ async function linkPortalUser(
   const link = await unwrap(
     dynamicFrom(adminDb, "customer_portal_users")
       .upsert(
-        { customer_id: customerId, user_id: userId },
+        { customer_id: customerId, user_id: userId, revoked_at: null },
         { onConflict: "customer_id,user_id" },
       )
       .select("customer_id, user_id")
@@ -208,13 +215,18 @@ async function linkPortalUser(
   }
 }
 
+/**
+ * The junction row as it stands BEFORE provisioning, tombstone included —
+ * compensation needs to know whether the row existed and whether it was
+ * revoked, so a failed re-grant restores exactly the prior state.
+ */
 async function findPortalLink(
   adminDb: AdminClient,
   customerId: string,
   userId: string,
 ): Promise<PortalLink | null> {
   const { data, error } = await dynamicFrom(adminDb, "customer_portal_users")
-    .select("customer_id, user_id")
+    .select("customer_id, user_id, revoked_at")
     .eq("customer_id", customerId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -342,6 +354,10 @@ function profileProvisioningChanges(profile: PortalProfile | null): boolean {
  * dangling portal-user row referencing a non-customer profile. When any
  * cleanup step fails, the raised error names the leftover rows explicitly so
  * an operator can repair them.
+ *
+ * A row that existed as a REVOKED tombstone is restored, not deleted (#605):
+ * deleting it would erase the revocation and let the portal layout's auto-link
+ * hand the access back on the user's next page load.
  */
 async function compensateExistingPortalUser(
   adminDb: AdminClient,
@@ -350,21 +366,29 @@ async function compensateExistingPortalUser(
     userId: string;
     profileBefore: PortalProfile | null;
     profileWriteAttempted: boolean;
-    linkExisted: boolean;
+    linkBefore: PortalLink | null;
     linkWriteAttempted: boolean;
   },
   provisioningError: unknown,
 ): Promise<never> {
   const cleanupErrors: string[] = [];
-  const danglingLinkNote = `dangling customer_portal_users row (customer_id=${input.customerId}, user_id=${input.userId}) must be removed manually`;
+  const revokedAtBefore = input.linkBefore?.revoked_at ?? null;
+  const danglingLinkNote = revokedAtBefore
+    ? `re-granted customer_portal_users row (customer_id=${input.customerId}, user_id=${input.userId}) must be revoked again manually`
+    : `dangling customer_portal_users row (customer_id=${input.customerId}, user_id=${input.userId}) must be removed manually`;
 
   let linkRemoved = true;
-  if (input.linkWriteAttempted && !input.linkExisted) {
+  if (input.linkWriteAttempted && (!input.linkBefore || revokedAtBefore)) {
     try {
-      const { error } = await dynamicFrom(adminDb, "customer_portal_users")
-        .delete()
-        .eq("customer_id", input.customerId)
-        .eq("user_id", input.userId);
+      const { error } = await (input.linkBefore
+        ? dynamicFrom(adminDb, "customer_portal_users")
+            .update({ revoked_at: revokedAtBefore })
+            .eq("customer_id", input.customerId)
+            .eq("user_id", input.userId)
+        : dynamicFrom(adminDb, "customer_portal_users")
+            .delete()
+            .eq("customer_id", input.customerId)
+            .eq("user_id", input.userId));
       if (error) {
         linkRemoved = false;
         cleanupErrors.push(
@@ -481,7 +505,7 @@ async function provisionExistingPortalUser(
         userId: input.userId,
         profileBefore: input.profileBefore,
         profileWriteAttempted,
-        linkExisted: linkBefore !== null,
+        linkBefore,
         linkWriteAttempted,
       },
       provisioningError,

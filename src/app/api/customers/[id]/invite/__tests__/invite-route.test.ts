@@ -63,7 +63,11 @@ const profileWritten = vi.fn();
 const linkWritten = vi.fn();
 
 type SetupOptions = {
-  links?: Array<{ customer_id: string; user_id: string }>;
+  links?: Array<{
+    customer_id: string;
+    user_id: string;
+    revoked_at?: string | null;
+  }>;
   profileRoles?: string[];
   existingProfile?: {
     id: string;
@@ -227,7 +231,9 @@ describe("POST /api/customers/[id]/invite", () => {
       expect.objectContaining({
         table: "customer_portal_users",
         op: "upsert",
-        row: { customer_id: CUSTOMER_ID, user_id: "new-user-1" },
+        // revoked_at: null makes the grant explicit — the invite route is the
+        // only path allowed to clear a revocation tombstone (issue #605).
+        row: { customer_id: CUSTOMER_ID, user_id: "new-user-1", revoked_at: null },
       }),
     );
     await expect(response.json()).resolves.toMatchObject({
@@ -283,6 +289,79 @@ describe("POST /api/customers/[id]/invite", () => {
         delivery: "otp",
       },
     });
+  });
+
+  it("clears the revocation tombstone when staff deliberately re-grant access", async () => {
+    setup({
+      links: [
+        {
+          customer_id: CUSTOMER_ID,
+          user_id: "existing-user-1",
+          revoked_at: "2026-07-20T12:00:00.000Z",
+        },
+      ],
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["customer"],
+        status: "active",
+      },
+    });
+
+    const response = await POST(request({ email: SECOND_EMAIL }), routeContext);
+
+    expect(response.status).toBe(200);
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: "customer_portal_users",
+        op: "upsert",
+        row: {
+          customer_id: CUSTOMER_ID,
+          user_id: "existing-user-1",
+          revoked_at: null,
+        },
+      }),
+    );
+  });
+
+  it("restores the tombstone when a re-grant fails after clearing it", async () => {
+    setup({
+      links: [
+        {
+          customer_id: CUSTOMER_ID,
+          user_id: "existing-user-1",
+          revoked_at: "2026-07-20T12:00:00.000Z",
+        },
+      ],
+      existingProfile: {
+        id: "existing-user-1",
+        email: SECOND_EMAIL,
+        roles: ["customer"],
+        status: "active",
+      },
+      otpError: { message: "delivery failed" },
+    });
+
+    await expect(
+      POST(request({ email: SECOND_EMAIL }), routeContext),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("delivery failed"),
+    });
+
+    // Deleting the row would hand the revoked user back their access on the
+    // next portal render; the compensation must re-stamp the tombstone.
+    expect(
+      writes.filter(
+        (write) => write.table === "customer_portal_users" && write.op === "delete",
+      ),
+    ).toEqual([]);
+    expect(writes).toContainEqual(
+      expect.objectContaining({
+        table: "customer_portal_users",
+        op: "update",
+        row: { revoked_at: "2026-07-20T12:00:00.000Z" },
+      }),
+    );
   });
 
   it("rejects an existing staff profile without changing its role or sending email", async () => {
