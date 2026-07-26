@@ -4,7 +4,7 @@ import {
   errorResponse,
   validateBody,
 } from "@/lib/api";
-import { recipeSchema } from "@/lib/schemas/recipe";
+import { recipeUpdateSchema } from "@/lib/schemas/recipe";
 
 export const GET = withPermission("recipes:read", async (request, { supabase, params }) => {
   const id = params?.id;
@@ -30,7 +30,7 @@ export const PATCH = withPermission("recipes:write", async (request, { supabase,
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "Recipe ID required", undefined, 400);
 
-  const body = await validateBody(recipeSchema.partial(), request);
+  const body = await validateBody(recipeUpdateSchema, request);
 
   const { data, error } = await supabase
     .from("recipes")

@@ -301,7 +301,10 @@ function SyncLogTab() {
     setVisibleCount(PAGE_SIZE);
   };
 
-  const { data, isLoading, isFetching } = useQuery({
+  // A failed read must render an error arm, not "No sync activity yet" — the
+  // latter hides every error row and its retry button behind a reassuring
+  // empty state.
+  const { data, isLoading, isFetching, isError } = useQuery({
     queryKey: qboKeys.syncLog({
       ...(statusFilter && statusFilter !== "all"
         ? { status: statusFilter }
@@ -318,6 +321,7 @@ function SyncLogTab() {
       const res = await fetch(
         `/api/integrations/quickbooks/sync-log?${params}`
       );
+      if (!res.ok) throw new Error("Failed to read QuickBooks sync log");
       return (await res.json()).data;
     },
     placeholderData: (prev) => prev,
@@ -369,6 +373,11 @@ function SyncLogTab() {
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading...</div>
+      ) : isError ? (
+        <div className="text-sm text-destructive py-8 text-center">
+          Could not load the sync log. Sync activity is unknown — retry in a
+          moment.
+        </div>
       ) : logs.length === 0 ? (
         <div className="text-sm text-muted-foreground py-8 text-center">
           No sync activity yet

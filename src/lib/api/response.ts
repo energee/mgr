@@ -25,11 +25,27 @@ export type ErrorBody = {
   };
 }
 
+/**
+ * Statuses the WHATWG `Response` constructor forbids a body on. Serializing a
+ * body for one throws a `TypeError`, which `withAuth` would convert into a 500
+ * *after* the handler's write already committed — so short-circuit them.
+ */
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
+
+/**
+ * Build a `{ data, meta? }` success response.
+ *
+ * Passing a null-body status (204/205/304) yields an empty-bodied response of
+ * that status; `data` and `meta` are ignored, as the HTTP spec requires.
+ */
 export function successResponse<T>(
   data: T,
   meta?: PaginationMeta,
   status: number = 200
 ): NextResponse<SuccessBody<T>> {
+  if (NULL_BODY_STATUSES.has(status)) {
+    return new NextResponse(null, { status }) as NextResponse<SuccessBody<T>>;
+  }
   return NextResponse.json({ data, ...(meta ? { meta } : {}) }, { status });
 }
 

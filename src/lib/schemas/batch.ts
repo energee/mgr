@@ -48,6 +48,21 @@ export const batchSchema = z.object({
 
 export type BatchFormValues = z.infer<typeof batchSchema>;
 
+/**
+ * Field-update schema for `PATCH /api/batches/[id]` — every editable column
+ * except the machine state.
+ *
+ * `status` is omitted before `.partial()` for two reasons. It stops a bare
+ * status flip from bypassing `transition_entity_atomic` and its side effects
+ * (vessel release, ingredient-allocation completion, loss reconciliation) —
+ * state changes belong to `POST /api/batches/[id]/transfer`. It also removes
+ * `.default("planned")`, which survives `.partial()` in Zod and would otherwise
+ * reset the state of any batch patched with unrelated fields.
+ */
+export const batchUpdateSchema = batchSchema.omit({ status: true }).partial();
+
+export type BatchUpdateValues = z.infer<typeof batchUpdateSchema>;
+
 /** Valid state transitions: { fromState: [toStates] }
  * planned -> fermenting is triggered by Transfer (to fermenter) or Pitch Yeast suggestion.
  * fermenting -> conditioning is triggered by Transfer (to brite tank) suggestion.

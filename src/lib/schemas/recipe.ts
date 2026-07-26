@@ -70,3 +70,21 @@ export const recipeSchema = z.object({
 });
 
 export type RecipeFormValues = z.infer<typeof recipeSchema>;
+
+/**
+ * Field-update schema for `PATCH /api/recipes/[id]`.
+ *
+ * `.partial()` alone is not enough: a Zod `.default()` still fires for an
+ * absent key, so `recipeSchema.partial()` injects `status: "draft"` and
+ * `is_active: true` into every payload. Piped into `.update(body)` that
+ * silently demotes a completed recipe and reactivates a retired one on any
+ * unrelated field edit. Redeclaring both as plain optionals drops the
+ * defaults while keeping the fields legitimately editable — unlike batches,
+ * `recipes.status` is a label, not a side-effect-bearing machine state.
+ */
+export const recipeUpdateSchema = recipeSchema.partial().extend({
+  status: z.enum(["draft", "spec", "complete"]).optional(),
+  is_active: z.boolean().optional(),
+});
+
+export type RecipeUpdateValues = z.infer<typeof recipeUpdateSchema>;

@@ -52,8 +52,15 @@ const mocks = vi.hoisted(() => {
   adminQuery.order.mockReturnValue(adminQuery);
   adminQuery.range.mockReturnValue(adminQuery);
   adminQuery.eq.mockReturnValue(adminQuery);
+  const adminResult = {
+    value: { data: [], error: null, count: 0 } as {
+      data: unknown;
+      error: { message: string } | null;
+      count: number | null;
+    },
+  };
   adminQuery.then.mockImplementation((resolve) =>
-    Promise.resolve({ data: [], error: null, count: 0 }).then(resolve),
+    Promise.resolve(adminResult.value).then(resolve),
   );
   const adminFrom = vi.fn(() => adminQuery);
   const createAdminClient = vi.fn(async () => ({ from: adminFrom }));
@@ -88,6 +95,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     session,
+    adminResult,
     getUser,
     profileSingle,
     from,
@@ -118,8 +126,10 @@ vi.mock("@/integrations/quickbooks", () => ({
   saveTokens: mocks.saveTokens,
 }));
 
+const loggerError = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/logger", () => ({
-  logger: { error: vi.fn() },
+  logger: { error: loggerError },
 }));
 
 import { GET as getAuthUrl } from "@/app/api/integrations/quickbooks/auth/route";
@@ -155,6 +165,7 @@ beforeEach(() => {
   mocks.session.status = "active";
   mocks.session.profileError = null;
   mocks.cookieValues.clear();
+  mocks.adminResult.value = { data: [], error: null, count: 0 };
 });
 
 describe("unauthenticated QuickBooks routes", () => {
@@ -281,5 +292,40 @@ describe("QuickBooks sync-log authorization", () => {
     expect(response.status).toBe(200);
     expect(mocks.createAdminClient).toHaveBeenCalledOnce();
     expect(mocks.adminFrom).toHaveBeenCalledWith("qbo_sync_log");
+  });
+
+  it("returns a genuinely empty result as 200 with an empty list", async () => {
+    setAuthorizedUser();
+
+    const response = await getSyncLog(syncLogRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toEqual({ logs: [], total: 0 });
+    expect(loggerError).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a query error as a logged 500 DB_ERROR, not an empty log", async () => {
+    setAuthorizedUser();
+    mocks.adminResult.value = {
+      data: null,
+      error: { message: "could not find the table in the schema cache" },
+      count: null,
+    };
+
+    const response = await getSyncLog(syncLogRequest());
+    const body = await response.json();
+
+    // A failed read must never be reported as "nothing has ever synced".
+    expect(response.status).toBe(500);
+    expect(body.error.code).toBe("DB_ERROR");
+    expect(body.data).toBeUndefined();
+    expect(loggerError).toHaveBeenCalledTimes(1);
+    expect(loggerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: "could not find the table in the schema cache",
+      }),
+      expect.stringContaining("qbo_sync_log"),
+    );
   });
 });
