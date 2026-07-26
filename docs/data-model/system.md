@@ -87,31 +87,60 @@ Location (brewery, warehouse, taproom, offsite)
 
 Unified audit trail for all entity changes. Replaces scattered JSONB revision arrays with a single, queryable audit log.
 
+`old_data` / `new_data` hold **complete `to_jsonb()` row images**, not references
+to the source row. `entity_revisions` is therefore a second, denormalized copy
+of every tracked table, and its read policy must be at least as strict as the
+source table's — see *Access control* below.
+
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| entity_type | TEXT | Entity type: batch, order, recipe, packaging_session, etc. |
-| entity_id | UUID | FK to the entity record |
-| action | TEXT | Action: created, updated, status_changed, deleted |
-| field | TEXT | Specific field changed (nullable for status changes) |
-| previous_value | JSONB | Previous value (nullable for creates) |
-| new_value | JSONB | New value (nullable for deletes) |
-| reason | TEXT | Reason for change (optional) |
-| user_id | UUID | FK to auth.users |
-| created_at | TIMESTAMPTZ | Timestamp of change |
+| entity_type | TEXT | **Tracked table name** (`TG_TABLE_NAME`), e.g. `orders`, `recipes` — plural, not a singular entity noun |
+| entity_id | UUID | Id of the tracked row (`COALESCE(NEW.id, OLD.id)`) |
+| revision_number | INTEGER | Sequential revision number per entity |
+| operation | TEXT | `INSERT`, `UPDATE`, or `DELETE` |
+| old_data | JSONB | Complete row image before the change (null for INSERT) |
+| new_data | JSONB | Complete row image after the change (null for DELETE) |
+| change_reason | TEXT | Optional user-provided reason |
+| changed_by | UUID | `auth.uid()` at write time; null for system operations |
+| changed_at | TIMESTAMPTZ | Timestamp of change |
+| created_at | TIMESTAMPTZ | Row insert timestamp |
 
 ### Entity Types
 
+`entity_type` is the tracked table's name. Rows are written by the
+`log_entity_revision()` trigger, currently attached to:
+
 | entity_type | Description |
 |-------------|-------------|
-| batch | Production batch changes |
-| brew_log | Brew log changes |
-| recipe | Recipe modifications |
-| order | Order status and field changes |
-| packaging_session | Packaging session changes |
-| finished_good | FG adjustments |
-| inventory_item | Inventory changes |
-| vessel | Vessel status changes |
+| batches | Production batch changes |
+| recipes | Recipe modifications |
+| orders | Order status and field changes |
+| purchase_orders | Procurement changes |
+| finished_goods | FG adjustments |
+| inventory_lots | Lot-level inventory changes |
+| keg_transactions | Keg movement history |
+| packaging_sessions | Packaging session changes |
+| allocations | Allocation ledger changes |
+| pricing_tier_prices | Tier price changes |
+
+### Access control
+
+Reads are gated by migration `00275`: `entity_revisions_select` maps
+`entity_type` to the permission the tracked table's own SELECT policy
+requires (`orders` → `orders:read`, `purchase_orders` → `purchasing:read`,
+`pricing_tier_prices` → `settings:manage`, and so on). Any `entity_type` not
+enumerated falls back to `settings:manage`, so a table that gains the trigger
+without a matching CASE branch is **admin-only until the branch is added** —
+the failure mode is closed, never open.
+
+Portal customers hold no staff permission and therefore read zero revision
+rows. Writes are unaffected: `log_entity_revision()` is `SECURITY DEFINER`, so
+customer-initiated changes are still recorded even though the customer cannot
+read them back. Rows are immutable — there is no UPDATE or DELETE policy.
+
+**When you attach `log_entity_revision()` to a new table, add its CASE branch
+to `entity_revisions_select` in the same migration.**
 
 ### Actions
 
