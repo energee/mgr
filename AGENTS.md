@@ -44,6 +44,8 @@ Run `make help` to list every target.
 
 For features with `verification: "manual"`, exit 0 requires a dated receipt on the entry: `last_verified` (ISO date the flow was last walked) and `verified_by` (verify-skill transcript path or e2e spec path). Without one, `make verify-feature` exits 4 (UNVERIFIED) — walk the flow, then record the receipt.
 
+For features whose verification touches a migration, `passing` means code and tests pass — it does not mean the migration is applied on the live database, and the two must not be conflated. If the migration can't be pushed live in-session (no `SUPABASE_DB_URL`, or live-apply is a human/operator step), say so in the `evidence` field (e.g. `migration 00250 pending live apply`) and leave a tracking issue open until an operator confirms application and updates `evidence` to record the date. F201 (#440) sat "passing" for 12+ days across three separate status checks while migration 00250 was still unconfirmed live — `passing` alone doesn't tell the next reader that.
+
 ## Shared worktrees
 
 All harnesses use `scripts/agent-worktree` for worktree creation and discovery. Worktrees live under `${AGENT_WORKTREE_ROOT:-<main-checkout>/.agents/worktrees}/<repo>/<name>` — repo-local by default (gitignored and excluded from tsc/eslint/next/vitest so tooling never recurses into the nested checkouts), registered in the repository's common Git directory.
