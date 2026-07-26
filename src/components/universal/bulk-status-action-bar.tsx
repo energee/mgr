@@ -14,6 +14,11 @@
  * - Bulk delete (entities with a delete action): opens the multi-record
  *   EntityBulkDeleteDialog via `onBulkDelete`.
  *
+ * Apply reports what the database actually moved: `onStatusChange` resolves to
+ * the number of transitioned records, and a resolved `0` suppresses the success
+ * toast entirely (the caller has already surfaced the failure). `undefined`
+ * means the callback opted out of counting and falls back to the selection size.
+ *
  * Targets listed in stateMachine.requiresAction render as disabled options
  * with a hint pointing at the named entity action — those transitions need
  * the action's interactive flow (e.g. the batch archive dialog capturing
@@ -37,6 +42,12 @@ import { Trash2, X } from "lucide-react";
 type BulkStatusActionBarProps<T> = {
   entity: EntityConfig<T>;
   selectedRows: T[];
+  /**
+   * Applies `targetStatus` to the selection and resolves with the number of
+   * records that actually transitioned. `0` means none did — the bar shows no
+   * success toast and relies on the caller's own error toast. `undefined` means
+   * the callback did not count, and the bar falls back to the selection size.
+   */
   onStatusChange: (targetStatus: string) => Promise<number | undefined>;
   onClearSelection: () => void;
   /**
@@ -115,16 +126,23 @@ export function BulkStatusActionBar<T>({
 
     setIsBulkUpdating(true);
     try {
+      // `0` is an in-band result ("nothing transitioned"), so coalesce with ??
+      // — `||` would fall back to the selection size and claim a success that
+      // did not happen. Every zero-count path in the caller already raised its
+      // own toast.error, so staying silent here leaves one accurate message.
       const count = await onStatusChange(bulkTargetStatus);
-      toast.success(
-        `Updated ${count || selectedRows.length} ${
-          (count || selectedRows.length) === 1
-            ? entity.displayName.toLowerCase()
-            : entity.displayNamePlural.toLowerCase()
-        } to ${
-          getStateLabel(entity, bulkTargetStatus)
-        }`
-      );
+      const updated = count ?? selectedRows.length;
+      if (updated > 0) {
+        toast.success(
+          `Updated ${updated} ${
+            updated === 1
+              ? entity.displayName.toLowerCase()
+              : entity.displayNamePlural.toLowerCase()
+          } to ${
+            getStateLabel(entity, bulkTargetStatus)
+          }`
+        );
+      }
       setBulkTargetStatus("");
     } catch {
       toast.error("Failed to update status. Please try again.");
