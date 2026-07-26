@@ -1,8 +1,10 @@
 /**
- * TTB summary SQL regression tests (audits 2026-07-06 H2, 2026-07-10 BD-1)
+ * TTB summary SQL regression tests (audits 2026-07-06 H2, 2026-07-10 BD-1,
+ * issue #603)
  *
  * Structural assertions on the latest migration definitions of the three
- * get_ttb_*_summary functions (00203 volume math, 00237 period keying).
+ * get_ttb_*_summary functions (00203 volume math, 00237 period keying, 00274
+ * cellar removals).
  * Pins the finished-goods volume contract shared with the client-side
  * computeUnitFillVolumeBbl (src/domain/consumption-planning.ts):
  *
@@ -36,6 +38,14 @@ const ALLOC_PERIOD_KEY = /COALESCE\(a\.completed_at, a\.created_at\)/g;
 
 /** The broken pre-00237 keying (allocation-creation month, BD-1). */
 const BROKEN_PERIOD_KEY = /AND a\.created_at [<>]/;
+
+/**
+ * The pre-00274 source narrowing (#603): it dropped every batch-sourced
+ * removal — i.e. every cellar loss — before the losses_bbl arm saw it. Does
+ * not collide with the CTE's `LEFT JOIN ... ON a.source_type = 'finished_good'`
+ * (that occurrence is preceded by `ON`, not `AND`).
+ */
+const BROKEN_SOURCE_NARROWING = /AND a\.source_type = 'finished_good'/;
 
 describe("get_ttb_inventory_summary volume math", () => {
   const body = latestFunctionBody("get_ttb_inventory_summary");
@@ -98,5 +108,36 @@ describe("get_ttb_removals_summary classification", () => {
     // inventory in exactly the month it is reported as removed.
     expect(body!.match(ALLOC_PERIOD_KEY)?.length).toBe(2);
     expect(body!).not.toMatch(BROKEN_PERIOD_KEY);
+  });
+
+  // --- issue #603: batch-sourced (cellar) removals -------------------------
+  // Behavioral coverage lives in
+  // src/__tests__/integration/ttb-removals-batch-losses.test.ts (real
+  // Postgres, runs in the db-lint workflow). These structural assertions are
+  // the fast gate that keeps the contract from being dropped by the next
+  // rewrite of this function — the 'finished_good' narrowing survived four.
+
+  it("admits batch-sourced removals, not just finished goods (#603)", () => {
+    // Every cellar-loss writer emits source_type='batch' (recordBatchLoss,
+    // archive_batch, transition_entity_atomic's completion reconciliation).
+    // Narrowed to finished goods, losses_bbl was structurally 0.00.
+    expect(body!).toMatch(/a\.source_type IN \('finished_good', 'batch'\)/);
+    expect(body!).not.toMatch(BROKEN_SOURCE_NARROWING);
+  });
+
+  it("classifies batch-sourced removals as cellar, never bottled (#603)", () => {
+    // Load-bearing: get_ttb_tax_class(NULL) returns 'bottled' via its ELSE
+    // branch, so without this arm batch rows are misfiled as packaged-beer
+    // removals instead of cellar ones.
+    expect(body!).toMatch(/WHEN a\.source_type = 'batch' THEN 'cellar'/);
+  });
+
+  it("excludes internal batch movements from removals (#603)", () => {
+    // Packaging (destination 'finished_good') already leaves the cellar via
+    // the production/packaging terms; 'transfer' and 'batch' are inter-vessel
+    // moves and blends. Counting them would debit the cellar twice.
+    expect(body!).toMatch(
+      /a\.destination_type IN \('finished_good', 'transfer', 'batch'\)/,
+    );
   });
 });
