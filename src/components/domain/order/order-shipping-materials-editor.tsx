@@ -116,7 +116,14 @@ export function OrderShippingMaterialsEditor({
       <TableBody>
         {materials.map((row) => (
           <MaterialRow
-            key={row.id}
+            // Server values are part of the key so a refetch that changes them
+            // remounts the row with a fresh input seed. MaterialRow seeds its
+            // Actual input from props once and never resyncs; without this,
+            // blurring an input the user never typed into would compare the
+            // stale seed against the fresh row and persist the old number as a
+            // manual actual_qty override, which recalculate_order_materials
+            // deliberately never corrects (issue #614).
+            key={`${row.id}:${row.estimated_qty}:${row.actual_qty ?? ""}`}
             row={row}
             disabled={disabled || updateMutation.isPending}
             onActualBlur={(value) => {

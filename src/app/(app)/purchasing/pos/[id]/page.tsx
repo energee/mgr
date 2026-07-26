@@ -77,9 +77,12 @@ export default function PurchaseOrderDetailPage({
             queryClient.invalidateQueries({
               queryKey: landedCostKeys.summary(id),
             });
-            queryClient.invalidateQueries({
-              queryKey: entityKeys.all("inventory_lots"),
-            });
+            // No inventory_lots invalidation here: migration 00189 rewrote
+            // calculate_landed_cost as a pure read (LANGUAGE sql, no UPDATE),
+            // so pressing this button changes no lot data. The key that used
+            // to be invalidated here — entityKeys.all("inventory_lots") — was
+            // also inert, since the lots pages cache under the view name
+            // (issue #615).
             queryClient.invalidateQueries({
               queryKey: entityKeys.detail("purchase_orders", id),
             });

@@ -39,6 +39,21 @@ useQuery({
   unified detail page, which caches under the entity's `viewTable` key
   (issue #560). Same rule applies to any entity with a `viewTable`:
   invalidate the view key, not just the base table.
+
+  **This rule is enforced.** `src/lib/__tests__/entity-key-table-names.test.ts`
+  scans `src/` and fails CI when either:
+  (a) an `entityKeys.*` call names a string that is not a real entity table or
+  view — a key no query can ever match (this is how `entityKeys.all("user_profile")`,
+  the entity *name* rather than the `user_profiles` table, went unnoticed); or
+  (b) an `invalidateQueries` names the base table of an entity that has a
+  `viewTable` without also invalidating the view in the same file.
+  If it fails, fix the call site; only extend `NON_ENTITY_RELATIONS` when the
+  name really is a relation with no entity config.
+
+  Mutations that write an entity table *outside* `entityService` must hand-roll
+  this pair — derive both names from the entity core
+  (`entityKeys.all(inventoryLotCore.table)` / `…viewTable`) rather than typing
+  literals, so a view rename cannot desynchronize them (issue #615).
 - `dashboardKeys` — dashboard metrics and summaries
 - `notificationKeys` — user notifications
 - `catalogKeys` — catalog / lookup data

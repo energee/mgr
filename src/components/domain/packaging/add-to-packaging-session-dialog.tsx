@@ -119,6 +119,9 @@ export function AddToPackagingSessionDialog({
       toast.success(`Batch ${batchNumber} added to packaging session`);
       queryClient.invalidateQueries({ queryKey: packagingKeys.historyForBatch(batchId) });
       queryClient.invalidateQueries({ queryKey: entityKeys.list("packaging_sessions") });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("packaging_sessions_with_summary"),
+      });
       onOpenChange(false);
       router.push(`/production/packaging/${sessionId}`);
     },

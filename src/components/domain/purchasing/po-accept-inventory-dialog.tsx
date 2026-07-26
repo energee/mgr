@@ -61,7 +61,13 @@ import { PackageCheck, AlertCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { resolveCatalogNames } from "@/entities/po-line-item";
 import { unitsEquivalent } from "@/domain/inventory-units";
-import { poReceiveKeys, entityKeys, binKeys } from "@/lib/query-keys";
+import {
+  poReceiveKeys,
+  entityKeys,
+  binKeys,
+  inventoryKeys,
+} from "@/lib/query-keys";
+import { inventoryLotCore } from "@/entities/inventory-lot/core";
 import { log } from "@/lib/client-logger";
 import { cn } from "@/lib/utils";
 import { useIsMobile, useIsTouch } from "@/hooks/use-mobile";
@@ -430,9 +436,22 @@ export function POAcceptInventoryDialog({
       queryClient.invalidateQueries({
         queryKey: poReceiveKeys.all(),
       });
+      // Both the base table and the view: the lots list/detail pages key off
+      // `viewTable ?? table`, so they cache under
+      // `inventory_lots_with_quantities` and the base-table key alone reaches
+      // nothing (issue #615, same class as #560). Derived from the entity core
+      // rather than typed literals so a view rename keeps the pair correct —
+      // this mirrors invalidationKeys() in entity-service.ts, which this raw
+      // insert bypasses.
       queryClient.invalidateQueries({
-        queryKey: entityKeys.all("inventory_lots"),
+        queryKey: entityKeys.all(inventoryLotCore.table),
       });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all(inventoryLotCore.viewTable!),
+      });
+      // Aggregates summed over lot rows.
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.itemOnHand() });
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.lots() });
       queryClient.invalidateQueries({ queryKey: binKeys.all() });
     },
   });

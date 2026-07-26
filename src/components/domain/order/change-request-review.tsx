@@ -12,7 +12,11 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
-import { entityKeys, changeRequestKeys } from "@/lib/query-keys";
+import {
+  entityKeys,
+  changeRequestKeys,
+  materialPlanningKeys,
+} from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
 import {
   Table,
@@ -151,6 +155,16 @@ export function ChangeRequestReview({ parentId, data }: ChangeRequestReviewProps
       queryClient.invalidateQueries({ queryKey: entityKeys.all("order_list_details") });
       queryClient.invalidateQueries({
         queryKey: entityKeys.detail("order_items_for_review", orderId!),
+      });
+      // apply_change_request rewrites order_items, and the
+      // trg_order_items_recalculate_materials trigger recomputes
+      // order_materials from them — so the Shipping Materials table rendered
+      // on this same order pane is stale until this key is invalidated too
+      // (issue #614). Mirrors invalidateOrderMaterials() in
+      // order-items-editor.tsx. Rejection writes no order_items, so
+      // rejectMutation deliberately does not invalidate this key.
+      queryClient.invalidateQueries({
+        queryKey: materialPlanningKeys.orderMaterials(orderId!),
       });
       toast.success("Change request approved");
     },

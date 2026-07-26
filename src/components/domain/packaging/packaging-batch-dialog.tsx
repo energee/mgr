@@ -207,7 +207,13 @@ export function PackagingBatchDialog({
       queryClient.invalidateQueries({ queryKey: batchKeys.detail(batchId) });
       queryClient.invalidateQueries({ queryKey: entityKeys.all("batches") });
       queryClient.invalidateQueries({
+        queryKey: entityKeys.all("batches_with_brew_info"),
+      });
+      queryClient.invalidateQueries({
         queryKey: entityKeys.all("packaging_sessions"),
+      });
+      queryClient.invalidateQueries({
+        queryKey: entityKeys.all("packaging_sessions_with_summary"),
       });
       queryClient.invalidateQueries({
         queryKey: packagingKeys.historyForBatch(batchId),

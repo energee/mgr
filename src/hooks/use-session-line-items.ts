@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { toast } from "sonner";
-import { sessionLineItemKeys } from "@/lib/query-keys";
+import { sessionLineItemKeys, materialPlanningKeys } from "@/lib/query-keys";
 import { usePackagingFormats } from "@/hooks/use-catalog";
 import { useKegFormatIds } from "@/hooks/use-packaging";
 
@@ -134,11 +134,30 @@ export function useLineItemMutations(sessionId: string) {
   const { data: packagingFormats } = usePackagingFormats();
   const kegFormatIds = useKegFormatIds();
 
-  const invalidateItems = useCallback(
+  /**
+   * Refresh every cache derived from this session's line items.
+   *
+   * The "Materials Required" preview (`useSessionMaterialPreview`) is computed
+   * straight from `session_line_items` but caches under a sibling namespace
+   * (`materialPlanningKeys.sessionMaterials`), so a prefix invalidation of the
+   * line-item key alone leaves it showing pre-edit needed/on-hand/shortfall
+   * numbers (issue #613). Only the per-session materials key is invalidated —
+   * not `materialPlanningKeys.all()` — so unrelated BOM/shortfall/order-material
+   * queries on other pages do not refetch on every line edit.
+   *
+   * All four write paths (add, update, delete, format change) route through
+   * here; keep it that way so a new path cannot bypass the materials refresh.
+   */
+  const invalidateSessionCaches = useCallback(
     () =>
-      queryClient.invalidateQueries({
-        queryKey: sessionLineItemKeys.all(sessionId),
-      }),
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: sessionLineItemKeys.all(sessionId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: materialPlanningKeys.sessionMaterials(sessionId),
+        }),
+      ]),
     [queryClient, sessionId]
   );
 
@@ -158,7 +177,7 @@ export function useLineItemMutations(sessionId: string) {
       );
     },
     onSuccess: () => {
-      invalidateItems();
+      invalidateSessionCaches();
       toast.success("Line item added");
     },
     onError: () => {
@@ -180,7 +199,7 @@ export function useLineItemMutations(sessionId: string) {
         supabase.from("session_line_items").update({ [field]: value }).eq("id", id)
       );
     },
-    onSuccess: invalidateItems,
+    onSuccess: invalidateSessionCaches,
     onError: () => {
       toast.error("Failed to update line item");
     },
@@ -191,7 +210,7 @@ export function useLineItemMutations(sessionId: string) {
       await unwrap(supabase.from("session_line_items").delete().eq("id", id));
     },
     onSuccess: () => {
-      invalidateItems();
+      invalidateSessionCaches();
       toast.success("Line item removed");
     },
     onError: () => {
@@ -217,7 +236,7 @@ export function useLineItemMutations(sessionId: string) {
       toast.error("Failed to update format");
       return;
     }
-    invalidateItems();
+    invalidateSessionCaches();
   };
 
   return { addItem, updateItem, deleteItem, handleFormatChange, kegFormatIds };
