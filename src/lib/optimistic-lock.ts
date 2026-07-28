@@ -73,6 +73,16 @@ export async function updateWithOptimisticLock<T extends VersionedRecord>(
     .single();
 
   if (error) {
+    // PostgREST returns PGRST116 when .single() matches no rows, which is
+    // exactly the version-mismatch case this function exists to detect —
+    // it arrives as an error, not as `data: null, error: null`.
+    if (error.code === "PGRST116") {
+      return {
+        success: false,
+        error: "Record was modified by another user. Please refresh and try again.",
+        conflicted: true,
+      };
+    }
     return {
       success: false,
       error: error.message || "Failed to update record",
@@ -81,7 +91,6 @@ export async function updateWithOptimisticLock<T extends VersionedRecord>(
   }
 
   if (!updated) {
-    // No rows updated - version mismatch (concurrent modification)
     return {
       success: false,
       error: "Record was modified by another user. Please refresh and try again.",
