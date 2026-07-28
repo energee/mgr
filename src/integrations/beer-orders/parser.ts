@@ -154,7 +154,7 @@ function parseModernSheet(name: string, rows: WorkbookRows): {
     ) as Record<BeerOrderFormatKey, number>;
     const tierIndex = header.values.indexOf("price tier");
     const tierColumn = tierIndex >= 0 ? tierIndex + 1 : null;
-    const endRow = headers[index + 1]?.row ?? header.row + 7;
+    const endRow = headers[index + 1]?.row ?? rows.length + 1;
     const lines: RawBeerOrderLine[] = [];
     const orderDates = new Set<string>();
     const requestedDates = new Set<string>();
