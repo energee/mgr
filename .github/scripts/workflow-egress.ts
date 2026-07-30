@@ -59,6 +59,17 @@
  * exact equality: a job that gains a write scope *or* starts minting an app
  * token shows up and fails, and a job that gave both up (sentry-harness's
  * `fix-error`) cannot silently take them back.
+ *
+ * `readOnlyMintContradictions` is the rule the inventory cannot express (#689).
+ * An enumeration catches a *change*; it cannot say which entries are wrong, so
+ * `health-audit`'s audit job sat in it for weeks reviewed as "read-only" while
+ * its agent held the write-capable app token. The invariant that would have
+ * caught it on the day it was written is narrow and general: a job whose
+ * `permissions:` block grants no repository write has declared itself
+ * read-only, and mechanism 2 above silently contradicts that declaration, so
+ * such a job must pass `github_token`. Jobs that hold write scopes are
+ * untouched — `bug-patrol`, `feedback-distill` and `quality-regrade` push from
+ * inside the agent on purpose, and this rule has nothing to say about them.
  */
 import { parse } from "yaml";
 
@@ -296,6 +307,49 @@ export function agentWriteScopeInventory(path: string, contents: string): string
   return jobs
     .filter((job) => agentHoldsWrite(job))
     .map((job) => `${path} (job: ${job.name}): ${describeAgentCredential(job)}`);
+}
+
+/**
+ * Whether the job's own `permissions:` block declares it read-only — an
+ * explicit scope map with no repository-write entry. `id-token: write` does not
+ * disqualify a job here (it is not a repository write), which is deliberate:
+ * that shape — every scope `read` plus `id-token: write` — is *exactly* the
+ * one this rule exists to catch, because the OIDC assertion is what makes the
+ * app-token exchange possible. An absent `permissions:` block ("inherited") is
+ * not a declaration of anything and is left to the inventory.
+ */
+export function declaresReadOnly(credential: JobCredential): boolean {
+  return credential.kind === "declared" && credential.write.length === 0;
+}
+
+/**
+ * `path (job: name)` violations of the read-only credential rule (#689): an
+ * agent job whose `permissions:` block grants no repository write, but whose
+ * agent step omits `github_token` and therefore hands its shell a Claude App
+ * token with `contents`/`pull_requests`/`issues: write`.
+ *
+ * Unlike {@link agentWriteScopeInventory} this is a pass/fail rule, so it
+ * applies to workflows nobody has enumerated yet — a new "read-only analysis
+ * job" copied from an existing one fails here on the day it is written rather
+ * than being added to a list of known exceptions.
+ */
+export function readOnlyMintContradictions(path: string, contents: string): string[] {
+  let jobs: AgentJob[];
+  try {
+    jobs = agentJobsOf(contents);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
+    return [`${path}: is not parseable YAML (${reason}), so credentials cannot be checked`];
+  }
+
+  return jobs
+    .filter((job) => declaresReadOnly(job.credential) && job.mintsAppToken)
+    .map(
+      (job) =>
+        `${path} (job: ${job.name}): declares read-only permissions but its agent step passes no ` +
+        `github_token, so claude-code-action mints a Claude App token (${APP_TOKEN_SCOPES.join(", ")}: write) ` +
+        `that the permissions block cannot restrain`,
+    );
 }
 
 function escapeRegExp(value: string): string {
