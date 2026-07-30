@@ -83,14 +83,18 @@ jobs:
           #   run this repo's scripts — so denying the two web tools while
           #   granting those would be the false-posture pattern documented in
           #   docs/agents/ci.md, not a closed one. (2) The threat model is
-          #   materially weaker than sentry-harness.yml's: the checkout above
-          #   sets persist-credentials: false and claude-code-action
-          #   authenticates its own writes, so no push-capable token sits in
-          #   the workspace, and a human triggered the run and is watching it.
-          #   Still not risk-free — fork-PR diffs and third-party issue text are
-          #   unvetted input and this job holds three write scopes — so the
-          #   tradeoff is #669's to settle. Contract: ci-workflows.test.ts
-          #   enumerates every such marker, so this opt-out cannot be silent.
+          #   materially weaker than sentry-harness.yml's: a human triggered the
+          #   run and is watching it. What that argument does NOT rest on — an
+          #   earlier version of this comment said it did — is the checkout's
+          #   persist-credentials: false. At the pinned action SHA,
+          #   configureGitAuth() writes
+          #   https://x-access-token:<token>@github.com/... into the origin
+          #   remote right after checkout, so a push-capable token DOES sit in
+          #   this workspace; this job holds three write scopes and mints an app
+          #   token on top. Still not risk-free — fork-PR diffs and third-party
+          #   issue text are unvetted input — so the tradeoff is #669's to
+          #   settle. Contract: ci-workflows.test.ts enumerates every such
+          #   marker, so this opt-out cannot be silent.
           claude_args: >-
             --allowed-tools
             "Bash(bun install),Bash(bun install:*),Bash(bun run:*),Bash(bunx:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh run view:*)"

@@ -56,17 +56,29 @@ You therefore **declare** your outcome instead of performing it:
 The lander **rejects** a plan that breaks the triage contract, and a rejection
 fails the run red — so these are hard rules, not preferences:
 
-- classification \`A\` → \`pr\` required.
-- classification \`B\` or \`C\` → \`pr\` **forbidden**, and the working tree must be
-  **clean** (revert experiments with \`git checkout -- .\`). Set \`issue\` or
-  \`comment\`, never both.
+- classification \`A\` → \`pr\` normally; \`issue\` instead **only** on the
+  3-attempts-failed fallback below. Declaring neither is rejected.
+- classification \`B\` or \`C\` → \`pr\` **forbidden**. Set \`issue\` or \`comment\`,
+  never both.
 - classification \`D\` → \`pr\` **and** \`issue\`, both required.
 - No outcome at all (stale event) → \`quietRun\` with an evidence file.
+- **Whenever you do not request a \`pr\`, the working tree must be empty of
+  changes** — including untracked scratch files, because the packing step runs
+  \`git add -A\`. Reverting takes BOTH commands:
+  \`git checkout -- . && git clean -fd -e outbox\` (\`git checkout\` restores
+  tracked files; only \`git clean\` removes the repro script you wrote, and
+  \`-e outbox\` keeps your plan). Run them, then confirm with
+  \`git status --porcelain -- . ':(exclude)outbox'\` — it must print nothing.
+  Dependencies are already installed; do not run \`bun install\`, it can churn
+  \`bun.lock\` into the patch.
 - Labels are applied by the lander (\`sentry-fix\` + \`automated\` on a PR,
   \`sentry-fix\` + \`needs-human\` on an issue). Do not ask for labels.
-- A patch that touches \`.github/workflows/\`, \`.github/actions/\` or
-  \`.github/scripts/\` is rejected. If a fix genuinely needs one of those, use
-  the \`issue\` path and say so.
+- A patch that touches CI or a build/tooling entry point — \`.github/\`,
+  \`Makefile\`, \`scripts/\`, \`package.json\`, \`bun.lock\`, \`bunfig.toml\`,
+  \`.claude/\`, \`.agents/\` — is rejected. If a fix genuinely needs one of
+  those, use the \`issue\` path and say so.
+- A \`comment\` may only target an issue this harness filed: the lander re-reads
+  the target's labels and refuses one that is not labelled \`sentry-fix\`.
 
 ## Error Details
 
@@ -164,7 +176,9 @@ Gather evidence before you classify — do not guess:
   this issue will now carry a usable stack and context. Say exactly this in the
   PR body. Do not write "Followups: none".
 - **(B) or (C)** → **STOP. Do not request a code PR, and leave the working tree
-  clean.** First check whether a previous run already triaged this: run
+  clean** (\`git checkout -- . && git clean -fd -e outbox\`, then verify with
+  \`git status --porcelain\`). First check whether a previous run already
+  triaged this: run
   \`gh issue list --state all --limit 200 --json number,title,state\` and grep
   the titles for \`[sentry] ${issue.shortId}:\` (plain list + grep — \`--search\`
   returns nothing under the Actions token). If a matching issue exists, request
@@ -246,8 +260,11 @@ attempts you cannot produce a working fix for an (A). Its body
 - Name the concrete remediation you believe is required.
 
 The lander applies \`sentry-fix\` and \`needs-human\` and reports the URL. When the
-issue replaces the PR, leave the working tree clean — do not also leave a
-compensating code change.
+issue replaces the PR — including the (A)-after-3-attempts case, where the plan
+is \`{"classification": "A", "issue": {...}}\` with no \`pr\` — leave the working
+tree clean: \`git checkout -- . && git clean -fd -e outbox\`, then verify with
+\`git status --porcelain\`. A half-finished fix left in the tree is read as a
+compensating patch and fails the run.
 
 ## PR Body Template (classification (A) only) — write this to \`outbox/${BODY_FILES.pr}\`
 

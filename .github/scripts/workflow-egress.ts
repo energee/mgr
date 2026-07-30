@@ -40,8 +40,12 @@
  *  1. `claude-code-action`'s run step assigns `process.env.GITHUB_TOKEN` and
  *     `GH_TOKEN` before starting the agent, and configures git auth with the
  *     same value, so the resolved token is readable by every Bash tool call.
- *     `persist-credentials: false` clears the `.git/config` copy and nothing
- *     more.
+ *     `persist-credentials: false` does **not** leave the workspace token-free:
+ *     at the pinned SHA `be7b93b`, `configureGitAuth()` unsets the
+ *     `http.<server>/.extraheader` that `actions/checkout` writes and then runs
+ *     `git remote set-url origin https://x-access-token:<token>@github.com/…`,
+ *     so the resolved token lands back in `.git/config` regardless. Only the
+ *     token's own scopes make that copy uninteresting.
  *  2. Which token gets resolved is decided by the action's `src/github/
  *     token.ts`: when the step passes no `github_token` input, it exchanges an
  *     OIDC assertion for a Claude GitHub **App** installation token whose
@@ -89,7 +93,12 @@ const NON_REPO_WRITE_SCOPES = new Set(["id-token"]);
 export type JobCredential =
   /** No `permissions:` block — the job inherits the repository's default scopes. */
   | { kind: "inherited" }
-  /** `permissions: write-all` (or the `write-all` shorthand on a scope map). */
+  /**
+   * The `permissions: write-all` string shorthand. Only the string form is
+   * recognized, which is the only form Actions accepts: `write-all` is not a
+   * legal *value* inside a scope map (`contents: write-all` is a schema error),
+   * so there is nothing else to match.
+   */
   | { kind: "write-all" }
   /** Declared scopes; `write` lists the repository-write ones it granted. */
   | { kind: "declared"; write: string[] };
