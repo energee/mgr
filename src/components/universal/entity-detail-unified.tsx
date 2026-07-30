@@ -432,14 +432,24 @@ export function buildDuplicateDefaults<T>(
 // Helper: Reset form from loaded record data and store optimistic lock version
 // =============================================================================
 
-function resetFormFromRecord(
+export function resetFormFromRecord(
   form: UseFormReturn<Record<string, unknown>>,
   record: Record<string, unknown>,
   formDefaults: Record<string, unknown>,
   loadedVersionRef: React.MutableRefObject<number | null>
 ): void {
   form.reset({ ...formDefaults, ...record });
-  if (typeof record.version === "number") {
+  // A successful save advances loadedVersionRef immediately (see the save
+  // handler below), but the query cache only catches up once its background
+  // refetch resolves. Editing flips false in the same tick as that refetch
+  // is kicked off, so this effect can still fire once more with the
+  // pre-save cached record. Never let that regress the ref backward, or the
+  // very next save's optimistic-lock check compares against a version the
+  // server has already moved past and reports a false conflict.
+  if (
+    typeof record.version === "number" &&
+    (loadedVersionRef.current === null || record.version >= loadedVersionRef.current)
+  ) {
     loadedVersionRef.current = record.version;
   }
 }
@@ -1013,6 +1023,15 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
               return;
             }
             throw new Error(lockResult.error);
+          }
+          // Advance the ref from the server-confirmed row now, not once the
+          // background refetch this save triggers resolves — otherwise an
+          // immediate second save reuses the pre-save version and the
+          // optimistic-lock check falsely reports a conflict with no one.
+          const savedVersion = (lockResult.data as { version?: unknown } | undefined)
+            ?.version;
+          if (typeof savedVersion === "number") {
+            loadedVersionRef.current = savedVersion;
           }
         } else {
           await unwrap(
