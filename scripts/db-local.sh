@@ -18,6 +18,11 @@
 # DESTRUCTIVE: `supabase db reset` drops the local database. It never touches
 # the live project — the reset is scoped to the local stack by --local.
 #
+# Closing message reminds you to resync `.env.local` with the running stack's
+# keys: re-creating the stack can rotate its anon/service_role JWTs, and a
+# stale value surfaces as a gateway "Unregistered API key" error rather than
+# anything that looks like a database problem (docs/agents/gotchas.md).
+#
 # Requires: supabase CLI, a Docker-compatible runtime, psql.
 #
 # Usage: bash scripts/db-local.sh
@@ -75,4 +80,11 @@ Local database ready${DEMO_SEED_PARTIAL:+ (demo data partial — issue #581)}.
 
   Integration suite:  DATABASE_URL='$DB_URL' bun run test:integration
   Dev server:         make dev
+
+NEXT: resync .env.local with THIS stack. Re-creating the local stack can
+rotate its JWT keys. Run \`supabase status\` and copy the printed "anon key"
+and "service_role key" over NEXT_PUBLIC_SUPABASE_ANON_KEY and
+SUPABASE_SERVICE_ROLE_KEY, then restart the dev server. A stale key fails as
+"Unregistered API key" from the gateway — no Postgres error code, so it does
+not look like a database problem. See docs/agents/gotchas.md.
 EOF

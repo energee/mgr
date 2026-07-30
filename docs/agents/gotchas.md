@@ -49,6 +49,29 @@ enum value, a constraint, or a column, the API can keep serving the old shape
 cache, not your migration. Reload the schema cache (`NOTIFY pgrst,
 'reload schema'`, or restart the local stack) before debugging further.
 
+**`Unregistered API key` is a stale local key, not a database fault.** Every
+route that calls `createAdminClient()` — `/api/settings/api-key`,
+`/api/slack/settings`, any server-side write — starts failing at once with a
+500 whose message is literally `Unregistered API key`. That string appears
+nowhere in this repository: it comes from the local Supabase Kong gateway,
+which rejects the request before PostgREST, RLS, or your table is ever
+reached. **The tell** is that the payload carries no Postgres error code — no
+`42501`, no `42883`, no `PGRST…` — which is how you separate it from a
+policy, GRANT, or migration problem. Cause: the `SUPABASE_SERVICE_ROLE_KEY`
+(or `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_URL`) in
+`.env.local` no longer belongs to the stack that is running — re-creating the
+local stack with `supabase start` / `make db-local` can rotate its JWT keys,
+and the stale value stays structurally valid, so `src/lib/env.ts` passes it
+through without complaint. Fix: `supabase status`, copy the printed
+`anon key` / `service_role key` into `.env.local`, restart the dev server.
+Expect a *burst*, not one error: the settings page probes each integration id
+in a single page load, so one stale key filed five near-identical Sentry
+issues (#636, #637, #638, #641, #642) for one machine in one minute.
+**Not this** when `environment` is `production` — a deployed instance cannot
+rotate its own keys, so a production occurrence is a real secret-rotation or
+misconfiguration incident. Escalate it; do not self-diagnose it as this
+entry.
+
 ## Build and tooling
 
 **Stale caches masquerade as type errors.** `tsc`/eslint failures that
