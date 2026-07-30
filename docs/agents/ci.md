@@ -50,6 +50,23 @@ it. Denial is explicit rather than by omission because a missing entry in an
 allowlist reads as an oversight and gets "fixed". If a run genuinely needs an
 external page, paste the content into the prompt or the mention thread.
 
+**`claude.yml` is not exempt (issue #669).** Its job is the most defensible
+candidate for an exception — human `@claude` mention, insider-gated
+(`OWNER`/`MEMBER`/`COLLABORATOR`), `persist-credentials: false`, and a human
+watching the run — so it was worth deciding deliberately rather than
+inheriting the denial from #645's unrelated fix. Decision: no exemption. The
+insider gate controls who can *start* a run, not what attacker-influenceable
+text the run then reads (a linked fork-PR diff, a third-party issue body), and
+the job still holds `contents`/`pull-requests`/`issues: write` the whole time
+a human is watching. Cost accepted: `@claude` can't fetch a page linked in the
+mention thread — paste the content into the comment instead. The exemption
+list in `ci-workflows.test.ts` stays empty; a future PR reintroducing one
+needs the same explicit sign-off this note records. Revisit only if that
+paste-it-in friction becomes common enough to justify scoping the denial to
+non-interactive event branches (e.g. `issues: opened`) instead of the whole
+job — that needs the contract to move from per-job to per-event, which is
+more machinery than the current cost justifies.
+
 ## Live apply and rollback
 
 CI never touches the live database. Migrations reach live only when a human
