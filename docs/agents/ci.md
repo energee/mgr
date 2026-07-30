@@ -14,6 +14,7 @@ workflow change, or the unit suite fails.
 | `shell-lint.yml` | PR touching `scripts/**` | `bash -n` + shellcheck over every shebang-bearing file under `scripts/` (selection is by shebang, not extension, so extensionless scripts like `scripts/agent-worktree` are covered). No database, no build. |
 | `live-drift.yml` | Daily schedule + dispatch | Watchdog comparing the live database catalog to `supabase/live-catalog.snapshot.txt` — catches out-of-band drift no PR would surface. Missing/changed objects FAIL; additions WARN. Two tracking issues, deliberately distinct: `live-drift` (real drift) and `watchdog-down` (the check never reached the database — missing secret, billing block, connection error). While `watchdog-down` is open there is **no** drift detection at all. |
 | `nightly-watch.yml` | `workflow_run` completion of scheduled Test runs, or dispatch with a simulated `conclusion` | Opens/updates ONE `nightly-red` tracking issue when the nightly fails; closes it on the next green run. Dispatch exists so the watchdog can be exercised without waiting for a red nightly. |
+| `prod-health.yml` | Schedule every 15 min + dispatch | Post-deploy verification: probes `${vars.PRODUCTION_URL}/api/health` (HTTP 200 **and** body `status: "ok"` — a 200 carrying `degraded` is a failure) and `/login` (the auth wall), retrying 3× with backoff. Maintains ONE `prod-down` issue; closes it on recovery. Checkout-free, `issues: write` only. A missing `PRODUCTION_URL` variable fails the run loudly rather than skipping. |
 | `progress.yml` | Push to main touching `docs/progress/**` | Regenerates `PROGRESS.md` via `scripts/build-progress.sh` and lands it through an auto-merged bot PR. This is why PROGRESS.md must never be edited on a branch (AGENTS.md constraint 18). |
 | `hygiene.yml` | Weekly schedule | Report-only branch hygiene summary (merged/stale branches). Never deletes anything. |
 | `sentry-harness.yml` | Weekday schedule + dispatch | Scores recent Sentry errors and dispatches up to 3 Claude fix jobs (45-min cap each). |
@@ -85,38 +86,36 @@ issue bodies are unvetted input and the job holds three `write` scopes — so
 #669 tracks whether to tighten it. The lesson generalises: an exemption is for
 when the denial would be *cosmetic*, and it must say so in writing.
 
-## Live apply and rollback
+## Deploy verification
 
-CI never touches the live database. Migrations reach live only when a human
-runs `scripts/db-push.sh` (see [`gotchas.md`](gotchas.md)), so "merged" and
-"applied" are two separate events and can drift apart for days — issue #440
-is exactly that. When you merge a migration, say in the PR whether live has
-it yet.
+CI does not deploy and does not gate the deploy: every merge to main
+auto-deploys to Vercel production, and `scripts/vercel-ignore-build.sh` only
+decides whether a commit is worth *building* (docs-only pushes skip). Nothing
+in the pipeline asserts the promoted artifact actually serves traffic — a
+failed build, a broken database connection, or a dead auth wall would only
+surface once a real user tripped Sentry.
 
-**There are no down migrations.** Rolling back means writing a new forward
-migration that reverses the change, numbered above the bad one, pushed the
-same way. Never edit or delete an applied migration file: the chain replayed
-by `db-lint.yml` and the `schema_migrations` version rows on live both key
-off the filename.
+`prod-health.yml` is the net for that (issue #587). Every 15 minutes it probes
+the production origin held in the **repository variable `PRODUCTION_URL`**
+(a variable, not a secret — the URL is public, and it is deliberately not
+committed):
 
-Order of operations when a live migration goes bad:
+- `GET /api/health` must answer HTTP 200 **and** a JSON body with
+  `status: "ok"`. The route (`src/app/api/health/route.ts`) answers 503
+  `{status:"degraded"}` when Postgres is unreachable; checking only the status
+  code would let a degraded body read as healthy.
+- `GET /login` must answer HTTP 200. A broken auth wall locks every user out
+  while the API route still answers. Only the status code is asserted —
+  matching page copy would turn wording changes into false alerts.
 
-1. Confirm the damage against the catalog, not against intent — run
-   `scripts/check-live-drift.sh` (needs `SUPABASE_DB_URL`).
-2. Write the reversing migration; verify it with `make db-local` and
-   `make db-dry-run` before it goes anywhere near live.
-3. Push with `scripts/db-push.sh`, which refreshes the snapshot in the same
-   step. Commit the snapshot with the migration.
-4. Re-run `live-drift.yml` (`gh workflow run live-drift.yml`) and confirm it
-   is green before closing anything out.
-
-**The watchdog is only as live as its secret.** `SUPABASE_DB_URL` is a
-read-only connection string held as a repository secret; when it is rotated
-or expires, `live-drift.yml` fails with `password authentication failed`
-rather than reporting drift, and the repo has *no* net for out-of-band schema
-changes until it is restored. A failing live-drift run is therefore urgent
-even when the failure looks like plumbing. Scheduled runs fail loudly on a
-missing secret by design (a green cron with no secret would be worse).
+Each probe retries 3× with a short backoff, so a single dropped connection
+does not alert. On failure it opens (or comments on) ONE `prod-down` issue;
+on the next passing probe it comments and closes. **If `PRODUCTION_URL` is
+unset the run fails loudly** and touches no issue: a health gate that turns
+green when unconfigured is worse than no gate — that is precisely how the old
+secrets-gated E2E job silently skipped for months (issue #437). Set it with
+`gh variable set PRODUCTION_URL --body "https://<production-host>"`, then
+`gh workflow run prod-health.yml`.
 
 ## Live apply and rollback
 

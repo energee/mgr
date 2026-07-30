@@ -7,6 +7,12 @@
  * The service role key is server-side only and never exposed to browsers.
  * - 200 with { status: "ok", database: "connected" } when everything is healthy
  * - 503 with { status: "degraded", database: "unreachable" } when the database is down
+ *
+ * Consumer contract: `.github/workflows/prod-health.yml` probes this route on
+ * production every 15 minutes and treats it as healthy ONLY when the response
+ * is HTTP 200 *and* the body's `status` field is exactly "ok". Renaming that
+ * field or its value would blind the post-deploy watchdog, so change both
+ * together (see docs/agents/ci.md, "Deploy verification").
  */
 
 import { NextResponse } from "next/server";

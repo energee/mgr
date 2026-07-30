@@ -567,6 +567,49 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).toContain("quiet-run.md");
   });
 
+  // Deploy verification (issue #587): every merge to main auto-deploys to
+  // Vercel production and nothing verified the deployed artifact — no smoke
+  // check, no uptime probe. The probe that closes that gap must stay a cron
+  // watchdog with ONE deduped issue, must reject a 200 that carries
+  // "degraded" (status-code-only checks would call a dead database healthy),
+  // must cover the auth wall, and must fail LOUDLY when PRODUCTION_URL is
+  // unset — a health gate that silently passes when unconfigured is worse
+  // than none, which is exactly how the secrets-gated E2E job never ran
+  // (issue #437).
+  it("probes production on a cron and fails loudly when PRODUCTION_URL is unset", () => {
+    const workflow = read(".github/workflows/prod-health.yml");
+
+    expect(workflow).toContain('cron: "*/15 * * * *"');
+    expect(workflow).toContain("workflow_dispatch");
+    expect(workflow).toContain("vars.PRODUCTION_URL");
+    expect(workflow).toMatch(/::error::PRODUCTION_URL repository variable is not set/);
+    expect(workflow).toContain("gh variable set PRODUCTION_URL");
+
+    // Both surfaces, and a body assertion — not just the status code.
+    expect(workflow).toContain("/api/health");
+    expect(workflow).toContain("jq -r '.status // empty'");
+    expect(workflow).toContain('!= "ok"');
+    expect(workflow).toContain("/login");
+
+    // Retry with backoff so one network blip does not open an issue.
+    expect(workflow).toContain("max_attempts=3");
+
+    // ONE deduped issue, mirroring live-drift.yml / nightly-watch.yml, and no
+    // issue churn at all when the probe never produced a verdict.
+    expect(workflow).toContain("gh label create");
+    expect(workflow).toContain("prod-down");
+    expect(workflow).toContain("gh issue create");
+    expect(workflow).toContain("gh issue close");
+    expect(workflow).toContain("steps.probe.outputs.healthy != ''");
+
+    // Least privilege: issue writes only, and no checkout to leak a token into.
+    expect(workflow).toMatch(/permissions:\n  issues: write/);
+    expect(workflow).not.toContain("contents: write");
+    expect(workflow).not.toContain("pull-requests:");
+    expect(workflow).not.toContain("actions/checkout");
+    expect(workflow).toContain("timeout-minutes:");
+  });
+
   // Routing freshness: docs/agents/ci.md's workflow table went stale in the
   // same commit that added new workflows. Every workflow file must appear in
   // ci.md (forward ratchet; the table itself is the backward migration).
