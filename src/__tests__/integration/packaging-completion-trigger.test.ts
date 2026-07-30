@@ -16,6 +16,13 @@
  * constraints, so replayed chains accept these rows directly — the pg_temp
  * stamping shim this suite previously carried is gone (#559).
  *
+ * The last describe block covers the keg half of the same function (#701).
+ * Until 00283 a chain-built database could not complete a keg-container
+ * session at all: the fill keg_transactions insert omitted keg_type_id, NOT
+ * NULL since 00032, so the completion aborted with "null value in column
+ * keg_type_id ... violates not-null constraint". 00283 retires that column,
+ * which is the shape live has had since the container/selling-format refactor.
+ *
  * All tests run inside BEGIN/ROLLBACK; nothing is committed.
  */
 
@@ -352,6 +359,163 @@ describe("revise_packaging_session below-committed guard", () => {
       ]);
     } finally {
       await client.query("ROLLBACK");
+      client.release();
+    }
+  });
+});
+
+describe("keg-container packaging completion (#701)", () => {
+  /**
+   * Seeds the keg counterpart of `seedPackagingFixture`: brand -> keg
+   * container -> selling format -> packaging-state batch -> in_progress
+   * session with one line item for 17 kegs.
+   *
+   * The container is created here rather than reused from a fixture because
+   * `containers.type = 'keg'` is exactly what
+   * `create_finished_goods_from_packaging` branches on when deciding to write
+   * the fill transaction (00183 onward: selling_formats -> containers).
+   */
+  async function seedKegFixture(client: import("pg").PoolClient, base: number) {
+    const brandId = uid(base + 1);
+    const containerId = uid(base + 2);
+    const formatId = uid(base + 3);
+    const batchId = uid(base + 4);
+    const sessionId = uid(base + 5);
+    const lineId = uid(base + 6);
+
+    await client.query(`INSERT INTO brands (id, name) VALUES ($1, $2)`, [
+      brandId,
+      `Keg fill brand ${base}`,
+    ]);
+    await client.query(
+      `INSERT INTO containers (id, name, type, volume_bbl)
+       VALUES ($1, $2, 'keg', 0.5)`,
+      [containerId, `Keg fill half barrel ${base}`]
+    );
+    await client.query(
+      `INSERT INTO selling_formats (id, container_id, name, unit_count)
+       VALUES ($1, $2, 'Per Keg', 1)`,
+      [formatId, containerId]
+    );
+    await client.query(
+      `INSERT INTO batches (id, batch_code, name, status, volume_bbl)
+       VALUES ($1, $2, 'Keg fill batch', 'packaging', 10)`,
+      [batchId, `KEGFILL-${base}`]
+    );
+    await client.query(
+      `INSERT INTO packaging_sessions (id, status, session_date)
+       VALUES ($1, 'in_progress', CURRENT_DATE)`,
+      [sessionId]
+    );
+    await client.query(
+      `INSERT INTO session_line_items
+         (id, session_id, brand_id, selling_format_id, batch_id,
+          planned_quantity, actual_quantity)
+       VALUES ($1, $2, $3, $4, $5, 20, 17)`,
+      [lineId, sessionId, brandId, formatId, batchId]
+    );
+
+    return { brandId, containerId, formatId, batchId, sessionId, lineId };
+  }
+
+  it("records the fill keg_transaction for a keg-container line item", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const fx = await seedKegFixture(client, 500);
+
+      // Pre-00283 this UPDATE raised:
+      //   null value in column "keg_type_id" of relation "keg_transactions"
+      //   violates not-null constraint
+      await client.query(
+        `UPDATE packaging_sessions SET status = 'completed' WHERE id = $1`,
+        [fx.sessionId]
+      );
+
+      const { rows: fgRows } = await client.query<{ id: string }>(
+        `SELECT id FROM finished_goods WHERE session_line_item_id = $1`,
+        [fx.lineId]
+      );
+      expect(fgRows).toHaveLength(1);
+
+      const { rows: txns } = await client.query<{
+        transaction_type: string;
+        selling_format_id: string;
+        container_type: string;
+        quantity: number;
+        from_state: string;
+        to_state: string;
+        batch_id: string;
+        finished_good_id: string;
+      }>(
+        `SELECT kt.transaction_type, kt.selling_format_id, c.type AS container_type,
+                kt.quantity, kt.from_state, kt.to_state, kt.batch_id,
+                kt.finished_good_id
+         FROM keg_transactions kt
+         JOIN selling_formats sf ON sf.id = kt.selling_format_id
+         JOIN containers c ON c.id = sf.container_id
+         WHERE kt.packaging_session_id = $1`,
+        [fx.sessionId]
+      );
+
+      // The keg identity of the fill: a non-null selling_format_id whose
+      // container is a keg. That is what replaced keg_type_id — the join
+      // above fails if selling_format_id is ever left null.
+      expect(txns).toHaveLength(1);
+      expect(txns[0]).toMatchObject({
+        transaction_type: "fill",
+        selling_format_id: fx.formatId,
+        container_type: "keg",
+        quantity: 17,
+        from_state: "empty",
+        to_state: "filled",
+        batch_id: fx.batchId,
+        finished_good_id: fgRows[0].id,
+      });
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  });
+
+  it("writes no keg_transaction for a package-container line item", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const fx = await seedPackagingFixture(client, 600);
+
+      await client.query(
+        `UPDATE packaging_sessions SET status = 'completed' WHERE id = $1`,
+        [fx.sessionId]
+      );
+
+      const { rows } = await client.query<{ n: string }>(
+        `SELECT count(*) AS n FROM keg_transactions WHERE packaging_session_id = $1`,
+        [fx.sessionId]
+      );
+      expect(Number(rows[0].n)).toBe(0);
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  });
+
+  it("has no legacy keg_type_id column on keg_transactions", async () => {
+    const client = await pool.connect();
+    try {
+      // Schema contract, asserted the same way square-draft-sales-schema.test.ts
+      // pins the sibling retirement (00254): a replay that restores the
+      // column also restores the NOT NULL that broke every keg write path.
+      const { rows } = await client.query<{ column_name: string }>(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'keg_transactions'
+           AND column_name IN ('keg_type_id', 'selling_format_id')
+         ORDER BY column_name`
+      );
+      expect(rows.map((r) => r.column_name)).toEqual(["selling_format_id"]);
+    } finally {
       client.release();
     }
   });
