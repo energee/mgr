@@ -1,6 +1,7 @@
 # Nightly generative bug hunt. Finds ONE small, high-confidence defect in
 # recently changed code, fixes it minimally, and opens a PR for human review.
-# Never merges — the required checks on main + a human are the gate. Bounded by
+# Never merges — a human is the gate (the PR checks report but are not
+# required: ruleset `main` declares no `required_status_checks`). Bounded by
 # --max-turns and timeout so a single run's token spend is capped. Only runs on
 # schedule/dispatch, so there is no fork-PR / untrusted-comment trigger surface.
 name: Nightly Bug Patrol

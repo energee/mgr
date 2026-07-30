@@ -327,6 +327,26 @@ green without testing anything:
   re-installs, boots its own Supabase and runs its own `bun run build` — so it
   declares no `needs:`, which also takes the static -> unit chain off the PR's
   critical path.
+- a **skip token in the commit message**, anywhere in the message and not just
+  the subject. This route is in no workflow file at all, which is what makes it
+  easy to hit by accident: a commit that merely *quotes* the token while
+  explaining it suppresses every workflow on that head. **Measured here on
+  2026-07-30**, which is why this bullet exists — the first draft of this
+  section's own commit (`117725d1`, since amended away) had `[skip ci]` inside
+  backticks in its body, describing `progress.yml`'s comment, and produced
+  **zero** workflow runs:
+
+  ```
+  gh api "repos/energee/mgr/actions/runs?head_sha=117725d1…" -q .total_count -> 0
+  gh api "repos/energee/mgr/actions/runs?head_sha=3eb41ff4…" -q .total_count -> 1
+  ```
+
+  No red X, no skipped check — the contexts simply never exist, and a PR with
+  no contexts is as green as one that passed. `[skip ci]` is the variant
+  observed; GitHub documents `[ci skip]`, `[no ci]`, `[skip actions]` and
+  `[actions skip]` as equivalent, which is read from their docs, not tested
+  here. Refer to them by description ("the skip-CI marker"), or break them up,
+  when writing a commit message *about* them.
 
 Only `build` keeps an event gate, and nothing that must report on a PR may
 depend on it.
@@ -357,6 +377,7 @@ ever to reach this job:
 |---|---|---|---|
 | [30559728366](https://github.com/energee/mgr/actions/runs/30559728366) | still had `needs: unit-tests` | 5m01s (16:07:01Z -> 16:12:02Z) | 7m55s — e2e started 2m54s late |
 | [30569164797](https://github.com/energee/mgr/actions/runs/30569164797) | no `needs:` (shipped shape) | 5m14s (18:09:29Z -> 18:14:43Z) | **5m14s** — e2e and `static` both started 18:09:29Z |
+| [30569862548](https://github.com/energee/mgr/actions/runs/30569862548) | no `needs:`, on the merged commit | 4m53s (18:19:01Z -> 18:23:54Z) | **4m53s** — same, `18 passed (22.8s)` |
 
 So the E2E job costs about 5 minutes (Supabase boot, a `next build` against it,
 and 23.0s of tests — `Running 23 tests using 1 worker` / `5 skipped` /
@@ -421,8 +442,9 @@ a workflow change, and it is a deliberate owner call — `Production Build` must
 
    This applies to the always-report set only: `test.yml`'s `static`,
    `unit-tests` and `e2e`. `db-lint.yml` (`supabase/migrations/**`) and
-   `shell-lint.yml` (`scripts/**`) are **deliberately** path-filtered and are
-   contract-pinned that way — they are opt-in lanes for the diffs that need
-   them, they report nothing on unrelated PRs, and for that reason they must
-   never be made required. Adding a job to the always-report set means giving
+   `shell-lint.yml` (`scripts/**`) are **deliberately** path-filtered, and both
+   filters are pinned in `.github/scripts/ci-workflows.test.ts` (removing
+   either `paths:` list reds the suite) — they are opt-in lanes for the diffs
+   that need them, they report nothing on unrelated PRs, and for that reason
+   they must never be made required. Adding a job to the always-report set means giving
    it a trigger that fires on every PR, not adding a path filter and hoping.

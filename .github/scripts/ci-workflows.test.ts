@@ -386,6 +386,13 @@ describe("GitHub Actions performance contracts", () => {
     expect(testWorkflow).not.toContain("Integration Tests (RLS)");
     expect(shellWorkflow).toContain("shellcheck");
     expect(shellWorkflow).not.toContain("postgres:");
+    // Pin shell-lint's trigger paths for the same reason db-lint's are pinned
+    // above, and because docs/agents/ci.md's rule 8 names both as deliberately
+    // path-filtered opt-in lanes: the carve-out is only defensible while the
+    // filter is the intended one, not an accident nobody would notice losing.
+    expect(shellWorkflow, "shell-lint must run on script changes").toContain(
+      '- "scripts/**"',
+    );
   });
 
   it("uses built-in psql and parallelizes only the selected Sentry fixes", () => {

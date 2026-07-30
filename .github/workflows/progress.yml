@@ -44,9 +44,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git switch -C "$branch"
           git add PROGRESS.md
-          # No skip-ci marker: static + unit are required status checks on
-          # main, so the bot PR must let them run (they pass — nothing
-          # depends on PROGRESS.md) or auto-merge below would wait forever.
+          # No skip-ci marker: static, unit and E2E report on every PR, so the
+          # bot PR must let them run (they pass — nothing depends on
+          # PROGRESS.md) rather than suppressing them. They are NOT required
+          # status checks — ruleset `main` (11725742) declares no
+          # `required_status_checks` rule — so `--auto` below does not actually
+          # wait on them today; keep the marker off anyway, so the day they are
+          # made required this job does not start hanging.
           git commit -m "docs(progress): rebuild PROGRESS.md"
 
           remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"
@@ -66,8 +70,11 @@ jobs:
             pr_number="${pr_url##*/}"
           fi
 
-          # --auto: wait for required status checks instead of merging
-          # immediately (an immediate merge fails once checks are required).
+          # --auto: queue the merge behind whatever checks are required rather
+          # than merging immediately. No context is required on `main` today,
+          # so this currently merges as soon as GitHub allows; it is here so
+          # the job keeps working unchanged once contexts are made required
+          # (an immediate merge would start failing at that point).
           gh pr merge "$pr_number" \
             --auto \
             --squash \
