@@ -9,9 +9,11 @@
  *   - Default: hit `/api/auth/dev-login`, which signs in `dev@brewery.test`
  *     (creating it if absent) and redirects. No credentials needed. That route
  *     404s unless it is explicitly enabled — `NODE_ENV=development` (what
- *     `bun dev` gives locally) or `E2E_DEV_LOGIN=1`. CI's nightly lane sets the
- *     flag because it serves a production `next build` via `bun start`, where
- *     NODE_ENV is "production" (issue #644).
+ *     `bun dev` gives locally), or `E2E_DEV_LOGIN=1` *together with* a loopback
+ *     `NEXT_PUBLIC_SUPABASE_URL` (issue #656). CI's nightly lane sets the flag
+ *     because it serves a production `next build` via `bun start`, where
+ *     NODE_ENV is "production" (issue #644), and points it at its own local
+ *     Supabase stack, which is what satisfies the loopback half.
  *   - If `E2E_USER_EMAIL` is set: drive the real credential form instead, for
  *     targets that cannot enable dev-login — notably a deployed environment,
  *     where the route stays 404 by design.

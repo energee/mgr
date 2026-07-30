@@ -14,7 +14,10 @@
  *                         production build (see that route's docstring). Required
  *                         for the credential-less path whenever the server under
  *                         test is `bun start` rather than `bun dev`; test.yml's
- *                         e2e job sets it.
+ *                         e2e job sets it. Not sufficient on its own: the route
+ *                         also requires NEXT_PUBLIC_SUPABASE_URL to be loopback
+ *                         on this path, so it cannot mint admin against a hosted
+ *                         project (issue #656).
  *
  * Set PLAYWRIGHT_BASE_URL when :3000 is taken by another worktree's dev server.
  * For localhost targets the port is derived from it and passed to `bun dev`,
