@@ -371,19 +371,21 @@ annotation when:
   17 enabled specs + the auth setup today). Raise both together as the
   remaining scaffolds get implemented.
 
-**Cost**, measured on two real `pull_request` events (2026-07-30), the first two
-ever to reach this job:
+**Cost**, measured on every real `pull_request` event this job has ever had —
+all five landed on 2026-07-30, because before that day it had none:
 
 | Run | Shape | E2E job | Whole PR |
 |---|---|---|---|
 | [30559728366](https://github.com/energee/mgr/actions/runs/30559728366) | still had `needs: unit-tests` | 5m01s (16:07:01Z -> 16:12:02Z) | 7m55s — e2e started 2m54s late |
 | [30569164797](https://github.com/energee/mgr/actions/runs/30569164797) | no `needs:` (shipped shape) | 5m14s (18:09:29Z -> 18:14:43Z) | **5m14s** — e2e and `static` both started 18:09:29Z |
 | [30569862548](https://github.com/energee/mgr/actions/runs/30569862548) | no `needs:` | 4m53s (18:19:01Z -> 18:23:54Z) | **4m53s** — `18 passed (22.8s)` |
-| [30572709446](https://github.com/energee/mgr/actions/runs/30572709446) | no `needs:`, head of #702 | 5m16s (18:57:28Z -> 19:02:44Z) | **5m16s** — `18 passed (23.6s)` |
+| [30572709446](https://github.com/energee/mgr/actions/runs/30572709446) | no `needs:` | 5m16s (18:57:28Z -> 19:02:44Z) | **5m16s** — `18 passed (23.6s)` |
+| [30573551199](https://github.com/energee/mgr/actions/runs/30573551199) | no `needs:` | 4m55s (19:08:53Z -> 19:13:48Z) | **4m55s** — `18 passed (22.5s)` |
 
-So the E2E job costs about 5 minutes (Supabase boot, a `next build` against it,
-and 23.0s of tests — `Running 23 tests using 1 worker` / `5 skipped` /
-`18 passed`), and because it no longer queues behind `static -> unit-tests` it
+So the E2E job costs about 5 minutes (4m53s-5m16s across the five: Supabase
+boot, a `next build` against it, and ~23s of tests — `Running 23 tests using 1
+worker` / `5 skipped` / `18 passed`, identical on every run), and because it no
+longer queues behind `static -> unit-tests` it
 *sets* the PR's critical path rather than extending it: PR latency went **down**
 by ~2m40s even though a five-minute browser suite was added to every PR.
 
