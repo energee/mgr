@@ -1,10 +1,32 @@
 # CI model (public repo — Actions minutes are unlimited/free):
-# Static + unit run on EVERY PR, including docs-only ones, so the
-# "Static Checks" and "Unit Tests" contexts always report and can be
-# configured as required status checks on main. Build + E2E stay on a
-# weekday nightly schedule against main instead of on every merge — local
-# `make check` already runs the build before commit, Vercel builds every
-# deploy, and the nightly catches squash-merge drift within 24h.
+# Static, unit AND Playwright E2E run on EVERY PR, including docs-only ones,
+# so their contexts always report. NOTE: none of them is a *required* status
+# check today — ruleset `main` (id 11725742) declares no `required_status_checks`
+# rule at all, and the branch has no legacy protection, so a red check here is
+# a visible failure but does not block a merge. Making them required is an
+# owner-only repository-settings change (docs/agents/ci.md). What this file
+# controls is that the contexts always report, which is the precondition.
+#
+# Nothing here is path-filtered, and only `build` carries an event gate:
+# GitHub reports a job that did not run as "skipped", and a skipped check reads
+# as green everywhere conclusions are consumed — including as a required status
+# check, were one configured. So every way of not running a job is a way of
+# turning its check green without testing anything, which is exactly how the
+# old secrets-gated E2E job read healthy for months (issue #437).
+#
+# E2E was kept off the PR lane on 2026-07-17 by the CI-minutes diet (#522).
+# That rationale expired on 2026-07-24 when this repository went public:
+# Actions minutes are free, so keeping the browser suite off pull requests buys
+# nothing. Moved onto the PR lane 2026-07-30 (#437) — for the FIRST time, not
+# restored: it had never run on a pull_request event before (see the e2e job's
+# own header). Do not "restore the diet" for this job — re-read #522 first; the
+# constraint it optimised for is gone.
+# The rest of #522 stands (unsharded vitest, no per-merge CI on main).
+#
+# `build` alone stays nightly/dispatch, because it compiles against the HOSTED
+# Supabase credentials, which fork pull requests cannot read. Pull requests
+# still compile the app: the e2e job runs its own `bun run build` against its
+# local stack, so a broken build fails a PR either way.
 name: Test
 
 on:
@@ -101,8 +123,16 @@ jobs:
         run: bunx vitest run --coverage
 
   build:
-    # Nightly/dispatch only — not per-PR or per-merge. `make check` runs the
-    # same build locally before every commit, and Vercel builds on deploy.
+    # Nightly/dispatch only, and the ONLY event-gated job here. It builds
+    # against the HOSTED Supabase credentials, which fork pull requests cannot
+    # read, and it carries the dependency audit. Pull requests are not left
+    # without build coverage: the e2e job compiles the same app against its own
+    # local stack. `make check` also builds locally before every commit, and
+    # Vercel builds on deploy.
+    #
+    # Because this job is event-gated, nothing that must report on a pull
+    # request may declare `needs: build` — a skipped dependency skips the
+    # dependent job, and a skipped check reads as passing.
     name: Production Build
     needs: unit-tests
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -154,16 +184,41 @@ jobs:
         # .github/scripts/ci-workflows.test.ts fails the build otherwise.
         run: bun audit --audit-level=high --ignore GHSA-mh99-v99m-4gvg
 
-  # Nightly-only (same gate as build). Boots an isolated local Supabase stack
-  # instead of pointing Playwright at hosted credentials — the hosted E2E
-  # secrets were never configured, so the old secrets-gated job silently
-  # skipped and the browser suite never actually ran.
+  # Runs on EVERY event this workflow has, pull requests included (#437).
+  # Boots an isolated local Supabase stack instead of pointing Playwright at
+  # hosted credentials — the hosted E2E secrets were never configured, so the
+  # original secrets-gated job silently skipped and the browser suite never ran.
+  #
+  # Three properties are load-bearing, all learned from that same failure mode:
+  #
+  #   - No `if:` gate. It had one (`schedule || workflow_dispatch`) from the day
+  #     it landed: #506 was authored as a per-PR gate but merged 14 minutes
+  #     after #522's minutes diet (2026-07-17T04:04:28Z vs 03:50:19Z), in
+  #     nightly form. So E2E had never run on a pull_request event at all
+  #     before 2026-07-30, while the check went on looking healthy. Minutes are
+  #     free on a public repo; the job's measured wall clock is 5m01s on run
+  #     30559728366 (Supabase boot + a build against it + 23.0s of tests).
+  #   - No path filter. "Only PRs that touch relevant paths" is the same defect
+  #     in a new costume: the PRs it declines to run for still report green.
+  #   - No `needs:` AT ALL. Any dependency that is skipped, red or cancelled
+  #     skips this job, and a skip reads as green — so `needs:` is a live
+  #     route back into the bug this job exists to close. That is measured, not
+  #     hypothetical: on main, `Static Checks` failed on the five 2026-07-20..24
+  #     nightlies and `Production Build` failed on the four 2026-07-27..30 ones,
+  #     and E2E reported "skipped" on all NINE (`gh run view <id> --json jobs`),
+  #     on top of every earlier run, which its own `if:` skipped. Its first
+  #     successful execution in its life was run 30551975249 on 2026-07-30.
+  #     This job consumes nothing from any other job anyway: it re-checks out,
+  #     re-installs, boots its own Supabase and runs its own `bun run build`
+  #     below. Removing the edge also takes the wait behind static -> unit-tests
+  #     off the PR's critical path. Measured, both on real pull_request events:
+  #     with the edge, run 30559728366 started e2e 2m54s late (16:04:07Z ->
+  #     16:07:01Z) for a 7m55s PR; without it, run 30569164797 started e2e and
+  #     static in the same second (18:09:29Z) and the whole PR took 5m14s.
   e2e:
     name: E2E Tests
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: build
     env:
       # Opt-in gate for /api/auth/dev-login, which e2e/auth.setup.ts uses to
       # obtain a session. That route 404s unless NODE_ENV=development, or this
@@ -205,6 +260,37 @@ jobs:
           set -euo pipefail
           supabase start --exclude vector
           eval "$(supabase status -o env 2>/dev/null)"
+
+          # Fail loudly rather than test nothing (#437's second criterion).
+          # `bun run build` runs with SKIP_ENV_VALIDATION=1, so an empty
+          # NEXT_PUBLIC_SUPABASE_URL compiles perfectly well and surfaces only
+          # as opaque Playwright timeouts several minutes later. `:-` on every
+          # read because `set -u` would otherwise abort with a bare "unbound
+          # variable" and no actionable message.
+          missing=""
+          for var in API_URL ANON_KEY SERVICE_ROLE_KEY; do
+            if [ -z "${!var:-}" ]; then
+              missing="${missing} ${var}"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::\`supabase status -o env\` exported no value for:${missing}. The E2E lane has no database to run against, so it fails here instead of running an unconfigured suite."
+            exit 1
+          fi
+
+          # /api/auth/dev-login is the only way this lane obtains a session, and
+          # on the E2E_DEV_LOGIN path it answers only when the Supabase URL the
+          # server's own clients resolve has a loopback hostname (#656). A
+          # non-loopback URL 404s every auth attempt and strands the `setup`
+          # project in a timeout, so name the real cause here.
+          case "$API_URL" in
+            http://127.0.0.1:*|http://localhost:*|http://\[::1\]:*) ;;
+            *)
+              echo "::error::Local Supabase API URL is '${API_URL}', which has no loopback hostname. /api/auth/dev-login stays 404 on the E2E_DEV_LOGIN path (#656), so the browser suite cannot authenticate."
+              exit 1
+              ;;
+          esac
+
           {
             echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
@@ -222,8 +308,48 @@ jobs:
       - name: Build against the local stack
         run: bun run build
 
+      # JSON alongside the HTML report so the next step can prove the run was
+      # not vacuous. The JSON lands in RUNNER_TEMP rather than in
+      # playwright-report/ because the HTML reporter clears that directory.
       - name: Run E2E tests
-        run: bun e2e
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/playwright-results.json
+        run: bun e2e --reporter=html,json
+
+      # A Playwright run in which every test skipped exits 0 — verified locally
+      # against the @playwright/test this repo actually resolves, 1.61.1
+      # (package.json asks for ^1.58.2, so do not cite the range as the version
+      # you tested): a two-test all-skipped suite exits 0 and reports
+      # `{"expected":0,"skipped":2,...}`. Without this step one stray file-scope
+      # `test.skip`, a bad `testMatch`, or a fixture that skips instead of
+      # failing would turn this check green while exercising nothing: #437's
+      # defect one layer below where it was found.
+      #
+      # `expected + flaky` because CI retries twice and a test that passes on
+      # retry is reported as flaky, not expected. The floor is a tripwire, not
+      # a coverage target: 18 pass today (17 enabled specs + the auth setup)
+      # against 5 tracked scaffold skips. Do NOT lower it to buy slack — a
+      # contract in .github/scripts/ci-workflows.test.ts counts the enabled
+      # `test(` declarations under e2e/ and fails if the floor drifts more than
+      # 2 below them, precisely so a shrinking suite cannot quietly keep a
+      # green gate. Raise both together as scaffolds get implemented.
+      - name: Assert the browser suite actually ran
+        env:
+          E2E_MIN_PASSING: "16"
+        run: |
+          set -euo pipefail
+          results="${RUNNER_TEMP}/playwright-results.json"
+          if [ ! -s "$results" ]; then
+            echo "::error::Playwright produced no JSON report at ${results}, so this run cannot be shown to have tested anything. Failing instead of reporting a green E2E gate."
+            exit 1
+          fi
+          passed="$(jq '(.stats.expected // 0) + (.stats.flaky // 0)' "$results")"
+          skipped="$(jq '.stats.skipped // 0' "$results")"
+          echo "Playwright executed ${passed} passing test(s), ${skipped} skipped (floor: ${E2E_MIN_PASSING})." >> "$GITHUB_STEP_SUMMARY"
+          if [ "$passed" -lt "$E2E_MIN_PASSING" ]; then
+            echo "::error::Only ${passed} E2E test(s) passed (${skipped} skipped); the floor is ${E2E_MIN_PASSING}. An all-skipped Playwright run exits 0, so a green gate here would mean nothing — either the suite lost coverage or the browser lane is broken."
+            exit 1
+          fi
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

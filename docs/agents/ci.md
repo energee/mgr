@@ -9,7 +9,7 @@ workflow change, or the unit suite fails.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `test.yml` | Every PR to main (docs-only included — required checks must always report) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-deploy-state` / `check-agent-config` + dependency audit. Build + Playwright E2E run only on the weekday-nightly schedule / `workflow_dispatch`, not per-PR. E2E boots an isolated local Supabase, builds against it (`NEXT_PUBLIC_*` are inlined at build time, so the hosted-credential build artifact cannot serve it), and runs Playwright against `bun start` — the shipped artifact, not a dev server. Because that server is a production build, the job sets `E2E_DEV_LOGIN: "1"` so `/api/auth/dev-login` (how `e2e/auth.setup.ts` gets a session, absent any hosted E2E credentials) answers instead of 404ing; the flag belongs to this job alone and must never be set on a deployed environment. The flag is not sufficient by itself — on that path the route also requires the Supabase project URL to have a **loopback hostname**, which this job satisfies via its own local stack. That narrows a stray `E2E_DEV_LOGIN=1` to databases reachable only on the serving machine (#656); it is not a guarantee that no real data is reachable, since a self-hosted Supabase, a sidecar, a tunnel or a local proxy can all sit behind a loopback name. The URL is resolved through `getSupabaseUrl()` — the same accessor `createAdminClient()` uses — precisely so a build-time-inlined `NEXT_PUBLIC_*` literal cannot make the gate disagree with the database the route actually connects to. The route's separate `NODE_ENV === "development"` path now requires the same loopback hostname by default, with `DEV_LOGIN_ALLOW_REMOTE_DB=1` as an explicit per-developer opt-in for a hosted project (#679); that variable must never be set in a workflow — a contract test asserts it appears in none. Full reasoning, including what is *not* guaranteed, is in the route's docstring (`src/app/api/auth/dev-login/route.ts`). |
+| `test.yml` | Every PR to main (docs-only included — a check has to report on every PR to be usable as a required one) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-deploy-state` / `check-agent-config`. Playwright E2E runs on every PR too as of 2026-07-30 (#437) — see [Why E2E runs on pull requests](#why-e2e-runs-on-pull-requests) for the shape and the reasoning, including why it never did before, despite #506 having been written to do it. Only `Production Build` stays nightly / `workflow_dispatch`: it compiles against the **hosted** Supabase credentials that fork PRs cannot read, and it is also the only job that runs `bun audit`, so the **dependency audit is a nightly signal, not a PR-time one**. PRs are not left without build coverage — the E2E job runs its own `bun run build` against its local stack. E2E boots an isolated local Supabase, builds against it (`NEXT_PUBLIC_*` are inlined at build time, so the hosted-credential build artifact cannot serve it), and runs Playwright against `bun start` — the shipped artifact, not a dev server. Because that server is a production build, the job sets `E2E_DEV_LOGIN: "1"` so `/api/auth/dev-login` (how `e2e/auth.setup.ts` gets a session, absent any hosted E2E credentials) answers instead of 404ing; the flag belongs to this job alone and must never be set on a deployed environment. The flag is not sufficient by itself — on that path the route also requires the Supabase project URL to have a **loopback hostname**, which this job satisfies via its own local stack. That narrows a stray `E2E_DEV_LOGIN=1` to databases reachable only on the serving machine (#656); it is not a guarantee that no real data is reachable, since a self-hosted Supabase, a sidecar, a tunnel or a local proxy can all sit behind a loopback name. The URL is resolved through `getSupabaseUrl()` — the same accessor `createAdminClient()` uses — precisely so a build-time-inlined `NEXT_PUBLIC_*` literal cannot make the gate disagree with the database the route actually connects to. The route's separate `NODE_ENV === "development"` path now requires the same loopback hostname by default, with `DEV_LOGIN_ALLOW_REMOTE_DB=1` as an explicit per-developer opt-in for a hosted project (#679); that variable must never be set in a workflow — a contract test asserts it appears in none. Full reasoning, including what is *not* guaranteed, is in the route's docstring (`src/app/api/auth/dev-login/route.ts`). |
 | `db-lint.yml` | PR touching `supabase/migrations/**` or `supabase/config.toml` | Replays the full migration chain from scratch (`ON_ERROR_STOP`) and runs the RLS integration tests against it. |
 | `shell-lint.yml` | PR touching `scripts/**` | `bash -n` + shellcheck over every shebang-bearing file under `scripts/` (selection is by shebang, not extension, so extensionless scripts like `scripts/agent-worktree` are covered). No database, no build. |
 | `live-drift.yml` | Daily schedule + dispatch | Watchdog comparing the live database catalog to `supabase/live-catalog.snapshot.txt` — catches out-of-band drift no PR would surface. Missing/changed objects FAIL; additions WARN. Two tracking issues, deliberately distinct: `live-drift` (real drift) and `watchdog-down` (the check never reached the database — missing secret, billing block, connection error). While `watchdog-down` is open there is **no** drift detection at all. |
@@ -24,7 +24,9 @@ workflow change, or the unit suite fails.
 | `quality-regrade.yml` | Weekly schedule (Mon) + dispatch | Re-grades `docs/agents/quality.md` from measured evidence into ONE docs-only `quality-regrade` PR — the improvement loop's steering signal. |
 | `claude.yml` | `@claude` mention in issue/PR comments | On-demand Claude runs against the repo. Needs `contents`/`pull-requests`/`issues: write` — the action posts a tracking comment before doing any work, so read-only permissions fail it on the first API call. Safety comes from the insider gate (`OWNER`/`MEMBER`/`COLLABORATOR`), not from withholding write. |
 
-There is no per-merge CI on main — the nightly build/E2E lane covers it.
+There is no per-merge CI on main — PRs run static, unit and E2E before the
+merge, and the **weekday**-nightly build lane picks up squash-merge drift on
+its next run (so a Friday-evening merge is uncovered until Monday).
 
 **Durable-outcome gate.** Every workflow that invokes `claude-code-action` on
 a schedule must end in `.github/actions/require-durable-outcome` (PR produced,
@@ -276,6 +278,133 @@ changes until it is restored. A failing live-drift run is therefore urgent
 even when the failure looks like plumbing. Scheduled runs fail loudly on a
 missing secret by design (a green cron with no secret would be worse).
 
+## Why E2E runs on pull requests
+
+`test.yml`'s Playwright job runs on **every** pull request, with no `if:` gate,
+no path filter, and no `needs:` at all. Each of those is deliberate and
+contract-tested. Note the framing: this is the first time it has run on a
+`pull_request` event, not a restoration — see the history below.
+
+**The history.** Issue #437 was filed because the E2E job was gated on hosted
+Playwright secrets that were never configured, so it skipped silently for
+months and read as a passing check. PR #506 rebuilt the job around an isolated
+local Supabase stack and was authored as a per-PR gate — but it merged
+**14 minutes after** #522's CI-minutes diet (2026-07-17T04:04Z vs 03:50Z), and
+it merged in nightly form. On `main`, therefore, the rebuilt job carried
+`if: schedule || workflow_dispatch` from the day it first existed. That was a
+documented cost decision rather than a defect, which is why nobody flagged it —
+and why #437's criterion 1 reads as "achieved" in the PR comments while never
+having been true on the default branch.
+
+**Why the cost decision no longer applies.** It expired on 2026-07-24, when
+this repository went public: Actions minutes are free. Keeping the browser
+suite off pull requests now buys nothing, and the standing instruction is that
+automation is not limited on minutes. **Do not "restore the diet" for this
+job** — the constraint it optimised for is gone. The rest of #522 still stands
+(unsharded vitest, docs-only skips elsewhere, no per-merge CI on main, one
+weekday Sentry run); only the E2E-off-PRs clause is reversed.
+
+**Why the shape matters as much as the trigger.** GitHub reports a job that did
+not run as *skipped*, and a skipped check **reads as green** wherever
+conclusions are consumed — including as a required status check, were one
+configured. So every way of not running this job is a way of turning its check
+green without testing anything:
+
+- an `if:` on the job — what stood here from 2026-07-17 to 2026-07-30;
+- a `paths:`/`paths-ignore:` filter — "only PRs that touch relevant paths"
+  is the same defect in a new costume, because the PRs it declines to run for
+  still report green;
+- **any `needs:` edge at all** — not just a gated one. A dependency that is
+  skipped, *red* or cancelled skips its dependents, and that skip reads as
+  green too. Both halves are measured, not hypothetical. The job carried
+  `needs: build`, and `build` is nightly-only *and* failed `bun audit` every
+  night from the day the job was written until #658 cleared the advisories on
+  2026-07-30T10:27Z (#639) — so between the two gates the browser suite had
+  **never once executed on `main`**; its first successful run was 30551975249
+  on 2026-07-30. And on the nightlies of 2026-07-20..24 `Static Checks` itself
+  failed, taking `Unit Tests` and everything downstream to `skipped` with it.
+  The E2E job consumes nothing from any other job — it re-checks out,
+  re-installs, boots its own Supabase and runs its own `bun run build` — so it
+  declares no `needs:`, which also takes the static -> unit chain off the PR's
+  critical path.
+- a **skip token in the commit message**, anywhere in the message and not just
+  the subject. This route is in no workflow file at all, which is what makes it
+  easy to hit by accident: a commit that merely *quotes* the token while
+  explaining it suppresses every workflow on that head. **Measured here on
+  2026-07-30**, which is why this bullet exists — the first draft of this
+  section's own commit (`117725d1`, since amended away) had `[skip ci]` inside
+  backticks in its body, describing `progress.yml`'s comment, and produced
+  **zero** workflow runs:
+
+  ```
+  gh api "repos/energee/mgr/actions/runs?head_sha=117725d1…" -q .total_count -> 0  # token present
+  gh api "repos/energee/mgr/actions/runs?head_sha=3eb41ff4…" -q .total_count -> 1  # parent
+  gh api "repos/energee/mgr/actions/runs?head_sha=a7d25268…" -q .total_count -> 1  # amended, token gone
+  ```
+
+  No red X, no skipped check — the contexts simply never exist, and a PR with
+  no contexts is as green as one that passed. `[skip ci]` is the variant
+  observed; GitHub documents `[ci skip]`, `[no ci]`, `[skip actions]` and
+  `[actions skip]` as equivalent, which is read from their docs, not tested
+  here. Refer to them by description ("the skip-CI marker"), or break them up,
+  when writing a commit message *about* them.
+
+Only `build` keeps an event gate, and nothing that must report on a PR may
+depend on it.
+
+**Failing loudly instead of testing nothing** — the same rule `prod-health.yml`
+follows for an unset `PRODUCTION_URL`. The job exits 1 with an `::error::`
+annotation when:
+
+- `supabase status -o env` exports no `API_URL`/`ANON_KEY`/`SERVICE_ROLE_KEY`.
+  `bun run build` sets `SKIP_ENV_VALIDATION=1`, so an empty-but-set URL
+  compiles fine and would surface only as opaque Playwright timeouts.
+- the local API URL has no loopback hostname — `/api/auth/dev-login` stays 404
+  on the `E2E_DEV_LOGIN` path without it (#656), so nothing could authenticate.
+- fewer than `E2E_MIN_PASSING` tests actually passed. **A Playwright run in
+  which every test skips exits 0** (verified against the `@playwright/test`
+  this repo resolves, 1.61.1), so a `test.skip` at file scope or a bad
+  `testMatch` would otherwise leave a green gate that exercised nothing. The
+  floor is a tripwire, not a coverage target, but it is not free-floating: a
+  contract in `ci-workflows.test.ts` counts the enabled `test(` declarations
+  under `e2e/` and reds if the floor drifts more than 2 below them (16 against
+  17 enabled specs + the auth setup today). Raise both together as the
+  remaining scaffolds get implemented.
+
+**Cost**, measured on the real `pull_request` runs of this job — all of which
+landed on 2026-07-30, because before that day it had never run on a pull
+request at all. The count is deliberately not stated: every commit that edits
+this section adds another run to it.
+
+| Run | Shape | E2E job | Whole PR |
+|---|---|---|---|
+| [30559728366](https://github.com/energee/mgr/actions/runs/30559728366) | still had `needs: unit-tests` | 5m01s (16:07:01Z -> 16:12:02Z) | 7m55s — e2e started 2m54s late |
+| [30569164797](https://github.com/energee/mgr/actions/runs/30569164797) | no `needs:` (shipped shape) | 5m14s (18:09:29Z -> 18:14:43Z) | **5m14s** — e2e and `static` both started 18:09:29Z |
+| [30569862548](https://github.com/energee/mgr/actions/runs/30569862548) | no `needs:` | 4m53s (18:19:01Z -> 18:23:54Z) | **4m53s** — `18 passed (22.8s)` |
+| [30572709446](https://github.com/energee/mgr/actions/runs/30572709446) | no `needs:` | 5m16s (18:57:28Z -> 19:02:44Z) | **5m16s** — `18 passed (23.6s)` |
+| [30573551199](https://github.com/energee/mgr/actions/runs/30573551199) | no `needs:` | 4m55s (19:08:53Z -> 19:13:48Z) | **4m55s** — `18 passed (22.5s)` |
+
+So the E2E job costs about 5 minutes (4m53s-5m16s across the five: Supabase
+boot, a `next build` against it, and ~23s of tests — `Running 23 tests using 1
+worker` / `5 skipped` / `18 passed`, identical on every run), and because it no
+longer queues behind `static -> unit-tests` it
+*sets* the PR's critical path rather than extending it: PR latency went **down**
+by ~2m40s even though a five-minute browser suite was added to every PR.
+
+**Still outstanding — the "required" half, so #437's criterion 1 is only half
+met.** The `main` ruleset declares no `required_status_checks` rule at all
+today (`gh api repos/energee/mgr/rulesets/11725742` returns `deletion`,
+`non_fast_forward`, `pull_request`, `required_linear_history` and nothing
+else), and `main` has no legacy branch protection either
+(`gh api repos/energee/mgr/branches/main/protection` -> 404 "Branch not
+protected"). So nothing is literally blocking: not `E2E Tests`, not
+`Static Checks`, not `Unit Tests`. They run and **report** on every PR, and a
+failure is a visible red X, but a merge is not prevented. Read every "gate" in
+this section as *reporting*, not *blocking*. Making those three contexts
+required is a repository-settings change (ruleset `main`, id `11725742`), not
+a workflow change, and it is a deliberate owner call — `Production Build` must
+**not** be added, since it does not run on PRs.
+
 ## Rules when changing workflows
 
 1. Update `.github/scripts/ci-workflows.test.ts` in the same commit — it
@@ -308,3 +437,20 @@ missing secret by design (a green cron with no secret would be worse).
 7. A job that consumes an artifact another job's agent produced must **apply**
    it, never execute it: `git apply` a patch, `--body-file` a body, argv arrays
    instead of shell strings, and no `eval`/`bash <agent output>`.
+8. **A check that is meant to always report must never be event-gated,
+   path-filtered, or hung off a `needs:` edge.** GitHub reports a job that did
+   not run as "skipped" and a skipped check reads as passing, so all three
+   silently turn it green on exactly the runs it declined to make — see
+   [Why E2E runs on pull requests](#why-e2e-runs-on-pull-requests) for the two
+   times this repo shipped that bug. The same rule in its other form: a check
+   that passes when it is unconfigured is worse than no check — fail loudly
+   with an `::error::` instead.
+
+   This applies to the always-report set only: `test.yml`'s `static`,
+   `unit-tests` and `e2e`. `db-lint.yml` (`supabase/migrations/**`) and
+   `shell-lint.yml` (`scripts/**`) are **deliberately** path-filtered, and both
+   filters are pinned in `.github/scripts/ci-workflows.test.ts` (removing
+   either `paths:` list reds the suite) — they are opt-in lanes for the diffs
+   that need them, they report nothing on unrelated PRs, and for that reason
+   they must never be made required. Adding a job to the always-report set means giving
+   it a trigger that fires on every PR, not adding a path filter and hoping.
