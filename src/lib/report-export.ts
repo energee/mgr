@@ -6,7 +6,12 @@
  */
 
 import { formatBbl } from "@/lib/format";
-import { getTaxClassLabel } from "@/domain/ttb-utils";
+import {
+  getTaxClassLabel,
+  getInProcessSnapshotCaveat,
+  getReportExemptionDisclosure,
+  IN_PROCESS_SNAPSHOT_LABEL,
+} from "@/domain/ttb-utils";
 
 // =============================================================================
 // CSV Export
@@ -75,9 +80,15 @@ function sanitizeFilename(filename: string): string {
  *
  * The object URL is revoked asynchronously because Firefox aborts the
  * download if the URL is invalidated synchronously after `link.click()`.
+ *
+ * A UTF-8 BOM is prepended because Excel ignores the blob's `charset=utf-8`
+ * for a file opened from disk and falls back to the system ANSI codepage — so
+ * any non-ASCII byte (the em dash in the TTB caveat rows, an accented beer or
+ * customer name) renders as mojibake in the copy someone attaches to a filing.
+ * The BOM makes Excel decode UTF-8; other CSV readers skip it.
  */
 export function downloadCSV(csv: string, filename: string): void {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
 
@@ -126,24 +137,27 @@ export type TTBBatchData = {
 }
 
 /**
- * Export TTB report data to CSV
+ * Build the TTB report CSV text.
+ *
+ * Split out from `exportTTBReportToCSV` so the content — in particular the
+ * trailing NOTE rows — is unit-testable without a DOM or a download.
+ *
+ * Those NOTE rows are load-bearing, not decoration: a CSV is the copy most
+ * likely to be attached to an actual Form 5130.9 filing, so it carries the same
+ * in-process snapshot caveat and "not accounting-identity checked" disclosure
+ * the screen and the print view show (issue #618). They are trailing rows in the
+ * "Line Item" column, matching how every other label and section header in this
+ * CSV is carried.
  */
-export function exportTTBReportToCSV(
+export function buildTTBReportCSV(
   reportData: TTBReportData[],
   year: number,
   month: number
-): void {
+): string {
   const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
+  const periodLabel = `${monthName} ${year}`;
 
-  // Create summary rows
-  const rows: CSVRow[] = [];
-
-  // Add header info
-  rows.push({ "Line Item": `TTB Form 5130.9 - ${monthName} ${year}`, "": "" });
-  rows.push({ "Line Item": "Brewer's Report of Operations", "": "" });
-  rows.push({ "Line Item": "", "": "" });
-
-  // Add column headers for each tax class
+  // Column headers for each tax class
   const taxClasses = reportData.map((r) => r.ttb_tax_class);
 
   // Create detailed report
@@ -189,14 +203,36 @@ export function exportTTBReportToCSV(
       Total: "",
     },
     {
-      "Line Item": "BEER IN PROCESS",
+      // In-process volumes are a live snapshot of batches currently
+      // fermenting/conditioning/packaging, not a month-end balance (issue #618).
+      "Line Item": "BEER IN PROCESS (CURRENT SNAPSHOT)",
       ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
       Total: "",
     },
-    createDataRow("End of Month (In Process)", reportData, "in_process_ending_bbl"),
+    createDataRow(IN_PROCESS_SNAPSHOT_LABEL, reportData, "in_process_ending_bbl"),
   ];
 
-  const csv = toCSV(detailRows);
+  // Trailing note rows. Only the "Line Item" key is set: toCSV takes its columns
+  // from the first row, so the remaining tax-class/Total cells render empty.
+  const exemptionDisclosure = getReportExemptionDisclosure(reportData);
+  const noteRows: CSVRow[] = [
+    { "Line Item": "" },
+    { "Line Item": `NOTE: ${getInProcessSnapshotCaveat(periodLabel)}` },
+    ...(exemptionDisclosure ? [{ "Line Item": `NOTE: ${exemptionDisclosure}` }] : []),
+  ];
+
+  return toCSV([...detailRows, ...noteRows]);
+}
+
+/**
+ * Export TTB report data to CSV (builds the text, then downloads it).
+ */
+export function exportTTBReportToCSV(
+  reportData: TTBReportData[],
+  year: number,
+  month: number
+): void {
+  const csv = buildTTBReportCSV(reportData, year, month);
   downloadCSV(csv, `ttb-report-${year}-${String(month).padStart(2, "0")}.csv`);
 }
 
@@ -278,6 +314,9 @@ export function generateTTBPrintHTML(
 ): string {
   const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
   const taxClasses = reportData.map((r) => r.ttb_tax_class);
+  // Same snapshot caveat and "not checked" disclosure the screen and the CSV
+  // carry — a printed copy must not be more confident than the screen (#618).
+  const exemptionDisclosure = getReportExemptionDisclosure(reportData);
 
   const tableHeaderCells = taxClasses
     .map((tc) => `<th style="text-align: right; padding: 8px; border: 1px solid #ccc;">${getTaxClassLabel(tc)}</th>`)
@@ -348,8 +387,8 @@ export function generateTTBPrintHTML(
       ${createSectionHeader("Ending Balance")}
       ${createRow("Ending Inventory", "ending_inventory_bbl")}
 
-      ${createSectionHeader("Beer in Process (Cellar)")}
-      ${createRow("End of Month (In Process)", "in_process_ending_bbl")}
+      ${createSectionHeader("Beer in Process (Cellar) — current snapshot")}
+      ${createRow(IN_PROCESS_SNAPSHOT_LABEL, "in_process_ending_bbl")}
     </tbody>
   </table>
 
@@ -357,6 +396,16 @@ export function generateTTBPrintHTML(
     <strong>Note:</strong> This report is prepared for internal use and TTB Form 5130.9 filing reference.
     One barrel (BBL) equals 31 gallons per TTB regulations. Verify all data before submission.
   </p>
+
+  <p style="font-size: 10px; color: #666;">
+    <strong>Cellar/In-Process:</strong> ${escapeHTML(getInProcessSnapshotCaveat(`${monthName} ${year}`))}
+  </p>
+
+  ${
+    exemptionDisclosure
+      ? `<p style="font-size: 10px; color: #666;">${escapeHTML(exemptionDisclosure)}</p>`
+      : ""
+  }
 
   <p style="font-size: 10px; color: #666;">
     Generated: ${new Date().toLocaleString()}

@@ -18,7 +18,7 @@ import {
   EMPTY_TOTALS,
   type TTBReportRow,
 } from "@/domain/ttb-utils";
-import { toCSV } from "@/lib/report-export";
+import { toCSV, buildTTBReportCSV, generateTTBPrintHTML } from "@/lib/report-export";
 
 // =============================================================================
 // Test Fixtures
@@ -324,6 +324,78 @@ describe("toCSV", () => {
     const csv = toCSV(rows);
     const dataLine = csv.split("\n")[1];
     expect(dataLine).toBe("42");
+  });
+});
+
+// =============================================================================
+// Exported report copies: CSV and print (issue #618)
+// =============================================================================
+
+describe("buildTTBReportCSV", () => {
+  /** A cellar + keg pair, as get_ttb_report returns them. */
+  const rows = [
+    makeRow({
+      ttb_tax_class: "cellar",
+      beer_produced_bbl: 62.5,
+      total_available_bbl: 62.5,
+      in_process_ending_bbl: 62.5,
+    }),
+    makeRow({
+      ttb_tax_class: "keg",
+      beginning_inventory_bbl: 100,
+      beer_produced_bbl: 20,
+      total_available_bbl: 120,
+      total_removals_bbl: 30,
+      ending_inventory_bbl: 90,
+    }),
+  ];
+
+  it("labels the in-process line as a current snapshot", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    expect(csv).toContain("BEER IN PROCESS (CURRENT SNAPSHOT)");
+    expect(csv).toContain("In Process (Current Snapshot)");
+  });
+
+  it("carries the snapshot caveat as a trailing note row, naming the period", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const noteLine = csv
+      .split("\n")
+      .find((line) => line.includes("snapshot of batches that are fermenting"));
+    expect(noteLine).toBeDefined();
+    expect(noteLine).toContain("NOTE:");
+    expect(noteLine).toContain("not a balance as of the end of June 2026");
+    // Trailing rows keep the report's column shape: note in "Line Item", rest empty.
+    expect(noteLine?.endsWith(",,,")).toBe(true);
+  });
+
+  it("discloses the exempt tax class rather than leaving the CSV silent", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    expect(csv).toContain("NOTE: Not accounting-identity checked:");
+    expect(csv).toContain("Cellar (In-Process)");
+  });
+
+  it("omits the exemption note when every class in the report was checked", () => {
+    const csv = buildTTBReportCSV([rows[1]], 2026, 6);
+    expect(csv).not.toContain("Not accounting-identity checked");
+    // The snapshot caveat still applies — the in-process line is always a snapshot.
+    expect(csv).toContain("snapshot of batches that are fermenting");
+  });
+
+  it("leaks no internal tracker reference into the filed artifact", () => {
+    expect(buildTTBReportCSV(rows, 2026, 6)).not.toContain("#618");
+  });
+
+  it("keeps the CSV and the print copy carrying the same two notes", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const html = generateTTBPrintHTML(rows, 2026, 6);
+    for (const fragment of [
+      "snapshot of batches that are fermenting",
+      "Not accounting-identity checked:",
+    ]) {
+      expect(csv).toContain(fragment);
+      expect(html).toContain(fragment);
+    }
+    expect(html).not.toContain("#618");
   });
 });
 

@@ -63,6 +63,37 @@ export function getTaxClassLabel(taxClass: string): string {
   return TAX_CLASS_LABELS[taxClass] ?? taxClass;
 }
 
+/**
+ * Label for the in-process (cellar) volume line, shared by the report page, the
+ * CSV export, and the print view. Deliberately says "current snapshot" rather
+ * than "end of month": the underlying figure is a live sum of batches that are
+ * *right now* fermenting/conditioning/packaging, with no period filter, so it is
+ * not a period-end balance and re-running a closed month can change it
+ * (issue #618).
+ */
+export const IN_PROCESS_SNAPSHOT_LABEL = "In Process (Current Snapshot)";
+
+/**
+ * The prose caveat that must accompany the in-process figures wherever they are
+ * shown: the report page (both the `get_ttb_report` table and the legacy
+ * fallback summary), the CSV export, and the print view. Single source of
+ * wording so no surface can carry the honest label without the honest
+ * explanation.
+ *
+ * @param periodLabel Human period the report covers, e.g. `"June 2026"`.
+ *   Omit for a generic "the period end" (used where the period is already in
+ *   the document heading).
+ */
+export function getInProcessSnapshotCaveat(periodLabel?: string): string {
+  const asOf = periodLabel ? `the end of ${periodLabel}` : "the period end";
+  return (
+    "In-process figures are a snapshot of batches that are fermenting, " +
+    `conditioning, or packaging right now — not a balance as of ${asOf}. ` +
+    "Re-running a past period can return a different in-process number as " +
+    "batches move on, so record the cellar figures you file."
+  );
+}
+
 // =============================================================================
 // Report Period Functions
 // =============================================================================
@@ -158,6 +189,10 @@ export function calculateTotals(rows: TTBReportRow[]): TTBTotals {
 /**
  * Validate that total_available = beginning_inventory + beer_produced + beer_received
  * for a single TTB report row. Returns true if the accounting identity holds.
+ *
+ * Raw arithmetic only: this says nothing about whether the identity *applies*
+ * to the row's tax class. Callers must gate on `isIdentityCheckedTaxClass`
+ * (or use `checkRowIdentities`, which does the gating for them).
  */
 export function validateRowBalance(row: TTBReportRow): boolean {
   const expected =
@@ -170,8 +205,171 @@ export function validateRowBalance(row: TTBReportRow): boolean {
 /**
  * Validate that ending_inventory = total_available - total_removals
  * for a single TTB report row. Returns true if the accounting identity holds.
+ *
+ * Raw arithmetic only — same caveat as `validateRowBalance`: it must not be
+ * applied to the cellar row, whose volume lives in the in-process columns
+ * rather than in `ending_inventory_bbl`. See `checkRowIdentities`.
  */
 export function validateEndingInventory(row: TTBReportRow): boolean {
   const expected = (row.total_available_bbl || 0) - (row.total_removals_bbl || 0);
   return Math.abs((row.ending_inventory_bbl || 0) - expected) < 0.005;
+}
+
+// =============================================================================
+// Identity-Check Scoping (which tax classes the identities apply to)
+// =============================================================================
+
+/**
+ * The tax classes exempt from the TTB accounting identities — an enumerated
+ * exemption list, not a list of checked classes. Everything not named here is
+ * checked, which is the safe direction: a tax class nobody has thought about
+ * yet gets verified (and shouts if the arithmetic breaks) rather than being
+ * silently excused. If a later migration adds a finished-goods class — a
+ * barrel-aged or cider arm — the identities apply to it from its first report,
+ * and a non-balancing row raises the loud "review before filing" alert instead
+ * of a quiet "not checked" footnote.
+ *
+ * Why 'cellar' is on the list: `get_ttb_tax_class` (migration 00041) only ever
+ * returns 'keg' or 'bottled', so no finished good is ever grouped under
+ * 'cellar'. The cellar row therefore gets `ending_inventory_bbl` = 0
+ * structurally, while `total_available_bbl` is non-zero whenever anything was
+ * brewed in the period (get_ttb_report takes cellar's produced volume from the
+ * production summary's batch term, 00041) and `total_removals_bbl` is non-zero
+ * whenever a cellar loss/sample was booked (batch-sourced removals, migration
+ * 00274). The cellar row's real balance lives in `in_process_beginning_bbl` /
+ * `in_process_ending_bbl`, columns that appear in neither identity. So
+ * `ending = available − removals` cannot hold for cellar: applying it fails on
+ * essentially every month an active brewery has — a chronic false alarm that
+ * trains the reader to ignore the one signal that would catch a real arithmetic
+ * break in the keg/bottled rows.
+ *
+ * KNOWN LIMITATION (issue #618): the in-process terms are a *live status
+ * snapshot*, not period-keyed history — `ip_ending` (migration 00237) sums
+ * `batches.volume_bbl` for every batch currently in fermenting/conditioning/
+ * packaging with no date filter at all, so re-running a closed month returns a
+ * different number every time a batch changes status. Closed months are not
+ * reproducible. Exempting cellar from the identity checks removes the false
+ * alarm; it does not fix the snapshot-vs-history defect. Options 1/2 in #618
+ * (derive history from `entity_revisions`, or add status-transition timestamp
+ * columns) remain the durable fix, and this scoping is forward-compatible with
+ * either: once the cellar row carries real period-keyed balances, drop 'cellar'
+ * from this list and it becomes checked like every other class.
+ */
+export const IDENTITY_EXEMPT_TAX_CLASSES = ["cellar"] as const;
+
+/** A tax class the Form 5130.9 accounting identities cannot be applied to. */
+export type IdentityExemptTaxClass = (typeof IDENTITY_EXEMPT_TAX_CLASSES)[number];
+
+/**
+ * Why the identities cannot be applied to each exempt tax class.
+ *
+ * User-facing copy: this text is rendered on the filing-prep screen and in the
+ * CSV/print exports, so it carries no internal tracker references. The issue
+ * numbers behind it live in the `IDENTITY_EXEMPT_TAX_CLASSES` docblock above
+ * (#618 for the snapshot-vs-history defect), where a developer will find them.
+ */
+const IDENTITY_EXEMPTION_REASONS: Record<IdentityExemptTaxClass, string> = {
+  cellar:
+    "cellar volume is reported in the in-process columns as a current snapshot, so its ending inventory is structurally 0",
+};
+
+/** True when this tax class is on the enumerated identity-exemption list. */
+function isIdentityExemptTaxClass(taxClass: string): taxClass is IdentityExemptTaxClass {
+  return (IDENTITY_EXEMPT_TAX_CLASSES as readonly string[]).includes(taxClass);
+}
+
+/**
+ * True when the Form 5130.9 accounting identities can be applied to this tax
+ * class — i.e. for everything except the enumerated exemptions. Unknown classes
+ * are checked, deliberately: see `IDENTITY_EXEMPT_TAX_CLASSES`.
+ */
+export function isIdentityCheckedTaxClass(taxClass: string): boolean {
+  return !isIdentityExemptTaxClass(taxClass);
+}
+
+/**
+ * Reason the identity checks skip this tax class, or `null` when it is checked.
+ * Exists so callers (and readers) can distinguish "checked and balanced" from
+ * "not checkable" instead of silently treating the latter as a pass.
+ */
+export function getIdentityExemptionReason(taxClass: string): string | null {
+  return isIdentityExemptTaxClass(taxClass) ? IDENTITY_EXEMPTION_REASONS[taxClass] : null;
+}
+
+/**
+ * Outcome of the accounting-identity checks for one TTB report row.
+ * `"exempt"` means the identities do not apply to this tax class at all —
+ * deliberately distinct from `"checked"` with no failures.
+ */
+export type TTBIdentityCheck =
+  | { taxClass: string; label: string; status: "exempt"; reason: string }
+  | { taxClass: string; label: string; status: "checked"; failures: string[] };
+
+/** The "not checkable" arm of TTBIdentityCheck. */
+export type TTBIdentityExemption = Extract<TTBIdentityCheck, { status: "exempt" }>;
+
+/**
+ * Run both Form 5130.9 accounting identities against one report row, skipping
+ * the classes they cannot verify (see IDENTITY_EXEMPT_TAX_CLASSES).
+ * Failure strings are display-ready; the cellar row comes back as `"exempt"`.
+ */
+export function checkRowIdentities(row: TTBReportRow): TTBIdentityCheck {
+  const label = getTaxClassLabel(row.ttb_tax_class);
+  const exemptionReason = getIdentityExemptionReason(row.ttb_tax_class);
+  if (exemptionReason !== null) {
+    return { taxClass: row.ttb_tax_class, label, status: "exempt", reason: exemptionReason };
+  }
+
+  const failures: string[] = [];
+  if (!validateRowBalance(row)) {
+    failures.push(
+      `${label}: total available (${formatTtbBbl(row.total_available_bbl)}) ≠ beginning inventory + beer produced + beer received`
+    );
+  }
+  if (!validateEndingInventory(row)) {
+    failures.push(
+      `${label}: ending inventory (${formatTtbBbl(row.ending_inventory_bbl)}) ≠ total available − total removals`
+    );
+  }
+  return { taxClass: row.ttb_tax_class, label, status: "checked", failures };
+}
+
+/**
+ * Flatten identity-check results into the display-ready failure list shown to
+ * the compliance officer. Exempt rows contribute nothing — they are surfaced
+ * separately as "not checked", never folded in as passes.
+ */
+export function collectIdentityFailures(checks: TTBIdentityCheck[]): string[] {
+  return checks.flatMap((check) => (check.status === "checked" ? check.failures : []));
+}
+
+/**
+ * The rows whose identities could not be checked, so the report can disclose
+ * "not checked" explicitly instead of letting a reader assume they balanced.
+ */
+export function collectIdentityExemptions(checks: TTBIdentityCheck[]): TTBIdentityExemption[] {
+  return checks.filter((check): check is TTBIdentityExemption => check.status === "exempt");
+}
+
+/**
+ * The "not checked" disclosure sentence, shared by the report page, the CSV
+ * export and the print view so every copy of the report discloses the same
+ * thing. Returns `null` when every class in the report was checked, so callers
+ * can omit the line entirely rather than print an empty disclosure.
+ */
+export function formatIdentityExemptionDisclosure(
+  exemptions: TTBIdentityExemption[]
+): string | null {
+  if (exemptions.length === 0) return null;
+  const list = exemptions.map((check) => `${check.label} (${check.reason})`).join("; ");
+  return `Not accounting-identity checked: ${list}.`;
+}
+
+/**
+ * Convenience wrapper: the disclosure sentence for a whole report, or `null`
+ * when nothing in it was exempt. Used by the CSV and print exports, which have
+ * the raw rows rather than pre-computed checks.
+ */
+export function getReportExemptionDisclosure(rows: TTBReportRow[]): string | null {
+  return formatIdentityExemptionDisclosure(collectIdentityExemptions(rows.map(checkRowIdentities)));
 }
