@@ -20,6 +20,13 @@
  *                         the flag to databases reachable only on the serving
  *                         machine (issue #656 — see that route's docstring for
  *                         what that does and does not guarantee).
+ *   DEV_LOGIN_ALLOW_REMOTE_DB
+ *                       - set to "1" only if you run this suite locally (`bun
+ *                         dev`, so NODE_ENV=development) against a NON-loopback
+ *                         Supabase project. Without it dev-login 404s there and
+ *                         the `setup` project times out on /dashboard (issue
+ *                         #679). Irrelevant to CI, which uses its own local
+ *                         stack, and it does not widen E2E_DEV_LOGIN.
  *
  * Set PLAYWRIGHT_BASE_URL when :3000 is taken by another worktree's dev server.
  * For localhost targets the port is derived from it and passed to `bun dev`,

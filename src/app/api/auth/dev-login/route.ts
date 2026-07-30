@@ -7,25 +7,44 @@
  * is either absent or a known-safe value (see the floor in `isDevLoginEnabled`)
  * AND one of these holds:
  *
- *   1. `NODE_ENV === "development"` — what `bun dev` sets. Unrestricted: this
- *      path is allowed against a hosted Supabase project, because pointing a
- *      local dev server at a shared project is a normal workflow here and the
- *      developer already holds those credentials.
+ *   1. `NODE_ENV === "development"` — what `bun dev` sets — AND the Supabase
+ *      project this server's own clients are built from is either
  *
- *      This is an ACCEPTED, DELIBERATE exposure, and it is the widest hole in
- *      this route — wider than anything the loopback rule below addresses. Any
- *      host whose serving process is a dev server, wired to a hosted database
- *      and reachable by someone (LAN, tunnel, `0.0.0.0`, reverse proxy), hands
- *      that person uncredentialed admin. It is pre-existing behavior and
- *      narrowing it would change what developers can do, so it is tracked for a
- *      decision in issue #679 rather than quietly restricted here.
+ *        a. addressed by a loopback hostname (`localhost`, `127.0.0.1`,
+ *           `[::1]`), which is the silent default and covers `make db-local`;
+ *           or
+ *        b. a non-loopback ("remote") project WITH `DEV_LOGIN_ALLOW_REMOTE_DB`
+ *           set to exactly `"1"`.
  *
- *   2. `E2E_DEV_LOGIN` is exactly `"1"` AND the Supabase project this server's
- *      own clients are built from has a loopback hostname (`localhost`,
- *      `127.0.0.1`, `[::1]`). A missing or unparseable URL fails closed.
+ *      Pointing a local dev server at a shared hosted project is a normal
+ *      workflow here and it still works — but it now has to be a choice
+ *      somebody typed, not a silent default (issue #679). On a laptop wired to
+ *      a local stack, nothing changed. When (b) is what is missing, the HTTP
+ *      response stays an undifferentiated 404 and never carries the URL,
+ *      hostname or any key — the explanation goes to the developer through two
+ *      other channels: the login page renders the precondition next to the Dev
+ *      Login button, and the refusal is logged server-side naming the variable
+ *      (see `logDevServerRefusal` for what that log does and does not
+ *      guarantee).
+ *
+ *   2. `E2E_DEV_LOGIN` is exactly `"1"` AND that same project has a loopback
+ *      hostname. No opt-in widens this one: `DEV_LOGIN_ALLOW_REMOTE_DB` applies
+ *      to condition (1) only, so a CI flag can never reach a hosted project.
  *
  * Anything else returns 404. Being unset is off; no truthy-ish value other
- * than `"1"` counts; merely running in CI does not enable it.
+ * than `"1"` counts for either flag; merely running in CI does not enable it.
+ * A Supabase URL the gate cannot resolve to a hostname — an `unknown` target —
+ * denies both conditions regardless of any opt-in: an unreadable target is not
+ * evidence about which database is behind it. That covers three shapes, not
+ * one: absent/empty, unparseable (`new URL()` throws), and parseable-but-
+ * hostless (`localhost:54321`, `file:///x`, `mailto:a@b` all parse and all
+ * yield `hostname === ""`). `classifySupabaseTarget()` in `src/lib/dev-login.ts`
+ * is where that is decided, and the suite pins each shape.
+ *
+ * The login page's Dev Login button is driven from the same module
+ * (`devLoginAffordance()`), so the UI cannot offer an action this gate refuses
+ * without saying why. A contract test in this route's suite drives both across
+ * one matrix and fails if they diverge.
  *
  * ## Build-time inlining — why the gate reads `getSupabaseUrl()`
  *
@@ -48,8 +67,9 @@
  * still depends on `SKIP_ENV_VALIDATION` — but it is now the same answer for
  * both, which is the property that matters.
  *
- * Of the other inputs, `VERCEL_ENV` and `E2E_DEV_LOGIN` are ordinary runtime
- * reads (no `NEXT_PUBLIC_` prefix, so nothing inlines them). `NODE_ENV` is
+ * Of the other inputs, `VERCEL_ENV`, `E2E_DEV_LOGIN` and
+ * `DEV_LOGIN_ALLOW_REMOTE_DB` are ordinary runtime reads (no `NEXT_PUBLIC_`
+ * prefix, so nothing inlines them). `NODE_ENV` is
  * neither: a production build constant-folds `process.env.NODE_ENV` to
  * `"production"`, so condition (1) is compiled out of the artifact entirely —
  * `NODE_ENV` does not appear in the emitted route chunk at all. THAT, not any
@@ -58,27 +78,38 @@
  * `next build` / `next start` "force `NODE_ENV=production`". They do not:
  * `node_modules/next/dist/bin/next` does
  * `process.env.NODE_ENV = process.env.NODE_ENV || defaultEnv` — a default, with
- * a warning on a non-standard value, not a force.)
+ * a warning on a non-standard value, not a force.) A corollary worth stating:
+ * because the whole of condition (1) is folded away, `DEV_LOGIN_ALLOW_REMOTE_DB`
+ * is unreachable in a production build and cannot re-open the artifact either.
  *
- * ## What the loopback condition on (2) buys, and what it does not
+ * ## What the loopback condition buys, and what it does not
  *
- *   - BUYS: on the `E2E_DEV_LOGIN` path, the database this route would touch
- *     must be addressed by a loopback hostname, so the admin connection cannot
- *     leave the machine serving the request. That is what stops a stray
- *     `E2E_DEV_LOGIN=1` from minting admin against a hosted Supabase project on
- *     a host where the Vercel floor is inert — i.e. any non-Vercel host
- *     (self-hosted Docker, Fly, Railway), where `VERCEL_ENV` simply does not
- *     exist, and Vercel itself when "Automatically expose System Environment
- *     Variables" is off (issue #656). There, the flag alone used to be the
- *     whole gate.
+ *   - BUYS: the database this route would touch must be addressed by a loopback
+ *     hostname, so the admin connection cannot leave the machine serving the
+ *     request — unconditionally on the `E2E_DEV_LOGIN` path, and by default on
+ *     the dev-server path. That is what stops a stray `E2E_DEV_LOGIN=1` from
+ *     minting admin against a hosted Supabase project on a host where the
+ *     Vercel floor is inert — i.e. any non-Vercel host (self-hosted Docker,
+ *     Fly, Railway), where `VERCEL_ENV` simply does not exist, and Vercel
+ *     itself when "Automatically expose System Environment Variables" is off
+ *     (issue #656). There, the flag alone used to be the whole gate.
  *   - DOES NOT mean "the database is disposable". Loopback constrains the
  *     network path, not the data behind it. A self-hosted Supabase/Kong on the
  *     same host, a sidecar container, an SSH tunnel, or a local reverse proxy
  *     all present a loopback hostname in front of a database that may hold real
  *     data. Run any of those with `E2E_DEV_LOGIN=1` and this route will mint
  *     admin on it.
- *   - DOES NOT constrain condition (1) in any way — see the note on it above
- *     and issue #679.
+ *   - DOES NOT stop a developer from opting back out of it on the dev-server
+ *     path. `DEV_LOGIN_ALLOW_REMOTE_DB=1` restores exactly the pre-#679
+ *     behavior for condition (1): a dev server reachable over a LAN, a tunnel,
+ *     a bound `0.0.0.0` or a reverse proxy, wired to a hosted project, hands
+ *     uncredentialed admin to whoever can reach the port. What changed is that
+ *     someone has to have typed the variable. Nothing here binds the LISTENING
+ *     interface (tracked as issue #691) or asks the caller for a secret
+ *     (issue #692); if you need those properties, do not set this variable.
+ *     Note the loopback default constrains only the DATABASE hostname, so even
+ *     without the opt-in a dev server bound to `0.0.0.0` against a local stack
+ *     is open on the LAN — that is #691's territory, not this gate's.
  *
  * `E2E_DEV_LOGIN` exists because the nightly Playwright lane
  * (`.github/workflows/test.yml`, job `e2e`) runs `next build` + `next start`
@@ -99,21 +130,17 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { getSupabaseUrl } from "@/lib/env";
+import {
+  ALLOW_REMOTE_DB_VALUE,
+  ALLOW_REMOTE_DB_VAR,
+  classifySupabaseTarget,
+  type SupabaseTarget,
+} from "@/lib/dev-login";
 import { isValidRedirect } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 const TEST_EMAIL = "dev@brewery.test";
 const TEST_PASSWORD = "devpassword123";
-
-/**
- * Hostnames that can only be reached on the machine serving the request.
- * Mirrors the local target list in `playwright.config.ts`. `new URL()` reports
- * an IPv6 host in brackets, and `[::1]` is the only form it can ever yield —
- * every bare spelling of `::1` throws — so no bare variant is listed.
- * `host.docker.internal` is deliberately absent: nothing in this repo's CI uses
- * it, and it resolves to the Docker host, which is a different machine.
- */
-const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
 /**
  * `VERCEL_ENV` values that are not a deployment. Only a local `vercel dev`
@@ -123,31 +150,43 @@ const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const NON_DEPLOYED_VERCEL_ENVS = new Set(["development"]);
 
 /**
- * Whether the Supabase project this server's own clients are built from is
- * addressed by a loopback hostname.
+ * Explain a dev-server refusal to the one audience that can act on it.
  *
- * Resolved through `getSupabaseUrl()` on purpose — see the build-time inlining
- * note at the top of this file. The point is not convenience: it is that this
- * check and `createAdminClient()` read one value, so they cannot disagree about
- * the target database.
+ * Deliberately server-side only: the HTTP response stays an undifferentiated
+ * `404 Not found`, so nothing about which database this server is wired to
+ * leaks to a caller. The hostname is left out of the log too — it adds nothing
+ * the developer does not already have in their own env file, and keeps "no
+ * target detail off the machine" true of the log as well as the response.
  *
- * Compares the parsed HOSTNAME, never a substring:
- * `https://localhost.evil.example.com` is a remote host that merely starts with
- * the word, and `https://localhost@evil.example.com` puts it in the userinfo.
- * Both must read as non-loopback. Missing or unparseable URLs fail closed — an
- * unreadable target is not evidence of a local database. (The annotation is
- * deliberate: `getSupabaseUrl()` is typed `string`, but under
- * `SKIP_ENV_VALIDATION` it is an unvalidated `process.env` read and can be
- * undefined at runtime.)
+ * WHAT THIS CHANNEL IS AND IS NOT. It is a `logger.warn`, so it reaches the
+ * terminal only when pino's level allows `warn`. That is true of the dev
+ * default (`debug`) but NOT when `LOG_LEVEL` is set to `error`, `fatal` or
+ * `silent`, in which case the refusal is silent here. Output is also pino's
+ * default JSON unless `pino-pretty` is installed (see `src/lib/logger.ts`), so
+ * "readable in the `bun dev` terminal" means one JSON line, not prose. The
+ * login page carries the same precondition on screen for exactly this reason —
+ * see `devLoginAffordance()` in `src/lib/dev-login.ts` — so this log is a
+ * second channel, not the only one.
+ *
+ * It fires on every denied request rather than once per process, which is a
+ * deliberate call, not an oversight: the branch exists only under
+ * `NODE_ENV === "development"` and is constant-folded out of a production
+ * build entirely, so the only process that can emit it is a dev server, which
+ * already prints a line per request. The message carries no per-request data,
+ * so a caller cannot vary it; the volume is a constant factor on a log that is
+ * already one-line-per-request. If that ever stops being true, dedupe by
+ * `target` rather than dropping the message.
  */
-function hasLoopbackSupabaseUrl(): boolean {
-  const url: string | undefined = getSupabaseUrl();
-  if (!url) return false;
-  try {
-    return LOOPBACK_HOSTNAMES.has(new URL(url).hostname);
-  } catch {
-    return false;
-  }
+function logDevServerRefusal(target: Exclude<SupabaseTarget, "loopback">): void {
+  const why =
+    target === "remote"
+      ? `its Supabase project is not loopback. Set ${ALLOW_REMOTE_DB_VAR}=${ALLOW_REMOTE_DB_VALUE} to allow a credential-less admin login against it.`
+      : `its Supabase URL is missing, or names no hostname (check the scheme — "localhost:54321" parses as a scheme, not a host), so the target database is unknown. Fix NEXT_PUBLIC_SUPABASE_URL — ${ALLOW_REMOTE_DB_VAR} does not override this.`;
+
+  logger.warn(
+    { route: "/api/auth/dev-login", supabaseTarget: target },
+    `dev-login refused on a development server: ${why}`,
+  );
 }
 
 /**
@@ -166,19 +205,35 @@ function isDevLoginEnabled(): boolean {
   //
   // An absent or empty value means the app is not on Vercel — self-hosted
   // Docker, Fly, Railway, a VM — and this floor is simply inert there. That is
-  // exactly why condition (2) also requires a loopback database (#656), and
-  // why condition (1) remains exposed (#679).
+  // exactly why both conditions below also care about which database is being
+  // touched (#656, #679).
   const vercelEnv = process.env.VERCEL_ENV;
   if (vercelEnv && !NON_DEPLOYED_VERCEL_ENVS.has(vercelEnv)) return false;
 
-  // A dev server: allowed against any project, including a hosted one.
-  // Accepted, deliberate exposure — see the module docstring and issue #679.
-  if (process.env.NODE_ENV === "development") return true;
+  const target = classifySupabaseTarget();
+
+  // A dev server. Loopback is the silent default — `make db-local` and any
+  // `supabase start` stack land here and behave exactly as they always have.
+  // A hosted project still works, but only once somebody has typed the opt-in
+  // (#679); `unknown` fails closed either way.
+  if (process.env.NODE_ENV === "development") {
+    if (target === "loopback") return true;
+    // Literal `process.env.X`, not `process.env[ALLOW_REMOTE_DB_VAR]`: a static
+    // read is what every bundler and reader expects of a security gate. The
+    // constants exist for the refusal message; a test pins that the variable
+    // they name is the one that actually opens this branch.
+    if (target === "remote" && process.env.DEV_LOGIN_ALLOW_REMOTE_DB === ALLOW_REMOTE_DB_VALUE) {
+      return true;
+    }
+    logDevServerRefusal(target);
+    // Falls through rather than returning: the E2E condition below also demands
+    // `loopback`, which `target` is not, so it cannot re-open what this closed.
+  }
 
   // The CI opt-in. Only ever meant for a local stack, so require one: this is
   // what stops the flag reaching a hosted project on a host where VERCEL_ENV
-  // never gets set (#656).
-  return process.env.E2E_DEV_LOGIN === "1" && hasLoopbackSupabaseUrl();
+  // never gets set (#656). No opt-in widens this — it is condition (1) only.
+  return process.env.E2E_DEV_LOGIN === "1" && target === "loopback";
 }
 
 export async function GET(request: NextRequest) {

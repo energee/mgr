@@ -86,6 +86,34 @@ screenshot() {
   $B screenshot "$SCREENSHOTS/$1.png" >/dev/null 2>&1
 }
 
+# Sign in through /api/auth/dev-login, which every suite except `auth` needs.
+#
+# Since issue #679 that route also checks WHICH database the dev server is wired
+# to: it answers under NODE_ENV=development only when NEXT_PUBLIC_SUPABASE_URL
+# has a loopback hostname (localhost / 127.0.0.1 / [::1]) or the server has
+# DEV_LOGIN_ALLOW_REMOTE_DB=1. Against a hosted project it returns a bare
+# {"error":"Not found"} — which used to surface here as every single check in
+# every suite failing with no stated cause. Detect it once, up front, and say so.
+dev_login() {
+  nav "$BASE/api/auth/dev-login?redirect=/"
+  sleep 2
+  if [[ "$($B js "window.location.pathname" 2>&1)" == *"/api/auth/dev-login"* ]]; then
+    red "Dev login refused (404) — cannot authenticate, every suite below will fail"
+    cat >&2 <<EOF
+
+  /api/auth/dev-login returned 404 instead of a session. Since issue #679 it
+  requires this dev server's NEXT_PUBLIC_SUPABASE_URL to have a loopback
+  hostname, or DEV_LOGIN_ALLOW_REMOTE_DB=1 to allow a hosted project. Point
+  .env.local at your local stack (\`make db-local\` prints the URL), or set the
+  opt-in. The dev server's terminal logs the reason; the HTTP body never does.
+EOF
+    FAILURES+=("Dev login refused (404): see issue #679 — non-loopback Supabase URL without DEV_LOGIN_ALLOW_REMOTE_DB=1")
+    FAIL=$((FAIL + 1))
+    return 1
+  fi
+  return 0
+}
+
 # Get first entity ID from a list table (reads data-id or extracts from DOM)
 first_id() {
   $B js "document.querySelector('table tbody tr td:nth-child(2)')?.closest('tr')?.dataset?.id || document.querySelector('table tbody tr')?.getAttribute('data-row-id') || ''" 2>&1
@@ -105,16 +133,21 @@ suite_auth() {
   check "Login page renders" \
     "document.querySelector('button')?.textContent || ''" "Sign in"
 
+  # Rendered from devLoginAffordance() (src/lib/dev-login.ts), the same module
+  # the route gates on. Present on a dev server unless the Supabase URL parses
+  # to no hostname at all; when the project is non-loopback it is present WITH
+  # an on-page note about DEV_LOGIN_ALLOW_REMOTE_DB (issue #679).
   check "Dev Login button visible (dev mode)" \
     "Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Dev Login'))?.textContent || ''" "Dev Login"
 
   screenshot "01-login-page"
 
-  # Sign in via dev-login API endpoint
-  nav "$BASE/api/auth/dev-login?redirect=/"
-  sleep 2
-  check "Dev login redirects to app" \
-    "!window.location.pathname.includes('login') ? 'authenticated' : ''" "authenticated"
+  # Sign in via dev-login API endpoint. A bare `check` here would report only
+  # "got empty/null/false"; dev_login names issue #679 when that is the cause.
+  if dev_login; then
+    check "Dev login redirects to app" \
+      "!window.location.pathname.includes('login') ? 'authenticated' : ''" "authenticated"
+  fi
 
   screenshot "01-auth-dashboard"
 }
@@ -344,10 +377,11 @@ if [[ "$SUITE" == "all" ]]; then
   suite_settings
 else
   if declare -f "suite_$SUITE" >/dev/null 2>&1; then
-    # Auth is required for all suites except auth itself
+    # Auth is required for all suites except auth itself. `|| true` because
+    # dev_login already recorded the failure and explained it — running the
+    # suite anyway shows which checks are reachable unauthenticated.
     if [[ "$SUITE" != "auth" ]]; then
-      nav "$BASE/api/auth/dev-login?redirect=/"
-      sleep 2
+      dev_login || true
     fi
     "suite_$SUITE"
   else

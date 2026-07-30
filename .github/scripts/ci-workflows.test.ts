@@ -75,6 +75,17 @@ describe("GitHub Actions performance contracts", () => {
       if (path === ".github/workflows/test.yml") continue;
       expect(read(path), `${path} must not enable E2E_DEV_LOGIN`).not.toContain("E2E_DEV_LOGIN");
     }
+
+    // Issue #679: DEV_LOGIN_ALLOW_REMOTE_DB lets dev-login mint admin against a
+    // NON-loopback project. It is a per-developer opt-in for a local dev server
+    // and has no legitimate use in CI — the e2e lane runs its own local stack,
+    // which is loopback already. No workflow may set it, this one included.
+    for (const path of workflows) {
+      expect(
+        read(path),
+        `${path} must not set DEV_LOGIN_ALLOW_REMOTE_DB`,
+      ).not.toContain("DEV_LOGIN_ALLOW_REMOTE_DB");
+    }
   });
 
   it("replays migrations once for DB lint and integration tests", () => {

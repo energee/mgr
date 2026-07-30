@@ -25,6 +25,7 @@
 # hosted value is the easy mistake. A credential that does not belong to the
 # instance in the URL is rejected upstream of Postgres, with no Postgres error
 # code, so it does not look like a database problem (docs/agents/gotchas.md).
+# A leftover hosted URL also 404s /api/auth/dev-login (issue #679).
 #
 # Requires: supabase CLI, a Docker-compatible runtime, psql.
 #
@@ -114,6 +115,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY, then restart the
 dev server. .env.example ships a hosted URL, so a leftover hosted value is the
 easy mistake. A credential that does not belong to the instance in the URL is
 rejected upstream of Postgres ("Unregistered API key", "Invalid API key") with
-no Postgres error code, so it does not look like a database problem. See
-docs/agents/gotchas.md.
+no Postgres error code, so it does not look like a database problem. A leftover
+hosted URL also makes /api/auth/dev-login 404 (it needs a loopback URL unless
+DEV_LOGIN_ALLOW_REMOTE_DB=1 — issue #679). See docs/agents/gotchas.md.
 EOF

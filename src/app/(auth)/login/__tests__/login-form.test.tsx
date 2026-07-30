@@ -16,7 +16,7 @@
  * repo intentionally has no @testing-library/react.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { act } from "react";
 import { setupRenderHarness } from "@/test/react-harness";
 
@@ -30,6 +30,18 @@ import { setupRenderHarness } from "@/test/react-harness";
 const mockSignInWithOtp = vi.fn();
 const mockSignInWithPassword = vi.fn();
 const mockVerifyOtp = vi.fn();
+
+// The Dev Login button is rendered from devLoginAffordance() (@/lib/dev-login),
+// which resolves the Supabase URL through @/lib/env. Mocking env both dodges
+// that module's import-time validation (repo idiom) and lets the #679 cases
+// below drive the classifier with vi.stubEnv.
+vi.mock("@/lib/env", () => ({
+  getSupabaseUrl: () => process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+  clientEnv: {
+    NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
+  },
+}));
 
 // Also prevents @/lib/env validation from throwing at import time.
 vi.mock("@/lib/supabase/client", () => ({
@@ -236,6 +248,81 @@ describe("LoginForm validation feedback (audit A11Y-4/A11Y-5)", () => {
     const passwordInput = container.querySelector("#password") as HTMLInputElement;
     expect(emailInput.getAttribute("autocomplete")).toBe("email");
     expect(passwordInput.getAttribute("autocomplete")).toBe("current-password");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dev-login affordance (issue #679)
+// ---------------------------------------------------------------------------
+// The button used to render on `process.env.NODE_ENV === "development"` alone.
+// When #679 taught /api/auth/dev-login to also check WHICH database it would
+// touch, that predicate silently stopped matching the route: the button showed,
+// the route refused, and the click landed on a raw {"error":"Not found"} page
+// with the reason only in the server terminal. Both sides now read
+// @/lib/dev-login. These cases pin what the page renders; the route's own suite
+// pins that the two agree (src/app/api/auth/dev-login/__tests__/route.test.ts).
+
+describe("LoginForm dev-login affordance (#679)", () => {
+  const LOOPBACK_URL = "http://127.0.0.1:54321";
+  const HOSTED_URL = "https://abcdefghijklmnop.supabase.co";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function devButton(container: HTMLElement): HTMLButtonElement | undefined {
+    return Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Dev Login")
+    );
+  }
+
+  it("hides the button outside a dev server", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", LOOPBACK_URL);
+
+    const container = render(<LoginForm />);
+
+    expect(devButton(container)).toBeUndefined();
+  });
+
+  it("offers the button with nothing to configure against a loopback project", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", LOOPBACK_URL);
+
+    const container = render(<LoginForm />);
+
+    expect(devButton(container)).toBeDefined();
+    // The unchanged, common case (`make db-local`): no caveat, no noise.
+    expect(container.textContent).not.toContain("DEV_LOGIN_ALLOW_REMOTE_DB");
+  });
+
+  it("offers the button but names the opt-in against a hosted project", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", HOSTED_URL);
+
+    const container = render(<LoginForm />);
+
+    // Still offered: the opted-in workflow is legitimate, and the browser
+    // cannot read a server-only variable to know whether it is set. So the
+    // precondition is stated on screen rather than guessed at.
+    expect(devButton(container)).toBeDefined();
+    expect(container.textContent).toContain("DEV_LOGIN_ALLOW_REMOTE_DB=1");
+    expect(container.textContent).toContain("#679");
+  });
+
+  it.each([
+    ["a scheme-less typo", "localhost:54321"],
+    ["a file URL", "file:///x"],
+    ["nothing parseable", "not-a-url"],
+  ])("hides the button when the Supabase URL is %s", (_label, url) => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", url);
+
+    const container = render(<LoginForm />);
+
+    // `unknown` target: no opt-in opens it, so offering the button could only
+    // ever produce a 404.
+    expect(devButton(container)).toBeUndefined();
   });
 });
 

@@ -22,6 +22,24 @@ DEV_LOGIN='Dev Login (dev@brewery.test)'
 
 die() { echo "verify: $*" >&2; exit 1; }
 
+# Since issue #679, /api/auth/dev-login also checks WHICH database this server
+# is wired to: under NODE_ENV=development it answers only when
+# NEXT_PUBLIC_SUPABASE_URL has a loopback hostname (localhost / 127.0.0.1 /
+# [::1]), or when DEV_LOGIN_ALLOW_REMOTE_DB=1 is set. Otherwise it 404s. The
+# HTTP body is a bare {"error":"Not found"} on purpose, and the route's own
+# explanation goes to the server log — so every login failure below prints this
+# instead of leaving the caller with "did not reach /dashboard".
+devlogin_hint() {
+  cat <<EOF
+
+  The likely cause is issue #679: dev-login refuses a non-loopback Supabase
+  project. Either point .env / .env.local at your local stack (\`make db-local\`
+  prints the URL), or set DEV_LOGIN_ALLOW_REMOTE_DB=1 and accept that anyone
+  who can reach this port gets uncredentialed admin on that hosted project.
+  The route logs the reason — check: $LOGF
+EOF
+}
+
 server_alive() {
   [ -s "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null && [ -s "$URLF" ] \
     && curl -sf -o /dev/null --max-time 3 "$(cat "$URLF")/login"
@@ -97,12 +115,21 @@ ensure_login() {
   # Match on text, not role. `find role button click "$DEV_LOGIN"` silently
   # clicks the FIRST button on the page (Sign in) — the trailing positional is
   # the action's input, not a name filter. Use `--name` or, as here, `find text`.
+  # The button is rendered from the same predicate the route gates on
+  # (devLoginAffordance() in src/lib/dev-login.ts), so its absence on a dev
+  # server means the Supabase URL yields no hostname at all — which no opt-in
+  # overrides.
   agent-browser find text "$DEV_LOGIN" click >/dev/null 2>&1 \
-    || die "no '$DEV_LOGIN' button — is this a production build?"
+    || die "no '$DEV_LOGIN' button — a production build, or this server's Supabase URL parses to no hostname.$(devlogin_hint)"
   agent-browser wait 3000 >/dev/null 2>&1
 
   url=$(agent-browser get url 2>/dev/null || true)
-  case "$url" in "$base"/dashboard*) ;; *) die "login did not reach $base/dashboard (at: ${url:-nothing})";; esac
+  case "$url" in
+    "$base"/dashboard*) ;;
+    # Still on the endpoint: it answered 404 rather than redirecting.
+    *"/api/auth/dev-login"*) die "dev-login returned 404 instead of a session.$(devlogin_hint)";;
+    *) die "login did not reach $base/dashboard (at: ${url:-nothing}).$(devlogin_hint)";;
+  esac
 }
 
 case "${1:-up}" in

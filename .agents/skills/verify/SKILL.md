@@ -54,6 +54,17 @@ lands on `/dashboard`. Re-running reuses the server and the browser session.
 removes the state dir, and removes the `.env` symlink it created (only when it
 is still that symlink — a real `.env` you placed is never touched).
 
+**`up` needs a loopback Supabase URL (issue #679).** `/api/auth/dev-login` mints
+an admin session with no credentials, so since #679 it also checks which
+database it is about to touch: under `NODE_ENV=development` it answers only when
+`NEXT_PUBLIC_SUPABASE_URL` has a loopback hostname (`localhost`, `127.0.0.1`,
+`[::1]`), or when the server has `DEV_LOGIN_ALLOW_REMOTE_DB=1`. The `.env` this
+script symlinks from the main checkout is the usual culprit — if it points at a
+hosted project, `up` fails and names #679 plus both fixes (point `.env` at the
+local stack from `make db-local`, or set the opt-in). The login page says the
+same thing next to the button; the HTTP response is a bare
+`{"error":"Not found"}` by design.
+
 One shared-daemon caveat: agent-browser sessions are daemon-wide. Without
 `AGENT_BROWSER_SESSION` set, every worktree drives the same default session, so
 parallel verify runs can steal each other's page (`up` guards against adopting
