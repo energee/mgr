@@ -327,15 +327,15 @@ jobs:
       #
       # `expected + flaky` because CI retries twice and a test that passes on
       # retry is reported as flaky, not expected. The floor is a tripwire, not
-      # a coverage target: 18 pass today (17 enabled specs + the auth setup)
-      # against 5 tracked scaffold skips. Do NOT lower it to buy slack — a
+      # a coverage target: 21 pass today (20 enabled specs + the auth setup)
+      # against 1 tracked scaffold skip. Do NOT lower it to buy slack — a
       # contract in .github/scripts/ci-workflows.test.ts counts the enabled
       # `test(` declarations under e2e/ and fails if the floor drifts more than
       # 2 below them, precisely so a shrinking suite cannot quietly keep a
       # green gate. Raise both together as scaffolds get implemented.
       - name: Assert the browser suite actually ran
         env:
-          E2E_MIN_PASSING: "16"
+          E2E_MIN_PASSING: "19"
         run: |
           set -euo pipefail
           results="${RUNNER_TEMP}/playwright-results.json"
