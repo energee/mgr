@@ -1,8 +1,10 @@
 -- MGR Demo Seed Data (Single-Tenant)
 --
--- Applied by `make db-local` (scripts/db-local.sh) AFTER the full migration
--- chain has replayed, and by `make db-seed` against an already-migrated
--- database. It runs with admin credentials, so RLS is bypassed.
+-- LOCAL ONLY. Applied by `make db-local` (scripts/db-local.sh) AFTER the full
+-- migration chain has replayed, and by `make db-seed` (= `supabase db seed`,
+-- which also targets the local stack). It runs with admin credentials, so RLS
+-- is bypassed. Never point it at the hosted database — see the MAINTENANCE
+-- NOTE below for why it cannot apply there.
 --
 -- Intent: one small, coherent demo brewery — recipes, batches at several
 -- statuses, the vessels holding them, packaging containers/formats, packaged
