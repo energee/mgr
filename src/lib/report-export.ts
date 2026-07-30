@@ -6,7 +6,7 @@
  */
 
 import { formatBbl } from "@/lib/format";
-import { getTaxClassLabel } from "@/domain/ttb-utils";
+import { getTaxClassLabel, IN_PROCESS_SNAPSHOT_LABEL } from "@/domain/ttb-utils";
 
 // =============================================================================
 // CSV Export
@@ -189,11 +189,13 @@ export function exportTTBReportToCSV(
       Total: "",
     },
     {
-      "Line Item": "BEER IN PROCESS",
+      // In-process volumes are a live snapshot of batches currently
+      // fermenting/conditioning/packaging, not a month-end balance (issue #618).
+      "Line Item": "BEER IN PROCESS (CURRENT SNAPSHOT)",
       ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
       Total: "",
     },
-    createDataRow("End of Month (In Process)", reportData, "in_process_ending_bbl"),
+    createDataRow(IN_PROCESS_SNAPSHOT_LABEL, reportData, "in_process_ending_bbl"),
   ];
 
   const csv = toCSV(detailRows);
@@ -348,14 +350,20 @@ export function generateTTBPrintHTML(
       ${createSectionHeader("Ending Balance")}
       ${createRow("Ending Inventory", "ending_inventory_bbl")}
 
-      ${createSectionHeader("Beer in Process (Cellar)")}
-      ${createRow("End of Month (In Process)", "in_process_ending_bbl")}
+      ${createSectionHeader("Beer in Process (Cellar) — current snapshot")}
+      ${createRow(IN_PROCESS_SNAPSHOT_LABEL, "in_process_ending_bbl")}
     </tbody>
   </table>
 
   <p style="margin-top: 30px; font-size: 10px; color: #666;">
     <strong>Note:</strong> This report is prepared for internal use and TTB Form 5130.9 filing reference.
     One barrel (BBL) equals 31 gallons per TTB regulations. Verify all data before submission.
+  </p>
+
+  <p style="font-size: 10px; color: #666;">
+    <strong>Cellar/In-Process:</strong> a snapshot of batches still fermenting, conditioning, or
+    packaging at the time this report was generated — not a balance as of the period end, and not
+    covered by the accounting-identity checks that apply to the keg and canned/bottled columns.
   </p>
 
   <p style="font-size: 10px; color: #666;">

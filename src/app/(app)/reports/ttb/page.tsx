@@ -10,10 +10,16 @@
  * - get_ttb_report(year, month) - Full report data by tax class
  * - get_ttb_production_summary(year, month) - Production details
  *
- * Every row is checked against the form's two accounting identities
- * (validateRowBalance / validateEndingInventory from @/domain/ttb-utils);
- * failures render a visible warning so a non-balancing report is never
- * silently filed.
+ * Every row is run through the form's two accounting identities
+ * (checkRowIdentities from @/domain/ttb-utils); failures render a visible
+ * warning so a non-balancing report is never silently filed.
+ *
+ * The cellar row is exempt from those checks rather than passed: its volume
+ * lives in the in-process columns, which the identities do not reference, and
+ * those columns are a live snapshot of batches currently in fermenting/
+ * conditioning/packaging — not a period-end balance (issue #618). Exempt tax
+ * classes are labelled as "not checked" in the UI instead of raising the
+ * warning, which would otherwise fire on every month an active brewery has.
  */
 
 import { useState } from "react";
@@ -25,8 +31,10 @@ import {
   formatTtbBbl,
   MONTHS,
   calculateTotals,
-  validateRowBalance,
-  validateEndingInventory,
+  checkRowIdentities,
+  collectIdentityFailures,
+  collectIdentityExemptions,
+  IN_PROCESS_SNAPSHOT_LABEL,
   EMPTY_TOTALS,
   type TTBReportRow,
 } from "@/domain/ttb-utils";
@@ -207,24 +215,14 @@ export default function TTBReportPage() {
         inProcessEnding: batchData?.inProgressVolume || 0,
       };
 
-  // TTB Form 5130.9 accounting-identity checks. A failing row means the
-  // report disagrees with its own math (e.g. removals not deducted from
-  // ending inventory) and must be reviewed before filing.
-  const identityFailures = (reportData ?? []).flatMap((row) => {
-    const label = getTaxClassLabel(row.ttb_tax_class);
-    const failures: string[] = [];
-    if (!validateRowBalance(row)) {
-      failures.push(
-        `${label}: total available (${formatTtbBbl(row.total_available_bbl)}) ≠ beginning inventory + beer produced + beer received`
-      );
-    }
-    if (!validateEndingInventory(row)) {
-      failures.push(
-        `${label}: ending inventory (${formatTtbBbl(row.ending_inventory_bbl)}) ≠ total available − total removals`
-      );
-    }
-    return failures;
-  });
+  // TTB Form 5130.9 accounting-identity checks, scoped to the tax classes the
+  // identities can actually verify (keg, bottled). A failing row means the
+  // report disagrees with its own math (e.g. removals not deducted from ending
+  // inventory) and must be reviewed before filing. Cellar comes back "exempt"
+  // and is disclosed as unchecked below the table rather than warned about.
+  const identityChecks = (reportData ?? []).map(checkRowIdentities);
+  const identityFailures = collectIdentityFailures(identityChecks);
+  const identityExemptions = collectIdentityExemptions(identityChecks);
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -608,14 +606,14 @@ export default function TTBReportPage() {
                   </TableCell>
                 </TableRow>
 
-                {/* In-Process */}
+                {/* In-Process — a live snapshot, not a period-end balance (#618) */}
                 <TableRow className="bg-muted/50">
                   <TableCell colSpan={reportData.length + 2} className="font-semibold">
-                    Beer in Process (Cellar)
+                    Beer in Process (Cellar) — current snapshot
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>End of Month (In Process)</TableCell>
+                  <TableCell>{IN_PROCESS_SNAPSHOT_LABEL}</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
                       {formatTtbBbl(row.in_process_ending_bbl)}
@@ -628,6 +626,21 @@ export default function TTBReportPage() {
               </TableBody>
             </Table>
             </div>
+            <p className="text-xs text-muted-foreground mt-3">
+              In-process figures are a snapshot of batches that are fermenting,
+              conditioning, or packaging <em>right now</em> — not a balance as of
+              the end of {monthName} {year}. Re-running a past period can return a
+              different in-process number as batches move on.
+            </p>
+            {identityExemptions.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Not accounting-identity checked:{" "}
+                {identityExemptions
+                  .map((check) => `${check.label} (${check.reason})`)
+                  .join("; ")}
+                .
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -676,7 +689,8 @@ export default function TTBReportPage() {
                     <TableCell></TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell className="pl-6">End of Month</TableCell>
+                    {/* Snapshot of batches in process now, not a month-end balance (#618) */}
+                    <TableCell className="pl-6">{IN_PROCESS_SNAPSHOT_LABEL}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatTtbBbl(batchData?.inProgressVolume)}
                     </TableCell>
@@ -792,6 +806,14 @@ export default function TTBReportPage() {
           <p className="text-sm text-muted-foreground mt-2">
             <strong>Tax Classes:</strong> Kegs (Column C), Canned/Bottled (Column F), Cellar/In-Process (Column A).
             One barrel (BBL) equals 31 gallons per TTB regulations.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            <strong>Cellar/In-Process:</strong> reported as a current snapshot of
+            batches still in fermentation, conditioning, or packaging — it is not a
+            period-end balance and is not covered by the accounting-identity
+            checks, which apply to the keg and canned/bottled columns. Record the
+            cellar figures for a closed month when you file; re-running the report
+            later may show a different snapshot.
           </p>
         </CardContent>
       </Card>
