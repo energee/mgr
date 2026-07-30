@@ -15,6 +15,15 @@
  * a `role="alert"` region referenced by the failing input's `aria-describedby`
  * with `aria-invalid` set (audit A11Y-4). Inputs carry autocomplete tokens
  * (audit A11Y-5).
+ *
+ * The "Dev Login" button's visibility comes from `devLoginAffordance()` in
+ * `@/lib/dev-login` — the module `/api/auth/dev-login`'s gate classifies its
+ * target with — and NOT from a local `process.env.NODE_ENV` test. It used to be
+ * the latter, which silently desynchronized when #679 tightened the route: the
+ * button rendered, the route refused, and the browser landed on raw
+ * `{"error":"Not found"}` with the reason only in the server terminal. A
+ * contract test in the route's suite drives the button state and the gate
+ * across one matrix and fails if they diverge again.
  */
 
 import { useRef, useState, type FormEvent } from "react";
@@ -23,6 +32,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
 import { rememberEmail, readRememberedEmail, otpSignInErrorMessage } from "@/lib/auth-utils";
+import { ALLOW_REMOTE_DB_VALUE, ALLOW_REMOTE_DB_VAR, devLoginAffordance } from "@/lib/dev-login";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
 import { OtpCodeInput, OTP_LENGTH } from "@/components/auth/otp-code-input";
 import { Button } from "@/components/ui/button";
@@ -44,6 +54,12 @@ export function LoginForm() {
   const supabase = createClient();
   const submitRef = useSubmitShortcut();
   const otpFormRef = useRef<HTMLFormElement>(null);
+  /* Whether — and how — to offer the dev-login shortcut. Comes from the module
+     the route's gate classifies its target with, never from a second local
+     environment test (see this file's docstring). Not state: every input is a
+     build-time constant in the client bundle, so it collapses to "hidden" in a
+     production build and the whole block below is compiled out. */
+  const devLogin = devLoginAffordance();
 
   const [isLoading, setIsLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -258,7 +274,7 @@ export function LoginForm() {
         Sign in with magic link
       </Button>
 
-      {process.env.NODE_ENV === "development" && (
+      {devLogin !== "hidden" && (
         <>
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -279,6 +295,19 @@ export function LoginForm() {
           >
             Dev Login (dev@brewery.test)
           </Button>
+          {/* The server-only opt-in is unreadable from here (no NEXT_PUBLIC_
+              prefix, deliberately), so state the precondition rather than guess:
+              without it the click lands on a bare 404 whose reason is otherwise
+              server-side only. */}
+          {devLogin === "needs-opt-in" && (
+            <p className="text-xs text-muted-foreground">
+              This app&apos;s Supabase URL is not loopback, so dev login needs{" "}
+              <code>
+                {ALLOW_REMOTE_DB_VAR}={ALLOW_REMOTE_DB_VALUE}
+              </code>{" "}
+              on the server (issue #679). Without it the button returns 404.
+            </p>
+          )}
         </>
       )}
 

@@ -120,6 +120,27 @@ sets it from `NODE_ENV`, so `next dev` against the *hosted* project still
 reports `development`. Judge severity by the instance step 1 names, not by the
 environment tag.
 
+**`/api/auth/dev-login` 404s — or `bun e2e` / `verify.sh` / `smoke-test.sh`
+fails to authenticate — when your dev server points at a hosted project.**
+Since #679 that route requires a loopback `NEXT_PUBLIC_SUPABASE_URL` even under
+`NODE_ENV=development`; against anything else it 404s unless
+`DEV_LOGIN_ALLOW_REMOTE_DB=1` is set. **The tells**, in the order you will meet
+them: the `/login` page prints the required variable next to the Dev Login
+button, and the `bun dev` terminal logs a warning naming it. The HTTP response
+is a bare `{"error":"Not found"}` on purpose and says nothing. (The log is a
+`logger.warn`, so `LOG_LEVEL=error`/`silent` suppresses it — the on-page note
+does not depend on the log level.) Two fixes, pick by intent: point `.env.local`
+at `supabase status`'s local API URL (what `make db-local` tells you to do, and
+the better answer), or set the opt-in and accept that anyone who can reach the
+port gets uncredentialed admin on that hosted project. `E2E_DEV_LOGIN` does
+**not** accept the opt-in, and neither variable affects a production build.
+
+A URL that names **no host at all** — `localhost:54321` without a scheme,
+which `new URL()` happily parses as scheme `localhost:` plus path `54321` — is
+an `unknown` target, not a remote one. The opt-in does not open it and the Dev
+Login button disappears entirely. If the button is missing on a dev server,
+check the scheme on `NEXT_PUBLIC_SUPABASE_URL` before anything else.
+
 ## Build and tooling
 
 **Stale caches masquerade as type errors.** `tsc`/eslint failures that
