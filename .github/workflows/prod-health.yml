@@ -1,0 +1,222 @@
+# Post-deploy verification watchdog (issue #587). Every merge to main
+# auto-deploys to Vercel production and, until this workflow existed, NOTHING
+# verified the deployed artifact: `scripts/vercel-ignore-build.sh` only decides
+# whether to build, and Sentry only fires once a real user hits a runtime
+# error. A failed promotion, a broken database connection, or a dead auth wall
+# was therefore silent.
+#
+# This probe closes that gap the same way live-drift.yml and nightly-watch.yml
+# close theirs: a cron that maintains exactly ONE deduped tracking issue.
+#
+#   - probe FAILS   -> open (or comment on) the single `prod-down` issue
+#   - probe PASSES  -> comment + close any open `prod-down` issue
+#
+# What it asserts (both must hold, or production counts as down):
+#   - GET /api/health   -> HTTP 200 *and* JSON body `status: "ok"`. The route
+#     answers 503 `{status:"degraded"}` when Postgres is unreachable, and a
+#     hypothetical 200 carrying "degraded" must not read as healthy either —
+#     hence the body check, not just the status code.
+#   - GET /login        -> HTTP 200. A broken auth wall locks every user out
+#     while the API route still answers, so the health endpoint alone cannot
+#     see it. Only the status code is asserted: matching page copy would turn
+#     ordinary wording changes into false "production is down" alerts.
+#
+# Requires repository VARIABLE `PRODUCTION_URL` (the production origin, e.g.
+# https://mgr.example.com). It is a variable, not a secret — the URL is public
+# — and it is deliberately NOT committed here. When it is unset the run FAILS
+# LOUDLY instead of skipping: a health gate that silently passes when
+# unconfigured is worse than no gate, which is exactly how the old
+# secrets-gated E2E job never ran (see the comment in test.yml and issue #437).
+#
+# Kill criterion: if this workflow misbehaves (issue spam, flaky alerts),
+# disable it from the Actions UI and delete the `prod-down` label.
+
+name: Production Health Probe
+
+on:
+  # Every 15 minutes: detection latency of at most ~15 min for a broken
+  # promotion, at the cost of ~96 sub-minute runs a day — free on a public
+  # repo. Finer buys little, because GitHub already delays and coalesces
+  # high-frequency schedules; coarser leaves a broken deploy live for half an
+  # hour or more.
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+# Least privilege: the only mutation this job makes is to its own tracking
+# issue. No checkout at all — nothing in the repo is needed (`gh` is
+# preinstalled and takes --repo), so there is no .git/config for a token to
+# linger in, and `contents` stays at none.
+permissions:
+  issues: write # upsert/close the single `prod-down` tracking issue
+
+# Serialize issue mutations: two probes must never race on create/close.
+# Never cancel a run in flight — a cancelled probe produces no verdict.
+concurrency:
+  group: prod-health
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe production health
+    runs-on: ubuntu-latest
+    # Worst case is 3 attempts × (2 requests × 20s max) + 30s backoff ≈ 2.5
+    # min; a hung curl must not sit on the 6-hour job default.
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+      LABEL: prod-down
+    steps:
+      - name: Probe /api/health and /login
+        id: probe
+        shell: bash
+        # No `set -e`: curl failures are handled explicitly so a connection
+        # error becomes a retryable probe failure, not an aborted step.
+        run: |
+          set -uo pipefail
+
+          # `:-` so that an entirely absent env entry lands on this branch's
+          # actionable message rather than a bare `unbound variable` abort.
+          if [ -z "${PRODUCTION_URL:-}" ]; then
+            echo "::error::PRODUCTION_URL repository variable is not set — the production health probe cannot run. Set it to the production origin with: gh variable set PRODUCTION_URL --body \"https://<production-host>\""
+            {
+              echo "### Production health probe could not run"
+              echo
+              echo 'The `PRODUCTION_URL` repository variable is unset, so there is'
+              echo 'nothing to probe and production is currently UNVERIFIED.'
+              echo
+              echo 'Fix: `gh variable set PRODUCTION_URL --body "https://<production-host>"`'
+              echo 'then re-run: `gh workflow run prod-health.yml`'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          base="${PRODUCTION_URL%/}"
+          body_file="$RUNNER_TEMP/health.json"
+          failures=""
+          attempt=1
+          max_attempts=3
+
+          # Retry with a short linear backoff before alerting: a single dropped
+          # connection or a cold-start timeout must not open an issue. Three
+          # attempts spread over ~30s distinguishes a blip from an outage.
+          while [ "$attempt" -le "$max_attempts" ]; do
+            failures=""
+
+            # Truncate first: the body file is reused across attempts, and a
+            # false "healthy" read from a previous attempt's body would be the
+            # worst failure this workflow could have.
+            : > "$body_file"
+            health_code="$(curl -sS --connect-timeout 10 --max-time 20 \
+              -o "$body_file" -w '%{http_code}' "$base/api/health")" || health_code="000"
+            health_status="$(jq -r '.status // empty' "$body_file" 2>/dev/null)" || health_status=""
+            # The body is remote-controlled (and fully attacker-controlled if
+            # the host is ever hijacked). It only ever reaches the issue text
+            # through an `env:` value, never inlined into a script, but bound
+            # its length anyway so a hostile body cannot flood an issue.
+            health_status="${health_status:0:64}"
+            if [ "$health_code" != "200" ] || [ "$health_status" != "ok" ]; then
+              failures="${failures}- \`GET /api/health\` -> HTTP ${health_code}, status=\"${health_status:-<no parseable status>}\" (want HTTP 200 and status \"ok\")
+          "
+            fi
+
+            login_code="$(curl -sS --connect-timeout 10 --max-time 20 \
+              -o /dev/null -w '%{http_code}' "$base/login")" || login_code="000"
+            if [ "$login_code" != "200" ]; then
+              failures="${failures}- \`GET /login\` -> HTTP ${login_code} (want HTTP 200)
+          "
+            fi
+
+            if [ -z "$failures" ]; then
+              break
+            fi
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              echo "Attempt ${attempt}/${max_attempts} failed; retrying in $((attempt * 10))s"
+              sleep "$((attempt * 10))"
+            fi
+            attempt=$((attempt + 1))
+          done
+
+          if [ -n "$failures" ]; then
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "failures<<PROBE_REPORT_EOF"
+              printf '%s' "$failures"
+              echo "PROBE_REPORT_EOF"
+            } >> "$GITHUB_OUTPUT"
+            {
+              echo "### Production health probe FAILED"
+              echo
+              echo "Base URL: \`${base}\` (after ${max_attempts} attempts)"
+              echo
+              printf '%s' "$failures"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Production health probe failed for ${base} after ${max_attempts} attempts — see the run summary."
+            exit 1
+          fi
+
+          echo "healthy=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Production healthy"
+            echo
+            echo "\`${base}/api/health\` -> 200 status \"ok\"; \`${base}/login\` -> 200."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ONE deduped tracking issue, same idiom as nightly-watch.yml: create the
+      # label defensively (first run owns it), then find the open issue by
+      # label + exact title (`gh --search` is unreliable under GITHUB_TOKEN, so
+      # filter a plain list instead), comment while still down, close on
+      # recovery.
+      #
+      # Guarded on a verdict existing, mirroring live-drift.yml: an
+      # unconfigured PRODUCTION_URL writes no `healthy` output, so a
+      # misconfigured probe never touches the issue — it just goes red.
+      - name: Upsert or resolve tracking issue
+        if: always() && steps.probe.outputs.healthy != ''
+        shell: bash
+        env:
+          HEALTHY: ${{ steps.probe.outputs.healthy }}
+          FAILURES: ${{ steps.probe.outputs.failures }}
+        run: |
+          set -euo pipefail
+          title="Production health probe failing"
+
+          gh label create "$LABEL" \
+            --repo "$REPO" \
+            --color B60205 \
+            --description "Production deployment is failing its health probe" \
+            2>/dev/null || true
+
+          existing="$(gh issue list \
+            --repo "$REPO" \
+            --label "$LABEL" \
+            --state open \
+            --json number,title \
+            --jq ".[] | select(.title == \"$title\") | .number" | head -1)"
+
+          if [ "$HEALTHY" = "false" ]; then
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$REPO" \
+                --body "Still failing: ${RUN_URL}
+
+          ${FAILURES}"
+              echo "Updated existing tracking issue #${existing}" >> "$GITHUB_STEP_SUMMARY"
+            else
+              gh issue create --repo "$REPO" --title "$title" --label "$LABEL" \
+                --body "The scheduled production health probe could not verify the deployed artifact: ${RUN_URL}
+
+          ${FAILURES}
+          Production auto-deploys on every merge to main, so the usual causes are a failed build/promotion, an unreachable database (\`/api/health\` answers 503 \`degraded\`), or a broken auth wall.
+
+          Maintained by \`.github/workflows/prod-health.yml\`; closed automatically on the next passing probe."
+              echo "Opened tracking issue (production probe failing)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" \
+              --body "Production is answering again: ${RUN_URL}. Closing."
+            gh issue close "$existing" --repo "$REPO"
+            echo "Closed tracking issue #${existing} (production recovered)" >> "$GITHUB_STEP_SUMMARY"
+          fi
