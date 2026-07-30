@@ -9,7 +9,7 @@ idempotent cleanup ops, then verify each box.
 - [ ] `make check` passes (lint + typecheck + vitest + build)
 - [ ] `make dev` still starts the server (no broken startup path)
 - [ ] No `console.log`, `debugger`, or session-only `TODO` markers remain in changed files
-- [ ] `feature_list.json` updated — every feature touched has its `state` field set correctly (and `evidence` populated for `passing` entries)
+- [ ] `feature_list.json` updated — every feature touched has its `state` field set correctly (and `evidence` populated for `passing` entries), plus `migrations` (the filenames it depends on, `[]` when you checked and it needs no schema change, `"unaudited"` only when nobody has checked) and, for a `passing` migration-backed entry, a `deployment` record. `make check-deploy-state` enforces all of it.
 - [ ] `PROGRESS.md` updated — current commit, completed list, next steps
 - [ ] All changes committed AND pushed (`git status` shows "up to date with origin")
 
@@ -23,6 +23,7 @@ idempotent cleanup ops, then verify each box.
 - [ ] `bun run db:generate:local` ran cleanly; `src/types/supabase.ts` reflects the new shape
 - [ ] `_schema_registry` entry added for any new table
 - [ ] [`docs/data-model/`](../data-model/) doc updated for the affected domain
+- [ ] Any feature entry that depends on the migration lists it in `migrations`, with a `deployment` record — `{"state":"pending","pending_since":…,"tracking_issue":NNN}` while live-apply is an operator step, `{"state":"live","observed_live_on":…,"verified_by":["supabase/live-catalog.snapshot.txt",…]}` once it lands and the regenerated snapshot carries its objects
 
 ## Periodic (recommend weekly)
 

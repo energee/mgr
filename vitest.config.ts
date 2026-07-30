@@ -35,6 +35,8 @@ const nodeTestGlobs = [
   "src/__tests__/**/*.test.{ts,tsx}",
   "src/app/api/**/*.test.{ts,tsx}",
   ".github/scripts/**/*.test.ts",
+  // Harness scripts (feature-tracker gates, etc.) — pure Node, never a DOM.
+  "scripts/**/*.test.ts",
 ];
 
 export default defineConfig({
@@ -63,9 +65,10 @@ export default defineConfig({
     // Two projects split the suite by environment. `extends: true` inherits
     // everything above (plugins, env, globals, setupFiles, resolve aliases);
     // only `environment` + `include` differ. The jsdom project's include is
-    // the full legacy glob minus the node globs, so the union of the two
-    // projects always equals the old single-project include — a test file in
-    // a brand-new directory lands in jsdom by default, never gets dropped.
+    // the full legacy glob minus the node globs, so no test file under `src/`
+    // can be dropped — one in a brand-new `src/` directory lands in jsdom by
+    // default. Directories outside `src/` (`.github/scripts/`, `scripts/`) are
+    // node-only and must be listed in `nodeTestGlobs` to run at all.
     projects: [
       {
         extends: true,

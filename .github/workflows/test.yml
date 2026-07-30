@@ -64,6 +64,11 @@ jobs:
       - name: Feature WIP check
         run: make check-wip
 
+      # #654: a migration-backed feature cannot read `passing` without a
+      # structured deployment record saying whether its migration is live.
+      - name: Feature deployment-state check
+        run: make check-deploy-state
+
       - name: Agent configuration checks
         run: make check-agent-config
 
