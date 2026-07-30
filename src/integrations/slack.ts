@@ -31,6 +31,8 @@ const TYPE_EMOJI: Record<string, string> = {
   order_status: ":package:",
   po_status: ":truck:",
   inventory_low: ":warning:",
+  // Nightly data-integrity watchdog findings (migration 00281, issue #586).
+  data_integrity: ":rotating_light:",
   system: ":gear:",
 };
 

@@ -820,6 +820,8 @@ When multi-tenant is enabled, all other tables would include a `brewery_id` colu
 
 Violations recorded by the nightly `check_data_integrity()` pg_cron sweep (migration 00272, repaired in 00273). One row per (check_name, entity_table, entity_id); re-detections refresh `detected_at`, and `resolved_at` is stamped when a later run no longer sees the violation. Read-only for staff with `inventory:read`; only the cron job owner writes.
 
+Open findings are announced to active staff by `notify_data_integrity_findings()` (migration 00281, daily 05:45 UTC) through `notify_all_users()` — in-app notification of type `data_integrity` at `high` priority, plus the usual email/Slack dispatch (Slack channel routing for the type is configurable in the Slack integration card). `notification_preferences` has no per-type toggle for `data_integrity`, so it is suppressed only by a recipient's `in_app_enabled`/`email_enabled` settings — deliberate for an integrity alert. `notified_at` is what keeps that from repeating every night: the notifier only picks up rows with `resolved_at IS NULL AND notified_at IS NULL`, the sweep's re-detection upsert preserves `notified_at` while a finding stays open, and it clears `notified_at` only when a *resolved* finding re-opens (a recurrence is a new event). At most 20 findings are itemised per run; the rest stay queued for the next one.
+
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
@@ -829,3 +831,4 @@ Violations recorded by the nightly `check_data_integrity()` pg_cron sweep (migra
 | detail | TEXT | Human-readable description with the offending value |
 | detected_at | TIMESTAMPTZ | Last time the sweep saw the violation |
 | resolved_at | TIMESTAMPTZ | Set when the violation cleared; NULL while open |
+| notified_at | TIMESTAMPTZ | Set when `notify_data_integrity_findings()` alerted staff about this open finding; NULL = not yet announced (or the finding re-opened after being resolved) |
