@@ -168,9 +168,12 @@ describe("GitHub Actions performance contracts", () => {
     expect(auditStep).not.toContain("continue-on-error");
     expect(auditStep).toContain("docs/security/dependency-policy.md");
 
-    // The gate must stay at `high`; downgrading the threshold is the broad
-    // severity suppression the policy prohibits.
-    expect(auditStep).not.toMatch(/--audit-level=(critical|moderate|low)/);
+    // The gate must stay at `high` or stricter. Only `critical` is a
+    // downgrade — it reports strictly fewer advisories, which is the broad
+    // severity suppression the policy prohibits. `moderate` and `low` report a
+    // superset of `high`, so they are stricter, not suppression, and must not
+    // be rejected here.
+    expect(auditStep).not.toMatch(/--audit-level=critical/);
     // `--ignore` must always name a concrete advisory. A bare flag, or one
     // taking a severity/package name, would suppress far more than the
     // documented exception.
