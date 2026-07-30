@@ -105,7 +105,9 @@ Immutable audit log for all keg state transitions. Keg inventory is calculated f
 refactor moved the format key to `selling_format_id` (00159), and every writer
 since 00183 — `create_finished_goods_from_packaging`,
 `create_keg_ship_transactions_from_order`, `record_keg_transaction` — supplies
-only that. Live dropped the column (and `keg_types`) out of band; the migration
+only that. Live appears to have dropped `keg_types` (and the column) out of band —
+inferred from `live-catalog.snapshot.txt` and the live-generated
+`src/types/supabase.ts`, not from a direct column read; the migration
 chain kept both, so any database built from the chain rejected *every* keg write
 with `null value in column "keg_type_id" ... violates not-null constraint`, which
 made keg packaging and keg order fulfillment impossible on a fresh replay (#701).

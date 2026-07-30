@@ -22,10 +22,12 @@
 -- BEFORE trigger and it sets from_state/to_state only, and the column has no
 -- default. So the value is simply never supplied.
 --
--- WHY THIS FIX, and not "supply a keg_type_id". There is nothing to supply.
--- Live already dropped the column out of band, the same class of drift 00254
--- captured for square_draft_sales.keg_type_id and 00269 captured for the 00080
--- xor constraints. Two live-derived artifacts committed in this repo agree:
+-- WHY THIS FIX, and not "supply a keg_type_id". Almost certainly there is
+-- nothing to supply. This is an inference from committed artifacts, not a
+-- direct read of live -- see STILL UNVERIFIED below, and do not restate it as
+-- settled. Live appears to have dropped keg_types out of band, the same class
+-- of drift 00254 captured for square_draft_sales.keg_type_id and 00269
+-- captured for the 00080 xor constraints. Two live-derived artifacts agree:
 -- supabase/live-catalog.snapshot.txt emits one TABLE| line per public base
 -- table (scripts/live-catalog.sql, relkind='r') and has none for keg_types,
 -- and src/types/supabase.ts — generated from the hosted project — has no
@@ -42,8 +44,19 @@
 -- STILL UNVERIFIED: whether live carries the column at all. The snapshot
 -- records tables, functions, triggers and policies but not columns, so only
 -- an operator running information_schema.columns against live can settle it.
--- This migration is written to be correct either way (see LIVE-SAFETY), so it
--- does not need to be settled before applying.
+-- This migration is SAFE either way (see LIVE-SAFETY), so it does not need to
+-- be settled before applying. "Safe" is narrower than "universally
+-- applicable", and the difference matters: of the three shapes live can be in,
+--   (a) column already gone            -> no-op, the expected case;
+--   (b) column present, table empty    -> clean drop;
+--   (c) column present WITH legacy rows -> the migration ABORTS, by design.
+-- Shape (c) is not repaired, it is refused, and on live it is the likely shape
+-- if the column survives at all: 00112's UUID-reuse backfill is guarded by
+-- `IF to_regclass('public.keg_types') IS NOT NULL`, and 00112's own header
+-- says the legacy tables were already gone when it ran against live -- so
+-- live's selling_formats ids were never seeded from keg_type ids and no
+-- legacy value would map. Do not describe this migration as "the repair" for
+-- a live database that still carries the column; it is the detector.
 --
 -- LIVE-SAFETY. DROP COLUMN IF EXISTS is a no-op where the column is already
 -- gone. Where it still exists, the legacy reference is preserved before it is
