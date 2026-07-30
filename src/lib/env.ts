@@ -34,6 +34,29 @@ export const clientEnv = process.env.SKIP_ENV_VALIDATION
     });
 
 /**
+ * The Supabase project URL that every server-side Supabase client in this app
+ * is built from (see `src/lib/supabase/server.ts`).
+ *
+ * Exists so that a security gate which needs to know *which database is about
+ * to be touched* can resolve it through the same accessor the clients use,
+ * rather than reading `process.env.NEXT_PUBLIC_SUPABASE_URL` itself. The two
+ * are NOT equivalent: `NEXT_PUBLIC_*` is inlined by the bundler at build time,
+ * so a direct read in application code compiles to the build machine's literal,
+ * whereas `clientEnv` returns the live `process.env` whenever
+ * `SKIP_ENV_VALIDATION` is set at runtime (`package.json`'s `build` script sets
+ * it). Mixing the two styles in one request path lets a gate and a client
+ * disagree about the target database — see
+ * `src/app/api/auth/dev-login/route.ts`, where that disagreement was a bypass.
+ *
+ * The return type follows `clientEnv`, which under `SKIP_ENV_VALIDATION` is an
+ * unvalidated cast of `process.env`. A caller that must fail closed on a
+ * missing value should therefore still check for one.
+ */
+export function getSupabaseUrl(): string {
+  return clientEnv.NEXT_PUBLIC_SUPABASE_URL;
+}
+
+/**
  * Server-only env vars. Call from server components, API routes,
  * and server actions only — never from client components.
  */
