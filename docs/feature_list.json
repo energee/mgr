@@ -314,8 +314,8 @@
     {
       "id": "F114",
       "area": "sales",
-      "title": "Customer order portal",
-      "user_visible_behavior": "External-facing portal for customers to place orders.",
+      "title": "Customer order portal (view + change requests)",
+      "user_visible_behavior": "External-facing portal where invited customers sign in to view their orders and submit change requests. Customers do NOT place orders \u2014 staff place orders on their behalf, by design (invite-only portal, staff confirm everything). Shipped routes: portal login, orders list, order detail, change-request/new.",
       "verification": "bun e2e ./e2e/customer-order.spec.ts",
       "state": "passing",
       "migrations": [
