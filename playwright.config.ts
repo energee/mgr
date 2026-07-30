@@ -14,10 +14,12 @@
  *                         production build (see that route's docstring). Required
  *                         for the credential-less path whenever the server under
  *                         test is `bun start` rather than `bun dev`; test.yml's
- *                         e2e job sets it. Not sufficient on its own: the route
- *                         also requires NEXT_PUBLIC_SUPABASE_URL to be loopback
- *                         on this path, so it cannot mint admin against a hosted
- *                         project (issue #656).
+ *                         e2e job sets it. Not sufficient on its own: on this
+ *                         path the route also requires the Supabase URL its own
+ *                         clients use to have a loopback hostname, which narrows
+ *                         the flag to databases reachable only on the serving
+ *                         machine (issue #656 — see that route's docstring for
+ *                         what that does and does not guarantee).
  *
  * Set PLAYWRIGHT_BASE_URL when :3000 is taken by another worktree's dev server.
  * For localhost targets the port is derived from it and passed to `bun dev`,
