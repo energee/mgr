@@ -1,5 +1,6 @@
 /**
- * Web-egress contract helpers for `.github/workflows/*` (issue #645).
+ * Web-egress and agent-credential contract helpers for `.github/workflows/*`
+ * (issues #645, #668).
  *
  * Pure functions over workflow YAML *text*, so the contract in
  * `ci-workflows.test.ts` can be exercised against synthetic workflows as well
@@ -28,6 +29,32 @@
  * exfiltration-proof — `Bash(git:*)` can push to an arbitrary remote,
  * `Bash(bun:*)` can `bun -e 'fetch(...)'`, and on a public repo
  * `gh issue create` is itself a publishing channel. See `docs/agents/ci.md`.
+ *
+ * Which is why this file also exports the *other* half of the same finding
+ * (#668): `agentWriteScopeInventory`. Since egress cannot be closed for a job
+ * that can execute code — and any agent with `Edit` plus `bun run test` or
+ * `make check` can execute code — the only structural remedy is to make sure
+ * the job has nothing worth stealing. Two mechanisms decide what an agent's
+ * shell can read, and only one of them is the `permissions:` block:
+ *
+ *  1. `claude-code-action`'s run step assigns `process.env.GITHUB_TOKEN` and
+ *     `GH_TOKEN` before starting the agent, and configures git auth with the
+ *     same value, so the resolved token is readable by every Bash tool call.
+ *     `persist-credentials: false` clears the `.git/config` copy and nothing
+ *     more.
+ *  2. Which token gets resolved is decided by the action's `src/github/
+ *     token.ts`: when the step passes no `github_token` input, it exchanges an
+ *     OIDC assertion for a Claude GitHub **App** installation token whose
+ *     permissions are hardcoded to `contents`/`pull_requests`/`issues: write`.
+ *     That token is not bounded by the job's `permissions:` block at all — it
+ *     is why this repo's bug-patrol PRs are authored by `app/claude`. A job
+ *     with entirely read-only `permissions:` still hands its agent a
+ *     push-capable token unless it passes `github_token` explicitly.
+ *
+ * The inventory therefore reports both, and the contract test asserts it for
+ * exact equality: a job that gains a write scope *or* starts minting an app
+ * token shows up and fails, and a job that gave both up (sentry-harness's
+ * `fix-error`) cannot silently take them back.
  */
 import { parse } from "yaml";
 
@@ -47,12 +74,43 @@ export const EGRESS_TOOLS = ["WebFetch", "WebSearch"] as const;
  */
 const ARG_INPUTS = ["claude_args", "allowed_tools", "disallowed_tools"] as const;
 
+/**
+ * `id-token: write` mints an OIDC assertion for an external identity provider;
+ * it grants no write against this repository, so it is excluded from the
+ * write-scope inventory. Every *other* scope counts — the deliberate direction,
+ * because the first version of the egress check allow-listed three scopes it
+ * judged "credentialed" and thereby skipped `actions: write` and `packages:
+ * write` entirely. Excluding one well-understood scope by name is safe;
+ * enumerating the ones that matter is not.
+ */
+const NON_REPO_WRITE_SCOPES = new Set(["id-token"]);
+
+/** What token a job holds, from its `permissions:` block. */
+export type JobCredential =
+  /** No `permissions:` block — the job inherits the repository's default scopes. */
+  | { kind: "inherited" }
+  /** `permissions: write-all` (or the `write-all` shorthand on a scope map). */
+  | { kind: "write-all" }
+  /** Declared scopes; `write` lists the repository-write ones it granted. */
+  | { kind: "declared"; write: string[] };
+
+/**
+ * Scopes the Claude GitHub App token carries when the action mints its own.
+ * Hardcoded upstream in `src/github/token.ts` (`DEFAULT_PERMISSIONS`), so no
+ * `permissions:` block can narrow them.
+ */
+export const APP_TOKEN_SCOPES = ["contents", "issues", "pull-requests"] as const;
+
 /** A job that runs the agent, with the argument strings each agent step got. */
 export type AgentJob = {
   /** Job key as written under `jobs:`. */
   name: string;
   /** One entry per agent step in the job, in step order. */
-  steps: { argStrings: string[] }[];
+  steps: { argStrings: string[]; bindsOwnToken: boolean }[];
+  /** The token this job's steps (and therefore its agent) can read. */
+  credential: JobCredential;
+  /** True when an agent step lets the action mint a Claude App token. */
+  mintsAppToken: boolean;
 };
 
 export type EgressAudit = {
@@ -126,6 +184,46 @@ function toolsIn(values: string[]): string[] {
     .filter((tool) => tool.length > 0);
 }
 
+/** Read one job's `permissions:` block into a {@link JobCredential}. */
+export function credentialOf(job: Record<string, unknown>): JobCredential {
+  const permissions = job.permissions;
+  if (permissions === undefined) return { kind: "inherited" };
+  if (typeof permissions === "string") {
+    return permissions.trim() === "write-all" ? { kind: "write-all" } : { kind: "declared", write: [] };
+  }
+  if (!isRecord(permissions)) return { kind: "declared", write: [] };
+  const write = Object.entries(permissions)
+    .filter(([scope, level]) => String(level).trim() === "write" && !NON_REPO_WRITE_SCOPES.has(scope))
+    .map(([scope]) => scope)
+    .sort();
+  return { kind: "declared", write };
+}
+
+/** Whether the job's own `permissions:` block can write to the repository. */
+export function holdsRepoWrite(credential: JobCredential): boolean {
+  return credential.kind !== "declared" || credential.write.length > 0;
+}
+
+/** Whether anything the agent's shell can read is push-capable. */
+export function agentHoldsWrite(job: AgentJob): boolean {
+  return job.mintsAppToken || holdsRepoWrite(job.credential);
+}
+
+/** Human-readable summary of a credential, for the enumerated inventory. */
+export function describeCredential(credential: JobCredential): string {
+  if (credential.kind === "inherited") return "inherited (no permissions: block)";
+  if (credential.kind === "write-all") return "write-all";
+  return credential.write.join(", ");
+}
+
+/** Both credential sources, as one inventory line. */
+export function describeAgentCredential(job: AgentJob): string {
+  const parts: string[] = [];
+  if (holdsRepoWrite(job.credential)) parts.push(describeCredential(job.credential));
+  if (job.mintsAppToken) parts.push(`claude app token (${APP_TOKEN_SCOPES.join(", ")})`);
+  return parts.join(" + ");
+}
+
 /** Every job in `contents` that runs at least one agent step. */
 export function agentJobsOf(contents: string): AgentJob[] {
   const document: unknown = parse(contents);
@@ -139,16 +237,56 @@ export function agentJobsOf(contents: string): AgentJob[] {
       .filter((step) => typeof step.uses === "string" && step.uses.includes(AGENT_ACTION))
       .map((step) => {
         const inputs = isRecord(step.with) ? step.with : {};
+        const override = inputs.github_token;
         return {
           argStrings: ARG_INPUTS.map((input) => inputs[input]).filter(
             (value): value is string => typeof value === "string",
           ),
+          // Any non-empty `github_token` takes token.ts's early return, so the
+          // agent gets that token instead of a freshly minted app token.
+          bindsOwnToken: typeof override === "string" && override.trim().length > 0,
         };
       });
-    if (steps.length > 0) agentJobs.push({ name, steps });
+    if (steps.length > 0) {
+      agentJobs.push({
+        name,
+        steps,
+        credential: credentialOf(job),
+        mintsAppToken: steps.some((step) => !step.bindsOwnToken),
+      });
+    }
   }
 
   return agentJobs;
+}
+
+/**
+ * `path (job: name): <credentials>` for every agent job whose shell can read a
+ * push-capable token — from its own `permissions:` block, from the Claude App
+ * token the action mints when no `github_token` is passed, or both. The
+ * contract test asserts exact equality against the known set, so this is an
+ * enumeration rather than a pass/fail rule: a job that gains either appears
+ * here and fails the suite, and one that gave both up cannot take them back
+ * unnoticed.
+ *
+ * ponytail: reads the `permissions:` block and the step's `github_token` input.
+ * A PAT handed to a step through `env:` is a stronger credential that this
+ * inventory does not see; the `docs/agents/ci.md` egress note carries that
+ * caveat. Upgrade path is to fold a `secrets.*`-in-`env:` scan in here if that
+ * pattern ever appears.
+ */
+export function agentWriteScopeInventory(path: string, contents: string): string[] {
+  let jobs: AgentJob[];
+  try {
+    jobs = agentJobsOf(contents);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
+    return [`${path}: is not parseable YAML (${reason}), so credentials cannot be checked`];
+  }
+
+  return jobs
+    .filter((job) => agentHoldsWrite(job))
+    .map((job) => `${path} (job: ${job.name}): ${describeAgentCredential(job)}`);
 }
 
 function escapeRegExp(value: string): string {

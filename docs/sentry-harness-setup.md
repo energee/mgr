@@ -69,8 +69,20 @@ colors.
    issues were scored. If no issues exist yet, the workflow ends green
    with `count: 0`.
 3. Trigger a deliberate error in local dev to seed Sentry, wait a minute,
-   then re-run the workflow. A `fix-error` job should spawn and open a
-   PR.
+   then re-run the workflow. A `fix-error` job should spawn, and the
+   `land-fix` job that follows it should open the PR.
+
+Since #668 those are two separate jobs, split on the credential boundary:
+`fix-error` runs the agent with **read-only** scopes and no persisted git
+credential — it cannot push or publish. It leaves its code changes in the
+working tree and declares the outcome it wants in `outbox/plan.json` plus one
+markdown body file per outcome; a deterministic step packs both into an
+artifact. `land-fix` holds `contents`/`pull-requests`/`issues: write`, runs no
+model, validates the artifact
+(`.github/scripts/sentry-harness/outbox.ts`), applies the patch with
+`git apply`, pushes `sentry-fix/SENTRY-<id>`, and opens the PR or the
+investigation issue. When something looks wrong, read both jobs: a missing or
+invalid outbox fails `land-fix` red with the exact reason.
 
 ## Scheduling
 
@@ -93,9 +105,15 @@ use case.
   `SENTRY_ORG` and `SENTRY_PROJECT` slugs. Verify the environment tag
   on your errors matches `SENTRY_ENVIRONMENT` in the workflow (defaults
   to `development`).
-- **`fix-error` opens a PR labeled `needs-human`** — the harness
-  could not produce a working fix after 3 attempts. Read the PR body for
-  the root-cause analysis and finish manually.
+- **An issue labeled `needs-human`** — the harness could not produce a
+  working fix, or classified the root cause as database/third-party. Read
+  the issue body for the root-cause analysis and finish manually.
+- **`land-fix` red with an `outbox:` message** — the agent's declared plan
+  broke the triage contract (a (B)/(C) classification that also left code
+  changes, a patch touching `.github/**`, a missing body file). The message
+  names the exact rule; nothing was pushed.
+- **`land-fix` red with "No sentry-outbox artifact"** — the agent job died
+  before packing. Check its log for `permission_denials`.
 - **Duplicate PRs across runs** — this should not happen. If it does,
   check that open PRs use the exact branch format
   `sentry-fix/SENTRY-<numeric-issue-id>`; any variation will break

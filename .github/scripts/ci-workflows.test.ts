@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { AGENT_ACTION, auditWorkflowEgress } from "./workflow-egress";
+import { AGENT_ACTION, agentWriteScopeInventory, auditWorkflowEgress } from "./workflow-egress";
 
 function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
@@ -311,6 +311,144 @@ describe("GitHub Actions performance contracts", () => {
     // names the action but yields no agent job; this pins the repo-wide total
     // so a parser change that silently halves the inventory is caught too.
     expect(audits.flatMap((audit) => audit.jobs).length).toBeGreaterThanOrEqual(6);
+  });
+
+  // Credential contract (#668), the other half of #645. Denying the web tools
+  // closes one channel; it cannot close egress for a job that can execute code,
+  // and every one of these agents can (`Edit` plus `bun run test` or
+  // `make check` is arbitrary code execution by construction). The remedy that
+  // does work is to leave nothing in the agent's reach worth stealing, and two
+  // separate mechanisms decide what is in reach:
+  //
+  //  1. The job's `permissions:` block, which scopes its `GITHUB_TOKEN`.
+  //  2. Whether the agent step passes `github_token`. With no such input,
+  //     claude-code-action exchanges an OIDC assertion for a Claude GitHub App
+  //     token hardcoded to contents/pull_requests/issues: write
+  //     (`src/github/token.ts`), assigns it to `process.env.GITHUB_TOKEN` and
+  //     `GH_TOKEN` before the agent starts (`src/entrypoints/run.ts`), and
+  //     configures git auth with it. That token ignores the `permissions:`
+  //     block entirely — it is why this repo's bug-patrol PRs are authored by
+  //     `app/claude` — and `persist-credentials: false` does nothing about it.
+  //
+  // So this is an enumerated inventory, not a pass/fail rule: four loops
+  // legitimately still push from inside the agent, and `health-audit`'s
+  // "read-only" audit job turns out to hold a write-capable app token despite
+  // read-only `permissions:` (noted in docs/agents/ci.md, tracked separately).
+  // Listing every one by exact credential means a job that gains either source
+  // fails here, and `sentry-harness.yml`'s `fix-error` — which gave up both —
+  // cannot silently take them back. `id-token: write` is not itself counted as
+  // a repository write, but removing it is what makes the app-token path
+  // unavailable. A PAT handed to a step via `env:` is not visible here; see
+  // docs/agents/ci.md for that caveat.
+  it("enumerates every generative agent job whose shell can read a push-capable token", () => {
+    const generative = workflows.filter((path) => read(path).includes(AGENT_ACTION));
+    const inventory = generative.flatMap((path) => agentWriteScopeInventory(path, read(path)));
+    const app = "claude app token (contents, issues, pull-requests)";
+
+    expect(inventory.sort()).toEqual([
+      `.github/workflows/bug-patrol.yml (job: patrol): contents, pull-requests + ${app}`,
+      `.github/workflows/claude.yml (job: claude): contents, issues, pull-requests + ${app}`,
+      `.github/workflows/feedback-distill.yml (job: distill): contents, pull-requests + ${app}`,
+      `.github/workflows/health-audit.yml (job: audit): ${app}`,
+      `.github/workflows/quality-regrade.yml (job: regrade): contents, pull-requests + ${app}`,
+    ]);
+  });
+
+  // Mutation checks on the inventory: undo either half of the Sentry fix and
+  // the contract must go red. Without these the assertion above proves only
+  // that today's files happen to match a hand-written array.
+  it("goes red if the Sentry agent job regains a write scope", () => {
+    const path = ".github/workflows/sentry-harness.yml";
+    // Rewrite only inside the fix-error job: score-errors is `contents: read`
+    // too, and a first-match replace would have mutated the wrong job and left
+    // this check passing over an unchanged file.
+    const [head, ...rest] = read(path).split("\n  fix-error:");
+    expect(rest).toHaveLength(1);
+    // Anchored on the indented scope line: the job's comment block quotes
+    // "`contents: read`" in prose, and a looser match would rewrite that
+    // instead and leave this check passing over an unchanged permissions block.
+    const restored = `${head}\n  fix-error:${rest[0].replace(/\n      contents: read\n/, "\n      contents: write\n")}`;
+
+    expect(restored).not.toEqual(read(path));
+    expect(agentWriteScopeInventory(path, restored)).toEqual([
+      `${path} (job: fix-error): contents`,
+    ]);
+  });
+
+  it("goes red if the Sentry agent step stops binding its own token", () => {
+    const path = ".github/workflows/sentry-harness.yml";
+    const dropped = read(path).replace(/\n {10}github_token: .+\n/, "\n");
+
+    expect(dropped).not.toEqual(read(path));
+    expect(agentWriteScopeInventory(path, dropped)).toEqual([
+      `${path} (job: fix-error): claude app token (contents, issues, pull-requests)`,
+    ]);
+  });
+
+  it.each([
+    { shape: "no permissions: block", permissions: "", expected: "inherited (no permissions: block)" },
+    { shape: "write-all", permissions: "    permissions: write-all\n", expected: "write-all" },
+    {
+      shape: "a quoted scalar",
+      permissions: '    permissions:\n      contents: "write"\n',
+      expected: "contents",
+    },
+    {
+      shape: "only actions/packages write",
+      permissions: "    permissions:\n      actions: write\n      packages: write\n",
+      expected: "actions, packages",
+    },
+    {
+      shape: "id-token write alone (no repository write)",
+      permissions: "    permissions:\n      contents: read\n      id-token: write\n",
+      expected: null,
+    },
+  ])("reads an agent job's permissions written as $shape", ({ permissions, expected }) => {
+    // `github_token` bound, so the app-token half is out of the way and this
+    // case isolates the permissions parse.
+    const contents = [
+      "name: Synthetic",
+      "on: [push]",
+      "jobs:",
+      "  agent:",
+      "    runs-on: ubuntu-latest",
+      permissions.replace(/\n$/, ""),
+      "    steps:",
+      `      - uses: ${AGENT_ACTION}@${"0".repeat(40)}`,
+      "        with:",
+      "          github_token: ${{ secrets.GITHUB_TOKEN }}",
+      "",
+    ]
+      .filter((line) => line !== "")
+      .join("\n");
+
+    expect(agentWriteScopeInventory("synthetic.yml", contents)).toEqual(
+      expected === null ? [] : [`synthetic.yml (job: agent): ${expected}`],
+    );
+  });
+
+  it.each([
+    { shape: "omits the input entirely", input: null, minted: true },
+    { shape: "passes an empty string", input: '          github_token: ""', minted: true },
+    { shape: "binds the job token", input: "          github_token: ${{ secrets.GITHUB_TOKEN }}", minted: false },
+  ])("detects the app-token mint when the agent step $shape", ({ input, minted }) => {
+    const contents = [
+      "name: Synthetic",
+      "on: [push]",
+      "jobs:",
+      "  agent:",
+      "    runs-on: ubuntu-latest",
+      "    permissions:",
+      "      contents: read",
+      "    steps:",
+      `      - uses: ${AGENT_ACTION}@${"0".repeat(40)}`,
+      ...(input === null ? [] : ["        with:", input]),
+      "",
+    ].join("\n");
+
+    expect(agentWriteScopeInventory("synthetic.yml", contents)).toEqual(
+      minted ? ["synthetic.yml (job: agent): claude app token (contents, issues, pull-requests)"] : [],
+    );
   });
 
   // Mutation check: the assertions above only prove the real workflows are

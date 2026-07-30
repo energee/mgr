@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BODY_FILES } from "./outbox";
 import { buildFixPrompt } from "./prompt";
 import type { SentryIssue } from "./types";
 
@@ -34,9 +35,41 @@ describe("buildFixPrompt", () => {
     const prompt = buildFixPrompt(issue);
     expect(prompt).toContain("gh issue list --state all");
     expect(prompt).toContain("[sentry] MGR-42:");
-    expect(prompt).toContain("gh issue comment");
-    expect(prompt).toContain("do **not** open a duplicate");
+    // Since #668 the agent requests the comment (comment.issue in the outbox
+    // plan) rather than posting it — it holds no write credential.
+    expect(prompt).toContain("comment.issue");
+    expect(prompt).toContain("do **not**\n  open a duplicate");
     expect(prompt).toContain("deleted from main");
+  });
+
+  // #668: the agent job holds no push-capable credential, so the prompt must
+  // not send it after one. A prompt that still says "push" or "gh pr create"
+  // spends turns on 403s and then improvises.
+  it("tells the agent it cannot write, and routes every outcome through the outbox", () => {
+    const prompt = buildFixPrompt(issue);
+
+    expect(prompt).toContain("no write access to this repository");
+    expect(prompt).toContain("outbox/plan.json");
+    expect(prompt).toContain(`outbox/${BODY_FILES.pr}`);
+    expect(prompt).toContain(`outbox/${BODY_FILES.issue}`);
+    expect(prompt).toContain(`outbox/${BODY_FILES.comment}`);
+    expect(prompt).toContain(`outbox/${BODY_FILES.quietRun}`);
+    // Each write command appears exactly once, in the sentence forbidding it —
+    // never as an instruction. The final pipeline step declares the PR.
+    expect(prompt).toContain("you cannot `git push`");
+    expect(prompt).toContain("14. **Declare the PR**");
+    for (const command of ["git push", "gh pr create", "gh issue create", "gh issue comment"]) {
+      expect(prompt.split(command)).toHaveLength(2);
+    }
+  });
+
+  // AGENTS.md constraint 18: PROGRESS.md is generated on main by CI, so a
+  // branch that edits it guarantees a conflict with the progress bot.
+  it("sends the progress note to docs/progress/, not PROGRESS.md", () => {
+    const prompt = buildFixPrompt(issue);
+
+    expect(prompt).toContain("docs/progress/");
+    expect(prompt).toContain("Do **not** edit `PROGRESS.md`");
   });
 
   it("enumerates the 14-step pipeline", () => {
@@ -46,10 +79,10 @@ describe("buildFixPrompt", () => {
     }
   });
 
-  it("requires the harness-state writes (feature_list, PROGRESS, session trace) and final make check gate", () => {
+  it("requires the harness-state writes (feature_list, progress note, session trace) and final make check gate", () => {
     const prompt = buildFixPrompt(issue);
     expect(prompt).toContain("docs/feature_list.json");
-    expect(prompt).toContain("PROGRESS.md");
+    expect(prompt).toContain("docs/progress/");
     expect(prompt).toContain(".harness/sessions/");
     expect(prompt).toContain("make check");
   });
@@ -84,9 +117,10 @@ describe("buildFixPrompt", () => {
 
   it("routes non-app-code root causes to an investigation issue, not a compensating code PR", () => {
     const prompt = buildFixPrompt(issue);
-    expect(prompt).toContain("gh issue create");
     expect(prompt).toContain("needs-human");
-    expect(prompt).toContain("Do not open a code PR");
+    expect(prompt).toContain("Do not request a code PR");
+    // The rule the lander enforces, restated where the agent will read it.
+    expect(prompt).toContain("rejects a (B)/(C) plan that carries a\n  patch");
   });
 
   // A (D) "observability gap" — the call site hands log.error a destructured

