@@ -63,16 +63,14 @@ jobs:
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
+          # Without an explicit allowlist the action's Bash tool is limited to a
+          # tiny default set, so Claude cannot run this repo's own tooling — it
+          # hit exactly that on PR #648 (couldn't `bun install` to regenerate a
+          # dependabot lockfile) and had to hand the fix back to a human.
+          # Scoped to package-manager / build / read-only inspection commands;
+          # commits and pushes go through claude-code-action's own git plumbing,
+          # so no `git push` here.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options.
-          #
-          # No web egress. This job runs with contents/pull-requests/issues
-          # write and reads whatever the mention thread points at — including
-          # fork-PR diffs and third-party issue text, which nobody vetted. The
-          # insider gate limits who can *start* a run, not what the run then
-          # reads, so an injected instruction in that content would otherwise
-          # have an outbound network tool in a credentialed job. Every
-          # generative job in this repo denies these two explicitly (contract
-          # in .github/scripts/ci-workflows.test.ts); if a request genuinely
-          # needs an external page, paste its content into the comment.
-          claude_args: '--disallowedTools "WebFetch,WebSearch"'
+          claude_args: >-
+            --allowed-tools
+            "Bash(bun install),Bash(bun install:*),Bash(bun run:*),Bash(bunx:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh run view:*)"
