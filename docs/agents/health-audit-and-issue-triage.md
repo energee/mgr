@@ -31,6 +31,13 @@ Never contact the live database, retrieve credentials, print environment
 values, or include secrets or customer data in evidence. A request to audit
 source code does not authorize production access.
 
+In `health-audit.yml` these boundaries are also enforced below the prompt: as
+of #689 the `audit` job binds the agent to its own `contents`/`issues`/
+`actions: read` token and holds no `id-token: write`, so phase 1 cannot reach
+phases 3–5 even if the prompt is subverted — the deterministic `publish` job
+owns every mutation. Running this guide locally has no such backstop; the
+phases are yours to honour.
+
 ## 1. Establish the audit baseline
 
 Before inspecting candidates:

@@ -18,7 +18,7 @@ workflow change, or the unit suite fails.
 | `progress.yml` | Push to main touching `docs/progress/**` | Regenerates `PROGRESS.md` via `scripts/build-progress.sh` and lands it through an auto-merged bot PR. This is why PROGRESS.md must never be edited on a branch (AGENTS.md constraint 18). |
 | `hygiene.yml` | Weekly schedule | Report-only branch hygiene summary (merged/stale branches). Never deletes anything. |
 | `sentry-harness.yml` | Weekday schedule + dispatch | Scores recent Sentry errors and dispatches up to 3 Claude fix jobs (45-min cap each). Three jobs split on the credential boundary (#668): `score-errors` (read-only), `fix-error` (the agent — **all** scopes `read`, no `id-token: write`, `github_token` bound to the job's own token; it writes `outbox/plan.json` + body files and cannot push or publish), `land-fix` (deterministic, holds the write scopes; validates the artifact, `git apply`s the patch, pushes, opens the PR/issue). |
-| `health-audit.yml` | Weekly schedule + dispatch | Read-only Claude audit job → separate publisher job with `issues: write` files deduplicated issues. See [`health-audit-and-issue-triage.md`](health-audit-and-issue-triage.md). |
+| `health-audit.yml` | Weekly schedule + dispatch | Read-only Claude audit job → separate publisher job with `issues: write` files deduplicated issues. The audit job is read-only in its `permissions:` **and** in the token its agent's shell holds: every scope `read`, no `id-token: write`, `github_token` bound to the job's own token (#689). See [`health-audit-and-issue-triage.md`](health-audit-and-issue-triage.md). |
 | `bug-patrol.yml` | Nightly schedule + dispatch | Finds ONE small high-confidence bug in recent changes, fixes it, opens one `bug-patrol` PR. |
 | `feedback-distill.yml` | Weekly schedule + dispatch | Deterministic loop scoreboard (`loop-scoreboard.ts`), then harvests recurring corrections into ONE docs-only `feedback-distill` PR proposing promotions AND retirements. |
 | `quality-regrade.yml` | Weekly schedule (Mon) + dispatch | Re-grades `docs/agents/quality.md` from measured evidence into ONE docs-only `quality-regrade` PR — the improvement loop's steering signal. |
@@ -103,11 +103,28 @@ Three facts make this concrete, and the second is the one that surprises people
   Actions mints one token per job at those scopes — and on a public repo a
   `contents: read` token is worth nothing to an exfiltrator.
 
-**`health-audit.yml`'s audit job is affected by the second bullet.** Its
-`permissions:` are read-only and its prompt forbids writes, but it passes no
-`github_token`, so its agent still holds a write-capable app token. The
-inventory below records that rather than pretending otherwise; tightening it is
-a separate change, tracked in #689.
+**`health-audit.yml`'s audit job was the second bullet's textbook case, and is
+fixed (#689).** Its `permissions:` were read-only, its prompt forbade every
+mutation, and `issues: write` was deliberately isolated in the separate
+`publish` job — and none of that bounded the token its agent held, because the
+step passed no `github_token`. It now passes one and holds no
+`id-token: write`, so the app-token path is both unused and unavailable. Two
+notes on what that did and did not change:
+
+- The `additional_permissions: actions: read` input was removed at the same
+  time rather than left inert. At `be7b93b` its only consumer is
+  `parseAdditionalPermissions()` inside `setupGitHubToken()`, which is
+  unreachable once `OVERRIDE_GITHUB_TOKEN` takes the early return, and the
+  `github_ci` MCP server it looks like it enables is gated on
+  `isEntityContext(context) && context.isPR` — never true for a schedule or
+  dispatch run. The job keeps `actions: read` in its own `permissions:` block.
+- The audit agent needs no write to do its job: its allowlist is `Task`, five
+  `Bash(git …)` read commands against a `fetch-depth: 0` checkout (local, no
+  network), and `gh issue list` / `gh issue view` / `gh label list`, all of
+  which the job's own `issues: read` covers. The action's own preflight
+  (`checkWritePermissions`) runs only for entity contexts — `schedule` and
+  `workflow_dispatch` are automation contexts — so nothing in the run path
+  needs more than this token grants.
 
 `sentry-harness.yml` is the worked example (#668). Its `fix-error` job declares
 every scope `read` with no `id-token: write`, passes
@@ -153,13 +170,27 @@ Do not describe it as closing "the one path".
 
 Every other agent job still holds a push-capable token: `bug-patrol`,
 `feedback-distill` and `quality-regrade` legitimately push from inside the
-agent; `health-audit`'s audit job does not push but holds the app token anyway;
-`claude.yml` is the declared exemption below and #669 owns its tightening.
-`ci-workflows.test.ts` enumerates all of them by exact credential, so a job that
-gains a write scope *or* starts minting an app token fails the suite, and
-`fix-error` cannot silently take either back. The inventory reads the
-`permissions:` block and the step's `github_token` input — a PAT handed to a
-step through `env:` is a stronger credential it does not see.
+agent; `claude.yml` is the declared exemption below and #669 owns its
+tightening. Those three keep the app token on purpose and not only for the
+write scope — a PR opened with `secrets.GITHUB_TOKEN` does not trigger
+workflows, so binding them would stop `test.yml` running on the PRs they open.
+Giving them the `fix-error` treatment means splitting each loop on the
+credential boundary, which is a per-loop change.
+
+`ci-workflows.test.ts` covers this two ways, and the second exists because the
+first was not enough. It **enumerates** every agent job by exact credential, so
+a job that gains a write scope *or* starts minting an app token fails the
+suite, and the two that gave both up (`fix-error`, `audit`) cannot silently
+take them back. But an enumeration only catches a *change*: `health-audit`'s
+audit job sat in that list for weeks, reviewed as read-only, because a listed
+entry reads as an accepted one. So there is also a **rule**
+(`readOnlyMintContradictions`): a job whose `permissions:` block grants no
+repository write has declared itself read-only, and must therefore pass
+`github_token`. That one generalises to workflows nobody has enumerated yet.
+`id-token: write` does not exempt a job from it — that shape is exactly the
+one it exists to catch. Both read the `permissions:` block and the step's
+`github_token` input; a PAT handed to a step through `env:` is a stronger
+credential neither sees.
 
 When you add a generative job, deny the web tools, keep the Bash allowlist to
 the command families the prompt actually names, and give the job read-only
@@ -268,10 +299,12 @@ missing secret by design (a green cron with no secret would be worse).
    for the writes (`health-audit.yml`'s audit/publish split;
    `sentry-harness.yml`'s `fix-error`/`land-fix` split). Read-only scopes are
    not enough on their own: also pass `github_token` and drop `id-token: write`,
-   or the action mints its own write-capable app token. If a new agent job must
-   hold a credential, add it to the enumerated inventory in
-   `ci-workflows.test.ts` in the same commit — the suite fails otherwise, which
-   is the point.
+   or the action mints its own write-capable app token. Declaring read-only
+   scopes *without* `github_token` now fails `ci-workflows.test.ts` outright
+   (#689) — that combination is a contradiction, not a configuration. If a new
+   agent job must genuinely hold a credential, give it the write scope it needs
+   and add it to the enumerated inventory in the same commit; the suite fails
+   otherwise, which is the point.
 7. A job that consumes an artifact another job's agent produced must **apply**
    it, never execute it: `git apply` a patch, `--body-file` a body, argv arrays
    instead of shell strings, and no `eval`/`bash <agent output>`.

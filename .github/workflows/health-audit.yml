@@ -1,6 +1,8 @@
-# Weekly evidence-first health audit. The AI job is read-only and returns a
-# schema-validated report. A separate deterministic publisher is the only job
-# with issue write permission and rechecks duplicates before creating anything.
+# Weekly evidence-first health audit. The AI job is read-only — in its
+# `permissions:` block *and* in the token its agent's shell can read (#689) —
+# and returns a schema-validated report. A separate deterministic publisher is
+# the only job with issue write permission and rechecks duplicates before
+# creating anything.
 
 name: Scheduled Health Audit
 
@@ -26,11 +28,41 @@ jobs:
     name: Read-only health audit
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Every scope is `read`, and there is deliberately no `id-token: write`
+    # (#689). Both halves are load-bearing, and the second is the non-obvious
+    # one — this block on its own did NOT bound what the agent could do:
+    #
+    #  - claude-code-action's run step does `process.env.GITHUB_TOKEN =
+    #    process.env.GH_TOKEN = <token>` before starting the agent
+    #    (src/entrypoints/run.ts), and configures git auth with it
+    #    (src/modes/agent/index.ts), so whatever token it resolves IS readable
+    #    by every Bash tool call. `persist-credentials: false` does NOT change
+    #    that, and it does not even leave .git/config token-free — see the
+    #    checkout step below.
+    #  - Which token it resolves is decided by src/github/token.ts: with no
+    #    `github_token` input it exchanges an OIDC assertion for a Claude
+    #    GitHub App installation token whose permissions are HARDCODED to
+    #    contents/pull_requests/issues: write. That token ignores this
+    #    permissions block entirely — it is why bug-patrol's PRs are authored
+    #    by `app/claude` rather than `github-actions[bot]`. Passing
+    #    `github_token` below takes the early return instead, so the agent
+    #    gets this job's own read-only token; dropping `id-token: write`
+    #    removes the OIDC assertion the exchange needs, so the app-token path
+    #    cannot come back by deleting one line.
+    #
+    # The audit's whole design premise is that it cannot mutate anything —
+    # that is why the deterministic `publish` job below exists and rechecks
+    # duplicates. Until #689 only the prompt enforced that premise.
     permissions:
       contents: read
+      # `gh issue list`, `gh issue view` and `gh label list` in the allowlist
+      # below; `read` is all any of them needs.
       issues: read
+      # Nothing in the allowlist reads workflow runs today (no `gh run`, no
+      # mcp__github_ci__ tools, and the action only installs that MCP server
+      # for pull-request contexts). Kept because it is read-only and the audit
+      # prompt's CI-focused rotation is one `gh run list` away from wanting it.
       actions: read
-      id-token: write
     outputs:
       should_run: ${{ steps.plan.outputs.should_run }}
       focus: ${{ steps.plan.outputs.focus }}
@@ -41,8 +73,20 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          # Read-only audit job that runs Bash(git:*); never leave
-          # GITHUB_TOKEN in .git/config for the agent's shell.
+          # Keeps checkout's own credential out of .git/config for the window
+          # between here and the agent step. It does NOT leave the workspace
+          # token-free, and no comment here should imply that it does: at the
+          # SHA pinned below, claude-code-action's configureGitAuth()
+          # (src/github/operations/git-config.ts) unsets the
+          # http.<server>/.extraheader checkout writes and then runs
+          # `git remote set-url origin
+          #  https://x-access-token:<token>@github.com/<owner>/<repo>.git`,
+          # putting the token it resolved back into .git/config in a more
+          # durable form than the header it removed. (The token-free branch of
+          # that function is gated on ALLOWED_NON_WRITE_USERS, which this job
+          # does not set.) What makes the workspace copy uninteresting is the
+          # permissions block above, not this flag. Re-verify against the SHA
+          # when bumping the action.
           persist-credentials: false
 
       - name: Select lookback and rotating focus
@@ -79,8 +123,20 @@ jobs:
         uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          additional_permissions: |
-            actions: read
+          # Bound the agent to THIS job's read-only token. Omitting this input
+          # is what makes the action mint a contents/pull_requests/issues:write
+          # Claude App token instead (see the permissions comment above), which
+          # no `permissions:` block can restrain. Contract-tested.
+          #
+          # `additional_permissions: actions: read` used to sit here. It is
+          # gone rather than kept-and-inert: at be7b93b its only consumer is
+          # parseAdditionalPermissions() inside setupGitHubToken(), which is
+          # unreachable once OVERRIDE_GITHUB_TOKEN takes the early return, and
+          # the github_ci MCP server it reads like it enables is gated on
+          # `isEntityContext(context) && context.isPR` — never true for a
+          # schedule or workflow_dispatch run. Leaving it would name a scope
+          # this step no longer grants.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             Perform one read-only health and correctness audit of this repository and return the result through the required JSON schema.
 

@@ -1,7 +1,12 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { AGENT_ACTION, agentWriteScopeInventory, auditWorkflowEgress } from "./workflow-egress";
+import {
+  AGENT_ACTION,
+  agentWriteScopeInventory,
+  auditWorkflowEgress,
+  readOnlyMintContradictions,
+} from "./workflow-egress";
 
 function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
@@ -238,9 +243,17 @@ describe("GitHub Actions performance contracts", () => {
     const publishJob = workflow.match(/  publish:\n([\s\S]*)/)?.[1];
 
     expect(auditJob).toBeDefined();
-    expect(auditJob).toContain("contents: read");
-    expect(auditJob).toContain("issues: read");
-    expect(auditJob).not.toContain("issues: write");
+    // Anchored on the indented scope line rather than matched as a substring:
+    // the job's comment block quotes "contents/pull_requests/issues: write" in
+    // prose to explain the app-token path it now avoids (#689), and a loose
+    // `not.toContain("issues: write")` reads that sentence as a granted scope.
+    // Same trap #700 found in the sentry mutation check.
+    expect(auditJob).toMatch(/\n {6}contents: read\n/);
+    expect(auditJob).toMatch(/\n {6}issues: read\n/);
+    expect(auditJob).not.toMatch(/\n {6}issues: write\n/);
+    // #689: the two halves that keep the agent's own shell read-only.
+    expect(auditJob).not.toMatch(/\n {6}id-token: write\n/);
+    expect(auditJob).toMatch(/\n {10}github_token: \$\{\{ secrets\.GITHUB_TOKEN \}\}\n/);
     expect(auditJob).toContain("fetch-depth: 0");
     expect(auditJob).not.toContain("needs.audit.outputs.audit_sha");
     expect(auditJob).toContain("--json-schema");
@@ -249,8 +262,8 @@ describe("GitHub Actions performance contracts", () => {
     expect(auditJob).toContain("steps.audit.outputs.structured_output");
 
     expect(publishJob).toBeDefined();
-    expect(publishJob).toContain("contents: read");
-    expect(publishJob).toContain("issues: write");
+    expect(publishJob).toMatch(/\n {6}contents: read\n/);
+    expect(publishJob).toMatch(/\n {6}issues: write\n/);
     expect(publishJob).toContain("ref: ${{ needs.audit.outputs.audit_sha }}");
     expect(publishJob).toContain("publish-health-audit.ts");
     expect(publishJob).toContain("CREATE_ISSUES:");
@@ -355,15 +368,14 @@ describe("GitHub Actions performance contracts", () => {
   //     `app/claude` — and `persist-credentials: false` does nothing about it.
   //
   // So this is an enumerated inventory, not a pass/fail rule: four loops
-  // legitimately still push from inside the agent, and `health-audit`'s
-  // "read-only" audit job turns out to hold a write-capable app token despite
-  // read-only `permissions:` (noted in docs/agents/ci.md, tracked separately).
-  // Listing every one by exact credential means a job that gains either source
-  // fails here, and `sentry-harness.yml`'s `fix-error` — which gave up both —
-  // cannot silently take them back. `id-token: write` is not itself counted as
-  // a repository write, but removing it is what makes the app-token path
-  // unavailable. A PAT handed to a step via `env:` is not visible here; see
-  // docs/agents/ci.md for that caveat.
+  // legitimately still push from inside the agent. Listing every one by exact
+  // credential means a job that gains either source fails here, and the two
+  // that gave both up — `sentry-harness.yml`'s `fix-error` (#668) and
+  // `health-audit.yml`'s `audit` (#689) — cannot silently take them back.
+  // `id-token: write` is not itself counted as a repository write, but
+  // removing it is what makes the app-token path unavailable. A PAT handed to
+  // a step via `env:` is not visible here; see docs/agents/ci.md for that
+  // caveat.
   it("enumerates every generative agent job whose shell can read a push-capable token", () => {
     const generative = workflows.filter((path) => read(path).includes(AGENT_ACTION));
     const inventory = generative.flatMap((path) => agentWriteScopeInventory(path, read(path)));
@@ -373,8 +385,111 @@ describe("GitHub Actions performance contracts", () => {
       `.github/workflows/bug-patrol.yml (job: patrol): contents, pull-requests + ${app}`,
       `.github/workflows/claude.yml (job: claude): contents, issues, pull-requests + ${app}`,
       `.github/workflows/feedback-distill.yml (job: distill): contents, pull-requests + ${app}`,
-      `.github/workflows/health-audit.yml (job: audit): ${app}`,
       `.github/workflows/quality-regrade.yml (job: regrade): contents, pull-requests + ${app}`,
+    ]);
+  });
+
+  // The rule the inventory above cannot express (#689). An enumeration catches
+  // a *change*; it cannot say which entries are wrong. `health-audit`'s audit
+  // job sat in that list for weeks — reviewed as read-only, prompt forbidding
+  // every mutation, `issues: write` deliberately isolated in a separate
+  // publisher — while its agent's shell held a write-capable app token,
+  // because a listed exception reads as accepted.
+  //
+  // The invariant that would have caught it the day it was written: a job
+  // whose `permissions:` block grants no repository write has *declared*
+  // itself read-only, and the app-token path silently contradicts that
+  // declaration, so such a job must pass `github_token`. Unlike the
+  // enumeration this generalises — a new read-only analysis job copied from an
+  // existing one fails here without anyone remembering to extend a list.
+  //
+  // Jobs holding write scopes are deliberately out of its reach: `bug-patrol`,
+  // `feedback-distill` and `quality-regrade` push from inside the agent by
+  // design, and binding them to `secrets.GITHUB_TOKEN` would also stop the PRs
+  // they open from triggering `test.yml` (GitHub does not run workflows on
+  // events raised by `GITHUB_TOKEN`). Splitting those on the credential
+  // boundary the way sentry-harness was split is a per-loop change, not this
+  // contract's business.
+  it("forbids a read-only agent job from minting a write-capable app token", () => {
+    const generative = workflows.filter((path) => read(path).includes(AGENT_ACTION));
+
+    expect(generative.flatMap((path) => readOnlyMintContradictions(path, read(path)))).toEqual([]);
+  });
+
+  it.each([
+    {
+      shape: "all-read permissions and no github_token",
+      permissions: "      contents: read\n      issues: read",
+      input: null,
+      violates: true,
+    },
+    {
+      // The exact shape health-audit.yml had: `id-token: write` is not a
+      // repository write, so the job still reads as read-only — and it is the
+      // very scope that makes the OIDC exchange possible.
+      shape: "all-read permissions plus id-token: write",
+      permissions: "      contents: read\n      id-token: write",
+      input: null,
+      violates: true,
+    },
+    {
+      shape: "all-read permissions with github_token bound",
+      permissions: "      contents: read\n      issues: read",
+      input: "          github_token: ${{ secrets.GITHUB_TOKEN }}",
+      violates: false,
+    },
+    {
+      // Out of scope by design: the job never claimed to be read-only.
+      shape: "a write scope and no github_token",
+      permissions: "      contents: write",
+      input: null,
+      violates: false,
+    },
+  ])("flags $shape", ({ permissions, input, violates }) => {
+    const contents = [
+      "name: Synthetic",
+      "on: [push]",
+      "jobs:",
+      "  agent:",
+      "    runs-on: ubuntu-latest",
+      "    permissions:",
+      permissions,
+      "    steps:",
+      `      - uses: ${AGENT_ACTION}@${"0".repeat(40)}`,
+      ...(input === null ? [] : ["        with:", input]),
+      "",
+    ].join("\n");
+
+    expect(readOnlyMintContradictions("synthetic.yml", contents)).toHaveLength(violates ? 1 : 0);
+  });
+
+  // Mutation checks on the real file: the assertion above proves only that
+  // today's workflows happen to comply, which is also what a check that
+  // inspects nothing reports. Undo either half of the #689 fix and it must go
+  // red — and each mutation must actually change the file, so a regex that
+  // stops matching after a rewrite fails here instead of passing vacuously.
+  it.each([
+    {
+      half: "the github_token binding is dropped",
+      mutate: (contents: string) => contents.replace(/\n {10}github_token: .+\n/, "\n"),
+    },
+    {
+      half: "id-token: write comes back",
+      mutate: (contents: string) =>
+        contents
+          .replace(/\n {10}github_token: .+\n/, "\n")
+          .replace(/\n {6}actions: read\n/, "\n      actions: read\n      id-token: write\n"),
+    },
+  ])("goes red if $half in health-audit", ({ mutate }) => {
+    const path = ".github/workflows/health-audit.yml";
+    const mutated = mutate(read(path));
+
+    expect(mutated).not.toEqual(read(path));
+    expect(readOnlyMintContradictions(path, mutated)).toHaveLength(1);
+    // And the job reappears in the push-capable inventory, which is #689's
+    // stated acceptance check.
+    expect(agentWriteScopeInventory(path, mutated)).toEqual([
+      `${path} (job: audit): claude app token (contents, issues, pull-requests)`,
     ]);
   });
 
