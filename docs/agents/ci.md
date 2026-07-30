@@ -17,7 +17,7 @@ workflow change, or the unit suite fails.
 | `prod-health.yml` | Schedule every 15 min + dispatch | Post-deploy verification: probes `${vars.PRODUCTION_URL}/api/health` (HTTP 200 **and** body `status: "ok"` — a 200 carrying `degraded` is a failure) and `/login` (the auth wall), retrying 3× with backoff. Maintains ONE `prod-down` issue; closes it on recovery. Checkout-free, `issues: write` only. A missing `PRODUCTION_URL` variable fails the run loudly rather than skipping. |
 | `progress.yml` | Push to main touching `docs/progress/**` | Regenerates `PROGRESS.md` via `scripts/build-progress.sh` and lands it through an auto-merged bot PR. This is why PROGRESS.md must never be edited on a branch (AGENTS.md constraint 18). |
 | `hygiene.yml` | Weekly schedule | Report-only branch hygiene summary (merged/stale branches). Never deletes anything. |
-| `sentry-harness.yml` | Weekday schedule + dispatch | Scores recent Sentry errors and dispatches up to 3 Claude fix jobs (45-min cap each). Three jobs split on the credential boundary (#668): `score-errors` (read-only), `fix-error` (the agent — **all** scopes `read`, no `id-token: write`, `github_token` bound to the job's own token, `persist-credentials: false`; it writes `outbox/plan.json` + body files and cannot push or publish), `land-fix` (deterministic, holds the write scopes; validates the artifact, `git apply`s the patch, pushes, opens the PR/issue). |
+| `sentry-harness.yml` | Weekday schedule + dispatch | Scores recent Sentry errors and dispatches up to 3 Claude fix jobs (45-min cap each). Three jobs split on the credential boundary (#668): `score-errors` (read-only), `fix-error` (the agent — **all** scopes `read`, no `id-token: write`, `github_token` bound to the job's own token; it writes `outbox/plan.json` + body files and cannot push or publish), `land-fix` (deterministic, holds the write scopes; validates the artifact, `git apply`s the patch, pushes, opens the PR/issue). |
 | `health-audit.yml` | Weekly schedule + dispatch | Read-only Claude audit job → separate publisher job with `issues: write` files deduplicated issues. See [`health-audit-and-issue-triage.md`](health-audit-and-issue-triage.md). |
 | `bug-patrol.yml` | Nightly schedule + dispatch | Finds ONE small high-confidence bug in recent changes, fixes it, opens one `bug-patrol` PR. |
 | `feedback-distill.yml` | Weekly schedule + dispatch | Deterministic loop scoreboard (`loop-scoreboard.ts`), then harvests recurring corrections into ONE docs-only `feedback-distill` PR proposing promotions AND retirements. |
@@ -80,8 +80,16 @@ Three facts make this concrete, and the second is the one that surprises people
   `process.env.GH_TOKEN` before it starts the agent, and configures git auth
   with the same value (`src/entrypoints/run.ts`, `src/modes/agent/index.ts`).
   Whatever token it resolves is readable by every Bash tool call.
-  `persist-credentials: false` removes the copy in `.git/config` and nothing
-  else.
+  **`persist-credentials: false` does not leave the workspace token-free** —
+  verify this against the SHA you pin before you rely on it. At `be7b93b`,
+  `configureGitAuth()` (`src/github/operations/git-config.ts`) unsets the
+  `http.<server>/.extraheader` `actions/checkout` writes and then runs
+  `git remote set-url origin https://x-access-token:<token>@github.com/…`,
+  putting the resolved token straight back into `.git/config` — a *more*
+  durable copy than the header it just removed. (The token-free branch of that
+  function is gated on `ALLOWED_NON_WRITE_USERS`, which no job here sets.) The
+  flag is still worth setting: it covers the window between checkout and the
+  action's own git setup. It is not what makes the workspace safe.
 - **Which token it resolves is not decided by your `permissions:` block.** With
   no `github_token` input, the action exchanges an OIDC assertion for a Claude
   GitHub **App** installation token whose permissions are hardcoded to
@@ -99,20 +107,22 @@ Three facts make this concrete, and the second is the one that surprises people
 `permissions:` are read-only and its prompt forbids writes, but it passes no
 `github_token`, so its agent still holds a write-capable app token. The
 inventory below records that rather than pretending otherwise; tightening it is
-a separate change.
+a separate change, tracked in #689.
 
 `sentry-harness.yml` is the worked example (#668). Its `fix-error` job declares
 every scope `read` with no `id-token: write`, passes
-`github_token: ${{ secrets.GITHUB_TOKEN }}`, sets `persist-credentials: false`,
-and grants no
-write-capable `gh` command; it declares its outcome in `outbox/plan.json` plus
-one markdown body file per outcome, and a deterministic `land-fix` job holds the
-write scopes, validates the artifact
-(`.github/scripts/sentry-harness/outbox.ts`), `git apply`s the patch and
-publishes. The artifact is untrusted agent output, so the lander applies it and
-never executes it: `git apply` evaluates nothing, bodies reach `gh` as
-`--body-file`, every subprocess is spawned with an argv array, and a patch that
-touches `.github/workflows|actions|scripts/` is rejected outright.
+`github_token: ${{ secrets.GITHUB_TOKEN }}`, and grants no write-capable `gh`
+command; it declares its outcome in `outbox/plan.json` plus one markdown body
+file per outcome, and a deterministic `land-fix` job holds the write scopes,
+validates the artifact (`.github/scripts/sentry-harness/outbox.ts`), `git
+apply`s the patch and publishes. The artifact is untrusted agent output, so the
+lander applies it and never executes it: `git apply` evaluates nothing, bodies
+reach `gh` as `--body-file`, every subprocess is spawned with an argv array, and
+a patch touching anything CI or a build/tooling entry point
+(`.github/`, `Makefile`, `scripts/`, `package.json`, `bun.lock`, `bunfig.toml`,
+`.claude/`, `.agents/`) is rejected outright. The job still sets
+`persist-credentials: false`, but see the first bullet above for what that flag
+does and does not buy.
 
 **What is still true for `fix-error` after that split.** It can still execute
 arbitrary code and still reach the network, and two credentials remain readable
@@ -121,6 +131,25 @@ unavoidable while an agent runs at all, and the same exposure every generative
 job in this repo has) and the `id-token: write` OIDC minting endpoint. Neither
 can write to this repository. What is gone is the push-capable
 `GITHUB_TOKEN` — #645's stated impact.
+
+**The outbox is itself a publishing channel, by construction.** `pr-body.md`,
+`issue-body.md` and `comment-body.md` are agent-authored free text that a
+credentialed job publishes verbatim to a public repository. Splitting the
+credential out did not remove that — it is the *point* of the split, the agent
+has to be able to say something — so it is a deterministic, always-available
+outbound channel, not a residual hole that a later patch closes. What the
+lander bounds is reach, not content: bodies are truncated at
+`MAX_BODY_CHARS`, and a comment may only target an issue this harness itself
+filed (the lander re-reads the target's labels and requires `sentry-fix`). Any
+generative job that publishes at all inherits this property; say so in its
+comment rather than describing the job as "cannot write".
+
+The patch denylist is the same kind of claim and deserves the same honesty. It
+refuses the build and automation surface — the files that get *executed* rather
+than reviewed. It is **not** a general defense against a hostile patch: a test
+file the agent adds runs in CI on the resulting PR like any other file (prompt
+step 5 requires one), which is #699's residual, not something this list closes.
+Do not describe it as closing "the one path".
 
 Every other agent job still holds a push-capable token: `bug-patrol`,
 `feedback-distill` and `quality-regrade` legitimately push from inside the
@@ -143,11 +172,13 @@ reasons worth understanding before you copy either pattern. Its Bash allowlist
 (#661) already includes `Bash(bunx:*)`, `Bash(bun run:*)` and `Bash(make:*)`, so
 the job can reach the network regardless — adding `--disallowedTools` beside
 those would be exactly the false posture described above. And its threat model
-is genuinely weaker than the scheduled loops': `persist-credentials: false` is
-set, `claude-code-action` authenticates its own writes, and a human triggered the
-run and is watching it. It is not risk-free — fork-PR diffs and third-party
-issue bodies are unvetted input and the job holds three `write` scopes — so
-#669 tracks whether to tighten it. The lesson generalises: an exemption is for
+is genuinely weaker than the scheduled loops': a human triggered the run and is
+watching it. Note what is *not* part of that argument — `persist-credentials:
+false` is set on its checkout, but per the first bullet above the action writes
+its own token back into the remote URL, and this job's token carries three
+`write` scopes, so a push-capable credential does sit in that workspace. It is
+not risk-free — fork-PR diffs and third-party issue bodies are unvetted input —
+so #669 tracks whether to tighten it. The lesson generalises: an exemption is for
 when the denial would be *cosmetic*, and it must say so in writing.
 
 ## Deploy verification
@@ -180,6 +211,39 @@ green when unconfigured is worse than no gate — that is precisely how the old
 secrets-gated E2E job silently skipped for months (issue #437). Set it with
 `gh variable set PRODUCTION_URL --body "https://<production-host>"`, then
 `gh workflow run prod-health.yml`.
+
+## Live apply and rollback
+
+CI never touches the live database. Migrations reach live only when a human
+runs `scripts/db-push.sh` (see [`gotchas.md`](gotchas.md)), so "merged" and
+"applied" are two separate events and can drift apart for days — issue #440
+is exactly that. When you merge a migration, say in the PR whether live has
+it yet.
+
+**There are no down migrations.** Rolling back means writing a new forward
+migration that reverses the change, numbered above the bad one, pushed the
+same way. Never edit or delete an applied migration file: the chain replayed
+by `db-lint.yml` and the `schema_migrations` version rows on live both key
+off the filename.
+
+Order of operations when a live migration goes bad:
+
+1. Confirm the damage against the catalog, not against intent — run
+   `scripts/check-live-drift.sh` (needs `SUPABASE_DB_URL`).
+2. Write the reversing migration; verify it with `make db-local` and
+   `make db-dry-run` before it goes anywhere near live.
+3. Push with `scripts/db-push.sh`, which refreshes the snapshot in the same
+   step. Commit the snapshot with the migration.
+4. Re-run `live-drift.yml` (`gh workflow run live-drift.yml`) and confirm it
+   is green before closing anything out.
+
+**The watchdog is only as live as its secret.** `SUPABASE_DB_URL` is a
+read-only connection string held as a repository secret; when it is rotated
+or expires, `live-drift.yml` fails with `password authentication failed`
+rather than reporting drift, and the repo has *no* net for out-of-band schema
+changes until it is restored. A failing live-drift run is therefore urgent
+even when the failure looks like plumbing. Scheduled runs fail loudly on a
+missing secret by design (a green cron with no secret would be worse).
 
 ## Rules when changing workflows
 

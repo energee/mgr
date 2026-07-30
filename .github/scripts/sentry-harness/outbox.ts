@@ -51,17 +51,41 @@ export type OutboxPlan = {
 };
 
 /**
- * A patch may not touch the CI surface that runs with elevated permissions.
- * A Sentry fix is an application-code fix; nothing about one legitimately
- * rewrites the workflow that produced it. Narrow by design — this is not a
- * general defense against a hostile patch (a test file the patch adds runs in
- * CI on the PR like any other), it removes the one path where agent-authored
- * text could rewrite the job that holds the credentials.
+ * A patch may not touch CI, or any file that is *itself* an executor one hop
+ * from CI. A Sentry fix is an application-code fix; nothing about one
+ * legitimately rewrites the workflow that produced it, the `Makefile` that
+ * `make check` runs, a script under `scripts/`, the `package.json` lifecycle
+ * hooks `bun install` runs, or the `.claude/` hooks that fire in every local
+ * agent session.
+ *
+ * Stated honestly, because the first version of this list said otherwise: this
+ * is **not** a general defense against a hostile patch, and it does not remove
+ * "the one path" by which agent-authored text reaches an executor. A test file
+ * the patch adds runs in CI on the resulting PR like any other file — prompt
+ * step 5 requires one — and that residual is tracked in #699, not closed here.
+ * What the list does is refuse the *build and automation surface*: the places
+ * where a change is executed without anyone reading it as code under review.
+ *
+ * Prefix matching, so a bare filename entry (`Makefile`) also rejects
+ * `Makefile.local`. Over-rejection is the safe direction here: the fallback is
+ * an investigation issue, which the prompt already tells the agent to use when
+ * a fix genuinely needs one of these files.
  */
 export const FORBIDDEN_PATCH_PREFIXES = [
-  ".github/workflows/",
-  ".github/actions/",
-  ".github/scripts/",
+  // CI itself, including dependabot/CODEOWNERS/issue templates.
+  ".github/",
+  // `make check` and everything it shells out to.
+  "Makefile",
+  "makefile",
+  "scripts/",
+  // `bun install` runs lifecycle scripts from here; the lockfile decides what
+  // code `bun install` fetches in the first place.
+  "package.json",
+  "bun.lock",
+  "bunfig.toml",
+  // Harness configuration: hooks and skills that execute in agent sessions.
+  ".claude/",
+  ".agents/",
 ] as const;
 
 /** Refuse absurd patches outright rather than pushing them. */
@@ -180,8 +204,17 @@ export function parsePlan(json: string, readBody: (file: string) => string): Out
       `classification ${plan.classification} must not open a code PR — file an investigation issue instead (prompt step 0)`,
     );
   }
-  if (plan.classification === "A" && !plan.pr) {
-    fail("classification A must open a PR");
+  // (A) is "there is a defect in this repo's code", not "a patch exists". The
+  // prompt's Investigation-Issue Fallback tells the agent to file an issue when
+  // three attempts fail to produce a working fix for an (A), and the first
+  // version of this rule threw on exactly that plan — turning the prompt's own
+  // documented give-up path into a red run that published nothing, where the
+  // pre-split design filed the issue and stayed green. Either outcome is
+  // durable; declaring neither is the failure.
+  if (plan.classification === "A" && !plan.pr && !plan.issue) {
+    fail(
+      "classification A must produce a PR (the fix) or an issue (the 3-attempts-failed fallback)",
+    );
   }
   if (plan.classification === "D" && !(plan.pr && plan.issue)) {
     fail("classification D must open BOTH a PR (the reporting fix) and an investigation issue");
@@ -270,7 +303,9 @@ export function validatePatch(plan: OutboxPlan, patch: string): string[] {
     FORBIDDEN_PATCH_PREFIXES.some((prefix) => path.startsWith(prefix)),
   );
   if (forbidden.length > 0) {
-    fail(`patch touches CI configuration (${forbidden.join(", ")}); make that change by hand`);
+    fail(
+      `patch touches CI or a build/tooling entry point (${forbidden.join(", ")}); make that change by hand`,
+    );
   }
 
   return paths;

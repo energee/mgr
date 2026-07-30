@@ -73,8 +73,13 @@ colors.
    `land-fix` job that follows it should open the PR.
 
 Since #668 those are two separate jobs, split on the credential boundary:
-`fix-error` runs the agent with **read-only** scopes and no persisted git
-credential — it cannot push or publish. It leaves its code changes in the
+`fix-error` runs the agent with **read-only** scopes and binds
+`github_token` so the action cannot mint a write-capable app token — the
+credential its shell can read is `contents: read`, so it cannot push or
+publish. (It is not that the workspace holds *no* credential:
+`persist-credentials: false` is set, but `claude-code-action` writes the token
+it resolved back into the origin remote URL. What makes that harmless is the
+token's scopes. See [`docs/agents/ci.md`](agents/ci.md).) It leaves its code changes in the
 working tree and declares the outcome it wants in `outbox/plan.json` plus one
 markdown body file per outcome; a deterministic step packs both into an
 artifact. `land-fix` holds `contents`/`pull-requests`/`issues: write`, runs no
@@ -109,9 +114,19 @@ use case.
   working fix, or classified the root cause as database/third-party. Read
   the issue body for the root-cause analysis and finish manually.
 - **`land-fix` red with an `outbox:` message** — the agent's declared plan
-  broke the triage contract (a (B)/(C) classification that also left code
-  changes, a patch touching `.github/**`, a missing body file). The message
-  names the exact rule; nothing was pushed.
+  broke the triage contract: a (B)/(C) classification that also left code
+  changes (including an untracked scratch file — the packing step runs
+  `git add -A`), a patch touching CI or a build/tooling entry point
+  (`.github/`, `Makefile`, `scripts/`, `package.json`, `bun.lock`,
+  `bunfig.toml`, `.claude/`, `.agents/`), a `comment` aimed at an issue not
+  labelled `sentry-fix`, or a missing body file. The message names the exact
+  rule; nothing was pushed.
+- **A second run on the same Sentry issue** — the branch
+  `sentry-fix/SENTRY-<id>` is stable, so a re-run updates it
+  (`--force-with-lease` against the tip it just read) and reports the PR that
+  is already open rather than failing to create a second one. If someone
+  pushed to that branch by hand in between, the lease fails and the leg goes
+  red without touching their commits.
 - **`land-fix` red with "No sentry-outbox artifact"** — the agent job died
   before packing. Check its log for `permission_denials`.
 - **Duplicate PRs across runs** — this should not happen. If it does,

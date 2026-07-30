@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BODY_FILES } from "./outbox";
+import { BODY_FILES, parsePlan } from "./outbox";
 import { buildFixPrompt } from "./prompt";
 import type { SentryIssue } from "./types";
 
@@ -172,5 +172,53 @@ describe("buildFixPrompt", () => {
   it("references AGENTS.md conventions", () => {
     const prompt = buildFixPrompt(issue);
     expect(prompt).toContain("AGENTS.md");
+  });
+
+  // The prompt and the lander are two halves of one contract, and they drifted:
+  // the fallback below was documented while parsePlan threw `classification A
+  // must open a PR` on exactly that plan, so a documented give-up path failed
+  // the run red and published nothing. Assert the agreement, not the prose.
+  describe("agrees with the lander's validator", () => {
+    const body = (): string => "body text";
+
+    it("documents the 3-attempts-failed fallback for an (A)", () => {
+      const prompt = buildFixPrompt(issue);
+
+      expect(prompt).toContain("after 3\nattempts you cannot produce a working fix for an (A)");
+      expect(prompt).toContain("3-attempts-failed fallback");
+    });
+
+    it("the plan that fallback describes is one parsePlan accepts", () => {
+      const parsed = parsePlan(
+        JSON.stringify({ classification: "A", issue: { title: `[sentry] ${issue.shortId}: gave up` } }),
+        body,
+      );
+
+      expect(parsed.pr).toBeNull();
+      expect(parsed.issue).not.toBeNull();
+    });
+
+    // `git checkout -- .` restores tracked files only. A repro script the agent
+    // wrote is untracked, `git add -A` in the packing step picks it up, and the
+    // non-empty patch then fails a (B)/(C) plan in validatePatch. The prompt has
+    // to name the command that actually achieves what it demands.
+    it("gives a tree-cleaning recipe that removes untracked files too", () => {
+      const prompt = buildFixPrompt(issue);
+
+      expect(prompt).toContain("git checkout -- . && git clean -fd -e outbox");
+      expect(prompt).toContain("git status --porcelain");
+    });
+
+    it("names every denylisted patch prefix the lander will reject", () => {
+      const prompt = buildFixPrompt(issue);
+
+      for (const prefix of [".github/", "Makefile", "scripts/", "package.json", ".claude/"]) {
+        expect(prompt, `${prefix} is rejected by the lander and must be named here`).toContain(prefix);
+      }
+    });
+
+    it("warns that a comment target must be an issue this harness filed", () => {
+      expect(buildFixPrompt(issue)).toContain("labelled `sentry-fix`");
+    });
   });
 });

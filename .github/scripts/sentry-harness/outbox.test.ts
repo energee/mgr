@@ -75,13 +75,24 @@ describe("parsePlan", () => {
     );
   });
 
-  it("requires an (A) fix to open a PR, not just an issue", () => {
+  // The prompt's Investigation-Issue Fallback documents exactly this plan for
+  // an (A) the agent could not fix in three attempts. An earlier rule required
+  // a `pr` unconditionally and threw here, turning a documented give-up path
+  // into a red run that published nothing.
+  it("accepts an (A) that gave up after 3 attempts and asks for an issue", () => {
+    const parsed = parsePlan(
+      JSON.stringify({ classification: "A", issue: { title: "[sentry] MGR-42: gave up" } }),
+      read,
+    );
+
+    expect(parsed.pr).toBeNull();
+    expect(parsed.issue?.title).toBe("[sentry] MGR-42: gave up");
+  });
+
+  it("rejects an (A) that declares neither a PR nor an issue", () => {
     expect(() =>
-      parsePlan(
-        JSON.stringify({ classification: "A", issue: { title: "[sentry] MGR-42: gave up" } }),
-        read,
-      ),
-    ).toThrow(/classification A must open a PR/);
+      parsePlan(JSON.stringify({ classification: "A", quietRun: { reason: "nothing to do" } }), read),
+    ).toThrow(/classification A must produce a PR .* or an issue/);
   });
 
   // The harness's single most important rule: a database or third-party root
@@ -213,12 +224,35 @@ describe("validatePatch", () => {
     expect(validatePatch(issuePlan(), "")).toEqual([]);
   });
 
+  // Every executor the repo runs, not just the workflow files: `make check`
+  // runs the Makefile and `scripts/*`, `bun install` runs package.json
+  // lifecycle scripts, and `.claude/settings.json` defines hooks that fire in
+  // every local agent session. The first version of this list stopped at
+  // `.github/**` while claiming to close "the one path".
   it.each([
     ".github/workflows/sentry-harness.yml",
     ".github/actions/require-durable-outcome/action.yml",
     ".github/scripts/land-sentry-fix.ts",
+    ".github/dependabot.yml",
+    "Makefile",
+    "scripts/db-push.sh",
+    "package.json",
+    "bun.lock",
+    "bunfig.toml",
+    ".claude/settings.json",
+    ".agents/skills/verify/SKILL.md",
   ])("refuses a patch touching %s", (path) => {
-    expect(() => validatePatch(prPlan(), diff(path))).toThrow(/touches CI configuration/);
+    expect(() => validatePatch(prPlan(), diff(path))).toThrow(/build\/tooling entry point/);
+  });
+
+  it("still accepts the harness-state files the prompt tells the agent to write", () => {
+    const paths = [
+      "src/lib/foo.ts",
+      "docs/feature_list.json",
+      "docs/progress/2026-07-30-sentry-1.md",
+      ".harness/sessions/2026-07-30-SENTRY-1.md",
+    ];
+    expect(validatePatch(prPlan(), paths.map(diff).join("")).sort()).toEqual([...paths].sort());
   });
 
   it("refuses a patch over the size ceiling", () => {

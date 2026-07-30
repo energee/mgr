@@ -34,14 +34,20 @@ describe("Sentry harness workflow", () => {
   // Issue #668. The agent job reads raw Sentry event text and, because it can
   // Edit files and run `make check`/`bun run test`, can execute arbitrary code —
   // so no allowlist makes it exfiltration-proof. The remedy is that it holds
-  // nothing worth stealing, which takes THREE things, not one:
+  // nothing worth stealing, which takes TWO things:
   //   - read-only `permissions:` (scopes this job's GITHUB_TOKEN),
   //   - `github_token:` on the agent step (otherwise the action mints a Claude
   //     App token hardcoded to contents/pull_requests/issues: write and assigns
   //     it to the agent's GITHUB_TOKEN/GH_TOKEN — no permissions block
   //     restrains that), and no `id-token: write` (the OIDC assertion that
-  //     exchange needs),
-  //   - `persist-credentials: false` (the .git/config copy).
+  //     exchange needs).
+  //
+  // `persist-credentials: false` is NOT a third thing, and the earlier version
+  // of this comment said it was. At the pinned action SHA, configureGitAuth()
+  // writes `https://x-access-token:<token>@github.com/...` into the origin
+  // remote right after checkout, so the workspace is not token-free either way.
+  // The flag is still set — it covers the window before the action runs — and
+  // still pinned below, but as hygiene, not as the control.
   describe("fix-error holds no push-capable credential (#668)", () => {
     const fixError = job("fix-error");
 
@@ -72,8 +78,18 @@ describe("Sentry harness workflow", () => {
     // Matched as an indented `with:` input, not as a substring: the job's own
     // comment quotes "`persist-credentials: false`" in prose, and a plain
     // toContain passed with the real setting deleted.
-    it("checks out without persisting a git credential", () => {
+    it("checks out without persisting checkout's own git credential", () => {
       expect(fixError).toMatch(/\n {10}persist-credentials: false\n/);
+    });
+
+    // A (B)/(C) triage must pack an EMPTY patch, and the packing step diffs
+    // the whole tree — so an agent-run `bun install` that rewrote bun.lock
+    // fails the lander. Install deterministically before the agent instead.
+    it("installs dependencies deterministically before the agent runs", () => {
+      expect(fixError).toMatch(/\n {8}run: bun install --frozen-lockfile\n/);
+      expect(fixError.indexOf("bun install --frozen-lockfile")).toBeLessThan(
+        fixError.indexOf("anthropics/claude-code-action"),
+      );
     });
 
     // Asserted against the parsed allowlist, not the raw text — the comment
