@@ -159,6 +159,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: build
+    env:
+      # Opt-in gate for /api/auth/dev-login, which e2e/auth.setup.ts uses to
+      # obtain a session. That route 404s unless this is exactly "1" or
+      # NODE_ENV=development; this lane serves a production `next build` via
+      # `bun start`, where NODE_ENV is "production", so without the flag the
+      # `setup` project timed out and every authenticated spec failed (#644).
+      # Job-scoped (not step-scoped) so it covers both the build and the server
+      # Playwright boots, regardless of whether Next reads it at build or run
+      # time. Safe here and nowhere else: ephemeral runner, throwaway local
+      # Supabase stack, no hosted data reachable.
+      E2E_DEV_LOGIN: "1"
 
     steps:
       - name: Checkout

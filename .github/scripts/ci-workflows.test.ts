@@ -74,6 +74,32 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflows.map(read).join("\n")).not.toContain("cache: true");
   });
 
+  // Issue #644: the E2E lane authenticates through /api/auth/dev-login, which
+  // 404s unless explicitly enabled. The job serves a production `next build`
+  // via `bun start` (NODE_ENV=production), and no E2E_USER_* credentials exist
+  // for the throwaway local stack — so without this flag the `setup` project
+  // times out and every authenticated spec fails. Pinned here so the lane
+  // cannot silently go credential-less again.
+  it("enables the dev-login route for the E2E lane and nowhere else", () => {
+    const workflow = read(".github/workflows/test.yml");
+    // `e2e` is the last job in the file; capture to EOF.
+    const e2eJob = workflow.match(/\n  e2e:\n([\s\S]*)$/)?.[1];
+
+    expect(e2eJob).toBeDefined();
+    // Job-scoped, so it reaches both `bun run build` and the server Playwright
+    // boots — a step-scoped flag on the wrong step is a silent no-op.
+    expect(e2eJob).toMatch(/\n    env:\n(?:\s*#.*\n)*\s+E2E_DEV_LOGIN: "1"\n/);
+    expect(e2eJob).toContain("bun e2e");
+
+    // Trust boundary: dev-login mints an admin session with no credentials.
+    // Enabling it anywhere but this ephemeral, throwaway-database job would
+    // widen that to real environments.
+    for (const path of workflows) {
+      if (path === ".github/workflows/test.yml") continue;
+      expect(read(path), `${path} must not enable E2E_DEV_LOGIN`).not.toContain("E2E_DEV_LOGIN");
+    }
+  });
+
   it("replays migrations once for DB lint and integration tests", () => {
     const dbWorkflow = read(".github/workflows/db-lint.yml");
     const testWorkflow = read(".github/workflows/test.yml");

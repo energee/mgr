@@ -10,6 +10,11 @@
  *   E2E_USER_EMAIL      - Supabase user email; if unset, auth.setup.ts uses the
  *                         dev-login route instead of the credential form
  *   E2E_USER_PASSWORD   - Supabase user password
+ *   E2E_DEV_LOGIN       - set to "1" to make /api/auth/dev-login answer against a
+ *                         production build (see that route's docstring). Required
+ *                         for the credential-less path whenever the server under
+ *                         test is `bun start` rather than `bun dev`; test.yml's
+ *                         e2e job sets it.
  *
  * Set PLAYWRIGHT_BASE_URL when :3000 is taken by another worktree's dev server.
  * For localhost targets the port is derived from it and passed to `bun dev`,
@@ -63,6 +68,10 @@ export default defineConfig({
       url: SERVER_READY_URL,
       timeout: process.env.CI ? 120_000 : 60_000,
       // Next reads PORT, so BASE_URL moves the server and the tests together.
+      // Only PORT is listed because Playwright merges this object *over*
+      // process.env when it spawns the command — everything the CI job exports
+      // (E2E_DEV_LOGIN, the local Supabase keys) is already inherited by the
+      // `bun start` child, so nothing else needs forwarding by hand.
       env: { PORT },
       // Locally this adopts whatever already answers on BASE_URL — including
       // another worktree's dev server. Set PLAYWRIGHT_BASE_URL to an unused port

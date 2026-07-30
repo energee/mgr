@@ -7,10 +7,14 @@
  *
  * Two paths:
  *   - Default: hit `/api/auth/dev-login`, which signs in `dev@brewery.test`
- *     (creating it if absent) and redirects. Requires NODE_ENV=development,
- *     which `bun dev` provides. No credentials needed.
+ *     (creating it if absent) and redirects. No credentials needed. That route
+ *     404s unless it is explicitly enabled — `NODE_ENV=development` (what
+ *     `bun dev` gives locally) or `E2E_DEV_LOGIN=1`. CI's nightly lane sets the
+ *     flag because it serves a production `next build` via `bun start`, where
+ *     NODE_ENV is "production" (issue #644).
  *   - If `E2E_USER_EMAIL` is set: drive the real credential form instead, for
- *     targets where the dev-login route 404s (any production build).
+ *     targets that cannot enable dev-login — notably a deployed environment,
+ *     where the route stays 404 by design.
  */
 import { test as setup } from "@playwright/test";
 
