@@ -36,19 +36,54 @@ sentry harness once failed the same way. The gate also echoes
 `worker-epoch: model=<id>` into each run's step summary — see
 [`improvement-loop.md`](improvement-loop.md) for what to do when it changes.
 
-**No web egress from credentialed generative jobs.** Every job that invokes
-`claude-code-action` with any `write` permission must pass
-`--disallowedTools "WebFetch,WebSearch"`, and must not grant either tool
-through `--allowedTools`. Contract-tested per job, so a new workflow inherits
-the rule. The reason is the pairing, not the tools: these agents read
-attacker-influenceable text (Sentry event payloads, fork-PR diffs, issue
-bodies) while a push-capable `GITHUB_TOKEN` sits on the runner, so an outbound
-network tool is what turns a prompt injection into exfiltration.
-`sentry-harness.yml` was the outlier that motivated the contract (issue #645) —
-it granted `WebFetch` for "occasional docs lookup" while the other four denied
-it. Denial is explicit rather than by omission because a missing entry in an
-allowlist reads as an oversight and gets "fixed". If a run genuinely needs an
-external page, paste the content into the prompt or the mention thread.
+**No web tool in generative jobs.** Every job that invokes
+`claude-code-action` must pass `--disallowedTools "WebFetch,WebSearch"` and must
+not grant either tool through `--allowedTools`. Contract-tested per job, so a
+new workflow inherits the rule; a job that genuinely needs the network declares
+`web-egress: allowed (job: <name>) — <rationale>` in a comment, the same escape
+hatch as `durable-state: exempt`, and the contract enumerates every marker so an
+opt-out is never silent. `sentry-harness.yml` motivated the rule (issue #645):
+it granted `WebFetch` for "occasional docs lookup" while reading raw Sentry
+event text. Denial is explicit rather than by omission because a missing entry
+in an allowlist reads as an oversight and gets "fixed".
+
+**Be precise about what this buys.** It is one channel, not the whole class.
+Removing `WebFetch`/`WebSearch` removes the egress an injected instruction can
+use in a *single tool call* with no shell work, which is worth having — it is
+the difference between a one-line injection and a conspicuous one that shows up
+in the job log. It does **not** make a credentialed job exfiltration-proof, and
+writing a workflow comment that says it does is worse than saying nothing.
+Anything that can reach the network still can:
+
+- `Bash(git:*)` — `git push` / `git ls-remote` to an attacker-controlled URL,
+  which also carries `.git/config` credentials when the checkout persisted them
+- `Bash(bun:*)` / `Bash(bunx:*)` — `bun -e 'fetch(...)'`, or fetching and
+  executing an arbitrary npm package
+- `Bash(gh …:*)` — on a public repo an issue or PR body is itself a publishing
+  channel
+
+So `--disallowedTools "WebFetch,WebSearch"` next to `Bash(bun:*)` and
+`Bash(git:*)` is **not** a closed egress posture. Closing it means removing the
+credential from the agent's reach — `persist-credentials: false` plus a push
+path that doesn't leave a token at rest, a scoped short-lived token, or a split
+into an uncredentialed agent job and a deterministic job that pushes. For
+`sentry-harness.yml`'s `fix-error` that work is tracked in #668; the residual is
+disclosed in the workflow comment rather than papered over. When you add a
+generative job, deny the web tools *and* keep the Bash allowlist to the command
+families the prompt actually names.
+
+**The one declared exemption: `claude.yml`.** It carries a
+`web-egress: allowed (job: claude)` marker instead of the denial, for two
+reasons worth understanding before you copy either pattern. Its Bash allowlist
+(#661) already includes `Bash(bunx:*)`, `Bash(bun run:*)` and `Bash(make:*)`, so
+the job can reach the network regardless — adding `--disallowedTools` beside
+those would be exactly the false posture described above. And its threat model
+is genuinely weaker than the scheduled loops': `persist-credentials: false` is
+set, `claude-code-action` authenticates its own writes, and a human triggered the
+run and is watching it. It is not risk-free — fork-PR diffs and third-party
+issue bodies are unvetted input and the job holds three `write` scopes — so
+#669 tracks whether to tighten it. The lesson generalises: an exemption is for
+when the denial would be *cosmetic*, and it must say so in writing.
 
 ## Live apply and rollback
 
@@ -131,5 +166,7 @@ missing secret by design (a green cron with no secret would be worse).
    split (read-only audit job → minimal publisher job).
 4. Scheduled prompts must not interpolate event-derived text (PR titles,
    issue bodies) — that's a command-injection surface.
-5. Any generative job holding a `write` permission must pass
-   `--disallowedTools "WebFetch,WebSearch"` (see the egress note above).
+5. Any job invoking `claude-code-action` must pass
+   `--disallowedTools "WebFetch,WebSearch"` (see the egress note above), and
+   must keep its Bash allowlist to the command families its prompt names —
+   denying the web tools alone does not close egress.

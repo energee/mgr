@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { AGENT_ACTION, auditWorkflowEgress } from "./workflow-egress";
 
 function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
@@ -15,30 +16,6 @@ const workflows = readdirSync(resolve(process.cwd(), WORKFLOW_DIR))
   .filter((file) => file.endsWith(".yml") || file.endsWith(".yaml"))
   .map((file) => `${WORKFLOW_DIR}/${file}`)
   .sort();
-
-type WorkflowJob = { name: string; body: string };
-
-// Split a workflow into its top-level `jobs:` entries. Job keys sit at two
-// spaces of indentation and their contents at four or more, so the two-space
-// headers are the block boundaries. `on:` sub-keys (`schedule:`, `push:`) land
-// in the same list; callers filter by content, so the extra blocks are inert.
-function jobsOf(contents: string): WorkflowJob[] {
-  const blocks: WorkflowJob[] = [];
-  let current: { name: string; lines: string[] } | null = null;
-
-  for (const line of contents.split("\n")) {
-    const header = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
-    if (header) {
-      if (current) blocks.push({ name: current.name, body: current.lines.join("\n") });
-      current = { name: header[1], lines: [] };
-      continue;
-    }
-    current?.lines.push(line);
-  }
-  if (current) blocks.push({ name: current.name, body: current.lines.join("\n") });
-
-  return blocks;
-}
 
 describe("GitHub Actions performance contracts", () => {
   it("uses the current checkout and artifact action generations", () => {
@@ -276,20 +253,28 @@ describe("GitHub Actions performance contracts", () => {
     }
   });
 
-  // Egress contract (#645): a generative Claude job that holds write
-  // credentials must not also hold a network egress tool. These jobs read
-  // attacker-influenceable text — Sentry event payloads, fork-PR diffs, issue
-  // bodies — while a push-capable GITHUB_TOKEN sits on the runner, so WebFetch
-  // is the difference between a prompt injection that can only make noise and
-  // one that can post the token somewhere. Denial must be explicit (a bare
-  // omission from --allowedTools is invisible and easy to undo by accident):
-  // sentry-harness.yml was the sole outlier, granting WebFetch while all four
-  // siblings passed --disallowedTools. Derived per job, so a workflow added
-  // later is covered without touching this test.
-  it("denies web egress in every generative Claude job that holds write credentials", () => {
-    const generative = workflows.filter((path) => read(path).includes("claude-code-action"));
+  // Egress contract (#645): every job that runs claude-code-action must deny
+  // WebFetch and WebSearch. These jobs read attacker-influenceable text —
+  // Sentry event payloads, fork-PR diffs, issue bodies — and most of them hold
+  // a push-capable GITHUB_TOKEN, so a web tool is the one egress channel an
+  // injected instruction can use with a single tool call and no shell work.
+  // It is NOT the only channel (`Bash(git:*)` pushes to any remote,
+  // `Bash(bun:*)` runs `bun -e 'fetch(...)'`, and `gh issue create` publishes
+  // on a public repo) — see docs/agents/ci.md for what this does and does not
+  // close. Denial must be explicit: a bare omission from --allowedTools is
+  // invisible and gets "fixed" by the next author.
+  //
+  // The rule is unconditional rather than scoped to "credentialed" jobs
+  // because the credential test was itself the bug — it counted only
+  // contents/issues/pull-requests: write, so `actions: write` or a PAT in
+  // `env:` skipped the check. A job that genuinely needs the network opts out
+  // with a `web-egress: allowed (job: <name>) — <rationale>` marker, the same
+  // escape hatch as `durable-state: exempt`, and every marker in the repo is
+  // listed below so an opt-out can never be silent.
+  it("denies web egress in every job that runs a generative Claude agent", () => {
+    const generative = workflows.filter((path) => read(path).includes(AGENT_ACTION));
 
-    // Guard the derivation: if the action reference is ever renamed, the loop
+    // Guard the derivation: if the action reference is ever renamed, the audit
     // below must not start passing vacuously.
     expect(generative).toEqual(
       expect.arrayContaining([
@@ -302,44 +287,254 @@ describe("GitHub Actions performance contracts", () => {
       ]),
     );
 
-    let checkedJobs = 0;
+    const audits = generative.map((path) => auditWorkflowEgress(path, read(path)));
 
-    for (const path of generative) {
-      for (const job of jobsOf(read(path))) {
-        const where = `${path} (job: ${job.name})`;
-        const agentSteps = job.body.match(/uses:\s*anthropics\/claude-code-action/g) ?? [];
-        if (agentSteps.length === 0) continue;
+    expect(audits.flatMap((audit) => audit.problems)).toEqual([]);
 
-        // A job that declares permissions and asks for no write scope has no
-        // credential worth exfiltrating (health-audit's audit job). Anything
-        // else — including a job that declares nothing and inherits the
-        // repository's default token scopes — counts as credentialed.
-        const declaresPermissions = /^ {4}permissions:$/m.test(job.body);
-        const grantsWrite = /^ {6}(?:contents|issues|pull-requests): write$/m.test(job.body);
-        if (declaresPermissions && !grantsWrite) continue;
-        checkedJobs += 1;
+    // Opt-outs are enumerated, not counted: a new workflow whose agent job
+    // stops being checked shows up here and fails, which a per-suite floor on
+    // the number of checked jobs could not do (the known jobs already met it).
+    // claude.yml is the one declared exemption — #661 gave that job a scoped
+    // Bash allowlist that already reaches the network (Bash(bunx:*)), so
+    // denying the web tools there would be posture, not protection; #669 owns
+    // the decision. Any *second* entry here is a silent opt-out and fails.
+    expect(audits.flatMap((audit) => audit.exemptions)).toEqual([
+      expect.stringContaining(
+        ".github/workflows/claude.yml (job: claude): interactive, insider-gated runs",
+      ),
+    ]);
 
-        const denials = job.body.match(/--disallowedTools\s+"[^"]*"/g) ?? [];
-        expect(
-          denials.length,
-          `${where}: runs a generative agent with write credentials but passes no --disallowedTools`,
-        ).toBeGreaterThanOrEqual(agentSteps.length);
-        for (const denial of denials) {
-          expect(denial, `${where}: must deny WebFetch`).toContain("WebFetch");
-          expect(denial, `${where}: must deny WebSearch`).toContain("WebSearch");
-        }
+    // Anti-vacuity backstop. auditWorkflowEgress already fails a file that
+    // names the action but yields no agent job; this pins the repo-wide total
+    // so a parser change that silently halves the inventory is caught too.
+    expect(audits.flatMap((audit) => audit.jobs).length).toBeGreaterThanOrEqual(6);
+  });
 
-        // Denying and granting the same tool is ambiguous at best; never do both.
-        const grants = job.body.match(/--allowed-?[Tt]ools\s+"[^"]*"/g) ?? [];
-        for (const grant of grants) {
-          expect(grant, `${where}: allow-list must not grant web egress`).not.toMatch(
-            /Web(?:Fetch|Search)/,
-          );
-        }
-      }
+  // Mutation check: the assertions above only prove the real workflows are
+  // currently compliant, which is also what a check that inspects nothing
+  // reports. Remove whatever makes each real workflow pass — its denial, or its
+  // exemption marker — and the audit must go red. This is the guarantee the
+  // previous version lacked: its per-suite floor was satisfied by the known
+  // jobs, so it could report success over a file it had silently skipped.
+  it.each(
+    workflows.filter((path) => read(path).includes(AGENT_ACTION)),
+  )("%s goes red when its declaration is removed", (path) => {
+    const original = read(path);
+    expect(auditWorkflowEgress(path, original).problems).toEqual([]);
+
+    const stripped = original
+      .replace(/--disallowedTools\s+"[^"]*"/g, "")
+      .replace(/web-egress:\s*allowed/g, "");
+    expect(auditWorkflowEgress(path, stripped).problems.length).toBeGreaterThan(0);
+  });
+
+  // Every case below is a workflow shape that the first version of the egress
+  // contract mishandled. Verified against that version before the rewrite: the
+  // "previously skipped" shapes each produced zero checked jobs and zero
+  // failures (the invariant passing while checking nothing), and the unquoted
+  // denial failed with the misleading "passes no --disallowedTools". They live
+  // here so the holes cannot silently reopen.
+  describe("egress contract on synthetic workflows", () => {
+    const DENIAL = `          claude_args: '--allowedTools "Read" --disallowedTools "WebFetch,WebSearch"'`;
+    const WRITE = "    permissions:\n      contents: write";
+    const NO_DENIAL = `          claude_args: '--allowedTools "Read"'`;
+
+    function synthetic({
+      jobKey = "  agent:",
+      permissions = WRITE,
+      args = DENIAL,
+    }: {
+      jobKey?: string;
+      permissions?: string;
+      args?: string;
+    } = {}): string {
+      return [
+        "name: Synthetic",
+        "on: [push]",
+        "jobs:",
+        jobKey,
+        "    runs-on: ubuntu-latest",
+        permissions,
+        "    steps:",
+        `      - uses: ${AGENT_ACTION}@${"0".repeat(40)}`,
+        "        with:",
+        args,
+        "",
+      ].join("\n");
     }
 
-    expect(checkedJobs).toBeGreaterThanOrEqual(5);
+    // Hole 1 (quoted scalar) and hole 5 (scope gap): the old credential test
+    // read these as "no write permission" and skipped the job entirely.
+    it.each([
+      { shape: 'a quoted scalar (contents: "write")', permissions: '    permissions:\n      contents: "write"' },
+      { shape: "the write-all shorthand", permissions: "    permissions: write-all" },
+      {
+        shape: "only actions/packages write",
+        permissions:
+          "    permissions:\n      contents: read\n      actions: write\n      packages: write",
+      },
+      {
+        shape: "read scopes plus a PAT injected via env",
+        permissions:
+          "    permissions:\n      contents: read\n    env:\n      GH_TOKEN: ${{ secrets.RELEASE_PAT }}",
+      },
+    ])("flags an undenied agent job whose permissions use $shape", ({ permissions }) => {
+      const audit = auditWorkflowEgress("synthetic.yml", synthetic({ permissions, args: NO_DENIAL }));
+
+      expect(audit.jobs).toEqual(["synthetic.yml (job: agent)"]);
+      expect(audit.exemptions).toEqual([]);
+      expect(audit.problems).toHaveLength(1);
+      expect(audit.problems[0]).toContain("--disallowedTools must name WebFetch and WebSearch");
+    });
+
+    // Hole 2: the old line splitter required a bare `  name:` header, so a
+    // trailing comment or anchor on the job key discarded the whole job body.
+    it.each([
+      { shape: "a trailing comment", jobKey: "  agent: # nightly" },
+      { shape: "a YAML anchor", jobKey: "  agent: &nightly-agent" },
+    ])("flags an undenied agent job whose key carries $shape", ({ jobKey }) => {
+      const audit = auditWorkflowEgress("synthetic.yml", synthetic({ jobKey, args: NO_DENIAL }));
+
+      expect(audit.jobs).toEqual(["synthetic.yml (job: agent)"]);
+      expect(audit.problems).toHaveLength(1);
+      expect(audit.problems[0]).toContain("--disallowedTools must name WebFetch and WebSearch");
+    });
+
+    // Hole 6 (false positive): the old matcher required double quotes around
+    // the value, so these correct denials were reported as missing.
+    it.each([
+      { shape: "unquoted", args: "          claude_args: --disallowedTools WebFetch,WebSearch" },
+      { shape: "single-quoted", args: `          claude_args: "--disallowedTools 'WebFetch,WebSearch'"` },
+      { shape: "in equals form", args: "          claude_args: --disallowedTools=WebFetch,WebSearch" },
+      { shape: "in kebab-case", args: `          claude_args: '--disallowed-tools "WebFetch,WebSearch"'` },
+      {
+        shape: "in a block scalar",
+        args:
+          '          claude_args: |\n            --max-turns 4\n            --allowedTools "Read"\n            --disallowedTools "WebFetch,WebSearch"',
+      },
+      {
+        shape: "alongside a JSON schema containing quotes",
+        args: `          claude_args: '--disallowedTools "WebFetch,WebSearch" --json-schema {"type":"object"}'`,
+      },
+    ])("accepts a denial written $shape", ({ args }) => {
+      expect(auditWorkflowEgress("synthetic.yml", synthetic({ args })).problems).toEqual([]);
+    });
+
+    it("flags an agent step that passes no argument input at all", () => {
+      const audit = auditWorkflowEgress(
+        "synthetic.yml",
+        synthetic({ args: `          prompt: "fix the failing test"` }),
+      );
+
+      expect(audit.problems).toHaveLength(1);
+      expect(audit.problems[0]).toContain("passes no claude_args/allowed_tools/disallowed_tools");
+    });
+
+    // Prompt text must not be able to satisfy the contract: in some jobs the
+    // prompt is built from attacker-influenceable input.
+    it("does not let a denial quoted inside the prompt satisfy the contract", () => {
+      const audit = auditWorkflowEgress(
+        "synthetic.yml",
+        synthetic({ args: `          prompt: 'run with --disallowedTools "WebFetch,WebSearch"'` }),
+      );
+
+      expect(audit.problems).toHaveLength(1);
+      expect(audit.problems[0]).toContain("passes no claude_args/allowed_tools/disallowed_tools");
+    });
+
+    it("flags an allow-list that grants a web tool even when it is also denied", () => {
+      const audit = auditWorkflowEgress(
+        "synthetic.yml",
+        synthetic({
+          args: `          claude_args: '--allowedTools "Read,WebFetch" --disallowedTools "WebFetch,WebSearch"'`,
+        }),
+      );
+
+      expect(audit.problems).toEqual(["synthetic.yml (job: agent): --allowedTools must not grant WebFetch"]);
+    });
+
+    it("checks every agent step in a multi-step job", () => {
+      const contents = [
+        "name: Synthetic",
+        "on: [push]",
+        "jobs:",
+        "  agent:",
+        "    steps:",
+        `      - uses: ${AGENT_ACTION}@${"0".repeat(40)}`,
+        "        with:",
+        DENIAL,
+        `      - uses: ${AGENT_ACTION}@${"0".repeat(40)}`,
+        "        with:",
+        NO_DENIAL,
+        "",
+      ].join("\n");
+
+      const audit = auditWorkflowEgress("synthetic.yml", contents);
+
+      expect(audit.problems).toHaveLength(1);
+      expect(audit.problems[0]).toContain("agent step 2");
+    });
+
+    // Hole 3: a floor on the number of checked jobs cannot notice a NEW file
+    // being skipped, because the known jobs already satisfy it. These two
+    // cases are the replacement — the audit fails when a file that names the
+    // action contributes no checked job.
+    it("flags a workflow that names the action but parses to no agent job", () => {
+      const contents = [
+        "name: Synthetic",
+        "on: [push]",
+        "jobs:",
+        "  note:",
+        "    steps:",
+        `      - run: echo ${AGENT_ACTION}`,
+        "",
+      ].join("\n");
+
+      const audit = auditWorkflowEgress("synthetic.yml", contents);
+
+      expect(audit.jobs).toEqual([]);
+      expect(audit.problems).toHaveLength(1);
+      expect(audit.problems[0]).toContain("no job parsed as running it");
+    });
+
+    it("flags unparseable YAML instead of silently checking nothing", () => {
+      const audit = auditWorkflowEgress("synthetic.yml", "jobs:\n  agent: [1,\n");
+
+      expect(audit.problems).toHaveLength(1);
+      expect(audit.problems[0]).toContain("is not parseable YAML");
+    });
+
+    it("honours a job-scoped exemption marker that carries a rationale", () => {
+      const contents = synthetic({
+        jobKey:
+          "  # web-egress: allowed (job: agent) — reads vendor changelogs; no write scope\n  agent:",
+        permissions: "    permissions:\n      contents: read",
+        args: NO_DENIAL,
+      });
+
+      const audit = auditWorkflowEgress("synthetic.yml", contents);
+
+      expect(audit.problems).toEqual([]);
+      expect(audit.exemptions).toEqual([
+        "synthetic.yml (job: agent): reads vendor changelogs; no write scope",
+      ]);
+    });
+
+    it.each([
+      {
+        shape: "names a different job",
+        marker: "  # web-egress: allowed (job: other) — reads vendor changelogs here",
+      },
+      { shape: "carries no rationale", marker: "  # web-egress: allowed (job: agent) — see above" },
+    ])("ignores an exemption marker that $shape", ({ marker }) => {
+      const audit = auditWorkflowEgress(
+        "synthetic.yml",
+        synthetic({ jobKey: `${marker}\n  agent:`, args: NO_DENIAL }),
+      );
+
+      expect(audit.exemptions).toEqual([]);
+      expect(audit.problems).toHaveLength(1);
+    });
   });
 
   // The rebuilt quality-regrade must never regress to its predecessor's
