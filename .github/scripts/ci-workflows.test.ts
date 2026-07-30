@@ -164,6 +164,42 @@ describe("GitHub Actions performance contracts", () => {
     expect(auditStep).toContain("bun audit --audit-level=high");
     expect(auditStep).not.toContain("continue-on-error");
     expect(auditStep).toContain("docs/security/dependency-policy.md");
+
+    // The gate must stay at `high`; downgrading the threshold is the broad
+    // severity suppression the policy prohibits.
+    expect(auditStep).not.toMatch(/--audit-level=(critical|moderate|low)/);
+    // `--ignore` must always name a concrete advisory. A bare flag, or one
+    // taking a severity/package name, would suppress far more than the
+    // documented exception.
+    for (const flag of auditStep!.matchAll(/--ignore(?:=|\s+)(\S+)/g)) {
+      expect(flag[1]).toMatch(/^(GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}|CVE-\d{4}-\d+)$/);
+    }
+  });
+
+  // An ignore with no dated record in the policy doc is exactly the
+  // "undocumented ignore" the policy prohibits, and it is invisible in review
+  // once the PR that added it scrolls out of sight. Pin the pairing so a
+  // suppression cannot outlive its written justification.
+  it("documents every suppressed advisory in the dependency policy", () => {
+    const auditStep = read(".github/workflows/test.yml").match(
+      /- name: Check for dependency vulnerabilities[\s\S]*?(?=\n\s+- name:|\n\s{2}[a-z-]+:|$)/,
+    )?.[0];
+    const policy = read("docs/security/dependency-policy.md");
+
+    expect(auditStep).toBeDefined();
+    const ignored = [...auditStep!.matchAll(/--ignore(?:=|\s+)(\S+)/g)].map((m) => m[1]);
+
+    for (const advisory of ignored) {
+      expect(policy).toContain(advisory);
+      // Each record carries an expiry date, so a stale exception is auditable.
+      expect(policy).toMatch(/Expiry\b/);
+    }
+
+    // Conversely: with no active exceptions the doc must say so, so "no
+    // exceptions" is an asserted state rather than an absence of text.
+    if (ignored.length === 0) {
+      expect(policy).toContain("There are no active exceptions.");
+    }
   });
 
   it("keeps scheduled health analysis read-only and isolates issue writes in the publisher", () => {
