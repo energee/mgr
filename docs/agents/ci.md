@@ -188,11 +188,24 @@ audit job sat in that list for weeks, reviewed as read-only, because a listed
 entry reads as an accepted one. So there is also a **rule**
 (`readOnlyMintContradictions`): a job whose `permissions:` block grants no
 repository write has declared itself read-only, and must therefore pass
-`github_token`. That one generalises to workflows nobody has enumerated yet.
-`id-token: write` does not exempt a job from it — that shape is exactly the
-one it exists to catch. Both read the `permissions:` block and the step's
-`github_token` input; a PAT handed to a step through `env:` is a stronger
-credential neither sees.
+`github_token`. `id-token: write` does not exempt a job from it — that shape is
+exactly the one it exists to catch.
+
+**Know where that rule stops.** It fires on a job that *declares* itself
+read-only: one carrying an explicit `permissions:` block with no write scope.
+`declaresReadOnly()` returns false for `{kind: "inherited"}`, so **a job with no
+`permissions:` block at all is not covered** — and that is the most common
+copy-paste shape. Such a job inherits the workflow or repository default, which
+may well be read-only at runtime, while its agent still mints a write-capable
+app token through the OIDC exchange. That is precisely the #689 defect, and the
+contract would not see it. Until the gap is closed, give every agent job an
+explicit `permissions:` block rather than relying on the default.
+
+Two further limits worth knowing before trusting either rule: `bindsOwnToken` is
+satisfied by any non-empty `github_token` input, so a PAT *stronger* than the app
+token passes silently, and a typo'd secret name resolves to an empty string and
+takes the OIDC path anyway. And a PAT handed to a step through `env:` is a
+credential neither rule sees at all.
 
 When you add a generative job, deny the web tools, keep the Bash allowlist to
 the command families the prompt actually names, and give the job read-only
