@@ -100,7 +100,25 @@ Immutable audit log for all keg state transitions. Keg inventory is calculated f
 
 **Note**: Transactions are immutable - no UPDATE or DELETE policies.
 
-**Migration:** `00032_keg_transactions.sql`, `00079_keg_owners.sql` (adds keg_owner_id)
+**Retired column — `keg_type_id`.** 00032 created the table with a NOT NULL
+`keg_type_id` referencing the old `keg_types` table. The container/selling-format
+refactor moved the format key to `selling_format_id` (00159), and every writer
+since 00183 — `create_finished_goods_from_packaging`,
+`create_keg_ship_transactions_from_order`, `record_keg_transaction` — supplies
+only that. Live appears to have dropped `keg_types` (and the column) out of band —
+inferred from `live-catalog.snapshot.txt` and the live-generated
+`src/types/supabase.ts`, not from a direct column read; the migration
+chain kept both, so any database built from the chain rejected *every* keg write
+with `null value in column "keg_type_id" ... violates not-null constraint`, which
+made keg packaging and keg order fulfillment impossible on a fresh replay (#701).
+00283 retires the column, backfilling `selling_format_id` from it first where a
+legacy value exists (00112 reuses each keg_type UUID as its replacement selling
+format's id) and aborting rather than dropping a reference it cannot map. The keg
+identity of a transaction is now `selling_format_id -> containers.type = 'keg'`.
+
+**Migration:** `00032_keg_transactions.sql`, `00079_keg_owners.sql` (adds keg_owner_id),
+`00159_packaging_sessions_redesign.sql` (adds selling_format_id),
+`00283_retire_keg_transactions_keg_type_id.sql` (retires keg_type_id)
 
 ---
 

@@ -38,7 +38,10 @@ you need a working database before you can repair it. Second, repair the seed
 against **the migration chain**, not against the live database: `db-local`
 replays `supabase/migrations/`, and the two have known drift (live dropped
 `batches.fermenter`, `inventory_items.supplier`, `packages.package_type_id`,
-and the whole `package_types` table out-of-band; the chain still creates them).
+and the whole `package_types` and `keg_types` tables out-of-band; the chain
+still creates them — `supabase/live-catalog.snapshot.txt` emits one `TABLE|`
+line per live base table, so a missing one is the cheapest live-side check
+you have without credentials).
 `src/types/supabase.ts` is generated from live, so it is a cross-check for
 column names, never the authority for a local reset. Third, the seed is only
 re-runnable against a *freshly reset* database, not idempotent: eight catalog
