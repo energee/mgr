@@ -26,6 +26,28 @@ explicitly (`db-lint.yml`); a local `supabase db reset` does not, and the
 resulting failure reads like a broken test rather than a missing fixture. Use
 `make db-local`, which replays migrations and loads both fixture sets.
 
+**`make db-local` now fails hard if `supabase/seed.sql` does not apply.** The
+demo seed used to be best-effort (warn and continue), which is how it silently
+rotted through several schema changes until nothing after its first statement
+ran (#581). It is strict now, so a schema change that breaks the seed shows up
+on the next bootstrap instead of months later. Three things follow. First, the
+failure is not fatal — migrations and the role fixtures are applied *before* the
+seed, so the database still works for `bun run test:integration` and `make dev`;
+only demo data is missing, and `MGR_SKIP_DEMO_SEED=1` skips the step outright if
+you need a working database before you can repair it. Second, repair the seed
+against **the migration chain**, not against the live database: `db-local`
+replays `supabase/migrations/`, and the two have known drift (live dropped
+`batches.fermenter`, `inventory_items.supplier`, `packages.package_type_id`,
+and the whole `package_types` table out-of-band; the chain still creates them).
+`src/types/supabase.ts` is generated from live, so it is a cross-check for
+column names, never the authority for a local reset. Third, the seed is only
+re-runnable against a *freshly reset* database, not idempotent: eight catalog
+inserts end in a bare `ON CONFLICT DO NOTHING` on tables with no unique
+constraint, so a second run duplicates every row, and `ON CONFLICT (id)` cannot
+absorb a natural-key collision (`vessels.name`, `containers.name`,
+`suppliers` `lower(name)`, `batches.batch_code`, `orders.order_number`). Reset
+first; do not re-point the seed at a database that already has data.
+
 ## Database
 
 **Never pick a migration number from the local checkout alone.** `ls

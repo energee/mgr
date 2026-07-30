@@ -8,7 +8,9 @@
 #     the RLS integration suite authenticates as. Without these,
 #     `bun run test:integration` fails with a confusing "no seeded user" error.
 #   * supabase/seed.sql — demo recipes/batches/orders so the dev server shows
-#     something other than empty tables.
+#     something other than empty tables. Applied STRICTLY (#581): a seed that no
+#     longer matches the schema fails the whole run. Set MGR_SKIP_DEMO_SEED=1 to
+#     skip it if you need a working database before you can repair it.
 #
 # Existing targets each do part of this and none do all of it:
 #   make db-dry-run  — replays migrations, then throws the database away
@@ -64,20 +66,43 @@ ADMIN_URL="${DB_URL/:\/\/postgres:/://supabase_admin:}"
 echo "==> Seeding RLS role fixtures"
 psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -f src/__tests__/integration/_fixtures/seed-roles.sql
 
-# Demo data is best-effort: supabase/seed.sql has rotted against the current
-# schema (batches.batch_number -> batch_code, inventory_items.supplier removed,
-# and likely more — see issue #581). The role fixtures above are what the
-# integration suite actually needs, so a stale demo seed must not fail the
-# whole bootstrap. Remove this tolerance once the seed is repaired.
-echo "==> Seeding demo data (best-effort)"
-if ! psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -f supabase/seed.sql; then
-  DEMO_SEED_PARTIAL=1
-  echo "WARNING: supabase/seed.sql stopped early — demo data is partial (issue #581)." >&2
+# Demo data is applied STRICTLY (issue #581). This used to tolerate failure with
+# a warning, which is exactly how supabase/seed.sql rotted unnoticed against
+# schema changes (batches.batch_number -> batch_code, inventory_items.supplier
+# dropped, package_types superseded by containers/selling_formats). A seed that
+# no longer matches the schema must break the bootstrap loudly and immediately.
+#
+# Note the ordering: migrations and the RLS role fixtures are already applied by
+# this point, so even when this step fails the database is still usable for
+# `bun run test:integration` and `make dev` — only demo data is missing. That is
+# what makes strictness affordable, and it is why the escape hatch below exists:
+# rot must break the build, but it must never be able to block a bootstrap.
+if [ "${MGR_SKIP_DEMO_SEED:-0}" = "1" ]; then
+  echo "==> Skipping demo data (MGR_SKIP_DEMO_SEED=1)"
+else
+  echo "==> Seeding demo data"
+  if ! psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -f supabase/seed.sql; then
+    cat >&2 <<'ERRMSG'
+
+ERROR: supabase/seed.sql failed — see the psql error above for the exact
+       statement. Migrations and the RLS role fixtures DID apply, so the
+       database already works for `bun run test:integration` and `make dev`;
+       only the demo data is missing.
+
+       Fix supabase/seed.sql against the migration chain in
+       supabase/migrations/ (the chain is the source of truth for a local
+       reset), then re-run `make db-local`.
+
+       To get unblocked right now without repairing it, re-run with
+       MGR_SKIP_DEMO_SEED=1 — but file the breakage, do not leave it.
+ERRMSG
+    exit 1
+  fi
 fi
 
 cat <<EOF
 
-Local database ready${DEMO_SEED_PARTIAL:+ (demo data partial — issue #581)}.
+Local database ready.
 
   Integration suite:  DATABASE_URL='$DB_URL' bun run test:integration
   Dev server:         make dev

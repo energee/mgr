@@ -1,6 +1,48 @@
--- MGR Seed Data (Single-Tenant)
--- Run this in the Supabase SQL Editor to create sample data for testing.
--- Note: This bypasses RLS since it runs with admin credentials.
+-- MGR Demo Seed Data (Single-Tenant)
+--
+-- LOCAL ONLY. Applied by `make db-local` (scripts/db-local.sh) AFTER the full
+-- migration chain has replayed, and by `make db-seed` (= `supabase db seed`,
+-- which also targets the local stack). It runs with admin credentials, so RLS
+-- is bypassed. Never point it at the hosted database — see the MAINTENANCE
+-- NOTE below for why it cannot apply there.
+--
+-- Intent: one small, coherent demo brewery — recipes, batches at several
+-- statuses, the vessels holding them, packaging containers/formats, packaged
+-- product, customers, orders, raw-material inventory with suppliers, plus the
+-- reference catalogs (styles, yeasts, malts, hops, ...).
+--
+-- RE-RUN SAFETY — read this before assuming "idempotent". Safe to re-run
+-- against a *freshly reset* database, which is the only case `make db-local`
+-- produces. It is NOT generally idempotent, and since the seed is now applied
+-- strictly (scripts/db-local.sh, #581) both gaps below are hard failures
+-- rather than warnings:
+--   * The eight catalog inserts that end in a bare `ON CONFLICT DO NOTHING`
+--     (yeasts, malts, hops, sugars, adjuncts, spices, fruits, additives) have
+--     no unique constraint anywhere in the chain, so nothing ever conflicts
+--     and a second run DUPLICATES every row.
+--   * `ON CONFLICT (id) DO NOTHING` only absorbs a repeat of *this* file. A
+--     pre-existing row with the same natural key but a different id still
+--     raises: vessels.name, containers.name, selling_formats
+--     (container_id, name), batches.batch_code, orders.order_number, and
+--     suppliers (lower(name), unique since 00252) are all unique.
+-- That is deliberate — a natural-key collision fails loudly at the offending
+-- statement instead of being skipped and then failing later on a dangling FK.
+--
+-- MAINTENANCE NOTE (issue #581): this file is written against the schema the
+-- migration chain in supabase/migrations/ produces, because that is what
+-- `make db-local` replays. It is therefore NOT valid against the hosted
+-- database, which dropped these out-of-band (the known chain/live drift):
+--   * packages.package_type_id  — NOT NULL in the chain (00001), so it must be
+--     supplied here; gone on live, where selling_format_id is NOT NULL instead.
+--   * package_types             — superseded by containers + selling_formats
+--     (created in 00112, re-stated in 00199), but never dropped by the chain,
+--     and still the target of the packages.package_type_id FK on a fresh
+--     replay.
+-- Columns that are merely nullable-in-chain and absent-on-live are simply
+-- omitted, so those statements stay valid against both shapes. The one that
+-- matters is batches.fermenter: the chain still creates it (00001) and never
+-- drops it, live removed it when vessel occupancy moved to
+-- vessels.current_batch_id — see the Vessels section.
 
 -- =============================================================================
 -- Update System Settings
@@ -37,29 +79,39 @@ ON CONFLICT (id) DO NOTHING;
 -- Batches
 -- Note: actual_og and brew_date are now derived from linked brew_logs
 -- volume_bbl stores volume in barrels (1 BBL = 31 gallons)
+-- batch_number was renamed to batch_code in 00155. Supplying it explicitly
+-- short-circuits the generate_batch_code() BEFORE INSERT trigger, which only
+-- generates when batch_code is NULL or ''.
+-- The free-text `fermenter` column is omitted: it still exists in the chain but
+-- is gone on live, and vessel occupancy is carried by vessels.current_batch_id
+-- either way — see the Vessels section below.
+-- completed_at is set explicitly because its trigger (trg_batches_set_completed_at,
+-- 00175) is BEFORE UPDATE only, so a batch inserted straight into 'completed'
+-- would keep a NULL — and 00237 buckets TTB removals by completed_at, which
+-- would leave the demo's only finished batch missing from those reports.
 -- =============================================================================
 
-INSERT INTO batches (id, recipe_id, batch_number, name, status, volume_bbl, planned_start_date, fermenter, actual_fg, actual_abv, notes)
+INSERT INTO batches (id, recipe_id, batch_code, name, status, volume_bbl, planned_start_date, completed_at, actual_fg, actual_abv, notes)
 VALUES
   -- Completed batch (10 gal = ~0.32 BBL)
   ('00000000-0000-0000-0002-000000000001',
    '00000000-0000-0000-0001-000000000001', '2024-001', 'Hazy Days #1', 'completed',
-   0.32, '2024-12-01', 'FV-1', 1.013, 7.0, 'First batch of our NEIPA. Turned out great!'),
+   0.32, '2024-12-01', '2024-12-20T00:00:00Z', 1.013, 7.0, 'First batch of our NEIPA. Turned out great!'),
 
   -- Conditioning batch
   ('00000000-0000-0000-0002-000000000002',
    '00000000-0000-0000-0001-000000000002', '2024-002', 'Midnight Stout #1', 'conditioning',
-   0.32, '2024-12-15', 'FV-2', 1.019, 7.3, 'Conditioning for another week.'),
+   0.32, '2024-12-15', NULL, 1.019, 7.3, 'Conditioning for another week.'),
 
   -- Fermenting batch
   ('00000000-0000-0000-0002-000000000003',
    '00000000-0000-0000-0001-000000000003', '2025-001', 'Summer Wheat #1', 'fermenting',
-   0.32, '2025-01-02', 'FV-1', NULL, NULL, 'Fermentation looking healthy.'),
+   0.32, '2025-01-02', NULL, NULL, NULL, 'Fermentation looking healthy.'),
 
   -- Fermenting batch (was "brewing" but that's not a valid status)
   ('00000000-0000-0000-0002-000000000004',
    '00000000-0000-0000-0001-000000000001', '2025-002', 'Hazy Days #2', 'fermenting',
-   0.32, '2025-01-09', 'FV-3', NULL, NULL, 'Fermentation in progress.'),
+   0.32, '2025-01-09', NULL, NULL, NULL, 'Fermentation in progress.'),
 
   -- Planned batch
   ('00000000-0000-0000-0002-000000000005',
@@ -68,8 +120,99 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
--- Package Types
+-- Vessels
 -- =============================================================================
+-- Carries what the batches.fermenter text column used to say. Vessel occupancy
+-- is one vessels.current_batch_id per vessel (the column has existed since
+-- 00006; 00209 is where the chain records that live dropped the old text
+-- column), so FV-1 holds the batch that is *currently* in it (Summer Wheat #1);
+-- Hazy Days #1 named FV-1 too but is already completed and out of the tank.
+-- location_id is the 'Main Brewery' row seeded by migration 00006.
+-- vessels.name is UNIQUE, so these three names must not already exist.
+
+INSERT INTO vessels (id, name, vessel_type, capacity_bbl, location_id, status, current_batch_id, notes)
+VALUES
+  ('00000000-0000-0000-000b-000000000001', 'FV-1', 'fermenter', 1.00,
+   '00000000-0000-0000-0000-000000000002', 'in_use',
+   '00000000-0000-0000-0002-000000000003', 'Summer Wheat #1 fermenting.'),
+  ('00000000-0000-0000-000b-000000000002', 'FV-2', 'fermenter', 1.00,
+   '00000000-0000-0000-0000-000000000002', 'in_use',
+   '00000000-0000-0000-0002-000000000002', 'Midnight Stout #1 conditioning.'),
+  ('00000000-0000-0000-000b-000000000003', 'FV-3', 'fermenter', 1.00,
+   '00000000-0000-0000-0000-000000000002', 'in_use',
+   '00000000-0000-0000-0002-000000000004', 'Hazy Days #2 fermenting.')
+ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================================
+-- Containers (physical container definitions)
+-- =============================================================================
+-- The real packaging model since the containers/selling_formats refactor
+-- (tables created in 00112, re-stated in 00199, registry rows in 00246): a
+-- *container* is one physical package (a can, a keg), and a *selling format* is
+-- the sellable grouping of them.
+--
+-- volume_oz is the volume of ONE unit and is required for type='package'
+-- (containers_package_needs_oz). Kegs carry volume_bbl instead
+-- (containers_keg_needs_bbl) and leave volume_oz NULL; only kegs may carry a
+-- non-zero deposit_amount (containers_deposit_keg_only).
+--
+-- HEADS UP — containers is NOT empty after a chain replay, and containers.name
+-- is UNIQUE. Migration 00112 converts every legacy keg_types row (seeded by
+-- 00029) into a keg container plus a 'Per Keg' selling format, so a fresh local
+-- database already holds '1/2 Barrel', '1/4 Barrel', '1/6 Barrel', '50 Liter',
+-- '30 Liter' and 'Corny (5 gal)'. The two keg rows below therefore overlap in
+-- substance with '1/2 Barrel' and '1/6 Barrel' and only avoid the unique index
+-- by spelling. They are still seeded under their own fixed UUIDs because the
+-- 00112 rows inherit keg_types' random ids, which this file cannot reference —
+-- but their volume_bbl and deposit_amount are kept identical to the keg_types
+-- values so the demo catalog is not self-contradictory. Do not rename these to
+-- the keg_types spellings: that would be a unique_violation on the very first
+-- bootstrap.
+
+INSERT INTO containers (id, name, type, volume_oz, volume_bbl, deposit_amount, position)
+VALUES
+  ('00000000-0000-0000-0009-000000000001', '16oz Can', 'package', 16.0, NULL, 0, 10),
+  ('00000000-0000-0000-0009-000000000002', '12oz Can', 'package', 12.0, NULL, 0, 20),
+  -- Matches keg_types '1/2 Barrel' (0.5 BBL, $30 deposit).
+  ('00000000-0000-0000-0009-000000000003', 'Half Barrel Keg', 'keg', NULL, 0.5000, 30.00, 30),
+  -- Matches keg_types '1/6 Barrel' (0.1667 BBL, $20 deposit).
+  ('00000000-0000-0000-0009-000000000004', 'Sixth Barrel Keg', 'keg', NULL, 0.1667, 20.00, 40)
+ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================================
+-- Selling Formats (sellable groupings of a container)
+-- =============================================================================
+-- The single-unit formats keep the original seed's quantity semantics: a
+-- packages/order_items quantity counts individual cans or kegs. The
+-- 'Case of 24' formats preserve the units_per_case = 24 that the retired
+-- package_types rows recorded.
+-- Layer geometry (units_per_layer / default_layers) is left NULL, so the
+-- compute_pallet_quantity() trigger (00160) leaves pallet_quantity NULL, which
+-- in turn makes recalculate_order_materials() (00265, fired by the order_items
+-- insert further down) count zero pallets rather than raising.
+-- The UNIQUE key is (container_id, name), so reusing 'Single Can' across two
+-- containers is fine, and the six 'Per Keg' rows migration 00112 already
+-- created hang off different containers entirely.
+
+INSERT INTO selling_formats (id, container_id, name, unit_count, position)
+VALUES
+  ('00000000-0000-0000-000a-000000000001', '00000000-0000-0000-0009-000000000001', 'Single Can', 1, 10),
+  ('00000000-0000-0000-000a-000000000002', '00000000-0000-0000-0009-000000000001', 'Case of 24', 24, 20),
+  ('00000000-0000-0000-000a-000000000003', '00000000-0000-0000-0009-000000000002', 'Single Can', 1, 10),
+  ('00000000-0000-0000-000a-000000000004', '00000000-0000-0000-0009-000000000002', 'Case of 24', 24, 20),
+  ('00000000-0000-0000-000a-000000000005', '00000000-0000-0000-0009-000000000003', 'Single Keg', 1, 10),
+  ('00000000-0000-0000-000a-000000000006', '00000000-0000-0000-0009-000000000004', 'Single Keg', 1, 10)
+ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================================
+-- Package Types (RETIRED — chain-replay only)
+-- =============================================================================
+-- Superseded by containers + selling_formats above; do not build anything new
+-- against this table. It is seeded only because a fresh replay of the migration
+-- chain still has packages.package_type_id as NOT NULL REFERENCES
+-- package_types(id) (00001), and the hosted database dropped both out-of-band.
+-- inner_pack_size / inner_packs_per_case stay NULL so
+-- chk_package_units_consistency (00010) is satisfied.
 
 INSERT INTO package_types (id, name, container_type, volume_oz, units_per_case)
 VALUES
@@ -83,13 +226,22 @@ ON CONFLICT (id) DO NOTHING;
 -- Packages (packaged products from completed batch)
 -- =============================================================================
 
-INSERT INTO packages (id, batch_id, package_type_id, quantity, packaged_date, best_by_date, lot_code)
+-- selling_format_id is what the app reads (00159). package_type_id is only
+-- supplied because it is still NOT NULL on a fresh chain replay — see the
+-- maintenance note at the top of this file. Both point at the same physical
+-- container, so the row is consistent whichever column a reader uses.
+-- quantity counts individual units, matching the 'Single Can'/'Single Keg'
+-- selling formats.
+
+INSERT INTO packages (id, batch_id, package_type_id, selling_format_id, quantity, packaged_date, best_by_date, lot_code)
 VALUES
   ('00000000-0000-0000-0004-000000000001',
    '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0003-000000000001',
+   '00000000-0000-0000-000a-000000000001',
    240, '2024-12-20', '2025-03-20', 'HD-2024001-A'),
   ('00000000-0000-0000-0004-000000000002',
    '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0003-000000000003',
+   '00000000-0000-0000-000a-000000000005',
    4, '2024-12-20', '2025-03-20', 'HD-2024001-K')
 ON CONFLICT (id) DO NOTHING;
 
@@ -125,34 +277,83 @@ ON CONFLICT (id) DO NOTHING;
 -- Order Items
 -- =============================================================================
 
-INSERT INTO order_items (id, order_id, batch_id, package_type_id, quantity, unit_price)
+-- order_items moved to selling_format_id (00159). package_type_id and
+-- keg_type_id are both left NULL, which chk_order_item_format_xor (00080)
+-- explicitly allows, and keg_owner_id stays NULL for chk_order_item_keg_owner.
+-- unit_price is per individual can/keg, matching the single-unit formats.
+
+INSERT INTO order_items (id, order_id, batch_id, selling_format_id, quantity, unit_price)
 VALUES
   ('00000000-0000-0000-0007-000000000001', '00000000-0000-0000-0006-000000000001',
-   '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0003-000000000001', 120, 3.50),
+   '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-000a-000000000001', 120, 3.50),
   ('00000000-0000-0000-0007-000000000002', '00000000-0000-0000-0006-000000000001',
-   '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0003-000000000003', 2, 180.00),
+   '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-000a-000000000005', 2, 180.00),
   ('00000000-0000-0000-0007-000000000003', '00000000-0000-0000-0006-000000000002',
-   '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0003-000000000001', 48, 4.00)
+   '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-000a-000000000001', 48, 4.00)
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
 -- Inventory Items
 -- =============================================================================
 
-INSERT INTO inventory_items (id, category, name, sku, unit, reorder_point, reorder_qty, supplier)
+-- The free-text `supplier` column was dropped in 00161; supplier links are now
+-- structured rows in supplier_catalog (see the two sections below).
+-- `category` is validated against the catalog_type enum registry by the
+-- validate_catalog_type trigger (00040), so it must be one of grain, hop,
+-- yeast, adjunct, chemical, packaging, equipment, other — note 'hop' is
+-- singular (00151 fixed an earlier 'hops' in this very file).
+
+INSERT INTO inventory_items (id, category, name, sku, unit, reorder_point, reorder_qty)
 VALUES
   ('00000000-0000-0000-0008-000000000001',
-   'grain', 'Pale Malt (2-Row)', 'GRAIN-001', 'lb', 100.0, 500.0, 'Midwest Malting'),
+   'grain', 'Pale Malt (2-Row)', 'GRAIN-001', 'lb', 100.0, 500.0),
   ('00000000-0000-0000-0008-000000000002',
-   'grain', 'Munich Malt', 'GRAIN-002', 'lb', 50.0, 200.0, 'Midwest Malting'),
+   'grain', 'Munich Malt', 'GRAIN-002', 'lb', 50.0, 200.0),
   ('00000000-0000-0000-0008-000000000003',
-   'hop', 'Citra Hops', 'HOPS-001', 'oz', 32.0, 64.0, 'Yakima Valley Hops'),
+   'hop', 'Citra Hops', 'HOPS-001', 'oz', 32.0, 64.0),
   ('00000000-0000-0000-0008-000000000004',
-   'hop', 'Mosaic Hops', 'HOPS-002', 'oz', 32.0, 64.0, 'Yakima Valley Hops'),
+   'hop', 'Mosaic Hops', 'HOPS-002', 'oz', 32.0, 64.0),
   ('00000000-0000-0000-0008-000000000005',
-   'yeast', 'US-05 Ale Yeast', 'YEAST-001', 'each', 10.0, 20.0, 'Fermentis'),
+   'yeast', 'US-05 Ale Yeast', 'YEAST-001', 'each', 10.0, 20.0),
   ('00000000-0000-0000-0008-000000000006',
-   'packaging', '16oz Cans', 'PKG-001', 'case', 20.0, 100.0, 'Ball Corporation')
+   'packaging', '16oz Cans', 'PKG-001', 'case', 20.0, 100.0)
+ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================================
+-- Suppliers
+-- =============================================================================
+-- Names must stay distinct case-insensitively: 00252 added the unique index
+-- suppliers_name_lower_key on lower(name).
+
+INSERT INTO suppliers (id, name, is_active)
+VALUES
+  ('00000000-0000-0000-000c-000000000001', 'Midwest Malting', true),
+  ('00000000-0000-0000-000c-000000000002', 'Yakima Valley Hops', true),
+  ('00000000-0000-0000-000c-000000000003', 'Fermentis', true),
+  ('00000000-0000-0000-000c-000000000004', 'Ball Corporation', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================================
+-- Supplier Catalog (supplier -> inventory item links)
+-- =============================================================================
+-- Replaces the dropped inventory_items.supplier free-text column (00161).
+-- catalog_type = 'inventory_item' points catalog_id at an inventory_items row;
+-- catalog_id is polymorphic, so there is no FK to enforce it.
+
+INSERT INTO supplier_catalog (id, supplier_id, catalog_type, catalog_id, unit, is_preferred)
+VALUES
+  ('00000000-0000-0000-000d-000000000001', '00000000-0000-0000-000c-000000000001',
+   'inventory_item', '00000000-0000-0000-0008-000000000001', 'lb', true),
+  ('00000000-0000-0000-000d-000000000002', '00000000-0000-0000-000c-000000000001',
+   'inventory_item', '00000000-0000-0000-0008-000000000002', 'lb', true),
+  ('00000000-0000-0000-000d-000000000003', '00000000-0000-0000-000c-000000000002',
+   'inventory_item', '00000000-0000-0000-0008-000000000003', 'oz', true),
+  ('00000000-0000-0000-000d-000000000004', '00000000-0000-0000-000c-000000000002',
+   'inventory_item', '00000000-0000-0000-0008-000000000004', 'oz', true),
+  ('00000000-0000-0000-000d-000000000005', '00000000-0000-0000-000c-000000000003',
+   'inventory_item', '00000000-0000-0000-0008-000000000005', 'each', true),
+  ('00000000-0000-0000-000d-000000000006', '00000000-0000-0000-000c-000000000004',
+   'inventory_item', '00000000-0000-0000-0008-000000000006', 'case', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
@@ -166,6 +367,9 @@ ON CONFLICT (id) DO NOTHING;
 -- =============================================================================
 -- CATALOG DATA: Beer Styles (BJCP 2021 Guidelines)
 -- =============================================================================
+-- beer_styles has UNIQUE(name), and 00067 already seeds the BJCP list, so most
+-- of these rows are absorbed by ON CONFLICT — they are kept so the file also
+-- works against a database that predates 00067.
 
 INSERT INTO beer_styles (name, category, og_min, og_max, fg_min, fg_max, ibu_min, ibu_max, srm_min, srm_max, abv_min, abv_max, description)
 VALUES
@@ -207,6 +411,10 @@ ON CONFLICT (name) DO NOTHING;
 -- =============================================================================
 -- CATALOG DATA: Yeasts
 -- =============================================================================
+-- This and the seven catalog blocks that follow end in a bare
+-- `ON CONFLICT DO NOTHING`. None of these tables has a unique constraint in the
+-- chain, so nothing ever conflicts and a second run duplicates every row —
+-- see RE-RUN SAFETY at the top. Only apply them to a freshly reset database.
 
 INSERT INTO yeasts (name, manufacturer, product_code, type, form, attenuation_min, attenuation_max, attenuation_typical, temp_min_f, temp_max_f, temp_ideal_f, flocculation, alcohol_tolerance, description)
 VALUES
