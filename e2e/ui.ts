@@ -22,8 +22,18 @@
  * is polled rather than just the assertion. Once the query is cached this
  * converges on the first attempt, so the common path costs nothing.
  *
- * The unpolled version failed 2 of 6 consecutive local runs of the
- * packaging flow; the polled version then passed 10 of 10 (issue #437).
+ * ## Measurements
+ *
+ * Recorded when the helper was first written, and NOT re-run since: the
+ * unpolled version failed 2 of 6 consecutive local runs of the packaging flow.
+ * Treat that as the author's note, not a reproduced number.
+ *
+ * Reproduced on 2026-07-30 while reviewing this file: with the click OUTSIDE
+ * the poll (see `pickComboboxOption`), the production-workflow chain failed 1
+ * of 7 executions — 0/5 running that spec alone, 0/1 with three specs, 1/1 in
+ * a full-suite run. With the click inside the poll, the full suite passed 3/3
+ * and each new flow passed 3/3 (issue #437). Three runs is the acceptance bar,
+ * not a proof of zero flake.
  */
 import { expect, type Locator, type Page } from "@playwright/test";
 
@@ -46,42 +56,54 @@ export async function pickComboboxOption(
   const input = page.getByPlaceholder(placeholder);
   const option = page.getByRole("option", { name: text });
 
+  // The WHOLE interaction is inside the retry, click included, and every step
+  // carries its own short timeout. An earlier version polled only up to
+  // "the option is visible" and then clicked outside the loop; that lost a
+  // full-suite run (2026-07-30) with
+  //   `locator.dispatchEvent: Test timeout of 90000ms exceeded.
+  //    Call log: - waiting for getByRole('option', { name: '…6-Pack 437' })`
+  // — the content unmounted in the window between the visibility assertion
+  // passing and the dispatch resolving the element again. Outside the loop
+  // there is no recovery from that, and an unbounded action call turns it
+  // into a swallowed test budget instead of a retry: hence both the placement
+  // and the explicit per-step timeouts.
   await expect(async () => {
     // Clear first: refilling identical text is a no-op for the underlying
     // input event, so a retry that did not change the value would not
     // re-trigger the filter that mounts the content.
-    await input.fill("");
-    await input.fill(text);
+    await input.fill("", { timeout: 5_000 });
+    await input.fill(text, { timeout: 5_000 });
     await expect(option).toBeVisible({ timeout: 2_000 });
+
+    // Selection dispatches a click directly on the matched option, rather than
+    // driving the mouse to it. `ComboboxContent` renders through a portal, and
+    // when the combobox sits inside a Radix dialog (the Start Packaging dialog,
+    // for one) the dialog's content paints above that portal and swallows the
+    // pointer: Playwright reports "<div role='dialog'> … subtree intercepts
+    // pointer events" and retries until it times out, even though the option is
+    // visible and enabled the whole time.
+    //
+    // The two obvious alternatives were measured against this exact dialog and
+    // both are worse:
+    //   - `click({ force: true })` still routes by coordinates, so the event
+    //     lands on the dialog. Observed result: the listbox closes and the input
+    //     is left EMPTY — a silent non-selection that later fails somewhere
+    //     unrelated.
+    //   - ArrowDown + Enter commits the wrong row. Observed result: with the
+    //     list filtered to a single match it still selected the first item of
+    //     the unfiltered list ("Per Keg"), which a `selling_format_id`
+    //     assertion caught only because it was checked against the DB.
+    //
+    // Dispatching on the element skips hit-testing entirely and cannot pick a
+    // different row, which is the property that matters here.
+    await option.dispatchEvent("click", undefined, { timeout: 2_000 });
+
+    // A committed selection closes the listbox. Asserting that (rather than
+    // returning blind) keeps a silently-missed selection from surfacing later
+    // as a confusing failure somewhere downstream — and it is what makes the
+    // retry safe: the loop only exits once the selection actually took.
+    await expect(option).toBeHidden({ timeout: 5_000 });
   }).toPass({ timeout: 30_000 });
-
-  // Selection dispatches a click directly on the matched option, rather than
-  // driving the mouse to it. `ComboboxContent` renders through a portal, and
-  // when the combobox sits inside a Radix dialog (the Start Packaging dialog,
-  // for one) the dialog's content paints above that portal and swallows the
-  // pointer: Playwright reports "<div role='dialog'> … subtree intercepts
-  // pointer events" and retries until it times out, even though the option is
-  // visible and enabled the whole time.
-  //
-  // The two obvious alternatives were measured against this exact dialog and
-  // both are worse:
-  //   - `click({ force: true })` still routes by coordinates, so the event
-  //     lands on the dialog. Observed result: the listbox closes and the input
-  //     is left EMPTY — a silent non-selection that later fails somewhere
-  //     unrelated.
-  //   - ArrowDown + Enter commits the wrong row. Observed result: with the
-  //     list filtered to a single match it still selected the first item of
-  //     the unfiltered list ("Per Keg"), which a `selling_format_id`
-  //     assertion caught only because it was checked against the DB.
-  //
-  // Dispatching on the element skips hit-testing entirely and cannot pick a
-  // different row, which is the property that matters here.
-  await option.dispatchEvent("click");
-
-  // A committed selection closes the listbox. Asserting that (rather than
-  // returning blind) keeps a silently-missed selection from surfacing later as
-  // a confusing failure somewhere downstream.
-  await expect(option).toBeHidden({ timeout: 10_000 });
 }
 
 /**
@@ -93,7 +115,9 @@ export async function pickComboboxOption(
  * …" toast, the toasts stack, and Playwright's click retries against
  * "<li data-sonner-toast> … subtree intercepts pointer events" until the test
  * times out. Observed on the order chain — confirm -> schedule -> pick -> pack
- * -> fulfil — where it took out one run in three.
+ * -> fulfil — where the author recorded it taking out one run in three. That
+ * count was not re-measured during the 2026-07-30 review; what was measured is
+ * that the order chain passed 6 of 6 executions WITH this helper in place.
  *
  * Waiting for the toasts to auto-dismiss would work but costs seconds per
  * transition and is not reliable for action toasts, which stay until answered.
@@ -105,9 +129,16 @@ export async function pickComboboxOption(
  * NOTE: the overlap is a real UI observation, not only a test problem — a user
  * clicking quickly through these transitions can have the same click land on a
  * toast.
+ *
+ * Unlike `pickComboboxOption` the dispatch is NOT retried, only bounded. A
+ * transition button is replaced by the next action as soon as its click lands,
+ * so a retry could not tell "the click never landed" from "it landed and the
+ * button is gone" — and re-firing a transition is a real mutation. The 10s
+ * bound only converts a detached-target hang into a fast, legible failure
+ * instead of a swallowed test budget.
  */
 export async function clickUnderToasts(target: Locator): Promise<void> {
   await expect(target).toBeVisible({ timeout: 30_000 });
   await expect(target).toBeEnabled({ timeout: 30_000 });
-  await target.dispatchEvent("click");
+  await target.dispatchEvent("click", undefined, { timeout: 10_000 });
 }

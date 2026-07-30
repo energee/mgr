@@ -9,8 +9,13 @@
  *
  * The former schema-drift blocker is gone: migration 00269 captured live's
  * out-of-band drop of the legacy 00080 xor constraints, so selling_format-only
- * line items now insert against a replayed local stack (verified — both
- * `chk_sli_format_xor` and `chk_fg_format_xor` are absent after replay).
+ * line items now insert against a replayed local stack. Re-verified 2026-07-30
+ * on a stack replayed through 00269:
+ *   select conname from pg_constraint
+ *    where conname in ('chk_sli_format_xor','chk_fg_format_xor',
+ *                      'chk_sli_keg_owner');
+ * returned 0 rows — and this test then writes exactly the selling_format-only
+ * line item those constraints would have rejected.
  */
 import { test, expect } from "@playwright/test";
 import type { SupabaseClient } from "@supabase/supabase-js";

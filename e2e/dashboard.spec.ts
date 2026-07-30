@@ -23,6 +23,14 @@
  *    has its own pinning test (`react-activity-calendar-dep.test.ts`), and
  *    browser-testing a vendor library's tooltip is not this suite's job.
  *
+ *    Those unit tests render the component in isolation, so one step of the
+ *    scaffold genuinely had no replacement: that the heatmap is MOUNTED on the
+ *    dashboard at all. Rather than leave that deleted, the smoke test below
+ *    asserts its section ("Batches Scheduled", dashboard/page.tsx) is on the
+ *    page. That assertion is data-independent — the section renders whether the
+ *    RPC returns rows, no rows, or an error — so it stays deterministic under
+ *    `fullyParallel`, which a cell-count assertion would not.
+ *
  * 2. "dashboard trends charts render with real data" — the original skip
  *    reason still holds and is itself the argument for deleting rather than
  *    implementing: these charts aggregate over the WHOLE database, so with
@@ -46,6 +54,14 @@ test.describe("Dashboard", () => {
   test("dashboard root renders", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page.locator("body")).toContainText(/dashboard/i);
+    // F200's heatmap is mounted here — see this file's header for why this is
+    // the one browser-level assertion the removed scaffold left uncovered.
+    // Matched as a heading, not by text: a stat card on the same page carries
+    // the lower-case label "batches scheduled", and a bare getByText resolves
+    // to both (strict-mode violation, observed 2026-07-30).
+    await expect(
+      page.getByRole("heading", { name: "Batches Scheduled" }),
+    ).toBeVisible();
   });
 
   test("inventory dashboard renders", async ({ page }) => {
