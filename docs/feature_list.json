@@ -323,7 +323,7 @@
         "00095_customer_portal_many_to_many.sql"
       ],
       "evidence": "docs/plans/2026-02-08-customer-order-portal-{design,plan}.md, e2e/customer-order.spec.ts",
-      "notes": "Smoke-level E2E covers internal + portal entry; full flow scaffolded as test.skip pending seed data.",
+      "notes": "E2E covers the staff-side chain end to end (confirm -> FIFO allocate -> schedule -> pick -> pack -> fulfil, asserted DB-side). The title overstates what shipped: the portal has NO order-placement UI (login, orders list, order detail, change-request only), so customers cannot place orders — staff do it on their behalf. That gap is the one remaining test.skip in the spec and is tracked in #706.",
       "deployment": {
         "state": "live",
         "observed_live_on": "2026-07-16",
@@ -495,7 +495,7 @@
       "state": "passing",
       "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-26-dashboard-trends-{design,plan}.md, e2e/dashboard.spec.ts",
-      "notes": "Smoke-level E2E covers all three dashboard routes; chart-content assertions scaffolded as test.skip."
+      "notes": "Smoke-level E2E covers all three dashboard routes. The chart-content test.skip scaffolds were REMOVED, not implemented (#437): the charts aggregate over the whole database, so under fullyParallel any content assertion depends on other specs' seed state. The failure that actually reached users (MGR-K, a failed RPC rendering as a silently-empty chart) is covered by src/app/(app)/dashboard/__tests__/production-trends.test.tsx. Rationale in e2e/dashboard.spec.ts's header."
     },
     {
       "id": "F129",
@@ -582,7 +582,7 @@
       "state": "passing",
       "migrations": "unaudited",
       "evidence": "docs/superpowers/plans/2026-03-14-batch-vessel-transfer-fixes.md, e2e/batch-transfer.spec.ts",
-      "notes": "Smoke-level E2E covers list and new-transfer routes; full transfer flow scaffolded as test.skip."
+      "notes": "E2E covers list and new-transfer routes plus the full transfer flow (PR #557): the Transfer dialog, the suggested state advance, and vessel occupancy + the vessel_transfers row asserted DB-side. The note that this was still a test.skip scaffold was stale."
     },
     {
       "id": "F136",
@@ -592,16 +592,18 @@
       "verification": "bun e2e ./e2e/packaging-session.spec.ts",
       "state": "passing",
       "migrations": [
-        "00159_packaging_sessions_redesign.sql"
+        "00159_packaging_sessions_redesign.sql",
+        "00269_drop_legacy_format_xor_constraints.sql"
       ],
-      "evidence": "docs/superpowers/plans/2026-03-14-packaging-sessions-redesign.md, e2e/packaging-session.spec.ts",
-      "notes": "Smoke-level E2E covers list and new routes; full session flow scaffolded as test.skip.",
+      "evidence": "docs/superpowers/plans/2026-03-14-packaging-sessions-redesign.md, e2e/packaging-session.spec.ts. 00269 only DROPs constraints, so it creates no catalog object of its own; this entry is reported as snapshot-verified on the strength of 00159's objects, and 00269 contributes nothing checkable either way. Its live effect (chk_sli_format_xor / chk_fg_format_xor / chk_sli_keg_owner absent) was established empirically in #559 from writes that could not otherwise have succeeded, and all three were confirmed absent on the local replayed stack on 2026-07-30 (pg_constraint query, 0 rows).",
+      "notes": "E2E covers the full session flow end to end: planned -> in_progress, add a line item through the PackagingDayView quick-add row, complete through the review dialog, then assert the finished_goods rows, lot numbering and batch -> finished_good allocation the DB trigger creates. Unblocked by migration 00269 (#437/#559), which captured live's drop of the legacy 00080 xor constraints.",
       "deployment": {
         "state": "live",
         "observed_live_on": "2026-07-07",
         "verified_by": [
           "supabase/live-catalog.snapshot.txt",
-          "#343"
+          "#343",
+          "#559"
         ]
       }
     },
