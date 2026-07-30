@@ -22,6 +22,140 @@ const workflows = readdirSync(resolve(process.cwd(), WORKFLOW_DIR))
   .map((file) => `${WORKFLOW_DIR}/${file}`)
   .sort();
 
+/**
+ * Split a workflow's `jobs:` mapping into one text block per job, so a
+ * contract can follow a `needs:` edge instead of pattern-matching the whole
+ * file. Text, not parsed YAML, because every other contract here reads text
+ * and the job-level assertions are all about literal indentation (a 4-space
+ * `if:` is job-level; an 8-space one belongs to a step).
+ *
+ * Comment lines that sit between two jobs land in the earlier job's block.
+ * That is harmless as long as callers checking for a key strip comments first
+ * — hence `uncommented` below.
+ */
+function jobBlocks(workflow: string): Map<string, string> {
+  const blocks = new Map<string, string>();
+  let current: string | null = null;
+  let buffer: string[] = [];
+  let inJobs = false;
+
+  for (const line of workflow.split("\n")) {
+    if (/^jobs:\s*$/.test(line)) {
+      inJobs = true;
+      continue;
+    }
+    if (!inJobs) continue;
+
+    const header = line.match(/^ {2}([A-Za-z][\w-]*):\s*$/);
+    if (header) {
+      if (current) blocks.set(current, buffer.join("\n"));
+      current = header[1];
+      buffer = [];
+      continue;
+    }
+    if (current) buffer.push(line);
+  }
+  if (current) blocks.set(current, buffer.join("\n"));
+
+  return blocks;
+}
+
+/**
+ * Drop comment-only lines. EVERY assertion about what a job *does* has to go
+ * through this: a comment can restate a guard's error message verbatim, so a
+ * contract that matches the raw block is satisfied by prose that survives the
+ * deletion of the code it describes. That is the same defect this file's E2E
+ * contracts exist to catch, one level up.
+ */
+function uncommented(block: string): string {
+  return block
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+}
+
+/**
+ * The jobs named by a job's `needs:`, in either YAML form (`needs: a` /
+ * `needs: [a, b]` / a block sequence). Comments are stripped first so a
+ * commented-out `needs:` is not read as a real edge.
+ */
+function declaredNeeds(block: string): string[] {
+  const lines = uncommented(block).split("\n");
+  const at = lines.findIndex((line) => /^ {4}needs:/.test(line));
+  if (at < 0) return [];
+
+  const inline = lines[at].replace(/^ {4}needs:\s*/, "").trim();
+  if (inline !== "") {
+    return inline
+      .replace(/[[\]]/g, "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+  }
+
+  const sequence: string[] = [];
+  for (const line of lines.slice(at + 1)) {
+    const item = line.match(/^ {6}-\s*(.+?)\s*$/);
+    if (!item) break;
+    sequence.push(item[1]);
+  }
+  return sequence;
+}
+
+/**
+ * Every job reachable from `start` through `needs:`, TRANSITIVELY. Direct
+ * dependencies are not enough: `e2e -> unit-tests -> static` means an `if:`
+ * two edges away still skips e2e on every pull request, and a skipped job
+ * reads as green. Cycle-safe (GitHub rejects cycles, but a contract that
+ * hangs is worse than one that reds).
+ */
+function transitiveNeeds(jobs: Map<string, string>, start: string): string[] {
+  const seen = new Set<string>([start]);
+  const queue = [start];
+  const reached: string[] = [];
+
+  while (queue.length > 0) {
+    const block = jobs.get(queue.shift()!);
+    if (block === undefined) continue;
+    for (const dep of declaredNeeds(block)) {
+      if (seen.has(dep)) continue;
+      seen.add(dep);
+      reached.push(dep);
+      queue.push(dep);
+    }
+  }
+  return reached;
+}
+
+/**
+ * Assert an `::error::` annotation is backed by an executable guard: the
+ * message must appear on a non-comment line and an `exit 1` must follow it
+ * within a few lines. Matching the message alone would let someone delete the
+ * `case`/`if` that raises it and leave the sentence behind — a contract that
+ * passes when the thing it pins is gone.
+ */
+function expectFailsLoudly(jobCode: string, marker: RegExp, guarded: string): void {
+  const lines = jobCode.split("\n");
+  const at = lines.findIndex((line) => marker.test(line));
+  expect(at, `no live \`::error::\` line for ${guarded} (matching ${marker}); a comment does not count`).toBeGreaterThanOrEqual(0);
+  expect(
+    lines.slice(at + 1, at + 6).join("\n"),
+    `the \`::error::\` for ${guarded} is not followed by \`exit 1\` — an annotation without a non-zero exit still reports a green check`,
+  ).toMatch(/^\s*exit 1\s*$/m);
+}
+
+/**
+ * Enabled (non-`test.skip`) cases under `e2e/*.spec.ts`. The E2E job's
+ * anti-vacuity floor is checked against this so it cannot drift into
+ * meaninglessness while the suite shrinks around it.
+ */
+function enabledE2eTests(): number {
+  return readdirSync(resolve(process.cwd(), "e2e"))
+    .filter((file) => file.endsWith(".spec.ts"))
+    .flatMap((file) => read(`e2e/${file}`).split("\n"))
+    .filter((line) => /^\s*test\(/.test(line)).length;
+}
+
 describe("GitHub Actions performance contracts", () => {
   it("uses the current checkout and artifact action generations", () => {
     const contents = workflows.map(read).join("\n");
@@ -32,18 +166,23 @@ describe("GitHub Actions performance contracts", () => {
     expect(contents).toContain("actions/upload-artifact@v7");
   });
 
-  // Public-repo contract (2026-07-24): static + unit run on EVERY PR —
-  // including docs-only ones — so their contexts always report and can be
-  // required status checks on main. Build + E2E stay on the weekday nightly
-  // schedule (design note in test.yml's header).
-  it("keeps the PR lane lean and defers build/E2E to the nightly schedule", () => {
+  // Public-repo contract (2026-07-24): static, unit and E2E run on EVERY PR —
+  // including docs-only ones — so their contexts always report, which is the
+  // precondition for making them required status checks on main. (None is
+  // required today; ruleset 11725742 declares no `required_status_checks`
+  // rule. That is a settings change, not a workflow one.) Only the
+  // hosted-credential build stays on the weekday nightly schedule (design note
+  // in test.yml's header).
+  it("keeps the PR lane unsharded and defers only the hosted build to the nightly schedule", () => {
     const workflow = read(".github/workflows/test.yml");
 
     expect(workflow).not.toContain("matrix:");
     expect(workflow).not.toContain("--shard=");
     expect(workflow).not.toContain("--merge-reports");
     expect(workflow).toContain("bunx vitest run --coverage");
-    // No paths-ignore: required checks must report on docs-only PRs too.
+    // No paths-ignore: an always-report check has to report on docs-only PRs
+    // too. ("Always-report", not "required" — none of these is a required
+    // status check today; see the note above this `it`.)
     expect(workflow).not.toContain("paths-ignore:");
     expect(workflow).toMatch(/build:[\s\S]*?if: github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch'/);
     expect(workflow).not.toMatch(/\n  push:/);
@@ -57,6 +196,130 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).toContain("make check-deploy-state");
     expect(workflow).toContain("make check-agent-config");
     expect(workflows.map(read).join("\n")).not.toContain("cache: true");
+  });
+
+  // Half of acceptance criterion 1 of issue #437 — the half a workflow file
+  // can own: E2E has to RUN and REPORT on pull requests. (The other half,
+  // making the context required, is a repository-settings change; see
+  // docs/agents/ci.md. Nothing here should be read as a claim that it is.)
+  //
+  // This is exactly the kind of change nobody notices in review: PR #506 was
+  // written as a per-PR Playwright gate but merged 14 minutes after #522's
+  // CI-minutes diet, in nightly form, so on main the job carried
+  // `if: schedule || workflow_dispatch` from the day it first existed and had
+  // never once run on a pull_request event. Minutes are free on a public repo
+  // since 2026-07-24, so it moved onto the PR lane — and is pinned here,
+  // because GitHub reports a job that never ran as "skipped" and a skipped
+  // check reads as green wherever conclusions are consumed. Every route to
+  // "did not run" is therefore a route to a green check that tested nothing.
+  it("runs the E2E gate on pull requests and never lets it skip into green", () => {
+    const workflow = read(".github/workflows/test.yml");
+    const jobs = jobBlocks(workflow);
+    const e2e = jobs.get("e2e");
+
+    expect(e2e).toBeDefined();
+
+    // Key order within `on:` is behaviour-neutral in YAML, so pin membership,
+    // not position — a contract that reds on a harmless reorder gets deleted.
+    const onBlock = workflow.match(/^on:\n([\s\S]*?)\n(?=\S)/m)?.[1] ?? "";
+    expect(onBlock).not.toBe("");
+    expect(onBlock, "test.yml must trigger on pull_request").toMatch(/^ {2}pull_request:/m);
+
+    // Route 1: a path filter. "Only PRs touching relevant paths" reports green
+    // on every PR it declines to run for, which is the same defect renamed.
+    // Comments are stripped so prose about paths cannot red this.
+    expect(
+      uncommented(onBlock),
+      "no path filter on the trigger — a filtered-out PR still reports green",
+    ).not.toMatch(/^\s*paths(-ignore)?:/m);
+
+    // Route 2: any `needs:` edge at all on the e2e job. A dependency that is
+    // skipped, RED or cancelled skips this job, and a skip reads as green —
+    // so an ungated dependency is not enough, the edge itself is the hazard.
+    // Measured, not hypothetical: on main, `Static Checks` failed on the
+    // 2026-07-20..24 nightlies and `Production Build` failed on 2026-07-27..30,
+    // and `E2E Tests` reported "skipped" on every one of those runs. The job
+    // consumes nothing from any other job — it re-checks out, re-installs,
+    // boots its own Supabase and runs its own `bun run build`.
+    expect(
+      declaredNeeds(e2e!),
+      "the e2e job must declare no `needs:` — a skipped, failed or cancelled dependency skips it, and a skipped check reads as green",
+    ).toEqual([]);
+
+    // Route 3: an event gate, on the job or anywhere in its needs graph.
+    // Checked TRANSITIVELY and for every job whose check reports on a PR: an
+    // `if:` on `static` would skip `unit-tests`, which would skip anything
+    // downstream of it, two edges from where the gate was written.
+    for (const job of ["static", "unit-tests", "e2e"]) {
+      const block = jobs.get(job);
+      expect(block, `test.yml declares no job named "${job}"`).toBeDefined();
+      expect(
+        uncommented(block!),
+        `the ${job} job must carry no job-level \`if:\` — an event gate is how the E2E check silently stopped running on pull requests`,
+      ).not.toMatch(/^ {4}if:/m);
+
+      for (const dep of transitiveNeeds(jobs, job)) {
+        const depBlock = jobs.get(dep);
+        expect(depBlock, `test.yml declares no job named "${dep}"`).toBeDefined();
+        expect(
+          uncommented(depBlock!),
+          `${job} depends (transitively) on "${dep}", which is event-gated: a dependency that does not run skips its dependents, and a skipped check reports as passing`,
+        ).not.toMatch(/^ {4}if:/m);
+      }
+    }
+  });
+
+  // Acceptance criterion 2 of #437: missing E2E configuration must fail
+  // visibly rather than yield an apparently healthy gate. Three concrete ways
+  // this lane could look green while proving nothing, each closed by a step
+  // that exits 1 with an ::error:: annotation — the same rule prod-health.yml
+  // follows for an unset PRODUCTION_URL.
+  //
+  // Everything below reads the job with comments stripped, and every guard is
+  // pinned as `::error::` + `exit 1` rather than as a message. A contract that
+  // matched the raw text would be satisfied by deleting the guard and leaving
+  // its sentence behind — which is this lane's own thesis ("a check that
+  // passes when unconfigured is worse than no check") turned on itself.
+  it("fails the E2E lane loudly when its stack is unconfigured or its run is vacuous", () => {
+    const e2e = jobBlocks(read(".github/workflows/test.yml")).get("e2e");
+
+    expect(e2e).toBeDefined();
+    const code = uncommented(e2e!);
+
+    // 1. No local Supabase credentials. `bun run build` sets
+    //    SKIP_ENV_VALIDATION=1, so an empty (but set) NEXT_PUBLIC_SUPABASE_URL
+    //    compiles fine and only surfaces as opaque Playwright timeouts.
+    expectFailsLoudly(code, /::error::.*supabase status -o env/, "missing local Supabase credentials");
+
+    // 2. A non-loopback Supabase URL: /api/auth/dev-login stays 404 on the
+    //    E2E_DEV_LOGIN path (#656), so nothing can authenticate. The guard is
+    //    a `case` over the exported URL; pin the branch, not just the message.
+    expect(code, "the loopback check must be a live `case` over $API_URL").toMatch(/case "\$API_URL" in[\s\S]*?esac/);
+    expectFailsLoudly(code, /::error::.*loopback hostname/, "a non-loopback Supabase URL");
+
+    // 3. A run where everything skipped — Playwright exits 0 for that.
+    expect(code).toContain("PLAYWRIGHT_JSON_OUTPUT_NAME");
+    expect(code).toContain("--reporter=html,json");
+    expect(code).toContain(".stats.expected");
+    expect(code).toContain("E2E_MIN_PASSING");
+    expectFailsLoudly(code, /::error::.*E2E test\(s\) passed/, "a vacuous (all-skipped) Playwright run");
+
+    // The floor must be a real one: 0 would accept an all-skipped run, and a
+    // floor far below the suite would accept most of it going away. Ratchet it
+    // to the enabled cases (17 today + the auth setup project = the 18 that
+    // pass), with 2 of slack for pruning a scaffold. Adding tests should raise
+    // the floor in the same commit; that is the point of the upper bound.
+    const floor = Number(code.match(/E2E_MIN_PASSING: "(\d+)"/)?.[1]);
+    const enabled = enabledE2eTests();
+    expect(floor).toBeGreaterThan(0);
+    expect(
+      floor,
+      `E2E_MIN_PASSING is ${floor} against ${enabled} enabled test(s) under e2e/ — a floor that far below the suite lets most of it be skipped while the gate stays green`,
+    ).toBeGreaterThanOrEqual(enabled - 2);
+    expect(
+      floor,
+      `E2E_MIN_PASSING is ${floor} but only ${enabled} spec test(s) plus the auth setup can pass — an unreachable floor reds the lane for everyone`,
+    ).toBeLessThanOrEqual(enabled + 1);
   });
 
   // Issue #644: the E2E lane authenticates through /api/auth/dev-login, which
@@ -148,8 +411,11 @@ describe("GitHub Actions performance contracts", () => {
     expect(progressWorkflow).toContain("cancel-in-progress: true");
     expect(progressWorkflow).toContain("gh pr create");
     expect(progressWorkflow).toContain("gh pr merge");
-    // Required-checks compatibility: the bot PR must run the required
-    // checks ([skip ci] would suppress them) and wait for them via --auto.
+    // Check compatibility: the bot PR must run the PR checks ([skip ci] would
+    // suppress them) and wait for them via --auto. NB `--auto` only actually
+    // waits where a check is *required*, and none is on `main` today (ruleset
+    // 11725742 has no `required_status_checks` rule) — so this pins the shape,
+    // not a merge-blocking guarantee.
     expect(progressWorkflow).not.toContain("[skip ci]");
     expect(progressWorkflow).toContain("--auto");
   });
