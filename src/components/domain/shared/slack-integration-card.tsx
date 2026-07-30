@@ -49,6 +49,8 @@ const NOTIFICATION_TYPES = [
   { type: "order_status", label: "Order Status Changes", defaultChannel: "#sales" },
   { type: "po_status", label: "Purchase Order Updates", defaultChannel: "#purchasing" },
   { type: "inventory_low", label: "Low Inventory Alerts", defaultChannel: "#inventory" },
+  // Nightly data-integrity watchdog findings (migration 00281, issue #586).
+  { type: "data_integrity", label: "Data Integrity Alerts", defaultChannel: "#inventory" },
   { type: "system", label: "System Notifications", defaultChannel: "" },
 ] as const;
 

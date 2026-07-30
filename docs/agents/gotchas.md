@@ -49,28 +49,54 @@ enum value, a constraint, or a column, the API can keep serving the old shape
 cache, not your migration. Reload the schema cache (`NOTIFY pgrst,
 'reload schema'`, or restart the local stack) before debugging further.
 
-**`Unregistered API key` is a stale local key, not a database fault.** Every
-route that calls `createAdminClient()` — `/api/settings/api-key`,
-`/api/slack/settings`, any server-side write — starts failing at once with a
-500 whose message is literally `Unregistered API key`. That string appears
-nowhere in this repository: it comes from the local Supabase Kong gateway,
-which rejects the request before PostgREST, RLS, or your table is ever
-reached. **The tell** is that the payload carries no Postgres error code — no
-`42501`, no `42883`, no `PGRST…` — which is how you separate it from a
-policy, GRANT, or migration problem. Cause: the `SUPABASE_SERVICE_ROLE_KEY`
-(or `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_URL`) in
-`.env.local` no longer belongs to the stack that is running — re-creating the
-local stack with `supabase start` / `make db-local` can rotate its JWT keys,
-and the stale value stays structurally valid, so `src/lib/env.ts` passes it
-through without complaint. Fix: `supabase status`, copy the printed
-`anon key` / `service_role key` into `.env.local`, restart the dev server.
+**`Unregistered API key` is a credential rejected upstream of Postgres — work
+out *which instance* before anything else.** Every route that calls
+`createAdminClient()` — `/api/settings/api-key`, `/api/slack/settings`, any
+server-side write — starts failing at once with a 500 whose `error.message` is
+literally `Unregistered API key`. **The tell** is that the payload carries no
+Postgres error code and no stack trace — no `42501`, no `42883`, no `PGRST…`
+— which is how you separate it from a policy, GRANT, or migration problem:
+the request was rejected before PostgREST, RLS, or your table was reached. The
+mismatch it reports lives in `createAdminClient()`
+(`src/lib/supabase/server.ts`), which pairs `NEXT_PUBLIC_SUPABASE_URL` with
+`SUPABASE_SERVICE_ROLE_KEY` from two independent env vars; `src/lib/env.ts`
+only checks "is a URL" and "is non-empty", never that the key belongs to that
+URL.
+
+Diagnose it, don't assume a cause:
+
+1. Read `NEXT_PUBLIC_SUPABASE_URL`. `127.0.0.1` is the CLI stack;
+   `https://<ref>.supabase.co` is the hosted project — and `.env.example`
+   ships the hosted form, so "it must be local" is not a safe default.
+2. Compare the presented key against *that* instance's current keys —
+   `supabase status` for local, the dashboard API-keys page for hosted. For
+   hosted, also check whether the legacy JWT `anon`/`service_role` pair is
+   still enabled: the newer `sb_publishable_…`/`sb_secret_…` format can be
+   rolled out with the legacy pair disabled, which rejects a key that is still
+   structurally valid.
+3. Reproduce it and read the answer instead of inferring it:
+   `curl -sD- -H "apikey: $KEY" "$URL/rest/v1/"`.
+
+Two claims were checked and did *not* hold, so don't re-derive them. Restarting
+the local stack does **not** invalidate local keys: `supabase/config.toml` sets
+no `[auth]`/JWT override, so the CLI signs local keys with its own hardcoded
+default secret, and a key minted by an earlier local stack still verifies
+against a later one. And the emitter of this exact string is **unidentified** —
+it is in neither this repo nor `@supabase/supabase-js`, so it comes from the
+endpoint, but as of 2026-07-30 this project's hosted gateway rejects an
+unregistered key with `Invalid API key` (`sb-error-code:
+UNAUTHORIZED_INVALID_API_KEY`) and Kong 2.8.1, the image the CLI pins for the
+local gateway, with `Invalid authentication credentials`. Neither emits
+`Unregistered API key`, so the "local Kong gateway says this" attribution in
+#636–#642 is unsupported. Use step 3 rather than inheriting it.
+
 Expect a *burst*, not one error: the settings page probes each integration id
-in a single page load, so one stale key filed five near-identical Sentry
-issues (#636, #637, #638, #641, #642) for one machine in one minute.
-**Not this** when `environment` is `production` — a deployed instance cannot
-rotate its own keys, so a production occurrence is a real secret-rotation or
-misconfiguration incident. Escalate it; do not self-diagnose it as this
-entry.
+in a single page load, so one bad credential filed five near-identical Sentry
+issues (#636, #637, #638, #641, #642) for one machine in one minute. Sentry's
+`environment` is **not** a discriminator here — `src/lib/sentry-config.ts`
+sets it from `NODE_ENV`, so `next dev` against the *hosted* project still
+reports `development`. Judge severity by the instance step 1 names, not by the
+environment tag.
 
 ## Build and tooling
 

@@ -16,6 +16,30 @@ const workflows = readdirSync(resolve(process.cwd(), WORKFLOW_DIR))
   .map((file) => `${WORKFLOW_DIR}/${file}`)
   .sort();
 
+type WorkflowJob = { name: string; body: string };
+
+// Split a workflow into its top-level `jobs:` entries. Job keys sit at two
+// spaces of indentation and their contents at four or more, so the two-space
+// headers are the block boundaries. `on:` sub-keys (`schedule:`, `push:`) land
+// in the same list; callers filter by content, so the extra blocks are inert.
+function jobsOf(contents: string): WorkflowJob[] {
+  const blocks: WorkflowJob[] = [];
+  let current: { name: string; lines: string[] } | null = null;
+
+  for (const line of contents.split("\n")) {
+    const header = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
+    if (header) {
+      if (current) blocks.push({ name: current.name, body: current.lines.join("\n") });
+      current = { name: header[1], lines: [] };
+      continue;
+    }
+    current?.lines.push(line);
+  }
+  if (current) blocks.push({ name: current.name, body: current.lines.join("\n") });
+
+  return blocks;
+}
+
 describe("GitHub Actions performance contracts", () => {
   it("uses the current checkout and artifact action generations", () => {
     const contents = workflows.map(read).join("\n");
@@ -140,6 +164,42 @@ describe("GitHub Actions performance contracts", () => {
     expect(auditStep).toContain("bun audit --audit-level=high");
     expect(auditStep).not.toContain("continue-on-error");
     expect(auditStep).toContain("docs/security/dependency-policy.md");
+
+    // The gate must stay at `high`; downgrading the threshold is the broad
+    // severity suppression the policy prohibits.
+    expect(auditStep).not.toMatch(/--audit-level=(critical|moderate|low)/);
+    // `--ignore` must always name a concrete advisory. A bare flag, or one
+    // taking a severity/package name, would suppress far more than the
+    // documented exception.
+    for (const flag of auditStep!.matchAll(/--ignore(?:=|\s+)(\S+)/g)) {
+      expect(flag[1]).toMatch(/^(GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}|CVE-\d{4}-\d+)$/);
+    }
+  });
+
+  // An ignore with no dated record in the policy doc is exactly the
+  // "undocumented ignore" the policy prohibits, and it is invisible in review
+  // once the PR that added it scrolls out of sight. Pin the pairing so a
+  // suppression cannot outlive its written justification.
+  it("documents every suppressed advisory in the dependency policy", () => {
+    const auditStep = read(".github/workflows/test.yml").match(
+      /- name: Check for dependency vulnerabilities[\s\S]*?(?=\n\s+- name:|\n\s{2}[a-z-]+:|$)/,
+    )?.[0];
+    const policy = read("docs/security/dependency-policy.md");
+
+    expect(auditStep).toBeDefined();
+    const ignored = [...auditStep!.matchAll(/--ignore(?:=|\s+)(\S+)/g)].map((m) => m[1]);
+
+    for (const advisory of ignored) {
+      expect(policy).toContain(advisory);
+      // Each record carries an expiry date, so a stale exception is auditable.
+      expect(policy).toMatch(/Expiry\b/);
+    }
+
+    // Conversely: with no active exceptions the doc must say so, so "no
+    // exceptions" is an asserted state rather than an absence of text.
+    if (ignored.length === 0) {
+      expect(policy).toContain("There are no active exceptions.");
+    }
   });
 
   it("keeps scheduled health analysis read-only and isolates issue writes in the publisher", () => {
@@ -188,6 +248,72 @@ describe("GitHub Actions performance contracts", () => {
         `${path} invokes claude-code-action but has neither the require-durable-outcome gate nor a durable-state: exempt rationale`,
       ).toMatch(/require-durable-outcome|durable-state: exempt/);
     }
+  });
+
+  // Egress contract (#645): a generative Claude job that holds write
+  // credentials must not also hold a network egress tool. These jobs read
+  // attacker-influenceable text — Sentry event payloads, fork-PR diffs, issue
+  // bodies — while a push-capable GITHUB_TOKEN sits on the runner, so WebFetch
+  // is the difference between a prompt injection that can only make noise and
+  // one that can post the token somewhere. Denial must be explicit (a bare
+  // omission from --allowedTools is invisible and easy to undo by accident):
+  // sentry-harness.yml was the sole outlier, granting WebFetch while all four
+  // siblings passed --disallowedTools. Derived per job, so a workflow added
+  // later is covered without touching this test.
+  it("denies web egress in every generative Claude job that holds write credentials", () => {
+    const generative = workflows.filter((path) => read(path).includes("claude-code-action"));
+
+    // Guard the derivation: if the action reference is ever renamed, the loop
+    // below must not start passing vacuously.
+    expect(generative).toEqual(
+      expect.arrayContaining([
+        ".github/workflows/bug-patrol.yml",
+        ".github/workflows/claude.yml",
+        ".github/workflows/feedback-distill.yml",
+        ".github/workflows/health-audit.yml",
+        ".github/workflows/quality-regrade.yml",
+        ".github/workflows/sentry-harness.yml",
+      ]),
+    );
+
+    let checkedJobs = 0;
+
+    for (const path of generative) {
+      for (const job of jobsOf(read(path))) {
+        const where = `${path} (job: ${job.name})`;
+        const agentSteps = job.body.match(/uses:\s*anthropics\/claude-code-action/g) ?? [];
+        if (agentSteps.length === 0) continue;
+
+        // A job that declares permissions and asks for no write scope has no
+        // credential worth exfiltrating (health-audit's audit job). Anything
+        // else — including a job that declares nothing and inherits the
+        // repository's default token scopes — counts as credentialed.
+        const declaresPermissions = /^ {4}permissions:$/m.test(job.body);
+        const grantsWrite = /^ {6}(?:contents|issues|pull-requests): write$/m.test(job.body);
+        if (declaresPermissions && !grantsWrite) continue;
+        checkedJobs += 1;
+
+        const denials = job.body.match(/--disallowedTools\s+"[^"]*"/g) ?? [];
+        expect(
+          denials.length,
+          `${where}: runs a generative agent with write credentials but passes no --disallowedTools`,
+        ).toBeGreaterThanOrEqual(agentSteps.length);
+        for (const denial of denials) {
+          expect(denial, `${where}: must deny WebFetch`).toContain("WebFetch");
+          expect(denial, `${where}: must deny WebSearch`).toContain("WebSearch");
+        }
+
+        // Denying and granting the same tool is ambiguous at best; never do both.
+        const grants = job.body.match(/--allowed-?[Tt]ools\s+"[^"]*"/g) ?? [];
+        for (const grant of grants) {
+          expect(grant, `${where}: allow-list must not grant web egress`).not.toMatch(
+            /Web(?:Fetch|Search)/,
+          );
+        }
+      }
+    }
+
+    expect(checkedJobs).toBeGreaterThanOrEqual(5);
   });
 
   // The rebuilt quality-regrade must never regress to its predecessor's
