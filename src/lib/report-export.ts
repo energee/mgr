@@ -6,7 +6,12 @@
  */
 
 import { formatBbl } from "@/lib/format";
-import { getTaxClassLabel, IN_PROCESS_SNAPSHOT_LABEL } from "@/domain/ttb-utils";
+import {
+  getTaxClassLabel,
+  getInProcessSnapshotCaveat,
+  getReportExemptionDisclosure,
+  IN_PROCESS_SNAPSHOT_LABEL,
+} from "@/domain/ttb-utils";
 
 // =============================================================================
 // CSV Export
@@ -126,24 +131,27 @@ export type TTBBatchData = {
 }
 
 /**
- * Export TTB report data to CSV
+ * Build the TTB report CSV text.
+ *
+ * Split out from `exportTTBReportToCSV` so the content — in particular the
+ * trailing NOTE rows — is unit-testable without a DOM or a download.
+ *
+ * Those NOTE rows are load-bearing, not decoration: a CSV is the copy most
+ * likely to be attached to an actual Form 5130.9 filing, so it carries the same
+ * in-process snapshot caveat and "not accounting-identity checked" disclosure
+ * the screen and the print view show (issue #618). They are trailing rows in the
+ * "Line Item" column, matching how every other label and section header in this
+ * CSV is carried.
  */
-export function exportTTBReportToCSV(
+export function buildTTBReportCSV(
   reportData: TTBReportData[],
   year: number,
   month: number
-): void {
+): string {
   const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
+  const periodLabel = `${monthName} ${year}`;
 
-  // Create summary rows
-  const rows: CSVRow[] = [];
-
-  // Add header info
-  rows.push({ "Line Item": `TTB Form 5130.9 - ${monthName} ${year}`, "": "" });
-  rows.push({ "Line Item": "Brewer's Report of Operations", "": "" });
-  rows.push({ "Line Item": "", "": "" });
-
-  // Add column headers for each tax class
+  // Column headers for each tax class
   const taxClasses = reportData.map((r) => r.ttb_tax_class);
 
   // Create detailed report
@@ -198,7 +206,27 @@ export function exportTTBReportToCSV(
     createDataRow(IN_PROCESS_SNAPSHOT_LABEL, reportData, "in_process_ending_bbl"),
   ];
 
-  const csv = toCSV(detailRows);
+  // Trailing note rows. Only the "Line Item" key is set: toCSV takes its columns
+  // from the first row, so the remaining tax-class/Total cells render empty.
+  const exemptionDisclosure = getReportExemptionDisclosure(reportData);
+  const noteRows: CSVRow[] = [
+    { "Line Item": "" },
+    { "Line Item": `NOTE: ${getInProcessSnapshotCaveat(periodLabel)}` },
+    ...(exemptionDisclosure ? [{ "Line Item": `NOTE: ${exemptionDisclosure}` }] : []),
+  ];
+
+  return toCSV([...detailRows, ...noteRows]);
+}
+
+/**
+ * Export TTB report data to CSV (builds the text, then downloads it).
+ */
+export function exportTTBReportToCSV(
+  reportData: TTBReportData[],
+  year: number,
+  month: number
+): void {
+  const csv = buildTTBReportCSV(reportData, year, month);
   downloadCSV(csv, `ttb-report-${year}-${String(month).padStart(2, "0")}.csv`);
 }
 
@@ -280,6 +308,9 @@ export function generateTTBPrintHTML(
 ): string {
   const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
   const taxClasses = reportData.map((r) => r.ttb_tax_class);
+  // Same snapshot caveat and "not checked" disclosure the screen and the CSV
+  // carry — a printed copy must not be more confident than the screen (#618).
+  const exemptionDisclosure = getReportExemptionDisclosure(reportData);
 
   const tableHeaderCells = taxClasses
     .map((tc) => `<th style="text-align: right; padding: 8px; border: 1px solid #ccc;">${getTaxClassLabel(tc)}</th>`)
@@ -361,10 +392,14 @@ export function generateTTBPrintHTML(
   </p>
 
   <p style="font-size: 10px; color: #666;">
-    <strong>Cellar/In-Process:</strong> a snapshot of batches still fermenting, conditioning, or
-    packaging at the time this report was generated — not a balance as of the period end, and not
-    covered by the accounting-identity checks that apply to the keg and canned/bottled columns.
+    <strong>Cellar/In-Process:</strong> ${escapeHTML(getInProcessSnapshotCaveat(`${monthName} ${year}`))}
   </p>
+
+  ${
+    exemptionDisclosure
+      ? `<p style="font-size: 10px; color: #666;">${escapeHTML(exemptionDisclosure)}</p>`
+      : ""
+  }
 
   <p style="font-size: 10px; color: #666;">
     Generated: ${new Date().toLocaleString()}

@@ -10,16 +10,19 @@
  * - get_ttb_report(year, month) - Full report data by tax class
  * - get_ttb_production_summary(year, month) - Production details
  *
- * Every row is run through the form's two accounting identities
- * (checkRowIdentities from @/domain/ttb-utils); failures render a visible
- * warning so a non-balancing report is never silently filed.
+ * Each row is run through the form's two accounting identities
+ * (checkRowIdentities from @/domain/ttb-utils) unless its tax class is on the
+ * exemption list; failures render a visible warning so a non-balancing report is
+ * never silently filed.
  *
- * The cellar row is exempt from those checks rather than passed: its volume
+ * The cellar row is the one exempt class — exempt rather than passed: its volume
  * lives in the in-process columns, which the identities do not reference, and
  * those columns are a live snapshot of batches currently in fermenting/
  * conditioning/packaging — not a period-end balance (issue #618). Exempt tax
  * classes are labelled as "not checked" in the UI instead of raising the
  * warning, which would otherwise fire on every month an active brewery has.
+ * Both summary cards below (the get_ttb_report table and the legacy fallback)
+ * carry that caveat via TTBReportCaveats.
  */
 
 import { useState } from "react";
@@ -34,10 +37,12 @@ import {
   checkRowIdentities,
   collectIdentityFailures,
   collectIdentityExemptions,
+  formatIdentityExemptionDisclosure,
   IN_PROCESS_SNAPSHOT_LABEL,
   EMPTY_TOTALS,
   type TTBReportRow,
 } from "@/domain/ttb-utils";
+import { TTBReportCaveats } from "@/components/reports/ttb-report-caveats";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -106,6 +111,17 @@ function getTaxClassIcon(taxClass: string) {
       return null;
   }
 }
+
+/**
+ * Identity disclosure for the legacy fallback card. When `get_ttb_report` is
+ * unavailable there are no per-tax-class rows at all, so *neither* accounting
+ * identity was evaluated — not merely the cellar exemption. Say so rather than
+ * let a reader infer the figures were checked.
+ */
+const LEGACY_NO_IDENTITY_CHECKS_NOTE =
+  "Not accounting-identity checked: this fallback summary is built from batch " +
+  "volumes because the per-tax-class report function is unavailable, so neither " +
+  "Form 5130.9 accounting identity could be evaluated.";
 
 // Generate year options (current year and 3 years back)
 function getYearOptions(): number[] {
@@ -626,21 +642,10 @@ export default function TTBReportPage() {
               </TableBody>
             </Table>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              In-process figures are a snapshot of batches that are fermenting,
-              conditioning, or packaging <em>right now</em> — not a balance as of
-              the end of {monthName} {year}. Re-running a past period can return a
-              different in-process number as batches move on.
-            </p>
-            {identityExemptions.length > 0 && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Not accounting-identity checked:{" "}
-                {identityExemptions
-                  .map((check) => `${check.label} (${check.reason})`)
-                  .join("; ")}
-                .
-              </p>
-            )}
+            <TTBReportCaveats
+              periodLabel={`${monthName} ${year}`}
+              identityDisclosure={formatIdentityExemptionDisclosure(identityExemptions)}
+            />
           </CardContent>
         </Card>
       )}
@@ -662,6 +667,7 @@ export default function TTBReportPage() {
                 ))}
               </div>
             ) : (
+              <>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -697,6 +703,13 @@ export default function TTBReportPage() {
                   </TableRow>
                 </TableBody>
               </Table>
+              {/* Same caveat the get_ttb_report card carries: the honest label
+                  never ships without the honest explanation (issue #618). */}
+              <TTBReportCaveats
+                periodLabel={`${monthName} ${year}`}
+                identityDisclosure={LEGACY_NO_IDENTITY_CHECKS_NOTE}
+              />
+              </>
             )}
           </CardContent>
         </Card>
@@ -810,10 +823,10 @@ export default function TTBReportPage() {
           <p className="text-sm text-muted-foreground mt-2">
             <strong>Cellar/In-Process:</strong> reported as a current snapshot of
             batches still in fermentation, conditioning, or packaging — it is not a
-            period-end balance and is not covered by the accounting-identity
-            checks, which apply to the keg and canned/bottled columns. Record the
-            cellar figures for a closed month when you file; re-running the report
-            later may show a different snapshot.
+            period-end balance, and it is the one column the accounting-identity
+            checks skip (every other tax class is checked). Record the cellar
+            figures for a closed month when you file; re-running the report later
+            may show a different snapshot.
           </p>
         </CardContent>
       </Card>
