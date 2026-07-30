@@ -148,6 +148,12 @@ export type TTBReportRow = {
   in_process_ending_bbl: number;
 }
 
+/**
+ * A volume column of a TTB report row. Every numeric column on the report is a
+ * barrel figure and its name ends in `_bbl`, so the suffix is the type.
+ */
+export type TTBVolumeField = Extract<keyof TTBReportRow, `${string}_bbl`>;
+
 /** Zero-valued totals, used as the initial accumulator and fallback. */
 export const EMPTY_TOTALS: TTBTotals = {
   beginningInventory: 0,
@@ -164,26 +170,31 @@ export const EMPTY_TOTALS: TTBTotals = {
 };
 
 /**
- * Aggregate TTB report rows into a single totals object.
- * Sums each numeric column across all tax classes.
+ * Aggregate TTB report rows into a single totals object — the report's Total
+ * column and the summary figures above it.
+ *
+ * Every column is summed with `totalForColumn`, which decides per column which
+ * rows may legitimately be added (see `TOTAL_SCOPE_BY_COLUMN`): the Part I
+ * inventory/production columns cover the identity-checked tax classes only, the
+ * Part II removals and the in-process columns cover every row. Do not reduce
+ * over the rows directly — that adds the cellar row's *brewed* volume to the
+ * keg/bottled rows' *packaged* volume and counts the same beer twice
+ * (issue #670).
  */
 export function calculateTotals(rows: TTBReportRow[]): TTBTotals {
-  return rows.reduce(
-    (acc, row) => ({
-      beginningInventory: acc.beginningInventory + (row.beginning_inventory_bbl || 0),
-      beerProduced: acc.beerProduced + (row.beer_produced_bbl || 0),
-      totalAvailable: acc.totalAvailable + (row.total_available_bbl || 0),
-      taxpaidDomestic: acc.taxpaidDomestic + (row.taxpaid_domestic_bbl || 0),
-      taxpaidExport: acc.taxpaidExport + (row.taxpaid_export_bbl || 0),
-      taxFreeSamples: acc.taxFreeSamples + (row.tax_free_samples_bbl || 0),
-      losses: acc.losses + (row.losses_bbl || 0),
-      destroyed: acc.destroyed + (row.destroyed_bbl || 0),
-      totalRemovals: acc.totalRemovals + (row.total_removals_bbl || 0),
-      endingInventory: acc.endingInventory + (row.ending_inventory_bbl || 0),
-      inProcessEnding: acc.inProcessEnding + (row.in_process_ending_bbl || 0),
-    }),
-    { ...EMPTY_TOTALS }
-  );
+  return {
+    beginningInventory: totalForColumn(rows, "beginning_inventory_bbl"),
+    beerProduced: totalForColumn(rows, "beer_produced_bbl"),
+    totalAvailable: totalForColumn(rows, "total_available_bbl"),
+    taxpaidDomestic: totalForColumn(rows, "taxpaid_domestic_bbl"),
+    taxpaidExport: totalForColumn(rows, "taxpaid_export_bbl"),
+    taxFreeSamples: totalForColumn(rows, "tax_free_samples_bbl"),
+    losses: totalForColumn(rows, "losses_bbl"),
+    destroyed: totalForColumn(rows, "destroyed_bbl"),
+    totalRemovals: totalForColumn(rows, "total_removals_bbl"),
+    endingInventory: totalForColumn(rows, "ending_inventory_bbl"),
+    inProcessEnding: totalForColumn(rows, "in_process_ending_bbl"),
+  };
 }
 
 /**
@@ -372,4 +383,249 @@ export function formatIdentityExemptionDisclosure(
  */
 export function getReportExemptionDisclosure(rows: TTBReportRow[]): string | null {
   return formatIdentityExemptionDisclosure(collectIdentityExemptions(rows.map(checkRowIdentities)));
+}
+
+// =============================================================================
+// Total Column Scoping (which rows a column's Total may add)
+// =============================================================================
+
+/** Heading of the report's Total column on all three surfaces. */
+export const TOTAL_COLUMN_LABEL = "Total";
+
+/**
+ * Footnote marker appended to the Line Item label of a line whose Total covers
+ * the packaged tax classes only (see `TOTAL_SCOPE_BY_COLUMN`). The marker sits
+ * on the line rather than in the column heading because the scope is per line,
+ * not per column: a single heading saying "finished goods" would be false for
+ * the Part II removals lines, which do total every class.
+ *
+ * `getTotalScopeCaveat` opens with the same marker, so screen, CSV and print
+ * all pair the mark with its explanation.
+ */
+export const PACKAGED_TOTAL_MARKER = "†";
+
+/**
+ * Which rows a column's Total may add.
+ *
+ * - `"packaged-only"` — the identity-checked (packaged) tax classes only. The
+ *   exempt classes' cells on this column are a different measurement, so adding
+ *   them counts the same beer twice.
+ * - `"all-classes"` — every row. Each cell is the same measurement whatever the
+ *   tax class, so every barrel is counted exactly once.
+ */
+export type TTBTotalScope = "packaged-only" | "all-classes";
+
+/**
+ * Total scope for every volume column of the report, decided per column on what
+ * the cells actually measure (issue #670).
+ *
+ * Typed as a total `Record` over `TTBVolumeField` on purpose: adding a `_bbl`
+ * column to `TTBReportRow` fails to compile until someone classifies it, so a
+ * new column cannot silently inherit a scope that is wrong for it.
+ *
+ * **Part I — `"packaged-only"`.** `get_ttb_tax_class` (migration 00041) never
+ * classes a finished good as 'cellar', so `get_ttb_report` composes the cellar
+ * row's Part I differently from the packaged rows:
+ *   - `beer_produced_bbl` on the cellar row is beer *brewed* in the period
+ *     (00041 takes it from the production summary's batch term); on the keg and
+ *     canned/bottled rows the same column is beer *packaged*. A batch brewed and
+ *     kegged in June is in both, so a Total spanning all three reported roughly
+ *     double the beer that existed. `total_available_bbl` is `beginning +
+ *     produced` and inherits the mixing; `beer_received_bbl` is the third addend
+ *     of that identity and is scoped with it (it is hardcoded 0 upstream today,
+ *     so the choice is currently inert).
+ *   - `beginning_inventory_bbl` / `ending_inventory_bbl` come from
+ *     `fg_beginning` / `fg_ending` (migration 00237), which group by
+ *     `get_ttb_tax_class(c.type)` and therefore never produce a cellar bucket.
+ *     The cellar row's cells are structurally 0, and the cellar's real balance
+ *     is carried on the beer-in-process line. Scoping these by tax class rather
+ *     than trusting the zeros is what keeps the Total right if a later migration
+ *     ever puts a number there.
+ * Scoping all five together also keeps the Total column's own
+ * `available = beginning + produced + received` identity exact, because it holds
+ * on each packaged row and the Total is a plain sum of those rows.
+ *
+ * **Part II removals — `"all-classes"`.** These are NOT double counted, and
+ * excluding them would understate removals on a filing-prep figure. Migration
+ * 00274 (issue #603) deliberately admitted batch-sourced cellar removals onto
+ * Form 5130.9 and built them so they cannot overlap the packaged rows: it drops
+ * every batch-sourced allocation whose `destination_type` is `finished_good`,
+ * `transfer` or `batch` — "Packaging: leaves the cellar via the
+ * production/packaging terms", "Counting them here would debit the cellar
+ * twice". What survives is beer that left the brewery from the cellar (a loss, a
+ * destruction, a sample, a taproom pour) and that no packaged line ever reports.
+ *
+ * **In process — `"all-classes"`.** Only 'cellar' carries in-process volume
+ * today (00237 attributes `ip_beginning`/`ip_ending` to 'cellar' alone), and a
+ * class that ever did report it would be reporting the same measure: beer still
+ * in a tank. Scoping this to packaged classes would report 0.00 beer in process
+ * next to a non-zero cellar cell.
+ *
+ * KNOWN CONSEQUENCE (tracked as issue #698): mixing the two scopes down one
+ * column means the Total column does not cross-foot. `ending = available −
+ * removals` holds on each packaged row, but the Total's removals include the
+ * cellar's, which draw down no packaged available — so `Total available −
+ * Total removals` lands *below* Total ending inventory, by exactly the exempt
+ * classes' removals. Worked from the parity fixture: available 185.00 −
+ * removals 43.25 = 141.75, against ending inventory 143.25 — an excess of 1.50,
+ * the cellar's `total_removals_bbl`. The direction is load-bearing: a reader
+ * told ending inventory is "short" would go looking for missing beer that does
+ * not exist. `getTotalScopeCaveat` states this on every surface.
+ * The alternative (dropping cellar removals to make the column cross-foot)
+ * understates real, non-duplicated removals, which is the worse error on a
+ * federal filing-prep screen.
+ */
+const TOTAL_SCOPE_BY_COLUMN: Record<TTBVolumeField, TTBTotalScope> = {
+  // Part I - operations (packaged stock and flow)
+  beginning_inventory_bbl: "packaged-only",
+  beer_produced_bbl: "packaged-only",
+  beer_received_bbl: "packaged-only",
+  total_available_bbl: "packaged-only",
+  ending_inventory_bbl: "packaged-only",
+  // Part II - disposition (brewery-wide; 00274 keeps cellar removals disjoint)
+  taxpaid_domestic_bbl: "all-classes",
+  taxpaid_export_bbl: "all-classes",
+  tax_free_samples_bbl: "all-classes",
+  losses_bbl: "all-classes",
+  destroyed_bbl: "all-classes",
+  adjustments_bbl: "all-classes",
+  total_removals_bbl: "all-classes",
+  // Beer in process (one measurement, one lifecycle stage)
+  in_process_beginning_bbl: "all-classes",
+  in_process_ending_bbl: "all-classes",
+};
+
+/** Which rows this column's Total may add. See `TOTAL_SCOPE_BY_COLUMN`. */
+export function totalScopeFor(field: TTBVolumeField): TTBTotalScope {
+  return TOTAL_SCOPE_BY_COLUMN[field];
+}
+
+/**
+ * The Total for one column of the TTB report — the single source every surface
+ * uses (the page's Total column and summary figures, the CSV export, and the
+ * print view), so the three cannot drift apart.
+ *
+ * A `"packaged-only"` column sums the identity-checked tax classes only. The
+ * excluded set is read from `IDENTITY_EXEMPT_TAX_CLASSES` — the same list that
+ * scopes the accounting identities (issue #618), not a second list that could
+ * drift from it: when the cellar row carries real period-keyed balances and
+ * drops off that list, it becomes both checked and summable in one edit.
+ *
+ * An `"all-classes"` column sums every row. Which column is which, and why, is
+ * in `TOTAL_SCOPE_BY_COLUMN`.
+ */
+export function totalForColumn(rows: readonly TTBReportRow[], field: TTBVolumeField): number {
+  const packagedOnly = totalScopeFor(field) === "packaged-only";
+  return rows.reduce((sum, row) => {
+    if (packagedOnly && !isIdentityCheckedTaxClass(row.ttb_tax_class)) return sum;
+    return sum + (row[field] || 0);
+  }, 0);
+}
+
+/**
+ * The exempt tax classes this report actually contains — the single gate on both
+ * the line marker and the caveat, so a marked line always has a footnote to
+ * explain it and a footnote never appears without a line to explain.
+ */
+function scopedOutClasses(rows: readonly TTBReportRow[]): IdentityExemptTaxClass[] {
+  return IDENTITY_EXEMPT_TAX_CLASSES.filter((taxClass) =>
+    rows.some((row) => row.ttb_tax_class === taxClass)
+  );
+}
+
+/**
+ * A report line's label, marked when that line's Total is packaged-only, so the
+ * reader can tell the two scopes apart in the table itself rather than having to
+ * map the footnote back onto the rows. Used by the screen, the CSV and the print
+ * view so all three mark the same lines.
+ *
+ * Nothing is marked when the report holds no exempt class: there the two scopes
+ * produce the same number, and a marker whose footnote says nothing was left out
+ * is noise. Same gate as `getTotalScopeCaveat`.
+ */
+export function totalScopedLineLabel(
+  rows: readonly TTBReportRow[],
+  label: string,
+  field: TTBVolumeField
+): string {
+  const marked = totalScopeFor(field) === "packaged-only" && scopedOutClasses(rows).length > 0;
+  return marked ? `${label} ${PACKAGED_TOTAL_MARKER}` : label;
+}
+
+/**
+ * Why each exempt tax class is left out of the packaged-only Totals.
+ *
+ * Per class, like `IDENTITY_EXEMPTION_REASONS`, so adding a second exempt class
+ * produces copy that is true of it instead of repeating the cellar's reason.
+ *
+ * User-facing: no internal tracker references (they live on
+ * `TOTAL_SCOPE_BY_COLUMN`, where a developer will find them).
+ */
+const PACKAGED_TOTAL_EXCLUSION_REASONS: Record<IdentityExemptTaxClass, string> = {
+  cellar:
+    "its produced and available volumes are beer brewed during the period, which the packaged lines report again once that beer is packaged, and its own balance is carried on the beer-in-process line instead",
+};
+
+/**
+ * What the marked Totals cover, in prose, for someone transcribing these figures
+ * onto Form 5130.9. Rendered under the report table on screen, as a trailing
+ * NOTE row in the CSV, and as a footnote in the print view — one wording, so no
+ * copy of the report is more confident than another.
+ *
+ * Returns `null` when the report contains no exempt class, in which case no line
+ * is marked and there is nothing to explain. Both the class names and their
+ * reasons are derived per class, so the sentence stays true if
+ * `IDENTITY_EXEMPT_TAX_CLASSES` gains or loses a member.
+ */
+export function getTotalScopeCaveat(rows: readonly TTBReportRow[]): string | null {
+  const excluded = scopedOutClasses(rows);
+  if (excluded.length === 0) return null;
+
+  const list = excluded
+    .map((taxClass) => `${getTaxClassLabel(taxClass)} — ${PACKAGED_TOTAL_EXCLUSION_REASONS[taxClass]}`)
+    .join("; ");
+  return (
+    `${PACKAGED_TOTAL_MARKER} ${TOTAL_COLUMN_LABEL} on the marked lines covers ` +
+    `the packaged tax classes only. Left out: ${list}. Every other line totals ` +
+    "all tax classes: a removal booked against beer " +
+    "still in the cellar is beer that left the brewery and no packaged line " +
+    "reports it again, and beer in process is one measurement at one stage. " +
+    `One consequence: the ${TOTAL_COLUMN_LABEL} column does not cross-foot — ` +
+    "available minus removals comes out below ending inventory, by exactly " +
+    "those cellar removals, which draw down no packaged available. Ending " +
+    "inventory is not short; the subtraction is."
+  );
+}
+
+/**
+ * What the four summary cards above the table cover, given the classes actually
+ * in this report. Three of them are packaged-only totals and one (Total
+ * Removals) is brewery-wide, so a single sentence under the grid is the only
+ * place that distinction can be stated — the cards have no room for it.
+ *
+ * Returns `null` when nothing is excluded, and derives both lists from the rows
+ * rather than naming classes literally.
+ */
+export function getSummaryCardScopeNote(rows: readonly TTBReportRow[]): string | null {
+  const excluded = rows
+    .filter((row) => !isIdentityCheckedTaxClass(row.ttb_tax_class))
+    .map((row) => getTaxClassLabel(row.ttb_tax_class));
+  if (excluded.length === 0) return null;
+
+  const included = rows
+    .filter((row) => isIdentityCheckedTaxClass(row.ttb_tax_class))
+    .map((row) => getTaxClassLabel(row.ttb_tax_class));
+  const includedList = included.length > 0 ? formatList(included) : "no tax class in this period";
+  return (
+    `Beginning Inventory, Beer Packaged and Ending Inventory cover the packaged ` +
+    `tax classes (${includedList}); ${formatList(excluded)} is reported on the ` +
+    "beer-in-process line below instead. Total Removals covers every tax class, " +
+    "including removals booked against beer still in the cellar."
+  );
+}
+
+/** `["a"] -> "a"`, `["a","b"] -> "a and b"`, `["a","b","c"] -> "a, b and c"`. */
+function formatList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }

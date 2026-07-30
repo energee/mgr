@@ -16,7 +16,14 @@ import {
   validateRowBalance,
   validateEndingInventory,
   EMPTY_TOTALS,
+  IN_PROCESS_SNAPSHOT_LABEL,
+  PACKAGED_TOTAL_MARKER,
+  TOTAL_COLUMN_LABEL,
+  totalScopeFor,
+  totalScopedLineLabel,
   type TTBReportRow,
+  type TTBTotals,
+  type TTBVolumeField,
 } from "@/domain/ttb-utils";
 import { toCSV, buildTTBReportCSV, generateTTBPrintHTML } from "@/lib/report-export";
 
@@ -174,15 +181,76 @@ describe("calculateTotals", () => {
     expect(totals.inProcessEnding).toBe(3);
   });
 
-  it("sums multiple tax classes (keg + bottled + cellar)", () => {
+  it("sums the packaged classes and leaves the cellar row out of Part I (issue #670)", () => {
+    // The cellar row's produced volume is beer *brewed* in the period; the keg
+    // and bottled rows' is beer *packaged*. Adding all three counted the same
+    // beer at two lifecycle stages. Note the cellar row here also carries a
+    // non-zero ending inventory: excluding it must not depend on that column
+    // being structurally 0 in production, which is the only reason the old
+    // arithmetic looked right for ending inventory.
     const rows = [
-      makeRow({ ttb_tax_class: "keg", beer_produced_bbl: 15, ending_inventory_bbl: 10 }),
-      makeRow({ ttb_tax_class: "bottled", beer_produced_bbl: 8, ending_inventory_bbl: 5 }),
-      makeRow({ ttb_tax_class: "cellar", beer_produced_bbl: 3, ending_inventory_bbl: 2 }),
+      makeRow({
+        ttb_tax_class: "keg",
+        beer_produced_bbl: 15,
+        ending_inventory_bbl: 10,
+        losses_bbl: 0.5,
+      }),
+      makeRow({
+        ttb_tax_class: "bottled",
+        beer_produced_bbl: 8,
+        ending_inventory_bbl: 5,
+        losses_bbl: 0.25,
+      }),
+      makeRow({
+        ttb_tax_class: "cellar",
+        beer_produced_bbl: 3,
+        ending_inventory_bbl: 2,
+        losses_bbl: 1.5,
+      }),
     ];
     const totals = calculateTotals(rows);
-    expect(totals.beerProduced).toBe(26);
-    expect(totals.endingInventory).toBe(17);
+    expect(totals.beerProduced).toBe(23);
+    expect(totals.endingInventory).toBe(15);
+    // ...but the removals lines DO include the cellar row: a batch-stage loss is
+    // beer that left the brewery, and migration 00274 (#603) keeps those rows
+    // disjoint from the packaged removals, so nothing is counted twice.
+    expect(totals.losses).toBe(2.25);
+  });
+
+  it("does not double-count a batch brewed and packaged in the same period (#670)", () => {
+    // 62.5 bbl brewed in June and kegged in June, 60 of it surviving packaging:
+    // the cellar row reports 62.5 brewed, the keg row reports the same beer as
+    // 60 packaged. The Total column used to read 122.5 — roughly twice the beer
+    // that existed. The two values differ so an inverted scope predicate would
+    // fail here rather than coincide.
+    const rows = [
+      makeRow({
+        ttb_tax_class: "cellar",
+        beer_produced_bbl: 62.5,
+        total_available_bbl: 62.5,
+        in_process_ending_bbl: 0,
+      }),
+      makeRow({
+        ttb_tax_class: "keg",
+        beer_produced_bbl: 60,
+        total_available_bbl: 60,
+        ending_inventory_bbl: 60,
+      }),
+    ];
+    const totals = calculateTotals(rows);
+    expect(totals.beerProduced).toBe(60);
+    expect(totals.totalAvailable).toBe(60);
+  });
+
+  it("still totals the in-process column across every tax class", () => {
+    // In-process means the same thing on every row — beer still in a tank — so
+    // that column is summed whole. Only the cellar row carries a value today, so
+    // scoping it to finished goods would have reported 0 beer in process.
+    const rows = [
+      makeRow({ ttb_tax_class: "cellar", in_process_ending_bbl: 62.5 }),
+      makeRow({ ttb_tax_class: "keg", in_process_ending_bbl: 0 }),
+    ];
+    expect(calculateTotals(rows).inProcessEnding).toBe(62.5);
   });
 
   it("treats falsy numeric fields as zero (no NaN propagation)", () => {
@@ -396,6 +464,203 @@ describe("buildTTBReportCSV", () => {
       expect(html).toContain(fragment);
     }
     expect(html).not.toContain("#618");
+  });
+});
+
+// =============================================================================
+// Total column: one rule across screen, CSV and print (issue #670)
+// =============================================================================
+
+/** The Total cell of one CSV data line, parsed back to a number. */
+function csvTotal(csv: string, label: string): number {
+  const line = csv.split("\n").find((l) => l.startsWith(`${label},`));
+  if (!line) throw new Error(`no CSV data line labelled "${label}"`);
+  return Number(line.split(",").pop());
+}
+
+/** The Total cell of one print-view table row, parsed back to a number. */
+function printTotal(html: string, label: string): number {
+  const row = html.split("<tr").find((r) => r.includes(`>${label}</td>`));
+  if (!row) throw new Error(`no print row labelled "${label}"`);
+  const cells = [...row.matchAll(/<td[^>]*>([^<]*)<\/td>/g)].map((m) => m[1]);
+  return Number(cells[cells.length - 1]);
+}
+
+describe("Total column parity (issue #670)", () => {
+  /**
+   * A cellar + keg + bottled report where the cellar row's brewed volume
+   * overlaps the packaged rows, and every column is non-zero, so a surface that
+   * summed the wrong set of rows shows a different number. Values are chosen so
+   * no packaged total coincides with the cellar cell it excludes — an inverted
+   * scope predicate must change the numbers, not reproduce them.
+   */
+  const rows: TTBReportRow[] = [
+    makeRow({
+      ttb_tax_class: "cellar",
+      beer_produced_bbl: 62.5,
+      total_available_bbl: 62.5,
+      losses_bbl: 1.5,
+      total_removals_bbl: 1.5,
+      // Deliberately non-zero: production has 0 here, and the Part I exclusion
+      // must not rely on that.
+      beginning_inventory_bbl: 4,
+      ending_inventory_bbl: 3,
+      in_process_beginning_bbl: 40,
+      in_process_ending_bbl: 62.5,
+    }),
+    makeRow({
+      ttb_tax_class: "keg",
+      beginning_inventory_bbl: 100,
+      beer_produced_bbl: 40,
+      total_available_bbl: 140,
+      taxpaid_domestic_bbl: 30,
+      taxpaid_export_bbl: 2,
+      tax_free_samples_bbl: 1,
+      losses_bbl: 0.5,
+      destroyed_bbl: 0.25,
+      total_removals_bbl: 33.75,
+      ending_inventory_bbl: 106.25,
+    }),
+    makeRow({
+      ttb_tax_class: "bottled",
+      beginning_inventory_bbl: 20,
+      beer_produced_bbl: 25,
+      total_available_bbl: 45,
+      taxpaid_domestic_bbl: 8,
+      total_removals_bbl: 8,
+      ending_inventory_bbl: 37,
+    }),
+  ];
+
+  /**
+   * Every data line of the report: its base label, the `TTBTotals` field behind
+   * it, and the column it sums. The rendered label comes from
+   * `totalScopedLineLabel`, so the packaged-only lines are looked up by their
+   * marked label — if a surface stopped marking them, these lookups throw.
+   */
+  const lines: [label: string, totalsField: keyof TTBTotals, column: TTBVolumeField][] = [
+    ["Beginning Inventory", "beginningInventory", "beginning_inventory_bbl"],
+    ["Beer Produced/Packaged", "beerProduced", "beer_produced_bbl"],
+    ["Total Available", "totalAvailable", "total_available_bbl"],
+    ["Taxpaid (Domestic)", "taxpaidDomestic", "taxpaid_domestic_bbl"],
+    ["Taxpaid (Export)", "taxpaidExport", "taxpaid_export_bbl"],
+    ["Tax-Free Samples", "taxFreeSamples", "tax_free_samples_bbl"],
+    ["Losses", "losses", "losses_bbl"],
+    ["Destroyed", "destroyed", "destroyed_bbl"],
+    ["Total Removals", "totalRemovals", "total_removals_bbl"],
+    ["Ending Inventory", "endingInventory", "ending_inventory_bbl"],
+    [IN_PROCESS_SNAPSHOT_LABEL, "inProcessEnding", "in_process_ending_bbl"],
+  ];
+
+  it("agrees line for line between the screen totals, the CSV and the print view", () => {
+    // The drift guard: all three surfaces derive their Total from the same
+    // helper, and this fails if any one of them starts re-deriving its own.
+    const totals = calculateTotals(rows);
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const html = generateTTBPrintHTML(rows, 2026, 6);
+
+    for (const [label, totalsField, column] of lines) {
+      const rendered = totalScopedLineLabel(rows, label, column);
+      expect(csvTotal(csv, rendered), `CSV total for ${label}`).toBe(totals[totalsField]);
+      expect(printTotal(html, rendered), `print total for ${label}`).toBe(totals[totalsField]);
+    }
+  });
+
+  it("excludes the cellar row from the Part I totals on all three surfaces", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const html = generateTTBPrintHTML(rows, 2026, 6);
+    const totals = calculateTotals(rows);
+    const produced = totalScopedLineLabel(rows, "Beer Produced/Packaged", "beer_produced_bbl");
+
+    // 40 + 25 packaged, NOT + 62.5 brewed.
+    expect(totals.beerProduced).toBe(65);
+    expect(csvTotal(csv, produced)).toBe(65);
+    expect(printTotal(html, produced)).toBe(65);
+
+    // Beginning/ending inventory are scoped by tax class, not by the cellar row
+    // happening to hold zeros — this fixture gives it 4 and 3.
+    expect(totals.beginningInventory).toBe(120);
+    expect(totals.endingInventory).toBe(143.25);
+    expect(csvTotal(csv, totalScopedLineLabel(rows, "Ending Inventory", "ending_inventory_bbl"))).toBe(
+      143.25
+    );
+  });
+
+  it("keeps the cellar row's removals IN the removals totals (00274 / issue #603)", () => {
+    // The cellar's 1.5 bbl loss is beer that left the brewery. Migration 00274
+    // admitted it onto Form 5130.9 and excludes packaging and inter-vessel
+    // movements so it can never overlap a packaged removal — dropping it here
+    // would understate removals on a filing-prep figure.
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const html = generateTTBPrintHTML(rows, 2026, 6);
+    const totals = calculateTotals(rows);
+
+    expect(totals.losses).toBe(2); // 1.5 cellar + 0.5 keg
+    expect(totals.totalRemovals).toBe(43.25); // 1.5 + 33.75 + 8
+    expect(csvTotal(csv, "Losses")).toBe(2);
+    expect(printTotal(html, "Total Removals")).toBe(43.25);
+  });
+
+  it("marks the packaged-only lines and leaves the removals lines unmarked", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const html = generateTTBPrintHTML(rows, 2026, 6);
+
+    for (const [label, , column] of lines) {
+      const rendered = totalScopedLineLabel(rows, label, column);
+      const marked = totalScopeFor(column) === "packaged-only";
+      expect(rendered.endsWith(PACKAGED_TOTAL_MARKER), `${label} marker`).toBe(marked);
+      expect(csv, `${label} in CSV`).toContain(`\n${rendered},`);
+      expect(html, `${label} in print`).toContain(`>${rendered}</td>`);
+    }
+    // The unmarked ones are not marked anywhere either.
+    expect(csv).not.toContain(`Total Removals ${PACKAGED_TOTAL_MARKER}`);
+    expect(html).not.toContain(`Total Removals ${PACKAGED_TOTAL_MARKER}`);
+  });
+
+  it("keeps the cellar row's own cells intact — only the Total changed", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const produced = totalScopedLineLabel(rows, "Beer Produced/Packaged", "beer_produced_bbl");
+    const producedLine = csv.split("\n").find((l) => l.startsWith(`${produced},`));
+    // Line Item, Cellar, Kegs, Canned/Bottled, Total
+    expect(producedLine?.split(",")).toEqual([produced, "62.5", "40", "25", "65"]);
+  });
+
+  it("heads the column plainly, because its scope is per line, not per column", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const html = generateTTBPrintHTML(rows, 2026, 6);
+    expect(TOTAL_COLUMN_LABEL).toBe("Total");
+    // CSV header row is the last column; print view is the last <th>.
+    expect(csv.split("\n")[0].split(",").pop()).toBe(TOTAL_COLUMN_LABEL);
+    expect(html).toContain(`>${TOTAL_COLUMN_LABEL}</th>`);
+  });
+
+  it("carries the same Total-column explanation in the CSV and the print view", () => {
+    const csv = buildTTBReportCSV(rows, 2026, 6);
+    const html = generateTTBPrintHTML(rows, 2026, 6);
+    for (const fragment of [
+      `${PACKAGED_TOTAL_MARKER} Total on the marked lines covers the packaged tax classes only`,
+      "Cellar (In-Process)",
+      "Every other line totals all tax classes",
+      "left the brewery and no packaged line reports it again",
+      "does not cross-foot",
+    ]) {
+      expect(csv).toContain(fragment);
+      expect(html).toContain(fragment);
+    }
+    expect(csv).not.toContain("#670");
+    expect(html).not.toContain("#670");
+  });
+
+  it("omits the scope note entirely when no class in the report is scoped out", () => {
+    // Nothing to mark, so nothing to explain — the note must not appear as
+    // boilerplate on a report it does not describe.
+    const packagedOnly = rows.filter((r) => r.ttb_tax_class !== "cellar");
+    const csv = buildTTBReportCSV(packagedOnly, 2026, 6);
+    const html = generateTTBPrintHTML(packagedOnly, 2026, 6);
+    expect(csv).not.toContain(PACKAGED_TOTAL_MARKER);
+    expect(html).not.toContain(PACKAGED_TOTAL_MARKER);
+    expect(csv).not.toContain("does not cross-foot");
+    expect(html).not.toContain("does not cross-foot");
   });
 });
 

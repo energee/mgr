@@ -2,8 +2,10 @@
 /**
  * Tests for TTB Form 5130.9 pure helpers (src/domain/ttb-utils.ts):
  * barrel/gallon conversion, compliance-safe decimal formatting, tax class
- * label lookup, report-period year options, and the scoping of the
- * accounting-identity checks to the tax classes they can verify (issue #618).
+ * label lookup, report-period year options, the scoping of the
+ * accounting-identity checks to the tax classes they can verify (issue #618),
+ * and the per-column scoping of the report's Total to the tax classes whose
+ * cells are commensurable on that column (issue #670).
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -19,9 +21,17 @@ import {
   getInProcessSnapshotCaveat,
   getReportExemptionDisclosure,
   isIdentityCheckedTaxClass,
+  getSummaryCardScopeNote,
+  getTotalScopeCaveat,
+  totalForColumn,
+  totalScopeFor,
+  totalScopedLineLabel,
   validateEndingInventory,
   IDENTITY_EXEMPT_TAX_CLASSES,
+  PACKAGED_TOTAL_MARKER,
+  TOTAL_COLUMN_LABEL,
   type TTBReportRow,
+  type TTBVolumeField,
 } from "@/domain/ttb-utils";
 
 afterEach(() => {
@@ -243,6 +253,294 @@ describe("identity-check scoping (issue #618)", () => {
     expect(failures).toHaveLength(1);
     expect(failures[0]).toContain("Canned/Bottled");
     expect(failures[0]).toContain("total available");
+  });
+});
+
+describe("Total column scoping (issue #670)", () => {
+  it("adds only the identity-checked classes on a Part I column", () => {
+    const rows = [
+      makeCellarRow(), // produced 62.5 = beer BREWED in the period, available 62.5
+      makeRow({ ttb_tax_class: "keg", beer_produced_bbl: 40, total_available_bbl: 140 }),
+      makeRow({ ttb_tax_class: "bottled", beer_produced_bbl: 25, total_available_bbl: 45 }),
+    ];
+    // 40 + 25 packaged. The cellar row's 62.5 is the same beer before packaging.
+    // Deliberately != 62.5, so an inverted scope predicate cannot pass this.
+    expect(totalForColumn(rows, "beer_produced_bbl")).toBe(65);
+    // total_available inherits the same mixing, so it is scoped the same way.
+    expect(totalForColumn(rows, "total_available_bbl")).toBe(185);
+  });
+
+  it("adds every class on a removals column — cellar removals are not duplicated", () => {
+    // Migration 00274 (issue #603) admitted batch-sourced cellar removals onto
+    // the form and excludes destination_type finished_good/transfer/batch so
+    // they cannot overlap a packaged removal. Dropping them here would
+    // understate removals on a filing-prep figure.
+    const rows = [
+      makeCellarRow(), // losses 1.5, total_removals 1.5
+      makeRow({ ttb_tax_class: "keg", losses_bbl: 0.5, total_removals_bbl: 0.5 }),
+    ];
+    expect(totalForColumn(rows, "losses_bbl")).toBe(2);
+    expect(totalForColumn(rows, "total_removals_bbl")).toBe(2);
+    expect(totalForColumn(rows, "destroyed_bbl")).toBe(0);
+  });
+
+  it("adds every class on an in-process column, where the cells mean one thing", () => {
+    const rows = [
+      makeCellarRow(), // in_process_ending 62.5
+      makeRow({ ttb_tax_class: "keg", in_process_ending_bbl: 0 }),
+    ];
+    // Scoping this to packaged classes would report 0 beer in process: only the
+    // cellar class ever carries in-process volume (migration 00237).
+    expect(totalForColumn(rows, "in_process_ending_bbl")).toBe(62.5);
+    expect(totalForColumn(rows, "in_process_beginning_bbl")).toBe(40);
+  });
+
+  it("classifies every volume column, Part I packaged-only and the rest whole", () => {
+    // The scope map is the contract; this pins it column by column so a
+    // reclassification is a deliberate, visible edit rather than a side effect.
+    const packagedOnly: TTBVolumeField[] = [
+      "beginning_inventory_bbl",
+      "beer_produced_bbl",
+      "beer_received_bbl",
+      "total_available_bbl",
+      "ending_inventory_bbl",
+    ];
+    const allClasses: TTBVolumeField[] = [
+      "taxpaid_domestic_bbl",
+      "taxpaid_export_bbl",
+      "tax_free_samples_bbl",
+      "losses_bbl",
+      "destroyed_bbl",
+      "adjustments_bbl",
+      "total_removals_bbl",
+      "in_process_beginning_bbl",
+      "in_process_ending_bbl",
+    ];
+    for (const field of packagedOnly) expect(totalScopeFor(field)).toBe("packaged-only");
+    for (const field of allClasses) expect(totalScopeFor(field)).toBe("all-classes");
+    // Every `_bbl` column of the row shape is covered by one of the two lists,
+    // so a column added later without a scope shows up here as well as failing
+    // to type-check against Record<TTBVolumeField, TTBTotalScope>.
+    const covered = [...packagedOnly, ...allClasses].sort();
+    const declared = (Object.keys(makeRow()) as (keyof TTBReportRow)[])
+      .filter((key): key is TTBVolumeField => key.endsWith("_bbl"))
+      .sort();
+    expect(covered).toEqual(declared);
+  });
+
+  it("excludes an exempt row's ending inventory by tax class, not because it is 0", () => {
+    // ending_inventory_bbl is structurally 0 on the cellar row today (00237's
+    // fg_ending groups by get_ttb_tax_class, which never returns 'cellar'), and
+    // that is the only reason the old all-rows sum looked right for this column.
+    // Give the row a real number and the exclusion must still hold.
+    const rows = [
+      makeRow({ ttb_tax_class: "cellar", ending_inventory_bbl: 99 }),
+      makeRow({ ttb_tax_class: "keg", ending_inventory_bbl: 10 }),
+    ];
+    expect(totalForColumn(rows, "ending_inventory_bbl")).toBe(10);
+  });
+
+  it("keeps available = beginning + produced + received exact down the Total column", () => {
+    // Scoping all of Part I the same way is what makes this hold: it holds on
+    // each packaged row, and the Total is a plain sum of those rows.
+    const rows = [
+      makeCellarRow(),
+      makeRow({
+        ttb_tax_class: "keg",
+        beginning_inventory_bbl: 100,
+        beer_produced_bbl: 40,
+        total_available_bbl: 140,
+      }),
+      makeRow({
+        ttb_tax_class: "bottled",
+        beginning_inventory_bbl: 20,
+        beer_produced_bbl: 25,
+        total_available_bbl: 45,
+      }),
+    ];
+    expect(totalForColumn(rows, "total_available_bbl")).toBe(
+      totalForColumn(rows, "beginning_inventory_bbl") +
+        totalForColumn(rows, "beer_produced_bbl") +
+        totalForColumn(rows, "beer_received_bbl")
+    );
+  });
+
+  it("does NOT cross-foot: available - removals lands BELOW ending, by the cellar removals", () => {
+    // The documented consequence of mixing scopes down one column: the cellar's
+    // removals are real (00274) but draw down no packaged available, so the
+    // subtraction comes up short — the ending inventory does not. Sign matters:
+    // `gap` is NEGATIVE, i.e. ending EXCEEDS available - removals. Pinned so the
+    // excess stays exactly this and nothing else.
+    const cellar = makeCellarRow(); // total_removals 1.5
+    const rows = [
+      cellar,
+      makeRow({
+        ttb_tax_class: "keg",
+        beginning_inventory_bbl: 100,
+        beer_produced_bbl: 40,
+        total_available_bbl: 140,
+        total_removals_bbl: 33.75,
+        ending_inventory_bbl: 106.25,
+      }),
+    ];
+    const gap =
+      totalForColumn(rows, "total_available_bbl") -
+      totalForColumn(rows, "total_removals_bbl") -
+      totalForColumn(rows, "ending_inventory_bbl");
+    expect(gap).toBeCloseTo(-cellar.total_removals_bbl, 10);
+  });
+
+  it("derives the excluded classes from the identity-exemption list, not a second list", () => {
+    // One list drives both, so the two cannot drift: a class that stops being
+    // exempt starts being summed in the same edit.
+    for (const taxClass of IDENTITY_EXEMPT_TAX_CLASSES) {
+      const rows = [
+        makeRow({ ttb_tax_class: taxClass, beer_produced_bbl: 7 }),
+        makeRow({ ttb_tax_class: "keg", beer_produced_bbl: 3 }),
+      ];
+      expect(isIdentityCheckedTaxClass(taxClass)).toBe(false);
+      expect(totalForColumn(rows, "beer_produced_bbl")).toBe(3);
+    }
+  });
+
+  it("sums a tax class nobody has thought about yet, matching the identity default", () => {
+    // Fail-closed stays consistent across both scopings: an unknown class is
+    // checked by the identities and counted in the Total.
+    const rows = [
+      makeRow({ ttb_tax_class: "barrel_aged", beer_produced_bbl: 5 }),
+      makeRow({ ttb_tax_class: "keg", beer_produced_bbl: 3 }),
+    ];
+    expect(totalForColumn(rows, "beer_produced_bbl")).toBe(8);
+  });
+
+  it("returns 0 for an empty report", () => {
+    expect(totalForColumn([], "beer_produced_bbl")).toBe(0);
+    expect(totalForColumn([], "in_process_ending_bbl")).toBe(0);
+  });
+});
+
+describe("line labels marked as packaged-only (issue #670)", () => {
+  it("marks a Part I line and leaves a removals line unmarked", () => {
+    const rows = [makeCellarRow(), makeRow({ ttb_tax_class: "keg" })];
+    expect(totalScopedLineLabel(rows, "Total Available", "total_available_bbl")).toBe(
+      `Total Available ${PACKAGED_TOTAL_MARKER}`
+    );
+    expect(totalScopedLineLabel(rows, "Total Removals", "total_removals_bbl")).toBe(
+      "Total Removals"
+    );
+    expect(totalScopedLineLabel(rows, "In Process", "in_process_ending_bbl")).toBe("In Process");
+  });
+
+  it("uses the same marker the caveat opens with", () => {
+    const caveat = getTotalScopeCaveat([makeCellarRow()]);
+    expect(caveat?.startsWith(PACKAGED_TOTAL_MARKER)).toBe(true);
+  });
+
+  it("marks nothing when the report holds no exempt class", () => {
+    // A marker whose footnote says nothing was left out is noise, and the
+    // footnote is suppressed in that case too — one gate drives both.
+    const packagedOnly = [makeRow({ ttb_tax_class: "keg" })];
+    expect(totalScopedLineLabel(packagedOnly, "Total Available", "total_available_bbl")).toBe(
+      "Total Available"
+    );
+    expect(getTotalScopeCaveat(packagedOnly)).toBeNull();
+  });
+});
+
+describe("Total column caveat (issue #670)", () => {
+  const rows = [makeCellarRow(), makeRow({ ttb_tax_class: "keg" })];
+
+  it("names the column, the class left out, and the reason that class is out", () => {
+    const caveat = getTotalScopeCaveat(rows) ?? "";
+    expect(caveat).toContain(TOTAL_COLUMN_LABEL);
+    expect(caveat).toContain("Cellar (In-Process)");
+    expect(caveat).toContain("beer brewed during the period");
+  });
+
+  it("says the removals lines DO cover every class, and why that is not a double count", () => {
+    // The heart of the fix: cellar removals reach the form only because
+    // migration 00274 put them there, and 00274 excludes packaging and
+    // inter-vessel movements so they cannot overlap a packaged removal. The
+    // caveat must not offer the double-count reason for them.
+    const caveat = getTotalScopeCaveat(rows) ?? "";
+    expect(caveat).toContain("Every other line totals all tax classes");
+    expect(caveat).toContain("left the brewery and no packaged line reports it again");
+  });
+
+  it("discloses that the Total column does not cross-foot", () => {
+    const caveat = getTotalScopeCaveat(rows) ?? "";
+    expect(caveat).toContain("does not cross-foot");
+  });
+
+  it("states the cross-foot direction the way the arithmetic actually goes", () => {
+    // The first version of this caveat said ending inventory was "short of"
+    // available minus removals. It is the other way round: the cellar's
+    // removals inflate the subtrahend, so `available - removals` lands BELOW
+    // ending inventory. A reader told ending was short would go hunting for
+    // beer that is not missing. Asserted against the computed sign rather than
+    // against a fixed string, so the prose cannot drift away from the numbers.
+    const gap =
+      totalForColumn(rows, "total_available_bbl") -
+      totalForColumn(rows, "total_removals_bbl") -
+      totalForColumn(rows, "ending_inventory_bbl");
+    expect(gap).toBeLessThan(0); // ending exceeds available - removals
+
+    const caveat = getTotalScopeCaveat(rows) ?? "";
+    expect(caveat).toContain("below ending inventory");
+    expect(caveat).not.toMatch(/ending inventory is short/i);
+  });
+
+  it("takes the excluded class names from the exemption list", () => {
+    const caveat = getTotalScopeCaveat(rows) ?? "";
+    for (const taxClass of IDENTITY_EXEMPT_TAX_CLASSES) {
+      expect(caveat).toContain(getTaxClassLabel(taxClass));
+    }
+  });
+
+  it("returns null when the report holds no exempt class, so no line is marked", () => {
+    const packagedOnlyReport = [
+      makeRow({ ttb_tax_class: "keg" }),
+      makeRow({ ttb_tax_class: "bottled" }),
+    ];
+    expect(getTotalScopeCaveat(packagedOnlyReport)).toBeNull();
+    expect(getTotalScopeCaveat([])).toBeNull();
+  });
+
+  it("carries no internal tracker reference into the compliance officer's copy", () => {
+    const caveat = getTotalScopeCaveat(rows) ?? "";
+    expect(caveat).not.toContain("#670");
+    expect(caveat).not.toContain("issue");
+  });
+});
+
+describe("summary card scope note (issue #670)", () => {
+  const rows = [
+    makeCellarRow(),
+    makeRow({ ttb_tax_class: "keg" }),
+    makeRow({ ttb_tax_class: "bottled" }),
+  ];
+
+  it("names the packaged classes and says Total Removals is not one of them", () => {
+    const note = getSummaryCardScopeNote(rows) ?? "";
+    expect(note).toContain("Beginning Inventory, Beer Packaged and Ending Inventory");
+    expect(note).toContain("Kegs and Canned/Bottled");
+    expect(note).toContain("Cellar (In-Process)");
+    expect(note).toContain("Total Removals covers every tax class");
+  });
+
+  it("derives both lists from the rows rather than naming classes literally", () => {
+    const note = getSummaryCardScopeNote([makeCellarRow(), makeRow({ ttb_tax_class: "keg" })]) ?? "";
+    expect(note).toContain("Kegs");
+    expect(note).not.toContain("Canned/Bottled");
+  });
+
+  it("returns null when nothing is excluded", () => {
+    expect(getSummaryCardScopeNote([makeRow({ ttb_tax_class: "keg" })])).toBeNull();
+    expect(getSummaryCardScopeNote([])).toBeNull();
+  });
+
+  it("carries no internal tracker reference", () => {
+    expect(getSummaryCardScopeNote(rows)).not.toContain("#670");
   });
 });
 
