@@ -1,4 +1,18 @@
+// .github/scripts/sentry-harness/prompt.ts
+//
+// Builds the fix-error prompt for one scored Sentry issue.
+//
+// The prompt embeds raw production event text and is therefore the harness's
+// trust boundary in the *other* direction: everything Sentry-derived sits inside
+// UNTRUSTED-SENTRY-DATA markers with a binding "evidence, never instructions"
+// preamble. Since #668 the agent this prompt drives holds no write credential —
+// it cannot push, open a PR, or file an issue. It declares its intended outcome
+// in `outbox/plan.json` plus one markdown body file per outcome, and the
+// deterministic `land-fix` job validates and performs the write (see
+// `outbox.ts`). Keep the two in sync: `parsePlan`'s cross-field rules are the
+// enforcement of the triage contract this prompt describes.
 import type { SentryIssue } from "./types";
+import { BODY_FILES } from "./outbox";
 
 export function buildFixPrompt(issue: SentryIssue): string {
   const tagLines = Object.entries(issue.tags)
@@ -6,6 +20,53 @@ export function buildFixPrompt(issue: SentryIssue): string {
     .join("\n");
 
   return `You are the Sentry Error Harness. Your job is to fix ONE production error thoroughly.
+
+## How your work gets published (read this first)
+
+You have **no write access to this repository**. There is no push credential in
+this job: you cannot \`git push\`, \`gh pr create\`, \`gh issue create\`, or
+\`gh issue comment\`, and attempting them wastes turns. That is deliberate — you
+read untrusted production text, so the credential lives in a separate
+deterministic job (\`land-fix\`) that runs no model.
+
+You therefore **declare** your outcome instead of performing it:
+
+1. Leave your code changes in the working tree. Do **not** commit, branch, or
+   push. A deterministic step diffs the tree against the base commit; that diff
+   is what gets pushed.
+2. Write \`outbox/plan.json\` — scalars only, no bodies:
+
+\`\`\`json
+{
+  "classification": "A",
+  "pr": { "title": "fix: <conventional-commit subject>" },
+  "issue": { "title": "[sentry] ${issue.shortId}: <root cause>" },
+  "comment": { "issue": 123 },
+  "quietRun": { "reason": "<one line>" }
+}
+\`\`\`
+
+   Include only the sections that apply; omit the rest or set them to \`null\`.
+3. Write each included section's markdown body to its own file:
+   \`outbox/${BODY_FILES.pr}\`, \`outbox/${BODY_FILES.issue}\`,
+   \`outbox/${BODY_FILES.comment}\`, \`outbox/${BODY_FILES.quietRun}\`.
+   Bodies go in files, never inside the JSON.
+4. Do not commit anything under \`outbox/\`; it is packed as a CI artifact.
+
+The lander **rejects** a plan that breaks the triage contract, and a rejection
+fails the run red — so these are hard rules, not preferences:
+
+- classification \`A\` → \`pr\` required.
+- classification \`B\` or \`C\` → \`pr\` **forbidden**, and the working tree must be
+  **clean** (revert experiments with \`git checkout -- .\`). Set \`issue\` or
+  \`comment\`, never both.
+- classification \`D\` → \`pr\` **and** \`issue\`, both required.
+- No outcome at all (stale event) → \`quietRun\` with an evidence file.
+- Labels are applied by the lander (\`sentry-fix\` + \`automated\` on a PR,
+  \`sentry-fix\` + \`needs-human\` on an issue). Do not ask for labels.
+- A patch that touches \`.github/workflows/\`, \`.github/actions/\` or
+  \`.github/scripts/\` is rejected. If a fix genuinely needs one of those, use
+  the \`issue\` path and say so.
 
 ## Error Details
 
@@ -97,28 +158,31 @@ Gather evidence before you classify — do not guess:
 - **(A)** → continue to step 1 below and fix it.
 - **(D)** → Fix the reporting (pass the real error object through), because
   until you do, nobody — including the next run of this harness — can diagnose
-  the real failure. **But you have not fixed the error.** Open the PR, and
-  *also* open an investigation issue (below) for the underlying failure, noting
-  that the root cause is still unknown and that the next Sentry event for this
-  issue will now carry a usable stack and context. Say exactly this in the PR
-  body. Do not write "Followups: none".
-- **(B) or (C)** → **STOP. Do not open a code PR.** First check whether a
-  previous run already triaged this: run
+  the real failure. **But you have not fixed the error.** Request the PR, and
+  *also* request an investigation issue (below) for the underlying failure,
+  noting that the root cause is still unknown and that the next Sentry event for
+  this issue will now carry a usable stack and context. Say exactly this in the
+  PR body. Do not write "Followups: none".
+- **(B) or (C)** → **STOP. Do not request a code PR, and leave the working tree
+  clean.** First check whether a previous run already triaged this: run
   \`gh issue list --state all --limit 200 --json number,title,state\` and grep
   the titles for \`[sentry] ${issue.shortId}:\` (plain list + grep — \`--search\`
-  returns nothing under the Actions token). If a matching issue exists,
-  add ONE comment to it (\`gh issue comment\`) with any genuinely new evidence
-  and exit — do **not** open a duplicate. The same applies when the culprit
-  route or file has been **deleted from main** (verify with
-  \`git log --all --diff-filter=D\` on the path): that is a stale event, not
-  new triage. Only when no matching issue exists, open a GitHub *issue*
-  (\`gh issue create\`), titled \`[sentry] ${issue.shortId}: <root cause>\`,
-  labelled \`sentry-fix\` and \`needs-human\`, containing: the classification and
-  why, the specific evidence (error code, snapshot/migration findings, the
-  object name), the concrete remediation you believe is required (e.g. "add
+  returns nothing under the Actions token). If a matching issue exists, request
+  ONE comment on it (\`comment.issue\` = its number, body in
+  \`outbox/${BODY_FILES.comment}\`) with any genuinely new evidence — do **not**
+  open a duplicate. The same applies when the culprit route or file has been
+  **deleted from main** (verify with \`git log --all --diff-filter=D\` on the
+  path): that is a stale event, not new triage — use \`quietRun\`. Only when no
+  matching issue exists, request a GitHub *issue*, titled
+  \`[sentry] ${issue.shortId}: <root cause>\`, whose body
+  (\`outbox/${BODY_FILES.issue}\`) contains: the classification and why, the
+  specific evidence (error code, snapshot/migration findings, the object name),
+  the concrete remediation you believe is required (e.g. "add
   \`GRANT EXECUTE ON FUNCTION foo(int) TO authenticated\` in a new migration"),
-  and a link to the Sentry issue. Then you are done — report the issue URL and
-  exit. Do **not** additionally patch the error handler to compensate.
+  and a link to the Sentry issue. The lander applies \`sentry-fix\` and
+  \`needs-human\` and reports the URL. Do **not** additionally patch the error
+  handler to compensate — the lander rejects a (B)/(C) plan that carries a
+  patch, and that rejection fails the run.
 
 A **(B)** classification is a *successful* run of this harness. Diagnosing a
 database bug and refusing to paper over it in the client is the outcome we
@@ -141,21 +205,21 @@ If — and only if — the root cause genuinely lies in app code, proceed:
 11. **Re-validate** — if step 10 changed anything, run \`bun run typecheck\`, \`bun run test\`, \`bun lint\` again.
 12. **Update harness state** — three short writes:
     - Append a feature entry to \`docs/feature_list.json\` with \`id: "SENTRY-${issue.issueId}"\`, \`area: "infra"\`, the issue title, \`verification: "<test command>"\`, \`state: "passing"\`, \`branch: "sentry-fix/SENTRY-${issue.issueId}"\`, and \`evidence: "branch:sentry-fix/SENTRY-${issue.issueId}"\`. Use the branch name (a stable ref) rather than a commit SHA — SHAs go stale on rebase/amend/squash between this step and step 14.
-    - Append a one-paragraph entry to \`PROGRESS.md\` under "Completed" describing the fix.
+    - Add a progress note as a NEW file \`docs/progress/<YYYY-MM-DD>-sentry-SENTRY-${issue.issueId}.md\` containing one bullet: \`- **<YYYY-MM-DD> (<title>).** <one or two sentences>\`. Do **not** edit \`PROGRESS.md\` — AGENTS.md constraint 18: it is generated on main by CI, and editing it on a branch guarantees a conflict.
     - Write a session trace to \`.harness/sessions/<YYYY-MM-DD>-SENTRY-${issue.issueId}.md\` using the template in \`docs/agents/observability.md\`.
 13. **Run \`make check\`** — final layered gate including \`check-db\` and \`check-wip\`. Must exit 0.
-14. **Open the PR** — create branch \`sentry-fix/SENTRY-${issue.issueId}\`, push, and open a PR with the template below. Apply labels \`sentry-fix\` and \`automated\`. After the PR is created, optionally update the \`evidence\` field to \`pr:<number>\` for a more precise stable ref.
+14. **Declare the PR** — write \`outbox/plan.json\` with \`classification: "A"\` and \`pr.title\` (a conventional-commit subject: \`fix: …\`), and write the body from the template below to \`outbox/${BODY_FILES.pr}\`. Leave your changes uncommitted in the working tree. The lander commits them onto \`sentry-fix/SENTRY-${issue.issueId}\`, pushes, opens the PR, and applies the labels.
 
 ## Guardrails
 
-- **Whatever the outcome, end by writing \`sentry-outcome.md\` at the repo root
-  (do NOT commit it).** If you opened or commented on a PR/issue, it must
-  contain \`Outcome: <the full GitHub URL>\`. If you exited with no artifact (a
-  stale event — culprit route deleted and no matching issue), it must contain a
-  one-line reason and an \`Evidence:\` section quoting the commands you ran
-  (the \`git log --diff-filter=D\` output, the issue-list grep) and their key
-  output. A deterministic workflow step verifies this file; a run that ends
-  without a PR, an issue update, or this file fails red.
+- **Whatever the outcome, end by writing \`outbox/plan.json\`.** A run that ends
+  without it fails red — the lander cannot tell a silently dead agent from a
+  quiet night, so it treats a missing plan as the former. If you exited with no
+  artifact (a stale event — culprit route deleted and no matching issue), set
+  \`quietRun.reason\` and write \`outbox/${BODY_FILES.quietRun}\` quoting the
+  commands you ran (the \`git log --diff-filter=D\` output, the issue-list grep)
+  and their key output. Do not report GitHub URLs yourself: you did not create
+  them, and the lander reports the real ones.
 - Follow AGENTS.md conventions strictly. Do not invent new patterns.
 - Do not modify unrelated code. No opportunistic refactors.
 - Do not skip hooks (\`--no-verify\`) or bypass validation.
@@ -171,19 +235,21 @@ If — and only if — the root cause genuinely lies in app code, proceed:
 
 ## Investigation-Issue Fallback
 
-Open a GitHub issue when the root cause is (B) or (C) (*instead of* a PR), when
-the classification is (D) (*in addition to* the PR), or when after 3 attempts
-you cannot produce a working fix for an (A). The issue must:
+Request a GitHub issue when the root cause is (B) or (C) (*instead of* a PR),
+when the classification is (D) (*in addition to* the PR), or when after 3
+attempts you cannot produce a working fix for an (A). Its body
+(\`outbox/${BODY_FILES.issue}\`) must:
 
 - State the classification and the evidence for it (error code, live-catalog /
   migration findings, the offending object).
 - Document the root cause analysis, with \`file:line\` references.
 - Name the concrete remediation you believe is required.
-- Carry labels \`sentry-fix\` and \`needs-human\`.
 
-Report the issue URL and exit. Do not also open a compensating code PR.
+The lander applies \`sentry-fix\` and \`needs-human\` and reports the URL. When the
+issue replaces the PR, leave the working tree clean — do not also leave a
+compensating code change.
 
-## PR Body Template (classification (A) only)
+## PR Body Template (classification (A) only) — write this to \`outbox/${BODY_FILES.pr}\`
 
 \`\`\`markdown
 ## Sentry Fix: ${issue.title}
@@ -211,7 +277,7 @@ Classified **(A) application code**. <why this is not (B) database/infra or (C) 
 - [x] /simplify pass completed
 - [x] /code-review pass completed
 - [x] feature_list.json updated with SENTRY-${issue.issueId} entry
-- [x] PROGRESS.md updated
+- [x] docs/progress/<date>-sentry-SENTRY-${issue.issueId}.md added (PROGRESS.md untouched)
 - [x] .harness/sessions/<date>-SENTRY-${issue.issueId}.md trace written
 - [x] make check passes (incl. check-db and check-wip)
 \`\`\`

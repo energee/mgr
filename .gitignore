@@ -109,3 +109,6 @@ __pycache__/
 /quiet-run.md
 /sentry-outcome.md
 /loop-scoreboard.md
+# Sentry harness outbox: the uncredentialed agent job's declared outcome, packed
+# as a CI artifact for the land-fix job (see .github/scripts/sentry-harness/outbox.ts)
+/outbox/
