@@ -48,6 +48,19 @@ names differ only by case or whitespace. When both duplicate suppliers have a
 row for the same catalog item, a preferred designation on either row is carried
 onto the surviving row before the collision is removed.
 
+**Audited — migration `00282`, committed but NOT YET APPLIED LIVE (#693).**
+Once it is pushed, every INSERT / UPDATE / DELETE writes an
+[`entity_revisions`](system.md#entity_revisions) row with the full before/after
+image (`entity_type = 'supplier_catalog'`). Until then the live database has no
+such trigger and `supplier_catalog` edits made in production leave no trail —
+check `supabase/live-catalog.snapshot.txt` for `tr_supplier_catalog_revision`
+before relying on this. Rows here are only ever written by a deliberate human
+action, and `is_preferred` has no derivable ground truth, so a row destroyed by
+a data migration or hand-edit is unrecoverable — that is what happened before
+#494 fixed `00252`, and #549 tracks the live re-marking still owed. Reading
+those revisions requires `purchasing:read`, the same permission
+`supplier_catalog_select` requires.
+
 **Extension — `inventory_item` catalog_type (migration `00161`):** The `catalog_type` column now accepts `'inventory_item'` in addition to the brewing ingredient catalog types. When `catalog_type = 'inventory_item'`, `catalog_id` is a direct FK to `inventory_items.id`, enabling structured supplier relationships for raw packaging materials and other non-catalog inventory (e.g., cans, trays, pallets, stretch wrap). This replaces the legacy free-text `inventory_items.supplier` column.
 
 ```sql
