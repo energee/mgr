@@ -23,6 +23,18 @@
  * warning, which would otherwise fire on every month an active brewery has.
  * Both summary cards below (the get_ttb_report table and the legacy fallback)
  * carry that caveat via TTBReportCaveats.
+ *
+ * The Total column is scoped per line, not per column (issue #670, see
+ * TOTAL_SCOPE_BY_COLUMN in @/domain/ttb-utils). Part I's inventory and
+ * production lines total the packaged tax classes only — adding the cellar
+ * column there counted beer brewed in the period alongside the same beer once
+ * packaged — and are marked with PACKAGED_TOTAL_MARKER. Part II's removals and
+ * the beer-in-process line total every class: cellar removals are beer that left
+ * the brewery and no packaged line repeats them (migration 00274 / issue #603).
+ * The same split applies to the four summary cards, whose scopes differ from
+ * each other and are stated by getSummaryCardScopeNote. On the legacy fallback
+ * path there are no tax classes at all — those cards are batch volumes — so both
+ * notes are suppressed there.
  */
 
 import { useState } from "react";
@@ -38,6 +50,10 @@ import {
   collectIdentityFailures,
   collectIdentityExemptions,
   formatIdentityExemptionDisclosure,
+  getSummaryCardScopeNote,
+  getTotalScopeCaveat,
+  totalScopedLineLabel,
+  TOTAL_COLUMN_LABEL,
   IN_PROCESS_SNAPSHOT_LABEL,
   EMPTY_TOTALS,
   type TTBReportRow,
@@ -66,11 +82,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+// No cast needed on the way in: the export functions take `TTBReportData`,
+// which is an alias of the `TTBReportRow` this page already holds. A cast here
+// would suppress exactly the page/export drift that alias exists to prevent.
 import {
   exportTTBReportToCSV,
   exportBatchDetailsToCSV,
   openTTBPrintView,
-  type TTBReportData,
 } from "@/lib/report-export";
 import { batchEntity } from "@/entities/batch";
 import { dynamicRpc } from "@/services/types";
@@ -240,6 +258,12 @@ export default function TTBReportPage() {
   // before filing. Exempt rows are disclosed as unchecked below the table rather
   // than warned about.
   const identityChecks = (reportData ?? []).map(checkRowIdentities);
+
+  // Total-column and summary-card scope notes (issue #670). Both are null when
+  // nothing in the report is exempt, and both are derived from the rows, so the
+  // legacy fallback (no rows) renders neither.
+  const totalScopeCaveat = getTotalScopeCaveat(reportData ?? []);
+  const summaryCardScopeNote = getSummaryCardScopeNote(reportData ?? []);
   const identityFailures = collectIdentityFailures(identityChecks);
   const identityExemptions = collectIdentityExemptions(identityChecks);
 
@@ -267,7 +291,7 @@ export default function TTBReportPage() {
             disabled={!reportData || reportData.length === 0}
             onClick={() => {
               if (reportData && reportData.length > 0) {
-                openTTBPrintView(reportData as TTBReportData[], year, month);
+                openTTBPrintView(reportData, year, month);
               }
             }}
           >
@@ -289,7 +313,7 @@ export default function TTBReportPage() {
               <DropdownMenuItem
                 onClick={() => {
                   if (reportData && reportData.length > 0) {
-                    exportTTBReportToCSV(reportData as TTBReportData[], year, month);
+                    exportTTBReportToCSV(reportData, year, month);
                   }
                 }}
               >
@@ -419,8 +443,15 @@ export default function TTBReportPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
+            {/* "Packaged", not "Produced": on the get_ttb_report path this sums
+                beer_produced_bbl over the packaged classes only, which 00041
+                fills from the production summary's beer_packaged term. Keeping
+                the old "Beer Produced" label would read 0.00 in a month with
+                brewing but no packaging (issue #670). The legacy fallback fills
+                the same card from batchData.completedVolume, which really is
+                beer brewed, so that path keeps the original label. */}
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Beer Produced
+              {reportData && reportData.length > 0 ? "Beer Packaged" : "Beer Produced"}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -467,6 +498,15 @@ export default function TTBReportPage() {
         </Card>
       </div>
 
+      {/* What the four cards above add up — they do not all have the same scope:
+          three are packaged-only, Total Removals is brewery-wide. Only on the
+          get_ttb_report path; the legacy fallback has no tax classes, so its
+          cards are batch volumes and this sentence would not describe them
+          (issue #670). */}
+      {summaryCardScopeNote && (
+        <p className="text-xs text-muted-foreground">{summaryCardScopeNote}</p>
+      )}
+
       {/* Report by Tax Class */}
       {reportData && reportData.length > 0 && (
         <Card>
@@ -490,7 +530,9 @@ export default function TTBReportPage() {
                       </div>
                     </TableHead>
                   ))}
-                  <TableHead className="text-right font-bold">Total</TableHead>
+                  <TableHead className="text-right font-bold">
+                    {TOTAL_COLUMN_LABEL}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -501,7 +543,9 @@ export default function TTBReportPage() {
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Beginning Inventory</TableCell>
+                  <TableCell>
+                    {totalScopedLineLabel(reportData, "Beginning Inventory", "beginning_inventory_bbl")}
+                  </TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
                       {formatTtbBbl(row.beginning_inventory_bbl)}
@@ -512,7 +556,9 @@ export default function TTBReportPage() {
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>Beer Produced/Packaged</TableCell>
+                  <TableCell>
+                    {totalScopedLineLabel(reportData, "Beer Produced/Packaged", "beer_produced_bbl")}
+                  </TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
                       {formatTtbBbl(row.beer_produced_bbl)}
@@ -523,7 +569,9 @@ export default function TTBReportPage() {
                   </TableCell>
                 </TableRow>
                 <TableRow className="border-t-2">
-                  <TableCell className="font-medium">Total Available</TableCell>
+                  <TableCell className="font-medium">
+                    {totalScopedLineLabel(reportData, "Total Available", "total_available_bbl")}
+                  </TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono font-medium">
                       {formatTtbBbl(row.total_available_bbl)}
@@ -614,7 +662,9 @@ export default function TTBReportPage() {
                   </TableCell>
                 </TableRow>
                 <TableRow className="font-bold">
-                  <TableCell>Ending Inventory</TableCell>
+                  <TableCell>
+                    {totalScopedLineLabel(reportData, "Ending Inventory", "ending_inventory_bbl")}
+                  </TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
                       {formatTtbBbl(row.ending_inventory_bbl)}
@@ -648,6 +698,7 @@ export default function TTBReportPage() {
             <TTBReportCaveats
               periodLabel={`${monthName} ${year}`}
               identityDisclosure={formatIdentityExemptionDisclosure(identityExemptions)}
+              totalColumnCaveat={totalScopeCaveat ?? undefined}
             />
           </CardContent>
         </Card>

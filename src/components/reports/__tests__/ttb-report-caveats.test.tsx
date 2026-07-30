@@ -2,10 +2,12 @@
  * TTBReportCaveats tests (issue #618).
  *
  * The component exists so both TTB report summary cards — the `get_ttb_report`
- * table and the legacy batch-volume fallback — carry the same two honesty notes.
+ * table and the legacy batch-volume fallback — carry the same honesty notes.
  * These cases pin the contract the fallback card was missing: the in-process
- * snapshot caveat always renders (with the period named), and the identity
- * disclosure renders only when there is something to disclose.
+ * snapshot caveat always renders (with the period named), the identity
+ * disclosure renders only when there is something to disclose, and the
+ * Total-column scope note (issue #670) renders only on the card that has a Total
+ * column.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -16,7 +18,14 @@ import { createRoot, type Root } from "react-dom/client";
   true;
 
 import { TTBReportCaveats } from "@/components/reports/ttb-report-caveats";
-import { getInProcessSnapshotCaveat } from "@/domain/ttb-utils";
+import { getInProcessSnapshotCaveat, PACKAGED_TOTAL_MARKER } from "@/domain/ttb-utils";
+
+/**
+ * Stand-in for whatever `getTotalScopeCaveat` returns. The component's contract
+ * is "render the string you were handed, or nothing" — pinning the real wording
+ * here would duplicate the assertions in the ttb-utils suite that own it.
+ */
+const TOTAL_SCOPE_CAVEAT = `${PACKAGED_TOTAL_MARKER} Total on the marked lines covers the packaged tax classes only.`;
 
 let container: HTMLDivElement;
 let root: Root;
@@ -66,5 +75,29 @@ describe("TTBReportCaveats", () => {
   it("never shows an internal tracker reference to the compliance officer", () => {
     render(<TTBReportCaveats periodLabel="June 2026" identityDisclosure={null} />);
     expect(container.textContent).not.toContain("#618");
+  });
+
+  it("renders what the Total column covers when given it (issue #670)", () => {
+    render(
+      <TTBReportCaveats
+        periodLabel="June 2026"
+        identityDisclosure={null}
+        totalColumnCaveat={TOTAL_SCOPE_CAVEAT}
+      />
+    );
+    const text = paragraphs();
+    expect(text).toHaveLength(2);
+    expect(text[1]).toBe(TOTAL_SCOPE_CAVEAT);
+    expect(container.textContent).not.toContain("#670");
+  });
+
+  it("omits the Total-column note when it was not given one", () => {
+    // Two callers omit it: the legacy fallback card, a two-column table with no
+    // Total column at all, and the by-tax-class card on a report where nothing
+    // is scoped out (getTotalScopeCaveat returns null). Explaining a scope that
+    // does not apply would be worse than saying nothing.
+    render(<TTBReportCaveats periodLabel="June 2026" identityDisclosure={null} />);
+    expect(container.textContent).not.toContain(PACKAGED_TOTAL_MARKER);
+    expect(paragraphs()).toHaveLength(1);
   });
 });

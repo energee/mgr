@@ -8,9 +8,15 @@
 import { formatBbl } from "@/lib/format";
 import {
   getTaxClassLabel,
+  getTotalScopeCaveat,
   getInProcessSnapshotCaveat,
   getReportExemptionDisclosure,
+  totalForColumn,
+  totalScopedLineLabel,
+  TOTAL_COLUMN_LABEL,
   IN_PROCESS_SNAPSHOT_LABEL,
+  type TTBReportRow,
+  type TTBVolumeField,
 } from "@/domain/ttb-utils";
 
 // =============================================================================
@@ -108,26 +114,14 @@ export function downloadCSV(csv: string, filename: string): void {
 // TTB Report Specific Exports
 // =============================================================================
 
-export type TTBReportData = {
-  report_year: number;
-  report_month: number;
-  report_period: string;
-  ttb_tax_class: string;
-  beginning_inventory_bbl: number;
-  beer_produced_bbl: number;
-  beer_received_bbl: number;
-  total_available_bbl: number;
-  taxpaid_domestic_bbl: number;
-  taxpaid_export_bbl: number;
-  tax_free_samples_bbl: number;
-  losses_bbl: number;
-  destroyed_bbl: number;
-  adjustments_bbl: number;
-  total_removals_bbl: number;
-  ending_inventory_bbl: number;
-  in_process_beginning_bbl: number;
-  in_process_ending_bbl: number;
-}
+/**
+ * A `get_ttb_report` row, as the export functions receive it.
+ *
+ * Alias rather than a second declaration: this used to be a hand-copied
+ * duplicate of `TTBReportRow`, which is exactly how the exported copies of a
+ * report drift from the screen's.
+ */
+export type TTBReportData = TTBReportRow;
 
 export type TTBBatchData = {
   batch_code: string;
@@ -144,10 +138,10 @@ export type TTBBatchData = {
  *
  * Those NOTE rows are load-bearing, not decoration: a CSV is the copy most
  * likely to be attached to an actual Form 5130.9 filing, so it carries the same
- * in-process snapshot caveat and "not accounting-identity checked" disclosure
- * the screen and the print view show (issue #618). They are trailing rows in the
- * "Line Item" column, matching how every other label and section header in this
- * CSV is carried.
+ * in-process snapshot caveat, "not accounting-identity checked" disclosure
+ * (issue #618) and Total-column scope note (issue #670) the screen and the print
+ * view show. They are trailing rows in the "Line Item" column, matching how every
+ * other label and section header in this CSV is carried.
  */
 export function buildTTBReportCSV(
   reportData: TTBReportData[],
@@ -160,65 +154,46 @@ export function buildTTBReportCSV(
   // Column headers for each tax class
   const taxClasses = reportData.map((r) => r.ttb_tax_class);
 
+  /** A label-only row: section header or blank spacer, with every value cell empty. */
+  const labelRow = (label: string): CSVRow => ({
+    "Line Item": label,
+    ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
+    [TOTAL_COLUMN_LABEL]: "",
+  });
+
   // Create detailed report
   const detailRows: CSVRow[] = [
-    {
-      "Line Item": "PART I - OPERATIONS",
-      ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
-      Total: "",
-    },
+    labelRow("PART I - OPERATIONS"),
     createDataRow("Beginning Inventory", reportData, "beginning_inventory_bbl"),
     createDataRow("Beer Produced/Packaged", reportData, "beer_produced_bbl"),
     createDataRow("Total Available", reportData, "total_available_bbl"),
-    {
-      "Line Item": "",
-      ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
-      Total: "",
-    },
-    {
-      "Line Item": "PART II - DISPOSITION",
-      ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
-      Total: "",
-    },
+    labelRow(""),
+    labelRow("PART II - DISPOSITION"),
     createDataRow("Taxpaid (Domestic)", reportData, "taxpaid_domestic_bbl"),
     createDataRow("Taxpaid (Export)", reportData, "taxpaid_export_bbl"),
     createDataRow("Tax-Free Samples", reportData, "tax_free_samples_bbl"),
     createDataRow("Losses", reportData, "losses_bbl"),
     createDataRow("Destroyed", reportData, "destroyed_bbl"),
     createDataRow("Total Removals", reportData, "total_removals_bbl"),
-    {
-      "Line Item": "",
-      ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
-      Total: "",
-    },
-    {
-      "Line Item": "ENDING BALANCE",
-      ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
-      Total: "",
-    },
+    labelRow(""),
+    labelRow("ENDING BALANCE"),
     createDataRow("Ending Inventory", reportData, "ending_inventory_bbl"),
-    {
-      "Line Item": "",
-      ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
-      Total: "",
-    },
-    {
-      // In-process volumes are a live snapshot of batches currently
-      // fermenting/conditioning/packaging, not a month-end balance (issue #618).
-      "Line Item": "BEER IN PROCESS (CURRENT SNAPSHOT)",
-      ...Object.fromEntries(taxClasses.map((tc) => [getTaxClassLabel(tc), ""])),
-      Total: "",
-    },
+    labelRow(""),
+    // In-process volumes are a live snapshot of batches currently
+    // fermenting/conditioning/packaging, not a month-end balance (issue #618).
+    labelRow("BEER IN PROCESS (CURRENT SNAPSHOT)"),
     createDataRow(IN_PROCESS_SNAPSHOT_LABEL, reportData, "in_process_ending_bbl"),
   ];
 
   // Trailing note rows. Only the "Line Item" key is set: toCSV takes its columns
   // from the first row, so the remaining tax-class/Total cells render empty.
   const exemptionDisclosure = getReportExemptionDisclosure(reportData);
+  const totalScopeCaveat = getTotalScopeCaveat(reportData);
   const noteRows: CSVRow[] = [
     { "Line Item": "" },
     { "Line Item": `NOTE: ${getInProcessSnapshotCaveat(periodLabel)}` },
     ...(exemptionDisclosure ? [{ "Line Item": `NOTE: ${exemptionDisclosure}` }] : []),
+    ...(totalScopeCaveat ? [{ "Line Item": `NOTE: ${totalScopeCaveat}` }] : []),
   ];
 
   return toCSV([...detailRows, ...noteRows]);
@@ -236,21 +211,28 @@ export function exportTTBReportToCSV(
   downloadCSV(csv, `ttb-report-${year}-${String(month).padStart(2, "0")}.csv`);
 }
 
+/**
+ * One data line of the CSV: the per-tax-class cells plus the Total cell.
+ *
+ * The Total comes from `totalForColumn`, the same helper the screen's
+ * `calculateTotals` and the print view use — it must not be re-derived here, or
+ * the exported copy silently disagrees with the screen about what the Total
+ * covers (issues #618, #670). The label is marked by `totalScopedLineLabel`
+ * when this line's Total is packaged-only, matching the screen and the print
+ * view.
+ */
 function createDataRow(
   label: string,
   reportData: TTBReportData[],
-  field: keyof TTBReportData
+  field: TTBVolumeField
 ): CSVRow {
-  const row: CSVRow = { "Line Item": label };
-  let total = 0;
+  const row: CSVRow = { "Line Item": totalScopedLineLabel(reportData, label, field) };
 
   reportData.forEach((r) => {
-    const value = r[field] as number || 0;
-    row[getTaxClassLabel(r.ttb_tax_class)] = formatBbl(value);
-    total += value;
+    row[getTaxClassLabel(r.ttb_tax_class)] = formatBbl(r[field] || 0);
   });
 
-  row["Total"] = formatBbl(total);
+  row[TOTAL_COLUMN_LABEL] = formatBbl(totalForColumn(reportData, field));
   return row;
 }
 
@@ -317,19 +299,23 @@ export function generateTTBPrintHTML(
   // Same snapshot caveat and "not checked" disclosure the screen and the CSV
   // carry — a printed copy must not be more confident than the screen (#618).
   const exemptionDisclosure = getReportExemptionDisclosure(reportData);
+  const totalScopeCaveat = getTotalScopeCaveat(reportData);
 
   const tableHeaderCells = taxClasses
     .map((tc) => `<th style="text-align: right; padding: 8px; border: 1px solid #ccc;">${getTaxClassLabel(tc)}</th>`)
     .join("");
 
-  function createRow(label: string, field: keyof TTBReportData, indent = false): string {
+  // The Total cell comes from `totalForColumn` and the label marker from
+  // `totalScopedLineLabel` — the same helpers the screen and the CSV use, so the
+  // printed Total cannot mean something else (#670).
+  function createRow(label: string, field: TTBVolumeField, indent = false): string {
     const cells = reportData
-      .map((r) => `<td style="text-align: right; padding: 8px; border: 1px solid #ccc; font-family: monospace;">${formatBbl(r[field] as number || 0)}</td>`)
+      .map((r) => `<td style="text-align: right; padding: 8px; border: 1px solid #ccc; font-family: monospace;">${formatBbl(r[field] || 0)}</td>`)
       .join("");
-    const total = reportData.reduce((sum, r) => sum + ((r[field] as number) || 0), 0);
+    const total = totalForColumn(reportData, field);
     const labelStyle = indent ? "padding-left: 24px;" : "font-weight: bold;";
     return `<tr>
-      <td style="${labelStyle} padding: 8px; border: 1px solid #ccc;">${label}</td>
+      <td style="${labelStyle} padding: 8px; border: 1px solid #ccc;">${totalScopedLineLabel(reportData, label, field)}</td>
       ${cells}
       <td style="text-align: right; padding: 8px; border: 1px solid #ccc; font-family: monospace; font-weight: bold;">${formatBbl(total)}</td>
     </tr>`;
@@ -367,7 +353,7 @@ export function generateTTBPrintHTML(
       <tr style="background: #333; color: white;">
         <th style="text-align: left; padding: 8px; border: 1px solid #ccc;">Line Item</th>
         ${tableHeaderCells}
-        <th style="text-align: right; padding: 8px; border: 1px solid #ccc;">Total</th>
+        <th style="text-align: right; padding: 8px; border: 1px solid #ccc;">${TOTAL_COLUMN_LABEL}</th>
       </tr>
     </thead>
     <tbody>
@@ -400,6 +386,12 @@ export function generateTTBPrintHTML(
   <p style="font-size: 10px; color: #666;">
     <strong>Cellar/In-Process:</strong> ${escapeHTML(getInProcessSnapshotCaveat(`${monthName} ${year}`))}
   </p>
+
+  ${
+    totalScopeCaveat
+      ? `<p style="font-size: 10px; color: #666;">${escapeHTML(totalScopeCaveat)}</p>`
+      : ""
+  }
 
   ${
     exemptionDisclosure
