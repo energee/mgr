@@ -63,6 +63,37 @@ describe("parseBeerOrderWorkbook", () => {
     expect(parsed.prices[3]).toEqual({ half: 168, sixtel: 79, case: 58 });
   });
 
+  it("reads every line of the last header block on a sheet, not just the first 6 rows", async () => {
+    // A single customer block with 8 distinct beer lines and no following header
+    // — the parser must bound the block by the sheet's actual last row, not a
+    // fixed 6-row fallback window.
+    const lastBlockRows = [
+      ["Order Date", "Pickup", "Sarene East", "Style", "Price Tier", "Half", "Sixtel", "Case"],
+      ...Array.from({ length: 8 }, (_, index) => [
+        new Date("2026-07-15T00:00:00Z"),
+        null,
+        `Beer ${index + 1}`,
+        "IPA",
+        3,
+        1,
+        0,
+        0,
+      ]),
+    ];
+    excelMocks.readSheetNames.mockResolvedValue(["Price Tiers", "7-15-26"]);
+    excelMocks.readXlsxFile.mockImplementation(async (_buffer, options) =>
+      options.sheet === "Price Tiers" ? priceRows : lastBlockRows,
+    );
+
+    const parsed = await parseBeerOrderWorkbook(Buffer.from("fixture"));
+
+    expect(parsed.orders).toHaveLength(1);
+    expect(parsed.orders[0]!.lines).toHaveLength(8);
+    expect(parsed.orders[0]!.lines.map((line) => line.beer)).toEqual([
+      "Beer 1", "Beer 2", "Beer 3", "Beer 4", "Beer 5", "Beer 6", "Beer 7", "Beer 8",
+    ]);
+  });
+
   it("rejects fractional quantities instead of silently rounding", async () => {
     excelMocks.readSheetNames.mockResolvedValue(["Price Tiers", "7-15-26"]);
     excelMocks.readXlsxFile.mockImplementation(async (_buffer, options) =>
