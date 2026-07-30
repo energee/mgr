@@ -68,18 +68,33 @@ export const SEEDED_UUIDS: Record<SeededRole, string> = {
   inactive_customer: "00000000-0000-0000-0000-000000000010",
 };
 
+/**
+ * The integration-test connection string, or a thrown error.
+ *
+ * Suites that build their own `pg.Pool` — most of them; role impersonation is
+ * only needed for RLS tests — should call this instead of reading
+ * `process.env.DATABASE_URL` directly. An unset variable makes `pg` fall back
+ * to libpq's own defaults (local socket, `$USER` database), which on a
+ * developer machine can silently reach some unrelated database. Fail closed and
+ * loudly at module load instead: a suite that runs against the wrong database,
+ * or does not run at all, is exactly the vacuity issue #437 was filed about.
+ */
+export function requireDatabaseUrl(): string {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      "Integration tests require DATABASE_URL. Set it to a Postgres URL " +
+        "with all migrations + seed-roles.sql applied.",
+    );
+  }
+  return connectionString;
+}
+
 let pool: Pool | undefined;
 
 function getPool(): Pool {
   if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error(
-        "Integration tests require DATABASE_URL. Set it to a Postgres URL " +
-          "with all migrations + seed-roles.sql applied.",
-      );
-    }
-    pool = new Pool({ connectionString, max: 4 });
+    pool = new Pool({ connectionString: requireDatabaseUrl(), max: 4 });
   }
   return pool;
 }
