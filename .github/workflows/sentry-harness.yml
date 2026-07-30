@@ -132,7 +132,18 @@ jobs:
           #    PRs the agent opens.
           #  - Edit/Write/MultiEdit: implement the fix and add tests.
           #  - Task: invoke /simplify and /code-review:code-review subagents.
-          #  - WebFetch: occasional docs lookup (e.g. nextjs.org/docs).
+          #  - NO web egress. WebFetch/WebSearch are denied explicitly rather
+          #    than merely left off the allowlist, because this job is the
+          #    worst case for it: the prompt embeds raw Sentry event text
+          #    (messages, URLs, request bodies, user input — attacker-
+          #    influenceable production data, see prompt.ts's UNTRUSTED
+          #    markers) while the job holds contents/pull-requests/issues
+          #    write and a checkout that keeps GITHUB_TOKEN in .git/config.
+          #    An injected instruction with no outbound network tool has no
+          #    path off the runner. Same denial as bug-patrol,
+          #    feedback-distill, quality-regrade, and health-audit; pinned by
+          #    .github/scripts/ci-workflows.test.ts. Nothing in the fix
+          #    pipeline needs the network — docs live in this repo.
           # Read/Grep/Glob are already on by default. Previous runs failed
           # silently with 9–19 permission_denials each because none of the
           # write/exec tools were allowed — Claude completed turns without
@@ -144,7 +155,7 @@ jobs:
           # The fix is the payload (see sentry-api.ts) and the step-0 triage gate
           # (see prompt.ts), not a heavier model. Revisit only if triage-passing
           # (A) fixes start coming back wrong on their merits.
-          claude_args: '--model claude-sonnet-5 --allowed-tools "Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue:*),Bash(gh run list:*),Bash(gh label list:*),Bash(bun:*),Bash(bunx:*),Bash(make:*),Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task,WebFetch"'
+          claude_args: '--model claude-sonnet-5 --allowed-tools "Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue:*),Bash(gh run list:*),Bash(gh label list:*),Bash(bun:*),Bash(bunx:*),Bash(make:*),Edit,Write,MultiEdit,Read,Grep,Glob,TodoWrite,Task" --disallowedTools "WebFetch,WebSearch"'
           additional_permissions: |
             actions: read
 
