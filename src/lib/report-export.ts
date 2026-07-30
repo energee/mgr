@@ -80,9 +80,15 @@ function sanitizeFilename(filename: string): string {
  *
  * The object URL is revoked asynchronously because Firefox aborts the
  * download if the URL is invalidated synchronously after `link.click()`.
+ *
+ * A UTF-8 BOM is prepended because Excel ignores the blob's `charset=utf-8`
+ * for a file opened from disk and falls back to the system ANSI codepage — so
+ * any non-ASCII byte (the em dash in the TTB caveat rows, an accented beer or
+ * customer name) renders as mojibake in the copy someone attaches to a filing.
+ * The BOM makes Excel decode UTF-8; other CSV readers skip it.
  */
 export function downloadCSV(csv: string, filename: string): void {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
 

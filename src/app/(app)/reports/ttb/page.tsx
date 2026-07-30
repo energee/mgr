@@ -231,11 +231,14 @@ export default function TTBReportPage() {
         inProcessEnding: batchData?.inProgressVolume || 0,
       };
 
-  // TTB Form 5130.9 accounting-identity checks, scoped to the tax classes the
-  // identities can actually verify (keg, bottled). A failing row means the
-  // report disagrees with its own math (e.g. removals not deducted from ending
-  // inventory) and must be reviewed before filing. Cellar comes back "exempt"
-  // and is disclosed as unchecked below the table rather than warned about.
+  // TTB Form 5130.9 accounting-identity checks. Every row is checked unless its
+  // tax class is explicitly exempt (today only cellar, whose volume lives in
+  // the in-process columns the identities do not read) — an unrecognised class
+  // is checked, not excused, so a future finished-goods class cannot slip out of
+  // the alert silently. A failing row means the report disagrees with its own
+  // math (e.g. removals not deducted from ending inventory) and must be reviewed
+  // before filing. Exempt rows are disclosed as unchecked below the table rather
+  // than warned about.
   const identityChecks = (reportData ?? []).map(checkRowIdentities);
   const identityFailures = collectIdentityFailures(identityChecks);
   const identityExemptions = collectIdentityExemptions(identityChecks);
