@@ -45,12 +45,20 @@ const FIXTURE_ENTITY_TYPES = [
   "recipes",
   "batches",
   "purchase_orders",
+  // Gained the revision trigger in 00282 (#549); its CASE branch mirrors
+  // supplier_catalog_select -> purchasing:read.
+  "supplier_catalog",
   "finished_goods",
   "inventory_lots",
   "keg_transactions",
   "packaging_sessions",
   "allocations",
   "pricing_tier_prices",
+  // Also gained the trigger in 00282. Its branch is settings:manage, NOT a
+  // mirror of enum_values_select (`auth.uid() IS NOT NULL`) — mirroring that
+  // literally would let portal customers read the row images, which is the
+  // hole 00275 closed. Same call 00275 made for pricing_tier_prices.
+  "enum_values",
   // Not enumerated by the policy: stands in for a table that gains the
   // revision trigger in a future migration without a matching CASE branch.
   "future_untracked_table",
@@ -66,13 +74,21 @@ type FixtureEntityType = (typeof FIXTURE_ENTITY_TYPES)[number];
  *   recipes             -> recipes:read
  *   batches             -> batches:read
  *   purchase_orders     -> purchasing:read
+ *   supplier_catalog    -> purchasing:read
  *   finished_goods      -> inventory:read
  *   inventory_lots      -> inventory:read
  *   keg_transactions    -> inventory:read
  *   packaging_sessions  -> batches:read
  *   allocations         -> inventory:read
  *   pricing_tier_prices -> settings:manage
+ *   enum_values         -> settings:manage
  *   (anything else)     -> settings:manage
+ *
+ * The two settings tables are the exception to "the permission the tracked
+ * table's own SELECT policy requires": both `pricing_tier_prices_select` and
+ * `enum_values_select` admit any authenticated principal, and a portal
+ * customer is authenticated, so the revision rows are gated on settings:manage
+ * instead. See the 00282 header.
  *
  * Role -> permission comes from `get_roles_for_permission()` (00266):
  * `viewer` holds purchasing:read but not settings:manage; `sales` holds
@@ -85,6 +101,7 @@ const EXPECTED_VISIBLE: Record<string, readonly FixtureEntityType[]> = {
     "recipes",
     "batches",
     "purchase_orders",
+    "supplier_catalog",
     "finished_goods",
     "inventory_lots",
     "keg_transactions",
@@ -187,12 +204,60 @@ describe("entity_revisions SELECT is gated by the tracked table's permission (#6
     // sales holds no purchasing:read and no settings:manage.
     const salesVisible = await visibleFixtureTypes("sales");
     expect(salesVisible).not.toContain("purchase_orders");
+    expect(salesVisible).not.toContain("supplier_catalog");
     expect(salesVisible).not.toContain("pricing_tier_prices");
     // viewer holds purchasing:read (00266) so purchase-order revisions are
     // legitimately visible, but settings:manage is admin-only.
     expect(await visibleFixtureTypes("viewer")).not.toContain(
       "pricing_tier_prices",
     );
+    expect(await visibleFixtureTypes("viewer")).not.toContain("enum_values");
+  });
+
+  /**
+   * Binds the three hand-maintained copies of the entity_type -> permission
+   * mapping (the CASE in the migration, the table in
+   * docs/data-model/system.md, and FIXTURE_ENTITY_TYPES above) to the one
+   * source of truth that cannot drift: which tables actually carry the
+   * trigger. Without this, a future migration that attaches
+   * log_entity_revision() to a new table without adding a CASE branch is
+   * silently admin-only — fail-closed, so no leak, but also no signal, and
+   * docs/data-model/system.md's "add its CASE branch in the same migration"
+   * rule would be enforced only by convention.
+   */
+  it("every table carrying log_entity_revision() is enumerated by the policy", async () => {
+    const { rows: tracked } = await ownerPool.query<{ table_name: string }>(
+      `SELECT c.relname AS table_name
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+        WHERE NOT t.tgisinternal
+          AND t.tgfoid = 'log_entity_revision'::regproc
+        ORDER BY 1`,
+    );
+    const trackedTables = tracked.map((r) => r.table_name);
+    // Guards against the query silently matching nothing and passing vacuously.
+    expect(trackedTables).toContain("supplier_catalog");
+    expect(trackedTables).toContain("enum_values");
+
+    const { rows: policies } = await ownerPool.query<{ qual: string }>(
+      `SELECT qual FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = 'entity_revisions'
+          AND policyname = 'entity_revisions_select'`,
+    );
+    expect(policies).toHaveLength(1);
+    const qual = policies[0].qual;
+
+    for (const table of trackedTables) {
+      expect(
+        qual,
+        `${table} carries log_entity_revision() but entity_revisions_select has no CASE branch for it, so its revisions are silently admin-only`,
+      ).toContain(`'${table}'`);
+      expect(
+        FIXTURE_ENTITY_TYPES as readonly string[],
+        `${table} carries log_entity_revision() but this spec never probes its visibility`,
+      ).toContain(table);
+    }
   });
 });
 

@@ -87,6 +87,16 @@ describe("GitHub Actions performance contracts", () => {
     expect(dbWorkflow).not.toMatch(/\n  push:/);
     expect(dbWorkflow).not.toMatch(/- "bun\.lock"/);
     expect(dbWorkflow).toContain("bun run test:integration");
+    // The integration suite is excluded from `make check` (it needs a live
+    // Postgres — see vitest.config.ts), so db-lint is the ONLY gate that runs
+    // it. Pin its trigger paths: a PR that drops a migration's trigger, or
+    // deletes the spec asserting it, must still start this job.
+    expect(dbWorkflow, "db-lint must run on migration changes").toContain(
+      '- "supabase/migrations/**/*.sql"',
+    );
+    expect(dbWorkflow, "db-lint must run on integration-spec changes").toContain(
+      '- "src/__tests__/integration/**"',
+    );
     // SHA-pinned (tag as trailing comment) per docs/security/dependency-policy.md.
     expect(dbWorkflow).toMatch(/supabase\/setup-cli@[0-9a-f]{40} # v3/);
     expect(dbWorkflow).toContain('version: "2.109.1"');

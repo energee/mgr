@@ -111,130 +111,116 @@ source table's — see *Access control* below.
 `entity_type` is the tracked table's name. Rows are written by the
 `log_entity_revision()` trigger, currently attached to:
 
-| entity_type | Description |
-|-------------|-------------|
-| batches | Production batch changes |
-| recipes | Recipe modifications |
-| orders | Order status and field changes |
-| purchase_orders | Procurement changes |
-| finished_goods | FG adjustments |
-| inventory_lots | Lot-level inventory changes |
-| keg_transactions | Keg movement history |
-| packaging_sessions | Packaging session changes |
-| allocations | Allocation ledger changes |
-| pricing_tier_prices | Tier price changes |
+| entity_type | Attached by | Description |
+|-------------|-------------|-------------|
+| batches | `00019` | Production batch changes |
+| recipes | `00019` | Recipe modifications |
+| orders | `00019` | Order status and field changes |
+| purchase_orders | `00019` | Procurement changes |
+| finished_goods | `00019` | FG adjustments |
+| allocations | `00211` | Allocation ledger changes |
+| inventory_lots | `00213` | Lot-level inventory changes |
+| keg_transactions | `00213` | Keg movement history |
+| packaging_sessions | `00213` | Packaging session changes |
+| pricing_tier_prices | `00213` | Tier price changes |
+| supplier_catalog | `00282`† | Price / SKU / lead time edits and preferred-supplier changes |
+| enum_values | `00282`† | Status-option edits: label, color, sort_order, `is_default` |
+
+† `00282` is committed but **not yet applied to the live database** (#693), so
+those two rows describe the migration chain, not production. The ten rows above
+them are live — `supabase/live-catalog.snapshot.txt` lists exactly ten
+`tr_*_revision` triggers.
+
+No other table carries the trigger. In particular `brew_logs`, `vessels` and
+`inventory_items` do **not**, despite the brew-log detail page rendering a
+Revision History section that is therefore permanently empty (#695).
 
 ### Access control
 
-Reads are gated by migration `00275`: `entity_revisions_select` maps
-`entity_type` to the permission the tracked table's own SELECT policy
-requires (`orders` → `orders:read`, `purchase_orders` → `purchasing:read`,
-`pricing_tier_prices` → `settings:manage`, and so on). Any `entity_type` not
-enumerated falls back to `settings:manage`, so a table that gains the trigger
-without a matching CASE branch is **admin-only until the branch is added** —
-the failure mode is closed, never open.
+Reads are gated by migration `00275` (re-stated by `00282` to add
+`supplier_catalog` and `enum_values`): `entity_revisions_select` maps
+`entity_type` to the permission the tracked table's own SELECT policy requires
+(`orders` → `orders:read`, `purchase_orders` and `supplier_catalog` →
+`purchasing:read`, and so on). Any `entity_type` not enumerated falls back to
+`settings:manage`, so a table that gains the trigger without a matching CASE
+branch is **admin-only until the branch is added** — the failure mode is
+closed, never open.
+
+Two settings tables are deliberately *not* mapped to their own SELECT
+permission. `pricing_tier_prices_select` and `enum_values_select` both admit
+any authenticated principal, and a portal customer is authenticated, so
+mirroring them literally would reopen the hole `00275` closed — the revision
+rows are full row images. Both map to `settings:manage` instead, matching the
+permission their `_write` policy already requires.
 
 Portal customers hold no staff permission and therefore read zero revision
-rows. Writes are unaffected: `log_entity_revision()` is `SECURITY DEFINER`, so
-customer-initiated changes are still recorded even though the customer cannot
-read them back. Rows are immutable — there is no UPDATE or DELETE policy.
+rows. Their writes are still recorded: `log_entity_revision()` is
+`SECURITY DEFINER`, so its INSERT runs as the function's owner (`postgres`),
+which owns `entity_revisions` and is not subject to its policies — no table
+here sets `FORCE ROW LEVEL SECURITY`. Note that `SECURITY DEFINER` alone does
+not bypass RLS: RLS is evaluated against the *definer* role, and a definer
+holding neither ownership nor `BYPASSRLS` would still be checked against
+`entity_revisions_insert`. Rows are immutable — there is no UPDATE or DELETE
+policy.
 
 **When you attach `log_entity_revision()` to a new table, add its CASE branch
-to `entity_revisions_select` in the same migration.**
-
-### Actions
-
-| action | Description |
-|--------|-------------|
-| created | Entity was created |
-| updated | One or more fields changed |
-| status_changed | State machine transition |
-| deleted | Entity was soft-deleted |
-
-### Entities Using entity_revisions
-
-All stateful entities track changes via `entity_revisions`. The following entities are tracked:
-
-| Entity | entity_type | Key Changes Tracked |
-|--------|-------------|---------------------|
-| batches | batch | Status transitions, FG/ABV updates, notes |
-| brew_logs | brew_log | Status transitions, events modifications |
-| recipes | recipe | Ingredient changes, parameter updates |
-| orders | order | Status transitions, line item changes |
-| packaging_sessions | packaging_session | Status transitions, quantity adjustments |
-| finished_goods | finished_good | Quantity adjustments, location changes |
-| vessels | vessel | Status transitions, cleaning events |
-| inventory_items | inventory_item | Stock adjustments |
-
-**Note:** Legacy tables may have `revisions JSONB` columns. These should be migrated to `entity_revisions` during implementation.
+to `entity_revisions_select` in the same migration.** The integration spec
+`src/__tests__/integration/entity-revisions-rls.test.ts` enforces this: it
+reads the tracked-table list from `pg_trigger` and fails if any table carrying
+the trigger has no branch in the policy.
 
 ### Query Examples
 
-```sql
--- All changes to a specific batch
-SELECT * FROM entity_revisions
-WHERE entity_type = 'batch' AND entity_id = '...'
-ORDER BY created_at DESC;
+`entity_revisions` has no `action`, `user_id`, `previous_value` or `new_value`
+column — the trigger writes `operation` (`INSERT`/`UPDATE`/`DELETE`),
+`changed_by`, `old_data` and `new_data`, per the column table above.
 
--- All status changes today
+```sql
+-- All changes to a specific batch. entity_type is the TABLE name (plural).
 SELECT * FROM entity_revisions
-WHERE action = 'status_changed'
-AND created_at >= CURRENT_DATE;
+WHERE entity_type = 'batches' AND entity_id = '...'
+ORDER BY revision_number DESC;
+
+-- Everything deleted today, with the row image that was destroyed
+SELECT entity_type, entity_id, old_data, changed_by, changed_at
+FROM entity_revisions
+WHERE operation = 'DELETE'
+  AND changed_at >= CURRENT_DATE;
+
+-- Which supplier catalog rows lost their preferred flag, and to whom they
+-- belonged (the #549 recovery query, once 00282 is live)
+SELECT entity_id,
+       old_data->>'supplier_id' AS supplier_id,
+       changed_at
+FROM entity_revisions
+WHERE entity_type = 'supplier_catalog'
+  AND operation = 'DELETE'
+  AND (old_data->>'is_preferred')::boolean;
 
 -- Changes by a specific user
 SELECT * FROM entity_revisions
-WHERE user_id = '...'
-ORDER BY created_at DESC
+WHERE changed_by = '...'
+ORDER BY changed_at DESC
 LIMIT 50;
 ```
 
-### Migration from JSONB Revisions
+### Writing revision records
 
-For tables with legacy `revisions JSONB` columns:
+Don't. Application code never inserts into `entity_revisions` — the
+`log_entity_revision()` trigger is the only writer, and `entity_revisions_insert`
+requires `changed_by = auth.uid()`. To put a new table under the ledger, attach
+the trigger in a migration and add its CASE branch in the same migration:
 
 ```sql
--- Example migration: packaging_sessions
-INSERT INTO entity_revisions (entity_type, entity_id, action, previous_value, new_value, user_id, created_at)
-SELECT
-  'packaging_session',
-  ps.id,
-  (r->>'action')::text,
-  r->'previous_value',
-  r->'new_value',
-  (r->>'user_id')::uuid,
-  (r->>'timestamp')::timestamptz
-FROM packaging_sessions ps,
-     jsonb_array_elements(ps.revisions) r
-WHERE ps.revisions IS NOT NULL;
-
--- Then drop the column
-ALTER TABLE packaging_sessions DROP COLUMN revisions;
+CREATE TRIGGER tr_<table>_revision
+  AFTER INSERT OR UPDATE OR DELETE ON <table>
+  FOR EACH ROW EXECUTE FUNCTION log_entity_revision();
 ```
 
-### Creating Revision Records
-
-Application code should create revision records on all entity changes:
-
-```typescript
-async function createRevision(
-  entityType: string,
-  entityId: string,
-  action: 'created' | 'updated' | 'status_changed' | 'deleted',
-  changes: { field?: string; previousValue?: any; newValue?: any; reason?: string },
-  userId: string
-) {
-  await supabase.from('entity_revisions').insert({
-    entity_type: entityType,
-    entity_id: entityId,
-    action,
-    field: changes.field,
-    previous_value: changes.previousValue,
-    new_value: changes.newValue,
-    reason: changes.reason,
-    user_id: userId
-  });
-}
-```
+The table must have an `id UUID` column: the function derives `entity_id` from
+`COALESCE(NEW.id, OLD.id)` and raises `record "new" has no field "id"`
+otherwise. That is why `_schema_registry` (primary key `table_name TEXT`)
+cannot be tracked.
 
 ---
 
