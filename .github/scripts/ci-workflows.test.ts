@@ -267,6 +267,32 @@ describe("GitHub Actions performance contracts", () => {
         ).not.toMatch(/^ {4}if:/m);
       }
     }
+
+    // Route 4: the same gate one indentation level down. Everything above
+    // guards the JOB; an `if:` or `continue-on-error:` on an individual STEP
+    // leaves the job reporting success on a pull request while the step that
+    // proves anything never ran. Measured against this suite before it was
+    // pinned: `if: github.event_name == 'schedule'` on the "Run E2E tests"
+    // step, the same on "Assert the browser suite actually ran", and
+    // `continue-on-error: true` on the assert step ALL left the contract green
+    // at 64/64. Step keys sit at 8 spaces, job keys at 4.
+    // Not a blanket ban: `always()` / `!cancelled()` / `failure()` make a step
+    // run MORE often, never less, and the job needs them for artifact upload
+    // and teardown. What must not appear is a condition that can evaluate
+    // false on a pull request — an event gate, a ref test, an input check.
+    const ALWAYS_RUNS = /^\$\{\{\s*(always\(\)|!\s*cancelled\(\)|failure\(\)|success\(\)\s*\|\|\s*failure\(\))\s*\}\}$|^(always\(\)|!\s*cancelled\(\)|failure\(\))$/;
+    const e2eCode = uncommented(e2e!);
+    const stepConditions = [...e2eCode.matchAll(/^ {8}if:\s*(.+?)\s*$/gm)].map((m) => m[1]);
+    for (const cond of stepConditions) {
+      expect(
+        cond,
+        `step-level \`if: ${cond}\` in the e2e job can evaluate false on a pull request, which lets the job report success without that step having run. Only always()/!cancelled()/failure() are allowed here — they widen when a step runs, never narrow it`,
+      ).toMatch(ALWAYS_RUNS);
+    }
+    expect(
+      e2eCode,
+      "no step in the e2e job may carry `continue-on-error:` — a guard whose failure does not fail the job is not a guard",
+    ).not.toMatch(/^ {8}continue-on-error:/m);
   });
 
   // Acceptance criterion 2 of #437: missing E2E configuration must fail
@@ -303,6 +329,17 @@ describe("GitHub Actions performance contracts", () => {
     expect(code).toContain(".stats.expected");
     expect(code).toContain("E2E_MIN_PASSING");
     expectFailsLoudly(code, /::error::.*E2E test\(s\) passed/, "a vacuous (all-skipped) Playwright run");
+
+    // Pin the COMPARISON, not just the tokens around it. Measured: rewriting
+    // the test to `[ "$passed" -lt 0 ]` left every assertion above satisfied —
+    // `E2E_MIN_PASSING: "16"`, `.stats.expected`, the `::error::` and its
+    // `exit 1` were all still present — while the tripwire could never fire.
+    // Pinning the annotation but not the condition is the same "matched the
+    // text, not the behaviour" defect this block's own header warns about.
+    expect(
+      code,
+      "the vacuity floor must actually compare the passing count against $E2E_MIN_PASSING — pinning the message while the condition compares a literal is a tripwire that cannot fire",
+    ).toMatch(/-lt\s+"?\$\{?E2E_MIN_PASSING\}?"?/);
 
     // The floor must be a real one: 0 would accept an all-skipped run, and a
     // floor far below the suite would accept most of it going away. Ratchet it

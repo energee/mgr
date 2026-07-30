@@ -371,8 +371,10 @@ annotation when:
   17 enabled specs + the auth setup today). Raise both together as the
   remaining scaffolds get implemented.
 
-**Cost**, measured on every real `pull_request` event this job has ever had —
-all five landed on 2026-07-30, because before that day it had none:
+**Cost**, measured on the real `pull_request` runs of this job — all of which
+landed on 2026-07-30, because before that day it had never run on a pull
+request at all. The count is deliberately not stated: every commit that edits
+this section adds another run to it.
 
 | Run | Shape | E2E job | Whole PR |
 |---|---|---|---|
