@@ -63,7 +63,16 @@ jobs:
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
-          # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
+          # or https://code.claude.com/docs/en/cli-reference for available options.
+          #
+          # No web egress. This job runs with contents/pull-requests/issues
+          # write and reads whatever the mention thread points at — including
+          # fork-PR diffs and third-party issue text, which nobody vetted. The
+          # insider gate limits who can *start* a run, not what the run then
+          # reads, so an injected instruction in that content would otherwise
+          # have an outbound network tool in a credentialed job. Every
+          # generative job in this repo denies these two explicitly (contract
+          # in .github/scripts/ci-workflows.test.ts); if a request genuinely
+          # needs an external page, paste its content into the comment.
+          claude_args: '--disallowedTools "WebFetch,WebSearch"'

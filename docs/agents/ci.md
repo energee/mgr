@@ -36,6 +36,20 @@ sentry harness once failed the same way. The gate also echoes
 `worker-epoch: model=<id>` into each run's step summary — see
 [`improvement-loop.md`](improvement-loop.md) for what to do when it changes.
 
+**No web egress from credentialed generative jobs.** Every job that invokes
+`claude-code-action` with any `write` permission must pass
+`--disallowedTools "WebFetch,WebSearch"`, and must not grant either tool
+through `--allowedTools`. Contract-tested per job, so a new workflow inherits
+the rule. The reason is the pairing, not the tools: these agents read
+attacker-influenceable text (Sentry event payloads, fork-PR diffs, issue
+bodies) while a push-capable `GITHUB_TOKEN` sits on the runner, so an outbound
+network tool is what turns a prompt injection into exfiltration.
+`sentry-harness.yml` was the outlier that motivated the contract (issue #645) —
+it granted `WebFetch` for "occasional docs lookup" while the other four denied
+it. Denial is explicit rather than by omission because a missing entry in an
+allowlist reads as an oversight and gets "fixed". If a run genuinely needs an
+external page, paste the content into the prompt or the mention thread.
+
 ## Live apply and rollback
 
 CI never touches the live database. Migrations reach live only when a human
@@ -117,3 +131,5 @@ missing secret by design (a green cron with no secret would be worse).
    split (read-only audit job → minimal publisher job).
 4. Scheduled prompts must not interpolate event-derived text (PR titles,
    issue bodies) — that's a command-injection surface.
+5. Any generative job holding a `write` permission must pass
+   `--disallowedTools "WebFetch,WebSearch"` (see the egress note above).
