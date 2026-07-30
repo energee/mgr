@@ -337,8 +337,9 @@ green without testing anything:
   **zero** workflow runs:
 
   ```
-  gh api "repos/energee/mgr/actions/runs?head_sha=117725d1…" -q .total_count -> 0
-  gh api "repos/energee/mgr/actions/runs?head_sha=3eb41ff4…" -q .total_count -> 1
+  gh api "repos/energee/mgr/actions/runs?head_sha=117725d1…" -q .total_count -> 0  # token present
+  gh api "repos/energee/mgr/actions/runs?head_sha=3eb41ff4…" -q .total_count -> 1  # parent
+  gh api "repos/energee/mgr/actions/runs?head_sha=a7d25268…" -q .total_count -> 1  # amended, token gone
   ```
 
   No red X, no skipped check — the contexts simply never exist, and a PR with
@@ -377,7 +378,8 @@ ever to reach this job:
 |---|---|---|---|
 | [30559728366](https://github.com/energee/mgr/actions/runs/30559728366) | still had `needs: unit-tests` | 5m01s (16:07:01Z -> 16:12:02Z) | 7m55s — e2e started 2m54s late |
 | [30569164797](https://github.com/energee/mgr/actions/runs/30569164797) | no `needs:` (shipped shape) | 5m14s (18:09:29Z -> 18:14:43Z) | **5m14s** — e2e and `static` both started 18:09:29Z |
-| [30569862548](https://github.com/energee/mgr/actions/runs/30569862548) | no `needs:`, on the merged commit | 4m53s (18:19:01Z -> 18:23:54Z) | **4m53s** — same, `18 passed (22.8s)` |
+| [30569862548](https://github.com/energee/mgr/actions/runs/30569862548) | no `needs:` | 4m53s (18:19:01Z -> 18:23:54Z) | **4m53s** — `18 passed (22.8s)` |
+| [30572709446](https://github.com/energee/mgr/actions/runs/30572709446) | no `needs:`, head of #702 | 5m16s (18:57:28Z -> 19:02:44Z) | **5m16s** — `18 passed (23.6s)` |
 
 So the E2E job costs about 5 minutes (Supabase boot, a `next build` against it,
 and 23.0s of tests — `Running 23 tests using 1 worker` / `5 skipped` /
