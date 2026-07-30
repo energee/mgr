@@ -436,19 +436,24 @@ export function resetFormFromRecord(
   form: UseFormReturn<Record<string, unknown>>,
   record: Record<string, unknown>,
   formDefaults: Record<string, unknown>,
-  loadedVersionRef: React.MutableRefObject<number | null>
+  loadedVersionRef: React.MutableRefObject<number | null>,
+  loadedRecordIdRef: React.MutableRefObject<string | null>
 ): void {
   form.reset({ ...formDefaults, ...record });
-  // A successful save advances loadedVersionRef immediately (see the save
-  // handler below), but the query cache only catches up once its background
-  // refetch resolves. Editing flips false in the same tick as that refetch
-  // is kicked off, so this effect can still fire once more with the
-  // pre-save cached record. Never let that regress the ref backward, or the
-  // very next save's optimistic-lock check compares against a version the
-  // server has already moved past and reports a false conflict.
+  const recordId = typeof record.id === "string" ? record.id : null;
+  // The component instance can be reused across a navigation between two
+  // different records of the same entity (e.g. a related-record link)
+  // without unmounting, so both refs persist across records. Only guard
+  // against regression *within the same record* — a stale cache read of the
+  // record just saved, arriving before its background refetch resolves (see
+  // the save handler below, which advances loadedVersionRef immediately from
+  // the server-confirmed row). A genuinely different record must always
+  // adopt its own version, even if it's lower than the last record's.
+  const isSameRecord = loadedRecordIdRef.current === null || loadedRecordIdRef.current === recordId;
+  loadedRecordIdRef.current = recordId;
   if (
     typeof record.version === "number" &&
-    (loadedVersionRef.current === null || record.version >= loadedVersionRef.current)
+    (!isSameRecord || loadedVersionRef.current === null || record.version >= loadedVersionRef.current)
   ) {
     loadedVersionRef.current = record.version;
   }
@@ -576,6 +581,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
   const [editing, setEditing] = useState(isCreateMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const loadedVersionRef = useRef<number | null>(null);
+  const loadedRecordIdRef = useRef<string | null>(null);
   const conflictDialog = useConflictDialog();
   const [deleteAction, setDeleteAction] = useState<EntityActionDef<T> | null>(null);
   // Action awaiting user confirmation (EntityActionDef.confirm) — see runAction
@@ -660,7 +666,13 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
     if (data) {
       prevDataRef.current = data;
       if (!editing) {
-        resetFormFromRecord(form, data as Record<string, unknown>, formDefaults, loadedVersionRef);
+        resetFormFromRecord(
+          form,
+          data as Record<string, unknown>,
+          formDefaults,
+          loadedVersionRef,
+          loadedRecordIdRef
+        );
       }
     }
   }, [data, form, formDefaults, editing]);
@@ -890,7 +902,13 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
   const startEditing = useCallback(() => {
     if (!canEdit) return;
     if (data) {
-      resetFormFromRecord(form, data as Record<string, unknown>, formDefaults, loadedVersionRef);
+      resetFormFromRecord(
+        form,
+        data as Record<string, unknown>,
+        formDefaults,
+        loadedVersionRef,
+        loadedRecordIdRef
+      );
     }
     setFormErrors([]);
     setEditing(true);
@@ -1102,7 +1120,8 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
           form,
           freshData as Record<string, unknown>,
           formDefaults,
-          loadedVersionRef
+          loadedVersionRef,
+          loadedRecordIdRef
         );
         toast.info("Data refreshed. Please re-apply your changes.");
       }
