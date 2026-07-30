@@ -71,6 +71,26 @@ jobs:
           # commits and pushes go through claude-code-action's own git plumbing,
           # so no `git push` here.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          #
+          # web-egress: allowed (job: claude) — interactive, insider-gated runs
+          #   where the requesting human often wants Claude to read the page
+          #   they just linked. #655 briefly denied WebFetch/WebSearch here;
+          #   #661 dropped that when it granted this job a scoped Bash
+          #   allowlist, and this comment records why that is defensible rather
+          #   than leaving the gap undeclared. Two reasons. (1) The allowlist
+          #   below already reaches the network — Bash(bunx:*) fetches and
+          #   executes arbitrary npm packages, Bash(bun run:*) and Bash(make:*)
+          #   run this repo's scripts — so denying the two web tools while
+          #   granting those would be the false-posture pattern documented in
+          #   docs/agents/ci.md, not a closed one. (2) The threat model is
+          #   materially weaker than sentry-harness.yml's: the checkout above
+          #   sets persist-credentials: false and claude-code-action
+          #   authenticates its own writes, so no push-capable token sits in
+          #   the workspace, and a human triggered the run and is watching it.
+          #   Still not risk-free — fork-PR diffs and third-party issue text are
+          #   unvetted input and this job holds three write scopes — so the
+          #   tradeoff is #669's to settle. Contract: ci-workflows.test.ts
+          #   enumerates every such marker, so this opt-out cannot be silent.
           claude_args: >-
             --allowed-tools
             "Bash(bun install),Bash(bun install:*),Bash(bun run:*),Bash(bunx:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh run view:*)"
