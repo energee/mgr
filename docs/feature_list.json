@@ -17,6 +17,15 @@
     "manual": "Verification not yet automated — requires a human or agent to walk a UI flow. `make verify-feature` exits 4 (UNVERIFIED) unless the entry carries a dated receipt: optional `last_verified` (ISO date the flow was last walked) and `verified_by` (verify-skill transcript path or e2e spec path). Add both when marking a manual feature verified.",
     "null": "No verification defined yet. Treat as a gap to fix."
   },
+  "deployment_conventions": {
+    "migrations": "REQUIRED on every entry, in exactly one of three shapes: an array of migration filenames in supabase/migrations/ that this feature needs applied; [] when the entry has been audited and needs no schema change; \"unaudited\" when nobody has established which it is. Mandatory rather than opt-in so a forgotten field cannot make the gate vacuously pass — and three-valued because a blanket [] backfill is a claim, not an audit, and a false claim a check blesses is worse than an unread one. A declared array names the migration(s) that INTRODUCE the schema the feature depends on (its anchors), not an exhaustive history of every later ALTER that touched the same tables. Every declared name is checked against the real chain, so a renumber/rename fails loudly.",
+    "deployment": "REQUIRED once state is `passing` and `migrations` is a non-empty array. Records SCHEMA APPLICATION only — not that the feature was exercised against production (that stays in `verification` / `last_verified`). Exactly one of two shapes, no other keys: {\"state\":\"live\",\"observed_live_on\":\"YYYY-MM-DD\",\"verified_by\":[...]} or {\"state\":\"pending\",\"pending_since\":\"YYYY-MM-DD\",\"tracking_issue\":NNN}. `observed_live_on` is the date the schema was OBSERVED present on live — an upper bound on the apply date, not the apply date — and must be a real, non-future ISO date. `verified_by` MUST cite supabase/live-catalog.snapshot.txt: the check opens that snapshot and requires every table, function and trigger the declared migrations create to appear in it. The snapshot does not record views, columns or data, so a migration that only adds those is counted as \"not verifiable from the snapshot\" in the output rather than silently blessed. Other `verified_by` items may be existing repo-relative paths or \"#NNN\" issue/PR pointers; #NNN is NOT resolved — this check never reaches the network. A `pending` record's `tracking_issue` is unresolved for the same reason, so `pending_since` is the dated receipt that stops it rotting: older than 90 days fails until it is applied or re-confirmed.",
+    "enforcement": "`make check-deploy-state` (part of `make check` and the CI static job) and `make verify-feature ID=Fxxx`; both exit 4 (UNVERIFIED) on a violation. `unaudited_backlog.count` must equal the number of entries declaring \"unaudited\", so auditing one means lowering it and adding one means raising it visibly in review. Implementation: scripts/check-feature-deployment.ts.",
+    "unaudited_backlog": {
+      "count": 32,
+      "tracking_issue": 696
+    }
+  },
   "features": [
     {
       "id": "F001",
@@ -25,6 +34,7 @@
       "user_visible_behavior": "`make check` runs lint + typecheck + vitest + build; `make check-all` adds Playwright; both exit 0 on success.",
       "verification": "make check",
       "state": "passing",
+      "migrations": [],
       "evidence": "Makefile",
       "notes": "Lecture 09 — three-layer validation hierarchy."
     },
@@ -35,6 +45,7 @@
       "user_visible_behavior": "Single 50–200 line entry file (AGENTS.md) links to focused topic docs in docs/agents/.",
       "verification": "test -f AGENTS.md && ! test -f CLAUDE.md && test -d docs/agents && grep -q 'docs/agents/patterns.md' AGENTS.md",
       "state": "passing",
+      "migrations": [],
       "evidence": "AGENTS.md, docs/agents/",
       "notes": "Lecture 04 — split monolithic instruction file."
     },
@@ -43,9 +54,10 @@
       "area": "harness",
       "title": "feature_list.json + WIP=1 per branch",
       "user_visible_behavior": "Machine-readable feature tracker enforces one in-flight feature per branch.",
-      "verification": "bash scripts/verify-feature.sh F003",
+      "verification": "bun run scripts/check-wip.ts && bun run test scripts/check-feature-deployment.test.ts",
       "state": "passing",
-      "evidence": "docs/feature_list.json",
+      "migrations": [],
+      "evidence": "docs/feature_list.json, scripts/check-wip.ts, scripts/check-feature-deployment.ts",
       "notes": "Lecture 08 — feature lists as harness primitives."
     },
     {
@@ -55,6 +67,7 @@
       "user_visible_behavior": "`make check-db` (and by extension `make check`) fails if any migration violates security_invoker, RLS, or auth.users-leak rules.",
       "verification": "make check-db",
       "state": "passing",
+      "migrations": [],
       "evidence": "scripts/check-rls.ts, scripts/check-security-invoker.ts, scripts/check-auth-users-leak.ts",
       "notes": "Lecture 10 — promote prose rules to executable checks."
     },
@@ -65,6 +78,7 @@
       "user_visible_behavior": "Cross-session continuity: each session reads PROGRESS.md at start and updates it at end.",
       "verification": "test -f PROGRESS.md && test -f DECISIONS.md && test -f docs/agents/session-handoff.md",
       "state": "passing",
+      "migrations": [],
       "evidence": "PROGRESS.md, DECISIONS.md, docs/agents/session-handoff.md",
       "notes": "Lecture 05 — agents are engineers with amnesia."
     },
@@ -75,6 +89,7 @@
       "user_visible_behavior": "End-of-session: `bash scripts/cleanup-session.sh` removes session artifacts; checklist verifies clean handoff.",
       "verification": "bash scripts/cleanup-session.sh && test -f docs/agents/clean-state-checklist.md",
       "state": "passing",
+      "migrations": [],
       "evidence": "scripts/cleanup-session.sh, docs/agents/clean-state-checklist.md",
       "notes": "Lecture 12 — idempotent cleanup operations."
     },
@@ -85,6 +100,7 @@
       "user_visible_behavior": "Six-dimension 0–2 rubric used at session end and code review.",
       "verification": "test -f docs/agents/evaluator-rubric.md",
       "state": "passing",
+      "migrations": [],
       "evidence": "docs/agents/evaluator-rubric.md",
       "notes": "Lecture 11 — quality scoring via structured rubric."
     },
@@ -95,6 +111,7 @@
       "user_visible_behavior": "Per-session decision trail in .harness/sessions/; Sentry covers runtime; weekly A–D quality grades.",
       "verification": "test -d .harness/sessions && test -f docs/agents/observability.md && test -f docs/agents/quality.md",
       "state": "passing",
+      "migrations": [],
       "evidence": "docs/agents/observability.md, docs/agents/quality.md, .harness/sessions/",
       "notes": "Lecture 11 — observability inside the harness."
     },
@@ -105,6 +122,7 @@
       "user_visible_behavior": "Autonomous fix-loop fetches Sentry issues, opens fix PRs, applies labels.",
       "verification": "bun run test .github/scripts/sentry-harness",
       "state": "passing",
+      "migrations": [],
       "evidence": "commit:67bf68c (PR #244), .github/workflows/sentry-harness.yml, .github/scripts/sentry-harness/workflow.test.ts",
       "notes": "Harness workflow permissions and scoring behavior are covered by focused tests."
     },
@@ -115,6 +133,7 @@
       "user_visible_behavior": "Claude, Codex, and Grok create and discover worktrees through one shared command under ~/.agents/worktrees.",
       "verification": "bash scripts/check-agent-config.sh && bash scripts/__tests__/agent-worktree.test.sh",
       "state": "passing",
+      "migrations": [],
       "evidence": "scripts/agent-worktree,.agents/skills/worktree-manager,scripts/__tests__/agent-worktree.test.sh",
       "notes": "Canonical workflow is implemented by scripts/agent-worktree and exposed through the shared worktree-manager skill."
     },
@@ -125,6 +144,7 @@
       "user_visible_behavior": "In-app AI chat panel with streaming.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-02-ai-chat-panel.md",
       "notes": null
     },
@@ -135,6 +155,7 @@
       "user_visible_behavior": "Codebase cleanup driven by review findings.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-02-code-review-cleanup.md",
       "notes": null
     },
@@ -145,6 +166,7 @@
       "user_visible_behavior": "Fixes to the Dice data table component.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-02-dice-data-table-fixes.md",
       "notes": null
     },
@@ -155,6 +177,7 @@
       "user_visible_behavior": "Project-wide minimalist UI overhaul.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-02-minimalist-ui-{implementation-plan,redesign}.md",
       "notes": null
     },
@@ -165,8 +188,19 @@
       "user_visible_behavior": "Brand and style catalog entities and views.",
       "verification": "manual",
       "state": "passing",
+      "migrations": [
+        "00003_brands.sql"
+      ],
       "evidence": "docs/plans/2026-02-03-brands-and-styles-design.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-07",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#343"
+        ]
+      }
     },
     {
       "id": "F105",
@@ -175,6 +209,7 @@
       "user_visible_behavior": "Demand-planning view tied to inventory levels.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-03-demand-planning-and-inventory.md",
       "notes": null
     },
@@ -185,6 +220,7 @@
       "user_visible_behavior": "Expanded AI tool surface (analysis, suggestions, write actions).",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-04-ai-tools-expansion-{design,plan}.md",
       "notes": null
     },
@@ -195,6 +231,7 @@
       "user_visible_behavior": "Combobox-based relation field type for entity forms.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-04-combobox-relation-fields.md",
       "notes": null
     },
@@ -205,6 +242,7 @@
       "user_visible_behavior": "Schema and data-shape enhancements across domains.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-04-data-enhancements-{design,plan}.md",
       "notes": null
     },
@@ -215,6 +253,7 @@
       "user_visible_behavior": "Packaging UI shows batch context inline.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-04-packaging-batch-context-{design,plan}.md",
       "notes": null
     },
@@ -225,8 +264,19 @@
       "user_visible_behavior": "Tiered pricing model and UI.",
       "verification": "manual",
       "state": "passing",
+      "migrations": [
+        "00077_pricing_tiers_redesign.sql"
+      ],
       "evidence": "docs/plans/2026-02-04-pricing-tiers-redesign.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-07",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#343"
+        ]
+      }
     },
     {
       "id": "F111",
@@ -235,6 +285,7 @@
       "user_visible_behavior": "Improved AI write actions with confirmation flow.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-05-ai-write-actions-v2.md",
       "notes": null
     },
@@ -245,6 +296,7 @@
       "user_visible_behavior": "Tighter linkage between recipe, batch, and brew-log entities.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-05-recipe-batch-brewlog-cohesion{,-plan}.md",
       "notes": null
     },
@@ -255,6 +307,7 @@
       "user_visible_behavior": "Single EntityDetailUnified component replaces EntityDetail + EntityForm.",
       "verification": "bun run test src/components/universal/",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-05-unified-entity-detail-edit-{design,plan}.md",
       "notes": "Deprecates EntityDetail and EntityForm (still in repo for compat)."
     },
@@ -265,8 +318,20 @@
       "user_visible_behavior": "External-facing portal for customers to place orders.",
       "verification": "bun e2e ./e2e/customer-order.spec.ts",
       "state": "passing",
+      "migrations": [
+        "00089_customer_portal_schema.sql",
+        "00095_customer_portal_many_to_many.sql"
+      ],
       "evidence": "docs/plans/2026-02-08-customer-order-portal-{design,plan}.md, e2e/customer-order.spec.ts",
-      "notes": "Smoke-level E2E covers internal + portal entry; full flow scaffolded as test.skip pending seed data."
+      "notes": "Smoke-level E2E covers internal + portal entry; full flow scaffolded as test.skip pending seed data.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#545"
+        ]
+      }
     },
     {
       "id": "F115",
@@ -275,6 +340,7 @@
       "user_visible_behavior": "Streamlined brew-day workflow UI.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-12-brew-day-ux-{design,plan}.md",
       "notes": null
     },
@@ -285,8 +351,19 @@
       "user_visible_behavior": "Role-based access control with granular permissions.",
       "verification": "manual",
       "state": "passing",
+      "migrations": [
+        "00097_permission_based_roles.sql"
+      ],
       "evidence": "docs/plans/2026-02-12-permission-based-roles-{design,plan}.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-07",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#343"
+        ]
+      }
     },
     {
       "id": "F117",
@@ -295,6 +372,7 @@
       "user_visible_behavior": "Polish pass on pricing and keg sales flows.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-12-pricing-kegs-polish-{design,plan}.md",
       "notes": null
     },
@@ -305,6 +383,7 @@
       "user_visible_behavior": "Delete action on every entity via universal pattern.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-12-universal-entity-delete-{design,plan}.md",
       "notes": null
     },
@@ -315,6 +394,7 @@
       "user_visible_behavior": "Project-wide WCAG conformance pass.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-12-wcag-accessibility-{design,plan}.md",
       "notes": "No automated axe-core gate yet — gap candidate."
     },
@@ -325,6 +405,7 @@
       "user_visible_behavior": "Brew logs anchored on the batch detail page.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-17-batch-centric-brew-logs-{design,plan}.md",
       "notes": null
     },
@@ -335,6 +416,7 @@
       "user_visible_behavior": "Batch detail page exposes 'Start Brew Day' action.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-18-batch-centric-start-brew-day-{design,plan}.md",
       "notes": null
     },
@@ -345,6 +427,7 @@
       "user_visible_behavior": "Updated water-addition UI in recipe editor.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-18-water-additions-redesign-{design,plan}.md",
       "notes": null
     },
@@ -355,6 +438,7 @@
       "user_visible_behavior": "Keg pricing exposed through selling-format pricing tiers.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-19-keg-pricing-integration.md",
       "notes": null
     },
@@ -365,6 +449,7 @@
       "user_visible_behavior": "Selling formats visible per sales channel (retail / wholesale / etc.).",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-19-per-channel-format-visibility-design.md",
       "notes": null
     },
@@ -375,6 +460,7 @@
       "user_visible_behavior": "UX polish across service-layer interactions.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-19-service-layer-ux-improvements-design.md",
       "notes": null
     },
@@ -385,6 +471,7 @@
       "user_visible_behavior": "Recipe editor shows live water-chemistry calculations.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-19-water-chemistry-calculator-{design,plan}.md",
       "notes": null
     },
@@ -395,6 +482,7 @@
       "user_visible_behavior": "Dedicated yeast-management workflow tied to batches.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-19-yeast-workflow-{design,plan}.md",
       "notes": null
     },
@@ -405,6 +493,7 @@
       "user_visible_behavior": "Dashboard trend charts for production / inventory / sales.",
       "verification": "bun e2e ./e2e/dashboard.spec.ts",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-26-dashboard-trends-{design,plan}.md, e2e/dashboard.spec.ts",
       "notes": "Smoke-level E2E covers all three dashboard routes; chart-content assertions scaffolded as test.skip."
     },
@@ -415,6 +504,7 @@
       "user_visible_behavior": "Cross-stack perf pass (queries, bundles, render).",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-26-performance-optimizations-{design,plan}.md",
       "notes": null
     },
@@ -425,8 +515,19 @@
       "user_visible_behavior": "Container-based selling formats (kegs, cases, etc.).",
       "verification": "manual",
       "state": "passing",
+      "migrations": [
+        "00160_selling_format_materials.sql"
+      ],
       "evidence": "docs/plans/2026-03-01-container-selling-format-{plan,redesign-design}.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-07",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#343"
+        ]
+      }
     },
     {
       "id": "F131",
@@ -435,6 +536,7 @@
       "user_visible_behavior": "Updated login UI.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-03-02-login-screen-redesign-{design,plan}.md",
       "notes": null
     },
@@ -445,6 +547,7 @@
       "user_visible_behavior": "Cost-of-goods projections in dashboard / reports.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-03-05-cogs-projections-{design,plan}.md",
       "notes": null
     },
@@ -455,6 +558,7 @@
       "user_visible_behavior": "Linear-inspired UI overhaul (denser layouts, keyboard-first).",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/plans/2026-03-06-linear-ui-overhaul-{design,impl}.md",
       "notes": null
     },
@@ -465,6 +569,7 @@
       "user_visible_behavior": "Bug fixes for the recipe editor (drag-drop, calculations, save).",
       "verification": "bun e2e ./e2e/recipe-editor.spec.ts",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/superpowers/plans/2026-03-13-recipe-editor-fixes.md, commit:73c49c7 (#246), e2e/recipe-editor.spec.ts",
       "notes": "Drag-and-drop reordering merged in commit 73c49c7. Smoke-level E2E covers list and detail routes."
     },
@@ -475,6 +580,7 @@
       "user_visible_behavior": "Bug fixes for batch and vessel transfer workflow.",
       "verification": "bun e2e ./e2e/batch-transfer.spec.ts",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/superpowers/plans/2026-03-14-batch-vessel-transfer-fixes.md, e2e/batch-transfer.spec.ts",
       "notes": "Smoke-level E2E covers list and new-transfer routes; full transfer flow scaffolded as test.skip."
     },
@@ -485,8 +591,19 @@
       "user_visible_behavior": "Packaging session UI redesign (PackagingDayView, in-progress flow).",
       "verification": "bun e2e ./e2e/packaging-session.spec.ts",
       "state": "passing",
+      "migrations": [
+        "00159_packaging_sessions_redesign.sql"
+      ],
       "evidence": "docs/superpowers/plans/2026-03-14-packaging-sessions-redesign.md, e2e/packaging-session.spec.ts",
-      "notes": "Smoke-level E2E covers list and new routes; full session flow scaffolded as test.skip."
+      "notes": "Smoke-level E2E covers list and new routes; full session flow scaffolded as test.skip.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-07",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#343"
+        ]
+      }
     },
     {
       "id": "F137",
@@ -495,6 +612,7 @@
       "user_visible_behavior": "Unified material-planning system across recipes / batches / inventory.",
       "verification": "manual",
       "state": "passing",
+      "migrations": "unaudited",
       "evidence": "docs/superpowers/plans/2026-04-15-material-planning.md, commit:a2704f7 (#243)",
       "notes": null
     },
@@ -505,6 +623,17 @@
       "user_visible_behavior": "Calendar-style heatmap on the dashboard showing brew / package / sales activity per day.",
       "verification": "bun e2e ./e2e/dashboard.spec.ts",
       "state": "passing",
+      "migrations": [
+        "00170_get_planned_batches_by_day.sql"
+      ],
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-07",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#343"
+        ]
+      },
       "evidence": "PR #248, commit e3c1af3. Implementation in src/components/dashboard/batch-activity-heatmap.tsx + heatmap-utils.ts, server RPC in supabase/migrations/00170_get_planned_batches_by_day.sql. Unit tests in src/components/dashboard/__tests__/heatmap-utils.test.ts.",
       "notes": "Year-view heatmap shipped 2026-05-06. Plan + spec at docs/superpowers/{plans,specs}/2026-05-02-dashboard-activity-heatmap*.md."
     },
@@ -515,7 +644,20 @@
       "user_visible_behavior": "Admins can upload Beer orders.xlsx from Settings → Integrations, preview a non-destructive reconciliation, resolve saved customer and brand mappings, and atomically apply spreadsheet-owned order changes without consulting MongoDB.",
       "verification": "bun run test src/integrations/beer-orders src/app/api/integrations/beer-orders src/components/domain/beer-orders",
       "state": "passing",
-      "evidence": "docs/plans/2026-07-14-beer-order-spreadsheet-sync.md; 11 focused tests; real workbook parity 216 orders/1205 lines; make check; migration 00250 confirmed applied live as of 2026-07-15 — inferred from supabase/live-catalog.snapshot.txt (generated from the live catalog by scripts/db-push.sh), which carries beer_order_import_runs / beer_order_customer_mappings / beer_order_brand_mappings with RLS + read policies plus apply_beer_order_import(p_run_id uuid); snapshot re-baselined by PRs #516 (7d0b3d35) and #545 (17a9b431); not confirmed by a direct live query; live admin smoke test of upload → preview → apply still outstanding (#440); structured deployed-state field tracked in #654",
+      "migrations": [
+        "00250_beer_order_imports.sql"
+      ],
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-15",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#440",
+          "#516",
+          "#545"
+        ]
+      },
+      "evidence": "docs/plans/2026-07-14-beer-order-spreadsheet-sync.md; 11 focused tests; real workbook parity 216 orders/1205 lines; make check. Live schema state is recorded structurally in `deployment`, not here. Admin smoke test of upload -> preview -> apply against production is still outstanding (#440).",
       "branch": "feat/beer-order-sync",
       "notes": "Approved defaults: internal/taproom rows are skipped; orders absent from a later workbook are reported but never automatically deleted."
     },
@@ -525,6 +667,7 @@
       "title": "Error: ./src/components/dashboard/batch-activity-heatmap.tsx:20:1 — Module not found: Can't resolve 'react-activity-calendar'",
       "verification": "bun run test src/components/dashboard/__tests__/react-activity-calendar-dep.test.ts",
       "state": "passing",
+      "migrations": [],
       "evidence": "commit:b72f09a",
       "branch": "sentry-fix/SENTRY-7465830666",
       "notes": "Root cause: react-activity-calendar was removed by a knip audit in commit 33c0793 then re-added in commit e3c1af3 (PR #248). Sentry error MGR-4 occurred when a developer ran the dev server without running bun install after pulling. Package is correctly declared in package.json. Regression coverage: bun run typecheck fails if the import in batch-activity-heatmap.tsx cannot be resolved."
@@ -535,6 +678,7 @@
       "title": "ReferenceError: SaveAllButton is not defined",
       "verification": "bun run test src/components/domain/recipe-editor/__tests__/recipe-editor-page-definition-order.test.ts",
       "state": "passing",
+      "migrations": [],
       "evidence": "commit:e8e8a79",
       "branch": "sentry-fix/SENTRY-7452842898",
       "notes": "Root cause: Turbopack Fast Refresh re-evaluates modules top-to-bottom without JavaScript hoisting. SaveAllButton, MobileEstimatesBar, and RecipeEditorSkeleton were defined after RecipeEditorPage; EstimateCard, SummaryRow, formatNum, formatGrainWeight, formatHopWeight, and bagLabel after RecipeSidebar. Moving all helpers before the component that uses them fixes the HMR race. Regression coverage: file-read test asserts textual ordering in both source files."
@@ -546,6 +690,7 @@
       "user_visible_behavior": "RecipeSidebar crashed on /production/recipes/:id when displayUnit was plato, because a local formatSg helper called sgToPlato without importing it.",
       "verification": "bun run test src/lib/__tests__/units.test.ts",
       "state": "passing",
+      "migrations": [],
       "evidence": "commit:f22b85b",
       "branch": "sentry-fix/SENTRY-7454377645",
       "notes": "Fix was already present in main (commit 73c49c7). This entry adds the missing formatGravityFromSg test coverage that proves sgToPlato is properly in scope. PR #259 merged 2026-05-12."
@@ -556,6 +701,7 @@
       "title": "Error: No QueryClient set, use QueryClientProvider to set one",
       "verification": "bun run test src/contexts/__tests__/notifications.test.tsx",
       "state": "passing",
+      "migrations": [],
       "evidence": "commit:c8d9161",
       "branch": "sentry-fix/SENTRY-7479939863"
     },
@@ -565,6 +711,7 @@
       "title": "Error: Hydration failed because the server rendered HTML didn't match the client (culprit: /dashboard)",
       "verification": "bun run test src/components/dashboard/__tests__/dashboard-lazy-hydration.test.ts",
       "state": "passing",
+      "migrations": [],
       "evidence": "pr:396",
       "branch": "sentry-fix/SENTRY-7477285440",
       "notes": "PR #308 already fixed the originally-reported cause (ChatLayout's ChatPanel using next/dynamic(ssr:false)), merged 2026-07-05 — but the issue kept receiving new events afterward (last seen 2026-07-11, in a release that already had that fix). Root cause of the recurrence: TrendChartLazy and BatchActivityHeatmapLazy (src/components/dashboard/) also used next/dynamic({ ssr:false }), and are rendered inside ProductionTrends/SalesTrends, which sit inside a Suspense boundary that itself genuinely suspends (usePeriod() -> useSearchParams()). Nesting a dynamic(ssr:false) client-only bailout boundary inside another suspending boundary is the same class of bug already fixed for ChatLayout. Fix: converted both to React.lazy + an explicit <Suspense> at each call site (4 usages across src/app/(app)/dashboard/page.tsx and src/app/(app)/dashboard/sales/page.tsx), mirroring the established ChatLayout fix. cogs-period-chart-lazy.tsx and batch-readings-chart-lazy.tsx use the same next/dynamic(ssr:false) pattern but are not nested inside a suspending boundary, so left as-is."
@@ -576,6 +723,7 @@
       "user_visible_behavior": "MongoDB sync (POST /api/integrations/mongodb/sync) failed an entire 50-row upsert chunk whenever the source Mongo data had two documents resolving to the same onConflict key (e.g. duplicate beer_styles/brands/vessels names) — Postgres rejects a whole INSERT ... ON CONFLICT statement, not just the offending rows, when two rows in it target the same conflict key.",
       "verification": "bun run test src/integrations/mongodb/__tests__/sync.test.ts src/lib/__tests__/logger.test.ts",
       "state": "passing",
+      "migrations": [],
       "evidence": "pr:432",
       "branch": "sentry-fix/SENTRY-7542174707",
       "notes": "Root cause (2026-07-13, PR #395): upsertRows() (src/integrations/mongodb/sync.ts) sent Mongo-derived rows straight through to a single Supabase .upsert() call per 50-row chunk without deduping by the onConflict column(s) first. Fix added dedupeByConflictKey(), which keeps the last row per conflict-key value (rows missing the conflict column pass through untouched, e.g. recipes upserts with no explicit id) and logs a warning with the dropped count. The Sentry issue kept firing after that fix (36 events through 2026-07-14), so it was re-triaged: classification is (D) observability gap, not a recurrence of the original defect. logger.error(\"Upsert error for %s batch %d: %s\", table, batchIndex, error.message) is a pino printf-style call, but src/lib/logger.ts's forwardToSentry() only handled Error-instance / {err,...ctx}+message / bare-string call shapes — a printf template with substitution args fell into the bare-string branch and was forwarded to Sentry.captureMessage() UN-interpolated, so every event showed the literal template with no table name, batch index, or actual Postgres error message. That is exactly why this session's stack trace was (unavailable) and the event context was empty: the real failure is still unknown. Fixed forwardToSentry() to interpolate printf placeholders via node:util format() before forwarding (covers this and every other printf-style logger.error/fatal call site in the repo), and upgraded the two implicated sync.ts call sites (upsertRows, syncPhase) to structured logger.error({err, ...ctx}, msg) calls so they route to Sentry.captureException with a real stack instead of just a message. Followups: the underlying Postgres error that is still recurring after the 2026-07-13 dedup fix is NOT diagnosed by this session — only its reporting is fixed. The next production event for this issue will carry the real table name, batch index, and Postgres error message (or a full stack via captureException), and should be re-triaged as a fresh (A)/(B) investigation once it arrives. Investigation issue: energee/mgr#433."
@@ -587,6 +735,7 @@
       "user_visible_behavior": "The dashboard, sales, and inventory trend sections caught RPC errors (get_production_trends / get_sales_trends / get_inventory_trends) and returned an empty array from the query, so React Query treated the fetch as a success. Users saw a silently zeroed-out empty state (or, on a transient background refetch failure, a chart flip to a misleading zero) with no indication the fetch had failed. Fixed by rethrowing after logging so isError surfaces, and rendering an explicit \"Couldn't load ... trends\" DashboardEmpty state only when there is no cached data to fall back on (preserves last known-good data across transient refetchInterval polling failures).",
       "verification": "bun run test src/app/(app)/dashboard/__tests__/production-trends.test.tsx",
       "state": "passing",
+      "migrations": [],
       "evidence": "pr:398",
       "branch": "sentry-fix/SENTRY-7597067731",
       "notes": "Pattern scan found the identical swallow-and-return-[] bug duplicated in all three dashboard trend queries (dashboard/page.tsx ProductionTrends, dashboard/inventory/page.tsx InventoryTrends, dashboard/sales/page.tsx SalesTrends); all three fixed identically."
@@ -598,6 +747,7 @@
       "user_visible_behavior": "BatchActivityHeatmap on /dashboard logged RPC errors by passing a destructured plain object to log.error instead of the real PostgrestError instance, so client-logger's instanceof-Error check missed it and Sentry captured only the generic literal message with no stack or detail. Same anti-pattern found and fixed in NotificationsProvider's fetch-notifications error path.",
       "verification": "bun run test src/components/dashboard/__tests__/batch-activity-heatmap.test.tsx src/contexts/__tests__/notifications.test.tsx",
       "state": "passing",
+      "migrations": [],
       "evidence": "pr:397",
       "branch": "sentry-fix/SENTRY-7597067759"
     },
@@ -608,6 +758,7 @@
       "user_visible_behavior": "Second recurrence of this Sentry issue, different root cause than the first. On /sales/customers/:id (dev environment), NotificationsProvider's unread-notifications fetch failed with a browser-level \"TypeError: Failed to fetch\" while calling the Supabase REST endpoint. Classified (D) observability gap: postgrest-js's fetch `.catch()` handler wraps network-level failures (and some Postgrest error responses) as a plain object literal `{ message, details, hint, code }` that is NOT an `instanceof Error`, despite its `PostgrestError` TS type claiming otherwise, so client-logger.ts's `instanceof Error` check missed it and Sentry got a stack-less captureMessage instead of the real message/stack/code. Fixed client-logger.ts to also recognize and unwrap Postgrest-error-shaped plain objects into a real Error (preserving message, stack from `details`, and code/hint as extra) before forwarding to Sentry.captureException — this applies to every log.error/log.warn call site in the app, not just notifications. The underlying network failure itself (why the fetch to Supabase failed) is still unresolved infra/(B) and is tracked in a separate GitHub issue, since it isn't fixable from application code. First recurrence (lock-steal AbortError from a non-singleton browser client) was fixed separately — see notes.",
       "verification": "bun run test src/lib/__tests__/client-logger.test.ts",
       "state": "passing",
+      "migrations": [],
       "evidence": "pr:513",
       "branch": "sentry-fix/SENTRY-7597067722",
       "notes": "History: first occurrence fixed by making src/lib/supabase/client.ts's createClient() a module-scoped singleton (lock-steal AbortError root cause). This second occurrence is a different symptom (network-level fetch failure) that exposed a pre-existing observability gap in client-logger.ts; see GitHub issue #514 for the still-unresolved network failure."
@@ -618,6 +769,7 @@
       "title": "Hydration Error (culprit: /dashboard)",
       "verification": "bun run test src/hooks/__tests__/use-persisted-page-size.test.tsx",
       "state": "passing",
+      "migrations": [],
       "evidence": "pr:407",
       "branch": "sentry-fix/SENTRY-7477285482",
       "notes": "This issue ID has a three-act history on /dashboard: PR #297 fixed a prefill-store sessionStorage read happening during render; PR #306 fixed unpinned toLocaleDateString()/toLocaleString() locale mismatches; the issue kept recurring afterward (last seen 2026-07-11T02:25:44Z, release 00fbe79). The sibling Sentry issue MGR-6 (SENTRY-7477285440) — same culprit, same release, same last-seen minute — was root-caused to TrendChartLazy/BatchActivityHeatmapLazy using next/dynamic({ssr:false}) nested inside a genuinely-suspending Suspense (usePeriod->useSearchParams), and fixed by PR #396 (already merged before this run). Confirmed current dashboard/page.tsx and dashboard/sales/page.tsx already reflect that fix, so no further /dashboard-specific change was needed for this recurrence. Pattern scan for the same defect class (browser-storage read during render instead of in an effect — the exact mechanism of this issue's first fix in PR #297) found one more live instance: usePersistedPageSize (src/hooks/use-persisted-page-size.ts), used by EntityDataTable on every entity list page, read localStorage inside a useState lazy initializer. Fixed by deferring the read to useEffect, mirroring usePrefillHydration (PR #407)."
@@ -629,6 +781,7 @@
       "user_visible_behavior": "While developing the sitewide server-prefetch loading pattern, importing an assembled entity presentation (e.g. batchEntity) from a Server Component crashed: createRevisionHistoryDisplay() is invoked eagerly at module scope inside every entity presentation.tsx, and its defining file carried an unnecessary \"use client\" directive even though it uses no hooks itself (the real hook logic lives in the child RevisionHistory component, which already has its own directive). Removed the incorrect directive so the factory can be called safely regardless of which context imports the presentation module. The same eagerly-invoked-factory-in-a-\"use client\"-file pattern existed for createQBOSyncDisplay (used by customer/supplier/order/purchase-order presentations); extracted it into a new non-client qbo-sync-display.tsx, mirroring the existing revision-history split, so QBOSyncSection keeps its (genuinely required) \"use client\" directive in its own file.",
       "verification": "bun run test src/components/domain/shared/__tests__/entity-config-client-boundary.test.ts",
       "state": "passing",
+      "migrations": [],
       "evidence": "pr:497",
       "branch": "sentry-fix/SENTRY-7611936148"
     },
@@ -639,6 +792,7 @@
       "user_visible_behavior": "Dev-only /_error crash on /production/batches (5 events, 2026-07-15T06:00-06:05Z, release 492ff277, worktree loading-pattern). A prior revision of production/batches/loading.tsx imported the assembled batchEntity from '@/entities/batch' (a client module) instead of the server-safe batchCore, purely to read listColumns.length for a skeleton. presentation.tsx calls the client-only factory createRevisionHistoryDisplay(\"batches\") at module-evaluation top level (exported by a \"use client\" file), so evaluating that import chain in the server module graph threw exactly this error.",
       "verification": "bun run test src/app/__tests__/server-entity-import-boundary.test.ts",
       "state": "passing",
+      "migrations": [],
       "evidence": "branch:sentry-fix/SENTRY-7611936203",
       "branch": "sentry-fix/SENTRY-7611936203",
       "notes": "Root cause already fixed on main before this harness run: commit c6b5539 (PR #453, authored 2026-07-15T07:11:53Z — after the last Sentry event at 06:05:31Z) rewrote loading.tsx to render null instead of importing batchEntity. Verified current production/batches/loading.tsx, page.tsx, and every other src/app server file import only *Core (server-safe) modules or @/entities/cores, never an assembled client entity config. No code fix was needed; added a regression test (server-entity-import-boundary.test.ts) that statically walks every non-\"use client\" file under src/app and fails if any imports an assembled @/entities/<name> config, so this class of RSC-boundary violation can't silently reappear. Confirmed the test fails against the exact pre-fix loading.tsx content and passes on current main."

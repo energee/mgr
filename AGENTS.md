@@ -30,6 +30,7 @@ Layered: static → unit → E2E. **No layer advances until the previous one is 
 | `make check-all` | 1+2+3 | Before PR / merge — adds Playwright E2E |
 | `make verify-feature ID=F003` | per-feature | At any time (per [`docs/feature_list.json`](docs/feature_list.json)) |
 | `make check-db` | DB rules | Already part of `make check`; runs the SQL security checks alone |
+| `make check-deploy-state` | tracker | Already part of `make check`; audits `migrations` / `deployment` in the feature tracker alone |
 
 Run `make help` to list every target.
 
@@ -44,7 +45,34 @@ Run `make help` to list every target.
 
 For features with `verification: "manual"`, exit 0 requires a dated receipt on the entry: `last_verified` (ISO date the flow was last walked) and `verified_by` (verify-skill transcript path or e2e spec path). Without one, `make verify-feature` exits 4 (UNVERIFIED) — walk the flow, then record the receipt.
 
-For features whose verification touches a migration, `passing` means code and tests pass — it does not mean the migration is applied on the live database, and the two must not be conflated. If the migration can't be pushed live in-session (no `SUPABASE_DB_URL`, or live-apply is a human/operator step), say so in the `evidence` field (e.g. `migration 00250 pending live apply`) and leave a tracking issue open until an operator confirms application and updates `evidence` to record the date. F201 (#440) sat "passing" for 12+ days across three separate status checks while migration 00250 was still unconfirmed live — `passing` alone doesn't tell the next reader that.
+`state` says nothing about the live database, so deployment state is a **separate, structured, enforced field** — not prose in `evidence` (#654). Every entry MUST carry `migrations`, in exactly one of three shapes:
+
+| Value | Means |
+|---|---|
+| `["00250_beer_order_imports.sql"]` | audited: these migrations introduce the schema it needs |
+| `[]` | audited: needs no schema change |
+| `"unaudited"` | **not** audited — nothing is claimed either way |
+
+The sentinel exists because a blanket `[]` backfill is a claim, not an audit, and a false claim a check blesses is worse than an unread one. **The gate's coverage is partial and it says so on every run** — as of 2026-07-30, 8 entries are migration-backed, 22 are audited as needing no schema change, and 32 read `"unaudited"`, about which it asserts nothing (backlog: #696). Do not trust that split from this sentence; run `make check-deploy-state`, which prints the current one. The unaudited count is ratcheted against `deployment_conventions.unaudited_backlog.count`, so adding to it takes a visible edit.
+
+Once an entry with a non-empty `migrations` list is `passing`, it MUST also carry `deployment`, in exactly one of two shapes and with no other keys:
+
+```json
+"migrations": ["00250_beer_order_imports.sql"],
+"deployment": { "state": "live", "observed_live_on": "2026-07-15", "verified_by": ["supabase/live-catalog.snapshot.txt", "#516"] }
+```
+
+…or, while live-apply is still waiting on an operator, `"deployment": { "state": "pending", "pending_since": "2026-07-30", "tracking_issue": 440 }`.
+
+`deployment` records **schema application only** — not that the feature was exercised against production; that stays in `verification` / `last_verified`. What is actually checked, and what is not:
+
+- `observed_live_on` is the date the schema was **observed** present on live — an upper bound on the apply date, not the apply date. Real, non-future ISO date.
+- `verified_by` MUST cite `supabase/live-catalog.snapshot.txt`. The gate opens it and requires every table, function and trigger the declared migrations create to appear there. Views, columns and data are not in the snapshot, so a migration that only adds those is reported as "not verifiable from the snapshot" rather than blessed.
+- A `#NNN` item is a **pointer for a human**, not a proof: nothing resolves it (the gate never reaches the network). Same for `pending.tracking_issue` — which is why `pending_since` must be re-confirmed at least every 90 days.
+
+Use `pending` when the migration can't be pushed in-session — no `SUPABASE_DB_URL`, or live-apply is an operator step.
+
+`make check-deploy-state` (in `make check` and in CI) and `make verify-feature ID=Fxxx` both read these fields and exit 4 (UNVERIFIED) on a violation, including a migration-backed entry that reads `passing` with no record at all. F201 (#440) sat "passing" for 12+ days across three status checks while migration 00250 was unconfirmed live, and the free-text fix that followed went stale within two weeks; that is why the field is machine-checked. Full field reference: `deployment_conventions` in [`docs/feature_list.json`](docs/feature_list.json).
 
 ## Shared worktrees
 

@@ -218,10 +218,10 @@ If — and only if — the root cause genuinely lies in app code, proceed:
 10. **Apply review fixes** — address each finding from step 9.
 11. **Re-validate** — if step 10 changed anything, run \`bun run typecheck\`, \`bun run test\`, \`bun lint\` again.
 12. **Update harness state** — three short writes:
-    - Append a feature entry to \`docs/feature_list.json\` with \`id: "SENTRY-${issue.issueId}"\`, \`area: "infra"\`, the issue title, \`verification: "<test command>"\`, \`state: "passing"\`, \`branch: "sentry-fix/SENTRY-${issue.issueId}"\`, and \`evidence: "branch:sentry-fix/SENTRY-${issue.issueId}"\`. Use the branch name (a stable ref) rather than a commit SHA — SHAs go stale on rebase/amend/squash between this step and step 14.
+    - Append a feature entry to \`docs/feature_list.json\` with \`id: "SENTRY-${issue.issueId}"\`, \`area: "infra"\`, the issue title, \`verification: "<test command>"\`, \`state: "passing"\`, \`branch: "sentry-fix/SENTRY-${issue.issueId}"\`, \`evidence: "branch:sentry-fix/SENTRY-${issue.issueId}"\`, and \`migrations\` — **required on every entry** (#654), and \`make check\` in step 13 fails exit 4 without it. Your fix is classification (A) or (D), so it is application code: write \`"migrations": []\` unless you actually added a file under \`supabase/migrations/\`, in which case list its filename and add the matching \`deployment\` record per AGENTS.md "Work-in-progress rule". Do **not** write the \`"unaudited"\` sentinel — it is for the historical backfill (#696), not for entries whose author knows the answer. Use the branch name (a stable ref) rather than a commit SHA — SHAs go stale on rebase/amend/squash between this step and step 14.
     - Add a progress note as a NEW file \`docs/progress/<YYYY-MM-DD>-sentry-SENTRY-${issue.issueId}.md\` containing one bullet: \`- **<YYYY-MM-DD> (<title>).** <one or two sentences>\`. Do **not** edit \`PROGRESS.md\` — AGENTS.md constraint 18: it is generated on main by CI, and editing it on a branch guarantees a conflict.
     - Write a session trace to \`.harness/sessions/<YYYY-MM-DD>-SENTRY-${issue.issueId}.md\` using the template in \`docs/agents/observability.md\`.
-13. **Run \`make check\`** — final layered gate including \`check-db\` and \`check-wip\`. Must exit 0.
+13. **Run \`make check\`** — final layered gate including \`check-db\`, \`check-wip\` and \`check-deploy-state\`. Must exit 0.
 14. **Declare the PR** — write \`outbox/plan.json\` with \`classification: "A"\` and \`pr.title\` (a conventional-commit subject: \`fix: …\`), and write the body from the template below to \`outbox/${BODY_FILES.pr}\`. Leave your changes uncommitted in the working tree. The lander commits them onto \`sentry-fix/SENTRY-${issue.issueId}\`, pushes, opens the PR, and applies the labels.
 
 ## Guardrails
@@ -293,10 +293,10 @@ Classified **(A) application code**. <why this is not (B) database/infra or (C) 
 - [x] Lint clean
 - [x] /simplify pass completed
 - [x] /code-review pass completed
-- [x] feature_list.json updated with SENTRY-${issue.issueId} entry
+- [x] feature_list.json updated with SENTRY-${issue.issueId} entry (including \`migrations\`)
 - [x] docs/progress/<date>-sentry-SENTRY-${issue.issueId}.md added (PROGRESS.md untouched)
 - [x] .harness/sessions/<date>-SENTRY-${issue.issueId}.md trace written
-- [x] make check passes (incl. check-db and check-wip)
+- [x] make check passes (incl. check-db, check-wip and check-deploy-state)
 \`\`\`
 
 Begin with step 0.`;

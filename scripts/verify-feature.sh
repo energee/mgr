@@ -46,6 +46,17 @@ fi
 echo "==> Feature $ID"
 echo "$FEATURE_JSON"
 
+# Structured deployment gate (#654). A migration-backed entry cannot pass
+# verification on code/test evidence alone: `migrations` says what schema it
+# needs and `deployment` says whether that schema is live. Runs before the
+# verification command itself and for every `verification` kind — an
+# executable test suite proves nothing about the live database. Same severity
+# as the manual-receipt path below: exit 4 (UNVERIFIED).
+echo
+if ! bun run "$REPO_ROOT/scripts/check-feature-deployment.ts" "$ID"; then
+  exit 4
+fi
+
 VERIFICATION=$(echo "$FEATURE_JSON" | bun -e "
 const f = JSON.parse(require('fs').readFileSync(0, 'utf8'));
 console.log(f.verification ?? '');

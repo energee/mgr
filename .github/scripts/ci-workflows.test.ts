@@ -47,6 +47,9 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).toContain("tsconfig.tsbuildinfo");
     expect(workflow).toContain("make check-db");
     expect(workflow).toContain("make check-wip");
+    // #654: the deployment-record gate is only worth having if it runs on
+    // every PR. `make check` includes it locally; this pins it in CI too.
+    expect(workflow).toContain("make check-deploy-state");
     expect(workflow).toContain("make check-agent-config");
     expect(workflows.map(read).join("\n")).not.toContain("cache: true");
   });

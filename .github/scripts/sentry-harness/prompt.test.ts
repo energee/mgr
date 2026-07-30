@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { auditFeatureDeployment } from "../../../scripts/check-feature-deployment";
 import { BODY_FILES, parsePlan } from "./outbox";
 import { buildFixPrompt } from "./prompt";
 import type { SentryIssue } from "./types";
@@ -85,6 +86,35 @@ describe("buildFixPrompt", () => {
     expect(prompt).toContain("docs/progress/");
     expect(prompt).toContain(".harness/sessions/");
     expect(prompt).toContain("make check");
+  });
+
+  // #654 added a `migrations` field that is REQUIRED on every tracker entry,
+  // and step 13 runs `make check`, which now enforces it. This harness is the
+  // only automated writer of tracker entries in the repo, so the template it
+  // dictates has to satisfy the gate it will then be graded by.
+  it("dictates a feature entry that satisfies the deployment-state gate", () => {
+    const prompt = buildFixPrompt(issue);
+    expect(prompt).toContain('"migrations": []');
+    expect(prompt).toContain("check-deploy-state");
+    // The sentinel is for the historical backfill only; an author who knows
+    // the answer must not reach for it.
+    expect(prompt).toMatch(/Do \*\*not\*\* write the .{0,4}"unaudited".{0,4} sentinel/);
+
+    const entry = {
+      id: `SENTRY-${issue.issueId}`,
+      state: "passing",
+      migrations: [],
+      verification: "bun run test src/lib/foo.test.ts",
+      evidence: `branch:sentry-fix/SENTRY-${issue.issueId}`,
+    };
+    const { violations } = auditFeatureDeployment([entry], {
+      migrationFiles: [],
+      readMigration: () => "",
+      liveCatalog: [],
+      pathExists: () => false,
+      today: "2026-07-30",
+    });
+    expect(violations).toEqual([]);
   });
 
   it("mentions required quality gates (simplify, code-review)", () => {

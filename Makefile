@@ -7,7 +7,8 @@
 #   make help          list every target
 #   make setup         install deps and run bootstrap script
 #   make dev           start Next.js dev server
-#   make check         pre-commit gate (lint + typecheck + test + check-db + check-wip + build)
+#   make check         pre-commit gate (lint + typecheck + test + check-db + check-wip +
+#                      check-deploy-state + build)
 #   make check-all     full gate plus Playwright E2E
 
 SHELL := /bin/bash
@@ -15,7 +16,8 @@ SHELL := /bin/bash
 
 .PHONY: help setup dev build \
         lint typecheck test e2e \
-        check-fast check check-all check-db check-wip check-coverage check-agent-config \
+        check-fast check check-all check-db check-wip check-deploy-state \
+        check-coverage check-agent-config \
         verify-feature feature-mark \
         worktree worktree-list worktree-doctor \
         db-generate db-generate-local db-migrate db-seed db-dry-run db-local \
@@ -74,10 +76,13 @@ check-db: ## DB rule checks (security_invoker / RLS / auth.users / search_path /
 check-wip: ## Verify WIP=1 per branch in feature_list.json
 	@bun run scripts/check-wip.ts
 
+check-deploy-state: ## Verify migration-backed features carry a structured deployment record
+	@bun run scripts/check-feature-deployment.ts
+
 check-coverage: ## Vitest with coverage (thresholds enforced via vitest.config.ts)
 	@bun run test:coverage
 
-check: lint typecheck check-agent-config check-writes test check-db check-wip build ## Layers 1+2: pre-commit gate
+check: lint typecheck check-agent-config check-writes test check-db check-wip check-deploy-state build ## Layers 1+2: pre-commit gate
 	@echo "OK: check passed"
 
 check-all: check e2e ## Layers 1+2+3: full gate including Playwright E2E
