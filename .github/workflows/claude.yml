@@ -63,7 +63,14 @@ jobs:
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
-          # Optional: Add claude_args to customize behavior and configuration
+          # Without an explicit allowlist the action's Bash tool is limited to a
+          # tiny default set, so Claude cannot run this repo's own tooling — it
+          # hit exactly that on PR #648 (couldn't `bun install` to regenerate a
+          # dependabot lockfile) and had to hand the fix back to a human.
+          # Scoped to package-manager / build / read-only inspection commands;
+          # commits and pushes go through claude-code-action's own git plumbing,
+          # so no `git push` here.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
+          claude_args: >-
+            --allowed-tools
+            "Bash(bun install),Bash(bun install:*),Bash(bun run:*),Bash(bunx:*),Bash(make:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh run view:*)"
