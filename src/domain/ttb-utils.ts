@@ -464,9 +464,13 @@ export type TTBTotalScope = "packaged-only" | "all-classes";
  * KNOWN CONSEQUENCE (tracked as issue #698): mixing the two scopes down one
  * column means the Total column does not cross-foot. `ending = available −
  * removals` holds on each packaged row, but the Total's removals include the
- * cellar's, which have no packaged ending-inventory cell to reduce — so Total
- * ending inventory is short of Total available − Total removals by exactly the
- * exempt classes' removals. `getTotalScopeCaveat` states this on every surface.
+ * cellar's, which draw down no packaged available — so `Total available −
+ * Total removals` lands *below* Total ending inventory, by exactly the exempt
+ * classes' removals. Worked from the parity fixture: available 185.00 −
+ * removals 43.25 = 141.75, against ending inventory 143.25 — an excess of 1.50,
+ * the cellar's `total_removals_bbl`. The direction is load-bearing: a reader
+ * told ending inventory is "short" would go looking for missing beer that does
+ * not exist. `getTotalScopeCaveat` states this on every surface.
  * The alternative (dropping cellar removals to make the column cross-foot)
  * understates real, non-duplicated removals, which is the worse error on a
  * federal filing-prep screen.
@@ -587,8 +591,9 @@ export function getTotalScopeCaveat(rows: readonly TTBReportRow[]): string | nul
     "still in the cellar is beer that left the brewery and no packaged line " +
     "reports it again, and beer in process is one measurement at one stage. " +
     `One consequence: the ${TOTAL_COLUMN_LABEL} column does not cross-foot — ` +
-    "ending inventory is short of available minus removals by exactly those " +
-    "cellar removals, which have no packaged inventory line to reduce."
+    "available minus removals comes out below ending inventory, by exactly " +
+    "those cellar removals, which draw down no packaged available. Ending " +
+    "inventory is not short; the subtraction is."
   );
 }
 

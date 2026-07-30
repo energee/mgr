@@ -365,10 +365,12 @@ describe("Total column scoping (issue #670)", () => {
     );
   });
 
-  it("does NOT cross-foot ending = available - removals, short by the cellar removals", () => {
+  it("does NOT cross-foot: available - removals lands BELOW ending, by the cellar removals", () => {
     // The documented consequence of mixing scopes down one column: the cellar's
-    // removals are real (00274) but have no packaged inventory line to reduce.
-    // Pinned so the shortfall stays exactly this and nothing else.
+    // removals are real (00274) but draw down no packaged available, so the
+    // subtraction comes up short — the ending inventory does not. Sign matters:
+    // `gap` is NEGATIVE, i.e. ending EXCEEDS available - removals. Pinned so the
+    // excess stays exactly this and nothing else.
     const cellar = makeCellarRow(); // total_removals 1.5
     const rows = [
       cellar,
@@ -468,6 +470,24 @@ describe("Total column caveat (issue #670)", () => {
   it("discloses that the Total column does not cross-foot", () => {
     const caveat = getTotalScopeCaveat(rows) ?? "";
     expect(caveat).toContain("does not cross-foot");
+  });
+
+  it("states the cross-foot direction the way the arithmetic actually goes", () => {
+    // The first version of this caveat said ending inventory was "short of"
+    // available minus removals. It is the other way round: the cellar's
+    // removals inflate the subtrahend, so `available - removals` lands BELOW
+    // ending inventory. A reader told ending was short would go hunting for
+    // beer that is not missing. Asserted against the computed sign rather than
+    // against a fixed string, so the prose cannot drift away from the numbers.
+    const gap =
+      totalForColumn(rows, "total_available_bbl") -
+      totalForColumn(rows, "total_removals_bbl") -
+      totalForColumn(rows, "ending_inventory_bbl");
+    expect(gap).toBeLessThan(0); // ending exceeds available - removals
+
+    const caveat = getTotalScopeCaveat(rows) ?? "";
+    expect(caveat).toContain("below ending inventory");
+    expect(caveat).not.toMatch(/ending inventory is short/i);
   });
 
   it("takes the excluded class names from the exemption list", () => {
