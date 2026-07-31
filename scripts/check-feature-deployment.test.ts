@@ -506,7 +506,17 @@ describe("the committed tracker", () => {
     // The point of the sentinel: `noSchema` is a claim, so it may only cover
     // entries somebody checked. If this ever equals `checked`, the backfill
     // came back.
-    expect(stats.unaudited).toBeGreaterThan(0);
+    //
+    // This used to assert `stats.unaudited > 0`, which was a proxy for the
+    // same thing that only held while the backlog was non-empty. #724 captured
+    // the last live-only table and drove it to 0 by auditing, not by
+    // backfilling, so the proxy started reporting a success as a failure.
+    // Asserting the backfill signature directly survives that: a blanket `[]`
+    // sweep shows up as every checked entry landing in `noSchema`, whatever
+    // the sentinel count happens to be. The ratchet in `auditUnauditedBacklog`
+    // (tested above) is what keeps re-adding a sentinel a visible edit.
+    expect(stats.noSchema).toBeLessThan(stats.checked);
+    expect(stats.migrationBacked).toBeGreaterThan(0);
     expect(stats.noSchema + stats.migrationBacked + stats.unaudited).toBe(stats.checked);
   });
 

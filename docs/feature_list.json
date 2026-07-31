@@ -22,7 +22,7 @@
     "deployment": "REQUIRED once state is `passing` and `migrations` is a non-empty array. Records SCHEMA APPLICATION only — not that the feature was exercised against production (that stays in `verification` / `last_verified`). Exactly one of two shapes, no other keys: {\"state\":\"live\",\"observed_live_on\":\"YYYY-MM-DD\",\"verified_by\":[...]} or {\"state\":\"pending\",\"pending_since\":\"YYYY-MM-DD\",\"tracking_issue\":NNN}. `observed_live_on` is the date the schema was OBSERVED present on live — an upper bound on the apply date, not the apply date — and must be a real, non-future ISO date. `verified_by` MUST cite supabase/live-catalog.snapshot.txt: the check opens that snapshot and requires every table, function and trigger the declared migrations create to appear in it. The snapshot does not record views, columns or data, so a migration that only adds those is counted as \"not verifiable from the snapshot\" in the output rather than silently blessed. Other `verified_by` items may be existing repo-relative paths or \"#NNN\" issue/PR pointers; #NNN is NOT resolved — this check never reaches the network. A `pending` record's `tracking_issue` is unresolved for the same reason, so `pending_since` is the dated receipt that stops it rotting: older than 90 days fails until it is applied or re-confirmed.",
     "enforcement": "`make check-deploy-state` (part of `make check` and the CI static job) and `make verify-feature ID=Fxxx`; both exit 4 (UNVERIFIED) on a violation. `unaudited_backlog.count` must equal the number of entries declaring \"unaudited\", so auditing one means lowering it and adding one means raising it visibly in review. Implementation: scripts/check-feature-deployment.ts.",
     "unaudited_backlog": {
-      "count": 1,
+      "count": 0,
       "tracking_issue": 696
     }
   },
@@ -545,9 +545,10 @@
       "user_visible_behavior": "Selling formats visible per sales channel (retail / wholesale / etc.).",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": ["00285_capture_channel_formats.sql"],
+      "deployment": { "state": "pending", "pending_since": "2026-07-31", "tracking_issue": 724 },
       "evidence": "docs/plans/2026-02-19-per-channel-format-visibility-design.md",
-      "notes": "Still unaudited for a structural reason: the shipped UI reads/writes channel_formats, which exists on live but is created by no migration in the chain (a #217 renumbering casualty). Needs a capture migration (00214 pattern) before it can be anchored. Tracked in #724."
+      "notes": "Anchored by the 00285 capture migration (#724), which brings the live-only channel_formats table — a #217 renumbering casualty the shipped UI reads and writes — into the chain. deployment is \"pending\", not \"live\", because 00285 itself has not been pushed: the tables it declares are already present on live (which is why the feature works in production and why the snapshot lists both), but section 4 of the migration also restores 00125's RLS tightening on the superseded pricing_channel_formats table, and that part has never applied to live. Flip to \"live\" once an operator runs scripts/db-push.sh."
     },
     {
       "id": "F125",
