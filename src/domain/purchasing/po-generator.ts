@@ -146,10 +146,14 @@ export async function createDraftPO(draft: PODraft): Promise<string> {
   // Generate PO number
   const poNumber = await generateNextPONumber();
 
-  // Calculate expected date
+  // Calculate expected date. `order_by_date` parses as UTC midnight, so the
+  // offset must be applied with the UTC setters — mixing them with the local
+  // getDate()/setDate() shifts the result by a day whenever the addition
+  // crosses a DST transition (host-timezone dependent). Same rule as
+  // src/integrations/quickbooks/sync-utils.ts's addDays.
   const orderByDate = new Date(draft.order_by_date);
   const expectedDate = new Date(orderByDate);
-  expectedDate.setDate(expectedDate.getDate() + (draft.max_lead_time_days ?? 7));
+  expectedDate.setUTCDate(expectedDate.getUTCDate() + (draft.max_lead_time_days ?? 7));
 
   // Create the PO
   const { data: po, error: poError } = await supabase
