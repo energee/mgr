@@ -22,7 +22,7 @@
     "deployment": "REQUIRED once state is `passing` and `migrations` is a non-empty array. Records SCHEMA APPLICATION only — not that the feature was exercised against production (that stays in `verification` / `last_verified`). Exactly one of two shapes, no other keys: {\"state\":\"live\",\"observed_live_on\":\"YYYY-MM-DD\",\"verified_by\":[...]} or {\"state\":\"pending\",\"pending_since\":\"YYYY-MM-DD\",\"tracking_issue\":NNN}. `observed_live_on` is the date the schema was OBSERVED present on live — an upper bound on the apply date, not the apply date — and must be a real, non-future ISO date. `verified_by` MUST cite supabase/live-catalog.snapshot.txt: the check opens that snapshot and requires every table, function and trigger the declared migrations create to appear in it. The snapshot does not record views, columns or data, so a migration that only adds those is counted as \"not verifiable from the snapshot\" in the output rather than silently blessed. Other `verified_by` items may be existing repo-relative paths or \"#NNN\" issue/PR pointers; #NNN is NOT resolved — this check never reaches the network. A `pending` record's `tracking_issue` is unresolved for the same reason, so `pending_since` is the dated receipt that stops it rotting: older than 90 days fails until it is applied or re-confirmed.",
     "enforcement": "`make check-deploy-state` (part of `make check` and the CI static job) and `make verify-feature ID=Fxxx`; both exit 4 (UNVERIFIED) on a violation. `unaudited_backlog.count` must equal the number of entries declaring \"unaudited\", so auditing one means lowering it and adding one means raising it visibly in review. Implementation: scripts/check-feature-deployment.ts.",
     "unaudited_backlog": {
-      "count": 32,
+      "count": 1,
       "tracking_issue": 696
     }
   },
@@ -144,9 +144,20 @@
       "user_visible_behavior": "In-app AI chat panel with streaming.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00064_ai_api_key_settings.sql",
+        "00266_durable_ai_chat_rate_limit.sql"
+      ],
       "evidence": "docs/plans/2026-02-02-ai-chat-panel.md",
-      "notes": null
+      "notes": "Two anchors: the first stores the API key (a column, a settings row and RLS policies — nothing the snapshot records), the second creates ai_rate_limit_buckets and consume_ai_rate_limit, which src/app/api/chat/route.ts calls unconditionally and throws on. Without the second every chat request 500s, so it is a hard runtime dependency rather than later hardening.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F101",
@@ -155,7 +166,7 @@
       "user_visible_behavior": "Codebase cleanup driven by review findings.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-02-code-review-cleanup.md",
       "notes": null
     },
@@ -166,7 +177,7 @@
       "user_visible_behavior": "Fixes to the Dice data table component.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-02-dice-data-table-fixes.md",
       "notes": null
     },
@@ -177,7 +188,7 @@
       "user_visible_behavior": "Project-wide minimalist UI overhaul.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-02-minimalist-ui-{implementation-plan,redesign}.md",
       "notes": null
     },
@@ -209,9 +220,19 @@
       "user_visible_behavior": "Demand-planning view tied to inventory levels.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00071_tbd_planning_fields.sql"
+      ],
       "evidence": "docs/plans/2026-02-03-demand-planning-and-inventory.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F106",
@@ -220,7 +241,7 @@
       "user_visible_behavior": "Expanded AI tool surface (analysis, suggestions, write actions).",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-04-ai-tools-expansion-{design,plan}.md",
       "notes": null
     },
@@ -231,7 +252,7 @@
       "user_visible_behavior": "Combobox-based relation field type for entity forms.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-04-combobox-relation-fields.md",
       "notes": null
     },
@@ -242,9 +263,19 @@
       "user_visible_behavior": "Schema and data-shape enhancements across domains.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00073_data_enhancements.sql"
+      ],
       "evidence": "docs/plans/2026-02-04-data-enhancements-{design,plan}.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F109",
@@ -253,7 +284,7 @@
       "user_visible_behavior": "Packaging UI shows batch context inline.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-04-packaging-batch-context-{design,plan}.md",
       "notes": null
     },
@@ -285,7 +316,7 @@
       "user_visible_behavior": "Improved AI write actions with confirmation flow.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-05-ai-write-actions-v2.md",
       "notes": null
     },
@@ -296,9 +327,21 @@
       "user_visible_behavior": "Tighter linkage between recipe, batch, and brew-log entities.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00083_recipe_variants.sql",
+        "00084_batch_additions.sql",
+        "00085_variant_cost_views.sql"
+      ],
       "evidence": "docs/plans/2026-02-05-recipe-batch-brewlog-cohesion{,-plan}.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F113",
@@ -307,7 +350,7 @@
       "user_visible_behavior": "Single EntityDetailUnified component replaces EntityDetail + EntityForm.",
       "verification": "bun run test src/components/universal/",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-05-unified-entity-detail-edit-{design,plan}.md",
       "notes": "Deprecates EntityDetail and EntityForm (still in repo for compat)."
     },
@@ -315,7 +358,7 @@
       "id": "F114",
       "area": "sales",
       "title": "Customer order portal (view + change requests)",
-      "user_visible_behavior": "External-facing portal where invited customers sign in to view their orders and submit change requests. Customers do NOT place orders \u2014 staff place orders on their behalf, by design (invite-only portal, staff confirm everything). Shipped routes: portal login, orders list, order detail, change-request/new.",
+      "user_visible_behavior": "External-facing portal where invited customers sign in to view their orders and submit change requests. Customers do NOT place orders — staff place orders on their behalf, by design (invite-only portal, staff confirm everything). Shipped routes: portal login, orders list, order detail, change-request/new.",
       "verification": "bun e2e ./e2e/customer-order.spec.ts",
       "state": "passing",
       "migrations": [
@@ -340,7 +383,7 @@
       "user_visible_behavior": "Streamlined brew-day workflow UI.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-12-brew-day-ux-{design,plan}.md",
       "notes": null
     },
@@ -372,9 +415,19 @@
       "user_visible_behavior": "Polish pass on pricing and keg sales flows.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00098_pricing_keg_formats.sql"
+      ],
       "evidence": "docs/plans/2026-02-12-pricing-kegs-polish-{design,plan}.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F118",
@@ -383,7 +436,7 @@
       "user_visible_behavior": "Delete action on every entity via universal pattern.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-12-universal-entity-delete-{design,plan}.md",
       "notes": null
     },
@@ -394,7 +447,7 @@
       "user_visible_behavior": "Project-wide WCAG conformance pass.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-12-wcag-accessibility-{design,plan}.md",
       "notes": "No automated axe-core gate yet — gap candidate."
     },
@@ -405,9 +458,20 @@
       "user_visible_behavior": "Brew logs anchored on the batch detail page.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00004_brew_logs.sql",
+        "00104_batch_centric_brew_logs.sql"
+      ],
       "evidence": "docs/plans/2026-02-17-batch-centric-brew-logs-{design,plan}.md",
-      "notes": null
+      "notes": "00104's own delta is a column drop + view rebuilds, which the snapshot cannot verify; co-anchor 00004 supplies the verifiable objects.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F121",
@@ -416,9 +480,20 @@
       "user_visible_behavior": "Batch detail page exposes 'Start Brew Day' action.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00004_brew_logs.sql",
+        "00104_batch_centric_brew_logs.sql"
+      ],
       "evidence": "docs/plans/2026-02-18-batch-centric-start-brew-day-{design,plan}.md",
-      "notes": null
+      "notes": "Shares F120's anchors: the dialog writes the post-00104 brew_logs shape via brew_log_batches.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F122",
@@ -427,9 +502,19 @@
       "user_visible_behavior": "Updated water-addition UI in recipe editor.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00191_capture_drifted_packaging_objects.sql"
+      ],
       "evidence": "docs/plans/2026-02-18-water-additions-redesign-{design,plan}.md",
-      "notes": null
+      "notes": "Not []: the shipped additions UI reads recipes.target_water_profile_id (src/components/domain/recipe/recipe-additions-display.tsx, src/app/(app)/production/recipes/[id]/additions/page.tsx). This feature's own PR added that column, but those files were removed by the #217 renumbering squash, so the drift-capture shim is where the column enters the chain. The column itself is not snapshot-recordable; the anchor's other objects are.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F123",
@@ -438,9 +523,20 @@
       "user_visible_behavior": "Keg pricing exposed through selling-format pricing tiers.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00098_pricing_keg_formats.sql",
+        "00214_capture_get_price_for_customer.sql"
+      ],
       "evidence": "docs/plans/2026-02-19-keg-pricing-integration.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F124",
@@ -451,7 +547,7 @@
       "state": "passing",
       "migrations": "unaudited",
       "evidence": "docs/plans/2026-02-19-per-channel-format-visibility-design.md",
-      "notes": null
+      "notes": "Still unaudited for a structural reason: the shipped UI reads/writes channel_formats, which exists on live but is created by no migration in the chain (a #217 renumbering casualty). Needs a capture migration (00214 pattern) before it can be anchored. Tracked in #724."
     },
     {
       "id": "F125",
@@ -460,7 +556,7 @@
       "user_visible_behavior": "UX polish across service-layer interactions.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-19-service-layer-ux-improvements-design.md",
       "notes": null
     },
@@ -471,9 +567,19 @@
       "user_visible_behavior": "Recipe editor shows live water-chemistry calculations.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00191_capture_drifted_packaging_objects.sql"
+      ],
       "evidence": "docs/plans/2026-02-19-water-chemistry-calculator-{design,plan}.md",
-      "notes": null
+      "notes": "Anchored only to the drift-capture shim that introduces recipes.target_water_profile_id. The catalog/junction migration was previously also listed; it creates 18 tables this feature merely reads and its design doc explicitly disclaims changes to recipe_additions, additives and recipes, so listing it made the entry read as fully snapshot-confirmed on objects that are not this feature's schema — the same reason F104 declares only its own anchor.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F127",
@@ -482,9 +588,20 @@
       "user_visible_behavior": "Dedicated yeast-management workflow tied to batches.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00035_yeast_pitches.sql",
+        "00158_yeast_pitch_events_and_remaining_view.sql"
+      ],
       "evidence": "docs/plans/2026-02-19-yeast-workflow-{design,plan}.md",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F128",
@@ -493,9 +610,19 @@
       "user_visible_behavior": "Dashboard trend charts for production / inventory / sales.",
       "verification": "bun e2e ./e2e/dashboard.spec.ts",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00190_capture_out_of_band_objects.sql"
+      ],
       "evidence": "docs/plans/2026-02-26-dashboard-trends-{design,plan}.md, e2e/dashboard.spec.ts",
-      "notes": "Smoke-level E2E covers all three dashboard routes. The chart-content test.skip scaffolds were REMOVED, not implemented (#437): the charts aggregate over the whole database, so under fullyParallel any content assertion depends on other specs' seed state. The failure that actually reached users (MGR-K, a failed RPC rendering as a silently-empty chart) is covered by src/app/(app)/dashboard/__tests__/production-trends.test.tsx. Rationale in e2e/dashboard.spec.ts's header."
+      "notes": "Smoke-level E2E covers all three dashboard routes. The chart-content test.skip scaffolds were REMOVED, not implemented (#437): the charts aggregate over the whole database, so under fullyParallel any content assertion depends on other specs' seed state. The failure that actually reached users (MGR-K, a failed RPC rendering as a silently-empty chart) is covered by src/app/(app)/dashboard/__tests__/production-trends.test.tsx. Rationale in e2e/dashboard.spec.ts's header.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F129",
@@ -504,7 +631,7 @@
       "user_visible_behavior": "Cross-stack perf pass (queries, bundles, render).",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-02-26-performance-optimizations-{design,plan}.md",
       "notes": null
     },
@@ -536,7 +663,7 @@
       "user_visible_behavior": "Updated login UI.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-03-02-login-screen-redesign-{design,plan}.md",
       "notes": null
     },
@@ -547,9 +674,9 @@
       "user_visible_behavior": "Cost-of-goods projections in dashboard / reports.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-03-05-cogs-projections-{design,plan}.md",
-      "notes": null
+      "notes": "Audited []: the shipped COGS/projections UI queries base tables directly and calls none of 00139's RPCs; three of those RPCs are absent from live — orphaned-RPC drift tracked in #697, not an anchor of this feature."
     },
     {
       "id": "F133",
@@ -558,7 +685,7 @@
       "user_visible_behavior": "Linear-inspired UI overhaul (denser layouts, keyboard-first).",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [],
       "evidence": "docs/plans/2026-03-06-linear-ui-overhaul-{design,impl}.md",
       "notes": null
     },
@@ -569,9 +696,19 @@
       "user_visible_behavior": "Bug fixes for the recipe editor (drag-drop, calculations, save).",
       "verification": "bun e2e ./e2e/recipe-editor.spec.ts",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00169_add_version_to_recipes.sql"
+      ],
       "evidence": "docs/superpowers/plans/2026-03-13-recipe-editor-fixes.md, commit:73c49c7 (#246), e2e/recipe-editor.spec.ts",
-      "notes": "Drag-and-drop reordering merged in commit 73c49c7. Smoke-level E2E covers list and detail routes."
+      "notes": "Drag-and-drop reordering merged in commit 73c49c7. Smoke-level E2E covers list and detail routes.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F135",
@@ -580,9 +717,19 @@
       "user_visible_behavior": "Bug fixes for batch and vessel transfer workflow.",
       "verification": "bun e2e ./e2e/batch-transfer.spec.ts",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00210_vessel_transfer_integrity.sql"
+      ],
       "evidence": "docs/superpowers/plans/2026-03-14-batch-vessel-transfer-fixes.md, e2e/batch-transfer.spec.ts",
-      "notes": "E2E covers list and new-transfer routes plus the full transfer flow (PR #557): the Transfer dialog, the suggested state advance, and vessel occupancy + the vessel_transfers row asserted DB-side. The note that this was still a test.skip scaffold was stale."
+      "notes": "E2E covers list and new-transfer routes plus the full transfer flow (PR #557): the Transfer dialog, the suggested state advance, and vessel occupancy + the vessel_transfers row asserted DB-side. The note that this was still a test.skip scaffold was stale. Anchored on 00210, which introduces the idempotency_key + handle_vessel_transfer mechanism the shipped dialog depends on. F135's original migrations (00153/00154) were deleted from the chain by the #217 renumbering reconciliation and never re-added.",
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F136",
@@ -614,9 +761,22 @@
       "user_visible_behavior": "Unified material-planning system across recipes / batches / inventory.",
       "verification": "manual",
       "state": "passing",
-      "migrations": "unaudited",
+      "migrations": [
+        "00160_selling_format_materials.sql",
+        "00161_supplier_catalog_inventory_items.sql",
+        "00162_order_shipping_materials.sql",
+        "00163_calculate_material_shortfalls.sql"
+      ],
       "evidence": "docs/superpowers/plans/2026-04-15-material-planning.md, commit:a2704f7 (#243)",
-      "notes": null
+      "notes": null,
+      "deployment": {
+        "state": "live",
+        "observed_live_on": "2026-07-16",
+        "verified_by": [
+          "supabase/live-catalog.snapshot.txt",
+          "#696"
+        ]
+      }
     },
     {
       "id": "F200",
