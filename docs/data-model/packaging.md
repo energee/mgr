@@ -80,6 +80,30 @@ Junction table: which selling formats appear in which sales channel. Replaces th
 
 ---
 
+## `pricing_channel_formats`
+
+**Superseded — do not build on this table.** It is the predecessor of
+[`channel_formats`](#channel_formats), from before the container/selling-format
+redesign replaced `packaging_formats` with `selling_formats JOIN containers`.
+No application code reads or writes it; only the generated Supabase types still
+mention it.
+
+It is retained rather than dropped because it still holds rows on the live
+database. Migration `00285_capture_channel_formats.sql` brought both tables back
+into the migration chain (they had been live-only since the #217 renumbering
+deleted `00117`/`00125`), and tightened this table's RLS to the standard
+any-auth-read / `settings:manage`-write pattern — the change `00125` intended
+but never delivered to live.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| sales_channel_id | UUID | FK to [sales_channels](./sales.md#sales_channels) |
+| format_id | UUID | Format id — no FK constraint; pointed at the old `packaging_formats` |
+
+**Primary key:** `(sales_channel_id, format_id)`
+
+---
+
 ## `packaging_sessions`
 
 Packaging sessions (group multiple products/batches packaged together). Created from batch detail pages when batches are ready for packaging.
