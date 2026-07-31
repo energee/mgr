@@ -55,9 +55,28 @@ Per-owner per-format deposit amounts. Overrides `containers.deposit_amount` when
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
-**Unique Constraint:** `(keg_owner_id, selling_format_id)`
+**Unique Constraint:** `(keg_owner_id, selling_format_id)` — index
+`uq_keg_owner_deposits_owner_format` (00284). Rows with a NULL
+`selling_format_id` are not constrained (NULLs compare distinct).
 
-**Migration:** `00079_keg_owners.sql`
+**Retired column — `keg_type_id`.** 00079 created the table with a NOT NULL
+`keg_type_id` referencing the old `keg_types` table and a
+`UNIQUE (keg_owner_id, keg_type_id)`. The container/selling-format refactor
+moved the format key to `selling_format_id` (00159), and every reader since —
+`keg_aging_report` (00191), `keg_fleet_summary` (00236), the
+`COALESCE(keg_owner_deposits.deposit_amount, containers.deposit_amount)`
+resolution — joins on that. The chain kept the NOT NULL column, so a database
+built from the chain rejected every deposit-override write with
+`null value in column "keg_type_id" ... violates not-null constraint` (#711 —
+latent, since no packaging or fulfillment path writes this table). 00284
+retires the column on the 00283 pattern: backfill `selling_format_id` from the
+legacy id where one exists (00112 reuses each keg_type UUID as its replacement
+selling format's id), abort rather than drop an unmappable reference, and
+re-key uniqueness on `(keg_owner_id, selling_format_id)`.
+
+**Migration:** `00079_keg_owners.sql`,
+`00159_packaging_sessions_redesign.sql` (adds selling_format_id),
+`00284_retire_keg_owner_deposits_keg_type_id.sql` (retires keg_type_id)
 
 ---
 
