@@ -26,6 +26,7 @@ import {
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
+import { planDepositSave, type OwnerDeposit } from "./keg-owner-deposits-plan";
 
 type KegOwnerDepositsEditorProps = {
   kegOwnerId: string;
@@ -35,13 +36,6 @@ type KegSellingFormat = {
   id: string;
   name: string;
   volume_bbl: number;
-  deposit_amount: number;
-}
-
-type OwnerDeposit = {
-  id: string;
-  keg_owner_id: string;
-  selling_format_id: string;
   deposit_amount: number;
 }
 
@@ -105,29 +99,7 @@ export function KegOwnerDepositsEditor({
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const upserts: { keg_owner_id: string; selling_format_id: string; deposit_amount: number }[] = [];
-      const deletes: string[] = [];
-
-      for (const formatId of dirtyKeys) {
-        const value = deposits[formatId];
-        const numValue = parseFloat(value || "0");
-
-        if (!value || value === "" || numValue === 0) {
-          // Delete the override if it exists
-          const existing = existingDeposits?.find(
-            (d) => d.selling_format_id === formatId
-          );
-          if (existing) {
-            deletes.push(existing.id);
-          }
-        } else {
-          upserts.push({
-            keg_owner_id: kegOwnerId,
-            selling_format_id: formatId,
-            deposit_amount: numValue,
-          });
-        }
-      }
+      const { upserts, deletes } = planDepositSave(kegOwnerId, dirtyKeys, deposits, existingDeposits);
 
       // Perform deletes
       if (deletes.length > 0) {
