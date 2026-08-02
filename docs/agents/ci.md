@@ -143,6 +143,37 @@ a patch touching anything CI or a build/tooling entry point
 `persist-credentials: false`, but see the first bullet above for what that flag
 does and does not buy.
 
+**The pack step can silently drop a classification-(A) patch (open, found
+2026-08-02).** `/outbox/` is gitignored (`.gitignore:114`, added on purpose so
+the artifact directory is never committed), and the "Pack the agent outbox"
+step's `git add -A -- . ':(exclude)outbox' ':(exclude)sentry-outcome.md'`
+(`sentry-harness.yml:274`) fails on that exact pathspec: git treats naming an
+ignored directory inside `:(exclude)` magic the same as an explicit add of an
+ignored path ("The following paths are ignored by one of your .gitignore
+files: outbox") and exits 1 under the step's `set -euo pipefail`, before
+`outbox/fix.patch` is ever written. `land-fix`'s own contract check catches
+the empty result and fails loud — `[land-sentry-fix] outbox: plan.json asks
+for a PR but the packed patch is empty` (run 30566343703, job 90957329205,
+MGR-K, 2026-07-30) — which is the right response to a bad artifact, but the
+net effect is that a real classification-(A) fix the agent spent its full
+budget producing is discarded outright, not merely delayed: nothing retries
+it, because the next scheduled run scores fresh issues, not the one that just
+failed to land. The same pack-step failure signature ("paths are ignored by
+one of your .gitignore files: outbox", then "Process completed with exit code
+1") also fired standalone on job 91225679847 (2026-07-31, classification B,
+harmless there since no patch was needed). Confirmed root cause via
+`sentry-harness.yml:274` + `.gitignore:114`; not yet fixed, and not
+fixable from here since it requires a workflow-file change. Whoever picks
+this up: stop the two mechanisms from fighting each other — either write the
+patch to a location outside the repo tree (`$RUNNER_TEMP`) instead of a
+gitignored in-tree directory, or drop the `.gitignore` entry and rely solely
+on the `:(exclude)` pathspec to keep `outbox/` out of the diff — and consider
+whether a discarded classification-(A) fix should re-file as a `needs-human`
+issue instead of vanishing with no trace. **Watch for:** this exact
+`git add`/ignored-path error recurring in a `sentry-harness.yml` run log, or
+another `land-fix` failure reading "packed patch is empty" against a
+classification-A plan — either means the fix above hasn't landed yet.
+
 **What is still true for `fix-error` after that split.** It can still execute
 arbitrary code and still reach the network, and two credentials remain readable
 by its shell: `secrets.CLAUDE_CODE_OAUTH_TOKEN` (the Anthropic credential —
@@ -417,6 +448,24 @@ this section as *reporting*, not *blocking*. Making those three contexts
 required is a repository-settings change (ruleset `main`, id `11725742`), not
 a workflow change, and it is a deliberate owner call — `Production Build` must
 **not** be added, since it does not run on PRs.
+
+**Side effect of the missing rule: `progress.yml`'s auto-merge intermittently
+fails outright (found 2026-08-02).** `progress.yml`'s `gh pr merge --auto`
+goes through GitHub's `enablePullRequestAutoMerge`, and roughly a third of
+recent `Build PROGRESS.md` runs (10 of the last 30 as of 2026-08-01) fail with
+`GraphQL: Pull request Pull request is in unstable status
+(enablePullRequestAutoMerge)` instead of merging (e.g. runs 30664808886,
+30657705808) — a PR whose checks are still running, not failing, reads as
+"unstable" rather than something GitHub will queue behind, because there is no
+`required_status_checks` rule for it to queue behind. This is not data loss:
+`progress.yml` retriggers on the next push to `docs/progress/**`, and the
+retry has so far always succeeded. It is noisy enough — about a third of runs
+red — to read as a fresh regression each time someone notices it, so treat a
+lone `Build PROGRESS.md` failure with this exact error as expected until #713
+lands, not a new bug to chase. **Watch for:** this note going stale once #713
+adds the required-checks rule — the failure should stop recurring, and if a
+future harvest still finds it after that rule lands, the fix didn't address
+this side effect and needs its own look.
 
 ## Rules when changing workflows
 
