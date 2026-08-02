@@ -81,7 +81,9 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
     },
   }));
 
-  if (!lines.length && !Number(po.shipping_cost || 0)) {
+  const taxAmount = Number(po.tax || 0);
+
+  if (!lines.length && !Number(po.shipping_cost || 0) && !taxAmount) {
     throw new Error(
       `Purchase order ${po.po_number || purchaseOrderId} has no line items. Cannot create an empty bill in QuickBooks.`
     );
@@ -118,6 +120,40 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
         AccountRef: shippingMapping?.qbo_account_id
           ? { value: shippingMapping.qbo_account_id }
           : accountRef,
+      },
+    });
+  }
+
+  // Add tax as extra line if present. `purchase_orders.tax` is a real
+  // vendor-payable amount (allocated into per-unit landed cost elsewhere),
+  // so omitting it — as this sync used to — understates the Bill total by
+  // exactly the tax amount. Mirrors the shipping-cost block: falls back to
+  // the COGS account when no 'tax' mapping is configured, with the same
+  // distinct-warning shape as SF-7.
+  if (taxAmount > 0) {
+    const { data: taxMapping, error: taxMappingError } = await admin
+      .from("qbo_account_mappings")
+      .select("qbo_account_id")
+      .eq("category", "tax")
+      .maybeSingle();
+    if (taxMappingError) {
+      logger.warn(
+        { err: taxMappingError.message, purchaseOrderId },
+        "QBO sync: failed to read 'tax' account mapping; posting tax to the COGS account"
+      );
+    } else if (!taxMapping?.qbo_account_id) {
+      logger.warn(
+        { purchaseOrderId },
+        "QBO sync: no 'tax' account mapping configured; posting tax to the COGS account"
+      );
+    }
+
+    lines.push({
+      Amount: taxAmount,
+      Description: "Tax",
+      DetailType: "AccountBasedExpenseLineDetail",
+      AccountBasedExpenseLineDetail: {
+        AccountRef: taxMapping?.qbo_account_id ? { value: taxMapping.qbo_account_id } : accountRef,
       },
     });
   }
