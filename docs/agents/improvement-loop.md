@@ -22,17 +22,18 @@ allowlist explicitly and, like every scheduled agentic workflow, ends in the
 `require-durable-outcome` gate; the once-promised scheduled-agent replacement
 was never built and that route is retired.)
 
-(Bug Patrol is a 2026-07-26 revise candidate per the loop scoreboard: both
-scheduled runs since it was added ended `error_max_turns` with zero PRs —
-07-25 hit the then-cap at 60 turns / 9 permission denials, so #598 raised the
-cap to 80, and the very next run on 07-26 hit *that* cap too, at 81 turns / 20
-permission denials. Denials rose faster than the turn budget did, so the
-ceiling is not the bottleneck — something in the task keeps reaching for a
-tool outside `--allowedTools` in `bug-patrol.yml` and burning turns on the
-retry. Next attempt should audit which tool that is before raising
-`--max-turns` a third time. Falsifies if a future run merges a PR or a
-quiet-run.md without another `error_max_turns`; stays failed if the scoreboard
-still shows 0 PRs / repeated `error_max_turns` after two more scheduled runs.)
+(Bug Patrol's 2026-07-26 revise-candidate flag is retired as of 2026-08-02:
+its own falsification clause fired. The two `error_max_turns` runs on
+07-25/07-26 were followed by seven consecutive green scheduled runs
+(07-27 through 08-02, run IDs 30248989067 through 30738495520), none hitting
+the turn/permission-denial ceiling, and the loop scoreboard now shows 7 PRs
+opened / 5 merged / 0 closed unmerged / 2 still open since the loop started —
+a merge rate that is not trending toward zero. No workflow-file change
+coincides with the recovery (`bug-patrol.yml` was last touched by #599 on
+07-25, before the streak began), so whatever combination of task content and
+the 80-turn cap from #598 was hitting the ceiling simply stopped recurring.
+Re-open the investigation the next time a scheduled run hits
+`error_max_turns`; until then there is nothing to revise.)
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
