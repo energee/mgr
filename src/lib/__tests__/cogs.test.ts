@@ -206,6 +206,23 @@ describe("buildSkuCostRows", () => {
     expect(rows[0].total_cost).toBeCloseTo(30);
   });
 
+  it("uses a caller-supplied totalUnitsByBatch instead of fgRows when fgRows is a windowed subset, so a report window that only sees part of a batch's packaging doesn't inflate cost-per-unit", () => {
+    // Batch b1 costs 1000 total and packaged 1000 units overall, but this
+    // report window's fgRows only contains 400 of those units (the rest
+    // packaged outside [fromDate, toDate]). The batch's full cost (1000)
+    // must be divided by the batch's full unit count (1000), not the 400
+    // visible in this window, or the windowed cost-per-unit is inflated by
+    // totalUnits/unitsInWindow and double-counts across adjacent windows.
+    const rows = buildSkuCostRows(
+      [fg("b1", 400, "Hazy", "6-pack")],
+      [alloc("b1", 1, 1000)],
+      batchInfo,
+      new Map([["b1", 1000]])
+    );
+    expect(rows[0].total_cost).toBeCloseTo(400); // 1000 * 400/1000, not 1000 * 400/400
+    expect(rows[0].avg_cost_per_unit).toBeCloseTo(1); // $1/unit, not $2.50/unit
+  });
+
   it("computes avg_cost_per_unit from totals", () => {
     const rows = buildSkuCostRows(
       [fg("b1", 25, "Hazy", "6-pack")],

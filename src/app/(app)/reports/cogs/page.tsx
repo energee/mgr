@@ -283,21 +283,37 @@ export default function CogsReportPage() {
 
       // Get batch number info (allocations come from shared data, but we need
       // batch numbers for display and may have FG referencing batches outside
-      // the shared query's date range, so fetch fresh here)
-      const [{ data: allocations, error: allocErr }, { data: batchInfo }] = await Promise.all([
-        supabase
-          .from("allocations")
-          .select("destination_id, quantity, unit_cost")
-          .eq("destination_type", "batch")
-          .in("destination_id", batchIds)
-          .in("status", ["completed", "planned"]),
-        supabase
-          .from("batches")
-          .select("id, batch_code")
-          .in("id", batchIds),
-      ]);
+      // the shared query's date range, so fetch fresh here). Also fetch each
+      // batch's full (unwindowed) packaged-unit count: `allocations` here is
+      // each batch's total cost regardless of date, so the proportional-cost
+      // denominator must likewise cover every unit the batch ever packaged —
+      // not just the ones inside [fromDate, toDate] — or a batch whose
+      // packaging spans the window boundary gets its cost inflated and
+      // double-counted across adjacent report windows (see cogs.ts).
+      const [{ data: allocations, error: allocErr }, { data: batchInfo }, { data: allFgForBatches, error: allFgErr }] =
+        await Promise.all([
+          supabase
+            .from("allocations")
+            .select("destination_id, quantity, unit_cost")
+            .eq("destination_type", "batch")
+            .in("destination_id", batchIds)
+            .in("status", ["completed", "planned"]),
+          supabase
+            .from("batches")
+            .select("id, batch_code")
+            .in("id", batchIds),
+          supabase
+            .from("finished_goods")
+            .select("batch_id, quantity")
+            .in("batch_id", batchIds),
+        ]);
 
       if (allocErr) throw allocErr;
+      if (allFgErr) throw allFgErr;
+
+      const totalUnitsByBatch = aggregateUnitsByBatch(
+        (allFgForBatches ?? []) as CogsFinishedGoodRow[]
+      );
 
       // Pure proportional-allocation math lives in src/lib/reports/cogs.ts.
       // Cast the joined brand/format objects to the lib's input shape.
@@ -311,7 +327,7 @@ export default function CogsReportPage() {
         } | null,
       }));
 
-      return buildSkuCostRows(skuRows, allocations ?? [], batchInfo ?? []);
+      return buildSkuCostRows(skuRows, allocations ?? [], batchInfo ?? [], totalUnitsByBatch);
     },
     enabled: activeTab === "by-sku",
   });
