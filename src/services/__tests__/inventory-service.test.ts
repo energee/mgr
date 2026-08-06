@@ -143,6 +143,20 @@ describe("inventoryService.getExpiringLots", () => {
     expect(lteCall?.args[1]).toBe("2026-08-11");
   });
 
+  it("computes the cutoff as calendar days ahead across a DST transition", async () => {
+    // 2026-03-02 (UTC) + 7 calendar days = 2026-03-09, regardless of the US
+    // DST "spring forward" transition (2026-03-08) inside that span. Tests
+    // run pinned to America/New_York (vitest.config.ts), where mixing a
+    // local-time getDate()/setDate() advance with a UTC toISOString() read
+    // shifts this by a day.
+    vi.setSystemTime(new Date("2026-03-02T00:00:00.000Z"));
+    const { client, calls } = createMockSupabase({ data: [], error: null });
+    await inventoryService.getExpiringLots(client, 7);
+
+    const lteCall = calls.find((c) => c.method === "lte");
+    expect(lteCall?.args[1]).toBe("2026-03-09");
+  });
+
   it("maps view rows into ExpiringLot with correct field shapes", async () => {
     const { client } = createMockSupabase({
       data: [
