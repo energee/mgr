@@ -45,8 +45,13 @@ export const inventoryService = {
     limit?: number
   ): Promise<ServiceResult<ExpiringLot[]>> {
     try {
+      // Advance with the UTC setters, not local getDate()/setDate() — mixing
+      // local-time arithmetic with the UTC toISOString() read below shifts
+      // the result by a day whenever the addition spans a DST transition
+      // (host-timezone dependent). Same rule as
+      // src/domain/purchasing/po-generator.ts's expected_date calculation.
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() + daysAhead);
+      cutoff.setUTCDate(cutoff.getUTCDate() + daysAhead);
       const cutoffStr = cutoff.toISOString().split("T")[0];
 
       let query = dynamicFrom(supabase, "inventory_lots_with_quantities")
