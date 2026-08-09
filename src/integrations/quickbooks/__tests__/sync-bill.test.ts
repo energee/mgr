@@ -251,6 +251,17 @@ describe("syncBill — happy paths (characterization)", () => {
     expect(shippingLine?.AccountBasedExpenseLineDetail.AccountRef).toEqual({ value: "ACC-COGS" });
   });
 
+  it("parses the Net term out of discount-terms notation, not every digit run concatenated", async () => {
+    // The supplier form's own placeholder suggests "2% 10 Net 30". Naively
+    // stripping all non-digits would read "2" + "10" + "30" = 21030 days.
+    useTables(makeTables({ suppliers: { data: { payment_terms: "2% 10 Net 30" }, error: null } }));
+    mockedPost.mockResolvedValue({ Bill: { Id: "B-9" } });
+
+    await syncBill(PO_ID);
+
+    expect(postedBill().DueDate).toBe("2026-03-31"); // order_date 2026-03-01 + 30 days
+  });
+
   it("refuses to create an empty Bill when the PO genuinely has no line items and no shipping", async () => {
     useTables(
       makeTables({
