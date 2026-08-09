@@ -151,6 +151,53 @@ job in this repo has) and the `id-token: write` OIDC minting endpoint. Neither
 can write to this repository. What is gone is the push-capable
 `GITHUB_TOKEN` — #645's stated impact.
 
+**The pack step has been failing on most scheduled runs since that split
+landed, independent of what the agent decided (recurring; first found
+2026-08-02, still failing 2026-08-08 — a near-identical diagnosis also sits in
+still-unmerged PR #732, which this entry supersedes with a week of further
+evidence).** `/outbox/` is gitignored (`.gitignore:114`, deliberately, so the
+artifact directory never gets committed), and the "Pack the agent outbox"
+step's `git add -A -- . ':(exclude)outbox' ':(exclude)sentry-outcome.md'`
+(`sentry-harness.yml:274`) exits 1 under the step's `set -euo pipefail`: git
+treats naming an ignored directory inside `:(exclude)` pathspec magic the same
+as an explicit add of an ignored path — `"The following paths are ignored by
+one of your .gitignore files: outbox"` / `"hint: Use -f if you really want to
+add them"` — and errors out before `outbox/fix.patch` is ever written. Sampled
+across every scheduled run since the credential split (#690, merged
+2026-07-30):
+
+- **07-30** (job 90957329205, MGR-K): a real classification-(A) patch the
+  agent spent its full budget producing was discarded outright — `land-fix`'s
+  own contract check caught the empty result: `"plan.json asks for a PR but
+  the packed patch is empty."` Nothing retries it; the next scheduled run
+  scores fresh issues, not the one that just failed to land.
+- **07-31** (job 91225679847, classification B): same pack-step failure,
+  harmless here because no patch was needed.
+- **08-03** (job 91766123955): worse than a dropped patch — `land-fix` itself
+  errored, `"[land-sentry-fix] outbox: classification must be one of A, B, C,
+  D (got undefined)"`, meaning the `plan.json` the agent wrote never reached
+  the lander intact either.
+- **08-07** (job 92949470812, MGR-K again): the agent correctly triaged a
+  stale re-delivery as a quiet run, wrote a valid `outbox/plan.json` and
+  `outbox/evidence.md` — and the pack step still failed the same way.
+
+The net effect: this workflow's own run conclusion has read red on most
+scheduled runs for over a week even when the agent's diagnosis and outbox
+contract were both correct. **Do not read a `sentry-harness.yml` red X as "the
+agent got it wrong"** without opening the "Fix error" step log and checking
+for this exact ignored-path message first — and do not read the loop as
+unhealthy from Actions-tab history alone; check the PR list instead (10 of 10
+`sentry-fix` PRs opened since 2026-07-12 have merged, per the loop
+scoreboard). **Not fixable from here**, since it requires a workflow-file
+change: the likely fix is to drop the redundant `:(exclude)outbox` pathspec
+(the directory is already gitignored, so a plain `git add -A -- .` already
+skips it without an explicit exclude) or to write the patch to `$RUNNER_TEMP`
+instead of an in-tree gitignored directory. **Watch for:** this exact message
+recurring in a future "Pack the agent outbox" step log, or a `land-fix`
+failure reading "packed patch is empty" or "classification must be one of A,
+B, C, D" against a plan the agent actually wrote correctly — either means the
+fix hasn't landed yet.
+
 **The outbox is itself a publishing channel, by construction.** `pr-body.md`,
 `issue-body.md` and `comment-body.md` are agent-authored free text that a
 credentialed job publishes verbatim to a public repository. Splitting the
