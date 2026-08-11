@@ -119,6 +119,16 @@ export function aggregateUnitsByBatch(
  * batch's total ingredient cost across its SKUs proportionally to the units
  * packaged: `(batch cost * SKU units from batch) / total batch units`.
  *
+ * `totalUnitsByBatch` is the denominator and MUST represent each batch's
+ * complete packaged-unit count, not just the units present in `fgRows`. A
+ * caller that windows `fgRows` by date (e.g. a report's from/to filter) but
+ * leaves `allocations` unwindowed — so `costByBatch` is the batch's full
+ * cost — must pass an unwindowed `totalUnitsByBatch` too, or the proportional
+ * cost is inflated by `totalUnits / unitsInWindow` and double-counted across
+ * adjacent report windows. When `fgRows` is already unwindowed (contains
+ * every finished-goods row for every batch referenced), pass
+ * `aggregateUnitsByBatch(fgRows)`.
+ *
  * For batches whose finished goods are all in `fgRows`, the proportional
  * costs of a batch sum back to that batch's total cost.
  *
@@ -128,13 +138,11 @@ export function aggregateUnitsByBatch(
 export function buildSkuCostRows(
   fgRows: SkuFinishedGoodRow[],
   allocations: CogsAllocationRow[],
-  batchInfo: { id: string; batch_code: string }[]
+  batchInfo: { id: string; batch_code: string }[],
+  totalUnitsByBatch: Map<string, number>
 ): CogsSkuRow[] {
   // Aggregate total cost per batch
   const costByBatch = aggregateCostByKey(allocations, (a) => a.destination_id);
-
-  // Aggregate total FG units per batch (for proportional allocation)
-  const totalUnitsByBatch = aggregateUnitsByBatch(fgRows);
 
   const batchNumberMap = new Map<string, string>();
   for (const b of batchInfo) {
