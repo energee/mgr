@@ -56,9 +56,9 @@ type Score = {
 function score(predicted: string[], gold: string[]): Score {
   const p = new Set(predicted);
   const g = new Set(gold);
-  const tp = [...g].filter((k) => p.has(k)).length;
-  const fp = [...p].filter((k) => !g.has(k)).length;
-  const fn = [...g].filter((k) => !p.has(k)).length;
+  const missing = [...g].filter((k) => !p.has(k)).sort();
+  const spurious = [...p].filter((k) => !g.has(k)).sort();
+  const tp = g.size - missing.length;
   // An empty gold set with an empty prediction is a perfect score, not 0/0.
   const precision = p.size === 0 ? (g.size === 0 ? 1 : 0) : tp / p.size;
   const recall = g.size === 0 ? 1 : tp / g.size;
@@ -66,50 +66,60 @@ function score(predicted: string[], gold: string[]): Score {
     precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
   return {
     tp,
-    fp,
-    fn,
+    fp: spurious.length,
+    fn: missing.length,
     precision,
     recall,
     f1,
-    missing: [...g].filter((k) => !p.has(k)).sort(),
-    spurious: [...p].filter((k) => !g.has(k)).sort(),
+    missing,
+    spurious,
   };
 }
 
 const pct = (n: number) => `${(n * 100).toFixed(0).padStart(3)}%`;
 
+// Each deterministic pass runs once per eval regardless of case count (the
+// AST pass is a full ~7s TS program compile).
+const passCache = new Map<string, { entities: StoredEntity[]; relations: StoredRelation[] }>();
+const passFor = (root: string, extractor: "sql" | "ast") => {
+  const cached = passCache.get(extractor);
+  if (cached) return cached;
+  const out = extractor === "sql" ? runSqlPass(root) : runAstPass(root);
+  passCache.set(extractor, out);
+  return out;
+};
+
 async function predictFor(
   root: string,
   c: GoldCase,
 ): Promise<{ entities: StoredEntity[]; relations: StoredRelation[] }> {
-  if (c.extractor === "sql") {
-    const all = runSqlPass(root);
-    // Scope by PROVENANCE, not topology. Every fact carries the file it was
-    // read from, and that is precisely "what this file contributes" - so the
-    // eval scores exactly that. Two earlier attempts got this wrong: filtering
-    // relations by file while keeping topologically-reached entities scored
-    // false misses, and expanding one hop dragged in everything adjacent to a
-    // hub table and destroyed precision.
-    //
-    // Consequence, and it is correct: a policy's `protects` edge belongs to the
-    // live-catalog snapshot (authoritative for policy->table), NOT to the
-    // migration that declared the policy. The migration contributes its own
-    // node and its `creates` edges. The gold set says exactly that.
-    return {
-      entities: all.entities.filter((e) => e.file_path === c.file),
-      relations: all.relations.filter((r) => r.file_path === c.file),
-    };
+  if (c.extractor === "llm") {
+    // Hold the eval to the same anti-fabrication gate production uses: without
+    // knownEndpoints, entityShapeOk falls back to a shape regex and the eval
+    // scores a laxer validator than the one that builds the graph.
+    const knownEndpoints = new Set(
+      passFor(root, "ast")
+        .entities.filter((e) => e.type === "API_ENDPOINT" || e.type === "WEBHOOK")
+        .map((e) => e.name),
+    );
+    return runLlmPass(root, { files: [c.file], knownEndpoints });
   }
-  if (c.extractor === "ast") {
-    // Same provenance scoping as SQL. The pass compiles the whole program
-    // (~7s) because import/call resolution needs the full program anyway.
-    const all = runAstPass(root);
-    return {
-      entities: all.entities.filter((e) => e.file_path === c.file),
-      relations: all.relations.filter((r) => r.file_path === c.file),
-    };
-  }
-  return runLlmPass(root, { files: [c.file] });
+  // Scope by PROVENANCE, not topology. Every fact carries the file it was
+  // read from, and that is precisely "what this file contributes" - so the
+  // eval scores exactly that. Two earlier attempts got this wrong: filtering
+  // relations by file while keeping topologically-reached entities scored
+  // false misses, and expanding one hop dragged in everything adjacent to a
+  // hub table and destroyed precision.
+  //
+  // Consequence, and it is correct: a policy's `protects` edge belongs to the
+  // live-catalog snapshot (authoritative for policy->table), NOT to the
+  // migration that declared the policy. The migration contributes its own
+  // node and its `creates` edges. The gold set says exactly that.
+  const all = passFor(root, c.extractor);
+  return {
+    entities: all.entities.filter((e) => e.file_path === c.file),
+    relations: all.relations.filter((r) => r.file_path === c.file),
+  };
 }
 
 async function main(): Promise<void> {

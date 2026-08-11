@@ -20,10 +20,11 @@
  * Results are cached by content hash so re-runs and incremental updates skip
  * unchanged files entirely.
  */
-import { execFile, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { MODEL, codexExec } from "./codex";
 import {
   LLM_ENTITY_TYPES,
   LLM_PREDICATES,
@@ -35,8 +36,6 @@ import {
 /** Bumping this invalidates every cache entry - do it when the prompt changes. */
 const PROMPT_VERSION = 3;
 
-const MODEL = "gpt-5.3-codex-spark";
-const EFFORT = "low";
 const CACHE_DIR = "tools/codegraph/llm-cache";
 
 /** Per-file input cap. Larger files are truncated with an explicit marker so
@@ -148,45 +147,6 @@ function cacheKey(relPath: string, content: string): string {
   return sha(`${PROMPT_VERSION} ${MODEL} ${relPath} ${content}`);
 }
 
-/** Run one codex exec call. Rejects on non-zero exit or timeout. */
-function runCodex(
-  repoRoot: string,
-  prompt: string,
-  schemaPath: string,
-  outPath: string,
-  timeoutMs: number,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const args = [
-      "exec",
-      "--ignore-user-config", // the global default is sol @ xhigh - far too slow here
-      "-s",
-      "read-only",
-      "--ephemeral",
-      "--skip-git-repo-check",
-      "-m",
-      MODEL,
-      "-c",
-      `model_reasoning_effort="${EFFORT}"`,
-      "--output-schema",
-      schemaPath,
-      "-o",
-      outPath,
-      prompt,
-    ];
-    // execFile with an argument array: no shell, so nothing in the prompt is
-    // interpreted. Closing stdin below is the `< /dev/null` that keeps codex
-    // from blocking forever waiting for input.
-    const child = execFile(
-      "codex",
-      args,
-      { cwd: repoRoot, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 },
-      (err) => (err ? reject(err) : resolve()),
-    );
-    child.stdin?.end();
-  });
-}
-
 export type LlmPassOptions = {
   files: string[];
   concurrency?: number;
@@ -291,7 +251,7 @@ export async function runLlmPass(
       // transport or timeout problem, not a malformed-output problem.
       for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
         try {
-          await runCodex(repoRoot, prompt, schemaPath, outPath, timeoutMs);
+          await codexExec(prompt, { schemaPath, outPath, cwd: repoRoot, timeoutMs });
           const result = LlmExtractedGraph.safeParse(
             JSON.parse(readFileSync(outPath, "utf8")),
           );

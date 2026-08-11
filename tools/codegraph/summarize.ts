@@ -22,9 +22,9 @@
  * which for a policy or a migration is already the whole truth.
  */
 /* eslint-disable no-console -- CLI entry point: stdout is the output. */
-import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { codexExecSync } from "./codex";
 import { load, save, GRAPH_PATH } from "./store";
 import type { StoredEntity } from "./schema";
 
@@ -68,29 +68,7 @@ function generate(
     `Its own description: ${entity.description}\n\n` +
     `1-hop neighborhood (${triples.length} edges):\n${triples.join("\n")}\n`;
   try {
-    const out = execFileSync(
-      "codex",
-      [
-        "exec",
-        "--ignore-user-config",
-        "-s",
-        "read-only",
-        "--ephemeral",
-        "--skip-git-repo-check",
-        "-m",
-        "gpt-5.3-codex-spark",
-        "-c",
-        'model_reasoning_effort="low"',
-        "--output-schema",
-        schemaPath,
-        prompt,
-      ],
-      {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        maxBuffer: 32 * 1024 * 1024,
-      },
-    );
+    const out = codexExecSync(prompt, { schemaPath });
     const parsed: unknown = JSON.parse(out);
     if (
       typeof parsed === "object" &&

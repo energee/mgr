@@ -17,6 +17,9 @@ import { createHash } from "node:crypto";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { StoredEntity, StoredRelation } from "./schema";
+import { runAstPass } from "./ast";
+import { runSqlPass } from "./sql";
+import { resolveGraph, type ResolutionReport } from "./resolve";
 
 export const GRAPH_PATH = "tools/codegraph/graph.json";
 
@@ -103,7 +106,7 @@ export function gitCommit(repoRoot: string): string {
 }
 
 /** Key an edge for dedup: the same triple from the same file is one edge. */
-const edgeKey = (r: StoredRelation) =>
+export const edgeKey = (r: StoredRelation) =>
   `${r.source} ${r.predicate} ${r.target} ${r.file_path}`;
 
 export type MergeReport = {
@@ -167,7 +170,7 @@ export function save(
   repoRoot: string,
   graph: Omit<Graph, "commit" | "built_at">,
   commit: string,
-): void {
+): Graph {
   const out: Graph = {
     commit,
     built_at: new Date().toISOString(),
@@ -175,6 +178,7 @@ export function save(
     ...graph,
   };
   writeFileSync(join(repoRoot, GRAPH_PATH), JSON.stringify(out, null, 1));
+  return out;
 }
 
 export function load(repoRoot: string): Graph {
@@ -210,6 +214,47 @@ export function llmPart(prev: Graph | undefined, excludeFiles?: Set<string>): Gr
     entities: prev.nodes.filter((n) => n.extractor === "llm" && keep(n.file_path)),
     relations: prev.links.filter((l) => l.extractor === "llm" && keep(l.file_path)),
   };
+}
+
+/**
+ * The one rebuild pipeline: passes -> merge (with LLM carry-over) -> resolve ->
+ * carryProfiles -> save. Every entry point (build.ts, update.ts, query.ts's
+ * auto-refresh) runs THIS; they differ only in whether they supply fresh LLM
+ * output. Before this existed each entry point hand-assembled the pipeline and
+ * they drifted: build.ts skipped resolveGraph entirely, and one caller's
+ * missing llmPart() deleted every LLM edge from the committed graph.
+ *
+ * `llm` receives the endpoint names the AST pass found (the LLM validator's
+ * anti-fabrication gate) and returns fresh LLM output plus the set of files it
+ * re-extracted, so prior LLM facts for those files are not double-carried.
+ */
+export async function rebuild(
+  repoRoot: string,
+  commit: string,
+  llm?: (
+    knownEndpoints: Set<string>,
+  ) => Promise<{ fresh: GraphPart; reExtracted: Set<string> }>,
+): Promise<{ graph: Graph; merge: MergeReport; resolution: ResolutionReport }> {
+  const prev = tryLoad(repoRoot);
+  const parts: GraphPart[] = [runSqlPass(repoRoot), runAstPass(repoRoot)];
+
+  let reExtracted = new Set<string>();
+  if (llm) {
+    const knownEndpoints = new Set(
+      parts[1].entities
+        .filter((e) => e.type === "API_ENDPOINT" || e.type === "WEBHOOK")
+        .map((e) => e.name),
+    );
+    const out = await llm(knownEndpoints);
+    parts.push(out.fresh);
+    reExtracted = out.reExtracted;
+  }
+  parts.push(llmPart(prev, reExtracted));
+
+  const { graph: merged, report } = merge(parts);
+  const { graph: resolved, report: resolution } = resolveGraph(merged);
+  carryProfiles(prev, resolved);
+  return { graph: save(repoRoot, resolved, commit), merge: report, resolution };
 }
 
 /**

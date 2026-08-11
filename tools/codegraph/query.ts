@@ -17,18 +17,11 @@
  * about the code - an ungrounded answer defeats the point of building this.
  */
 /* eslint-disable no-console -- CLI entry point: stdout is the output. */
-import { execFileSync } from "node:child_process";
-import { writeFileSync, mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { load, isStale, save, gitCommit, type Graph } from "./store";
-import { runAstPass } from "./ast";
-import { runSqlPass } from "./sql";
-import { merge, llmPart, carryProfiles } from "./store";
-import { resolveGraph } from "./resolve";
+import { load, isStale, rebuild, gitCommit, type Graph } from "./store";
+import { codexExecSync } from "./codex";
 import type { StoredEntity, StoredRelation } from "./schema";
 
-export type Subgraph = {
+type Subgraph = {
   seed: StoredEntity;
   triples: string[];
   nodes: StoredEntity[];
@@ -59,7 +52,7 @@ const STOPWORDS = new Set([
 ]);
 
 /** Find the best seed node for a free-text query. */
-export function findSeed(graph: Graph, query: string, exact = false): StoredEntity | undefined {
+function findSeed(graph: Graph, query: string, exact = false): StoredEntity | undefined {
   if (exact) return graph.nodes.find((n) => n.name === query);
 
   const candidates = [
@@ -94,7 +87,7 @@ export function findSeed(graph: Graph, query: string, exact = false): StoredEnti
  * BFS outward from `center` in BOTH directions for `hops` levels, and return
  * the induced subgraph serialized as sorted triples.
  */
-export function serializeSubgraph(
+function serializeSubgraph(
   graph: Graph,
   center: string,
   hops = 2,
@@ -143,36 +136,14 @@ Rules, in order of importance:
 4. Do not speculate about edges that "probably" exist. A missing edge means the graph does not know, not that the relationship is absent.`;
 
 function answer(question: string, sub: Subgraph): string {
-  const dir = mkdtempSync(join(tmpdir(), "codegraph-"));
   const prompt =
     `${GROUNDING}\n\nQuestion: ${question}\n\n` +
     `Seed entity: ${sub.seed.name} (${sub.seed.type}) - ${sub.seed.description}\n\n` +
     `Triples (${sub.triples.length}):\n${sub.triples.join("\n")}\n`;
-  writeFileSync(join(dir, "prompt.txt"), prompt);
-  return execFileSync(
-    "codex",
-    [
-      "exec",
-      "--ignore-user-config",
-      "-s",
-      "read-only",
-      "--ephemeral",
-      "--skip-git-repo-check",
-      "-m",
-      "gpt-5.3-codex-spark",
-      "-c",
-      'model_reasoning_effort="low"',
-      prompt,
-    ],
-    {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      maxBuffer: 32 * 1024 * 1024,
-    },
-  );
+  return codexExecSync(prompt);
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const wantAnswer = argv.includes("--answer");
   const exact = argv.includes("--exact");
@@ -198,16 +169,7 @@ function main(): void {
   // that needs a subscription; `update.ts --llm` refreshes those explicitly.
   if (!argv.includes("--no-refresh") && isStale(process.cwd(), graph)) {
     const root = process.cwd();
-    const head = gitCommit(root);
-    const { graph: merged } = merge([
-      runSqlPass(root),
-      runAstPass(root),
-      llmPart(graph),
-    ]);
-    const { graph: resolved } = resolveGraph(merged);
-    carryProfiles(graph, resolved);
-    save(root, resolved, head);
-    graph = load(root);
+    graph = (await rebuild(root, gitCommit(root))).graph;
     console.error(`# graph was stale; rebuilt in-place (llm edges preserved)`);
   }
   const seed = findSeed(graph, query, exact);
@@ -238,4 +200,4 @@ function main(): void {
   }
 }
 
-if (import.meta.main) main();
+if (import.meta.main) await main();

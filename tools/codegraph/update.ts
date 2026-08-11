@@ -25,11 +25,8 @@
  */
 /* eslint-disable no-console -- CLI entry point: stdout is the output. */
 import { execFileSync } from "node:child_process";
-import { runAstPass } from "./ast";
-import { runSqlPass } from "./sql";
 import { runLlmPass, llmCorpus } from "./extract";
-import { resolveGraph } from "./resolve";
-import { merge, save, gitCommit, tryLoad, llmPart, carryProfiles, GRAPH_PATH } from "./store";
+import { rebuild, gitCommit, tryLoad, GRAPH_PATH, type GraphPart } from "./store";
 
 /** Files changed between `ref` and HEAD, repo-relative. */
 function changedFiles(repoRoot: string, ref: string): string[] {
@@ -49,8 +46,7 @@ async function main(): Promise<void> {
   const explicitRef = argv.find((a) => !a.startsWith("--"));
 
   const head = gitCommit(root);
-  const prevGraph = tryLoad(root);
-  const previous = prevGraph?.commit;
+  const previous = tryLoad(root)?.commit;
 
   const ref = explicitRef ?? previous;
   let changed: string[] = [];
@@ -74,47 +70,36 @@ async function main(): Promise<void> {
   );
 
   const t0 = Date.now();
-  const sql = runSqlPass(root);
-  const ast = runAstPass(root);
-  const parts = [sql, ast];
-  // The AST pass is the authority on which endpoints exist; the LLM pass is
-  // held to it so it cannot invent routes.
-  const knownEndpoints = new Set(
-    ast.entities
-      .filter((e) => e.type === "API_ENDPOINT" || e.type === "WEBHOOK")
-      .map((e) => e.name),
+  // rebuild() owns the pipeline (passes -> merge/carry -> resolve -> save);
+  // this entry point only decides which files the LLM pass re-extracts.
+  const { graph, resolution: report } = await rebuild(
+    root,
+    head,
+    withLlm
+      ? async (knownEndpoints) => {
+          const none: GraphPart = { entities: [], relations: [] };
+          const corpus = llmCorpus(root);
+          // Filter to changed files when we have a diff; otherwise run the whole
+          // corpus, which the content-hash cache makes nearly free on a re-run.
+          const targets =
+            changed.length > 0 ? corpus.filter((f) => changed.includes(f)) : corpus;
+          if (targets.length === 0) {
+            console.log("  llm: no corpus files changed");
+            return { fresh: none, reExtracted: new Set<string>() };
+          }
+          console.log(`  llm: ${targets.length} file(s) (cache skips unchanged)`);
+          return {
+            fresh: await runLlmPass(root, {
+              files: targets,
+              knownEndpoints,
+              onProgress: (d, t, f, cached) =>
+                console.log(`    [${d}/${t}] ${cached ? "cached" : "ran   "} ${f}`),
+            }),
+            reExtracted: new Set(targets),
+          };
+        }
+      : undefined,
   );
-
-  const reExtracted = new Set<string>();
-  if (withLlm) {
-    const corpus = llmCorpus(root);
-    // Filter to changed files when we have a diff; otherwise run the whole
-    // corpus, which the content-hash cache makes nearly free on a re-run.
-    const targets =
-      changed.length > 0 ? corpus.filter((f) => changed.includes(f)) : corpus;
-    if (targets.length === 0) {
-      console.log("  llm: no corpus files changed");
-    } else {
-      console.log(`  llm: ${targets.length} file(s) (cache skips unchanged)`);
-      for (const f of targets) reExtracted.add(f);
-      parts.push(
-        await runLlmPass(root, {
-          files: targets,
-          knownEndpoints,
-          onProgress: (d, t, f, cached) =>
-            console.log(`    [${d}/${t}] ${cached ? "cached" : "ran   "} ${f}`),
-        }),
-      );
-    }
-  }
-
-  // Carry prior LLM facts for every file not re-extracted this run (all of
-  // them, without --llm), and hub profiles — no pass reproduces either.
-  parts.push(llmPart(prevGraph, reExtracted));
-  const { graph: mergedGraph } = merge(parts);
-  const { graph, report } = resolveGraph(mergedGraph);
-  carryProfiles(prevGraph, graph);
-  save(root, graph, head);
 
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`wrote ${GRAPH_PATH} @ ${head.slice(0, 8)} in ${secs}s`);

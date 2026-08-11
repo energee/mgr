@@ -2,7 +2,7 @@
  * Knowledge-graph schema for the mgr codebase.
  *
  * Mirrors the Pydantic schema from Anthropic's knowledge-graph cookbook
- * (Entity / Relation / ExtractedGraph), expressed in zod so the same
+ * (Entity / Relation / LlmExtractedGraph), expressed in zod so the same
  * definitions drive both LLM structured output and the deterministic
  * AST/SQL passes.
  *
@@ -116,13 +116,6 @@ export const Relation = z.object({
 });
 export type Relation = z.infer<typeof Relation>;
 
-/** Exactly the cookbook's ExtractedGraph — the LLM output contract. */
-export const ExtractedGraph = z.object({
-  entities: z.array(Entity),
-  relations: z.array(Relation),
-});
-export type ExtractedGraph = z.infer<typeof ExtractedGraph>;
-
 // --- persisted forms (superset of the extraction contract) ---
 
 /** An entity as stored: extraction fields plus resolution/provenance state. */
@@ -141,22 +134,6 @@ export type StoredRelation = Relation & {
   file_path: string;
   extractor: Extractor;
 };
-
-/** Entity-resolution output — the cookbook's Cluster/ResolvedClusters. */
-export const Cluster = z.object({
-  canonical: z.string().describe("most complete surface form"),
-  aliases: z.array(z.string()).describe("all surface forms that mean this"),
-});
-export const ResolvedClusters = z.object({ clusters: z.array(Cluster) });
-export type Cluster = z.infer<typeof Cluster>;
-
-/** Hub-node profile — the cookbook's EntityProfile. */
-export const EntityProfile = z.object({
-  summary: z.string().describe("2-3 sentences"),
-  key_facts: z.array(z.string()).describe("3-5 atomic facts"),
-});
-export type EntityProfile = z.infer<typeof EntityProfile>;
-
 
 // --- LLM-facing subset -------------------------------------------------
 //

@@ -25,7 +25,7 @@
  * rule touched, and merges that look suspicious enough to eyeball.
  */
 import type { StoredEntity, StoredRelation } from "./schema";
-import type { Graph } from "./store";
+import { edgeKey, type Graph } from "./store";
 
 /** The persisted node-link shape, minus the metadata save() adds. */
 type GraphBody = Omit<Graph, "commit" | "built_at">;
@@ -139,10 +139,11 @@ export function resolveGraph(graph: GraphBody): {
     if (source !== r.source || target !== r.target) edgesRewritten++;
     if (source === target) continue;
     if (!byName.has(source) || !byName.has(target)) continue;
-    const k = `${source} ${r.predicate} ${target} ${r.file_path}`;
+    const renamed = { ...r, source, target };
+    const k = edgeKey(renamed);
     if (seen.has(k)) continue;
     seen.add(k);
-    links.push({ ...r, source, target });
+    links.push(renamed);
   }
 
   const merged = [...aliasesOf.entries()].map(([canonical, s]) => ({
