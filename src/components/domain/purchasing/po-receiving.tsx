@@ -304,7 +304,10 @@ export function POReceiving({
             <Skeleton className="h-10 w-full" />
           </div>
         ) : lineItems && lineItems.length > 0 ? (
-          <div className="space-y-4">
+          // min-w-0 keeps this grid item from stretching DialogContent to the
+          // table's intrinsic width on phones; the Table's own overflow-x-auto
+          // wrapper then provides horizontal panning (390px verification pass).
+          <div className="min-w-0 space-y-4">
             <Table>
               <TableHeader>
                 <TableRow>
