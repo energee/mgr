@@ -58,6 +58,19 @@ with zero permission denials. Stays failed if either failure mode recurs
 after two more scheduled runs — and if so, the retire/revise question should
 be reopened, not re-closed under the 07-26 framing.)
 
+(Bug Patrol's 2026-07-26 revise-candidate flag is retired as of 2026-08-02:
+its own falsification clause fired. The two `error_max_turns` runs on
+07-25/07-26 were followed by seven consecutive green scheduled runs
+(07-27 through 08-02, run IDs 30248989067 through 30738495520), none hitting
+the turn/permission-denial ceiling, and the loop scoreboard now shows 7 PRs
+opened / 5 merged / 0 closed unmerged / 2 still open since the loop started —
+a merge rate that is not trending toward zero. No workflow-file change
+coincides with the recovery (`bug-patrol.yml` was last touched by #599 on
+07-25, before the streak began), so whatever combination of task content and
+the 80-turn cap from #598 was hitting the ceiling simply stopped recurring.
+Re-open the investigation the next time a scheduled run hits
+`error_max_turns`; until then there is nothing to revise.)
+
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
 the week's merges actually moved codebase health — its trend log is the
