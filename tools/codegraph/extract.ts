@@ -103,14 +103,22 @@ function jsonSchema(): unknown {
 const EDGE_TYPES: Record<string, { from: string; to: string }> = {
   // The handler is triggered by the outside system, never the reverse.
   triggered_by: { from: "WEBHOOK", to: "EXTERNAL_SYSTEM" },
-  // The thing points at the doc that describes it.
-  documented_in: { from: "*", to: "DOC" },
+  // The thing points at the doc that describes it. The source must NOT itself
+  // be a DOC: "db-security.md documented_in architecture.md" is a true citation
+  // but the wrong predicate - documented_in means "this code or database object
+  // is described in that doc". Doc-to-doc citation would need its own predicate.
+  documented_in: { from: "!DOC", to: "DOC" },
   // A feature is verified by a test/doc, so the feature is the source.
   verifies: { from: "FEATURE", to: "*" },
 };
 
-const typeOk = (want: string, got: string | undefined) =>
-  want === "*" ? got !== undefined : got === want;
+/** `*` = any known type, `!X` = any known type except X, otherwise exact match. */
+const typeOk = (want: string, got: string | undefined): boolean => {
+  if (got === undefined) return false;
+  if (want === "*") return true;
+  if (want.startsWith("!")) return got !== want.slice(1);
+  return got === want;
+};
 
 /** A DOC must be an actual document path; a FEATURE an actual tracker id.
  *  Without this the model uses them as generic buckets for code symbols. */
@@ -192,26 +200,25 @@ export async function runLlmPass(
   const absorb = (relPath: string, parsed: LlmExtractedGraph) => {
     const kept = parsed.entities.filter(entityShapeOk);
     const typeOfName = new Map(kept.map((e) => [e.name, e.type as string]));
-    for (const e of kept) {
-      entities.push({ ...e, aliases: [], extractor: "llm" });
-    }
+
+    const accepted: StoredRelation[] = [];
     for (const r of parsed.relations) {
       // No orphaned edges: the model is told this, but enforce it too.
       if (!typeOfName.has(r.source) || !typeOfName.has(r.target)) continue;
       const rule = EDGE_TYPES[r.predicate];
       if (!rule) continue;
-      const s = typeOfName.get(r.source);
-      const t = typeOfName.get(r.target);
+      const st = typeOfName.get(r.source);
+      const tt = typeOfName.get(r.target);
       let { source, target } = r;
-      if (!(typeOk(rule.from, s) && typeOk(rule.to, t))) {
-        // Reversed? Flip it. Otherwise the edge is unsalvageable — drop it.
-        if (typeOk(rule.from, t) && typeOk(rule.to, s)) {
+      if (!(typeOk(rule.from, st) && typeOk(rule.to, tt))) {
+        // Reversed? Flip it. Otherwise the edge is unsalvageable - drop it.
+        if (typeOk(rule.from, tt) && typeOk(rule.to, st)) {
           [source, target] = [r.target, r.source];
         } else {
           continue;
         }
       }
-      relations.push({
+      accepted.push({
         source,
         predicate: r.predicate,
         target,
@@ -220,6 +227,19 @@ export async function runLlmPass(
         extractor: "llm",
       });
     }
+
+    // Drop entities left with no surviving edge. This pass exists to contribute
+    // boundary RELATIONS; a node it introduced that connects to nothing adds no
+    // reachability and is usually a passing mention the model turned into a
+    // node (a doc citing another doc, an integration named in prose). The
+    // file's own node is exempt - it is the anchor even when nothing links it.
+    const connected = new Set(accepted.flatMap((r) => [r.source, r.target]));
+    for (const e of kept) {
+      if (connected.has(e.name) || e.name === relPath) {
+        entities.push({ ...e, aliases: [], extractor: "llm" });
+      }
+    }
+    relations.push(...accepted);
   };
 
   const worker = async (queue: string[]) => {
