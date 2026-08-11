@@ -161,15 +161,14 @@ it, because the next scheduled run scores fresh issues, not the one that just
 failed to land. The same pack-step failure signature ("paths are ignored by
 one of your .gitignore files: outbox", then "Process completed with exit code
 1") also fired standalone on job 91225679847 (2026-07-31, classification B,
-harmless there since no patch was needed). Confirmed root cause via
-`sentry-harness.yml:274` + `.gitignore:114`; not yet fixed, and not
-fixable from here since it requires a workflow-file change. Whoever picks
-this up: stop the two mechanisms from fighting each other — either write the
-patch to a location outside the repo tree (`$RUNNER_TEMP`) instead of a
-gitignored in-tree directory, or drop the `.gitignore` entry and rely solely
-on the `:(exclude)` pathspec to keep `outbox/` out of the diff — and consider
-whether a discarded classification-(A) fix should re-file as a `needs-human`
-issue instead of vanishing with no trace. **Watch for:** this exact
+harmless there since no patch was needed). Not fixed here — it needs a
+workflow-file change. Whoever picks this up: stop the two mechanisms from
+fighting each other — either write the patch to a location outside the repo
+tree (`$RUNNER_TEMP`) instead of a gitignored in-tree directory, or drop the
+`.gitignore` entry and rely solely on the `:(exclude)` pathspec to keep
+`outbox/` out of the diff — and consider whether a discarded
+classification-(A) fix should re-file as a `needs-human` issue instead of
+vanishing with no trace. **Watch for:** this exact
 `git add`/ignored-path error recurring in a `sentry-harness.yml` run log, or
 another `land-fix` failure reading "packed patch is empty" against a
 classification-A plan — either means the fix above hasn't landed yet.
@@ -459,8 +458,8 @@ recent `Build PROGRESS.md` runs (10 of the last 30 as of 2026-08-01) fail with
 "unstable" rather than something GitHub will queue behind, because there is no
 `required_status_checks` rule for it to queue behind. This is not data loss:
 `progress.yml` retriggers on the next push to `docs/progress/**`, and the
-retry has so far always succeeded. It is noisy enough — about a third of runs
-red — to read as a fresh regression each time someone notices it, so treat a
+retry has so far always succeeded. It is noisy enough to read as a fresh
+regression each time someone notices it, so treat a
 lone `Build PROGRESS.md` failure with this exact error as expected until #713
 lands, not a new bug to chase. **Watch for:** this note going stale once #713
 adds the required-checks rule — the failure should stop recurring, and if a
