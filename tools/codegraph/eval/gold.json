@@ -6,6 +6,50 @@
   ],
   "cases": [
     {
+      "file": "src/domain/yeast-lineage.ts",
+      "extractor": "ast",
+      "why": "One small module exercising four AST edge kinds: a resolved path-alias import, an exported function, a dynamicRpc-wrapped invoke, and a read-only supabase chain.",
+      "entities": [
+        {
+          "name": "src/domain/yeast-lineage.ts",
+          "type": "MODULE"
+        },
+        {
+          "name": "src/domain/yeast-lineage.ts#resolveYeastLineageRoot",
+          "type": "FUNCTION"
+        }
+      ],
+      "relations": [
+        {
+          "source": "src/domain/yeast-lineage.ts",
+          "predicate": "imports",
+          "target": "src/services/types.ts"
+        },
+        {
+          "source": "src/domain/yeast-lineage.ts",
+          "predicate": "defines",
+          "target": "src/domain/yeast-lineage.ts#resolveYeastLineageRoot"
+        },
+        {
+          "source": "src/domain/yeast-lineage.ts",
+          "predicate": "invokes",
+          "target": "get_yeast_lineage_root"
+        },
+        {
+          "source": "src/domain/yeast-lineage.ts",
+          "predicate": "reads_from",
+          "target": "yeast_pitches_with_remaining"
+        }
+      ],
+      "notes": [
+        "Scored by provenance: only facts whose file_path is this file.",
+        "The imports edge asserts module RESOLUTION: '@/services/types' must land on src/services/types.ts. The external '@supabase/supabase-js' import must produce nothing.",
+        "invokes comes from the dynamicRpc(client, \"get_yeast_lineage_root\", args) wrapper - argument index 1, not 0. A regression to plain .rpc() matching loses this edge.",
+        "reads_from, not writes_to: the fluent chain is .select().eq().single(), no write method. A chain-walk regression flips this.",
+        "Deliberately absent: a calls edge to src/services/types.ts#dynamicRpc. Direct calls to imported identifiers resolve to the local import specifier (alias not dereferenced), so the AST pass emits none; the invokes edge carries the semantic fact. If alias dereferencing is ever added, add the calls edge here in the same commit."
+      ]
+    },
+    {
       "file": "supabase/migrations/00064_ai_api_key_settings.sql",
       "extractor": "sql",
       "why": "Three RLS policies with no user_has_permission() call, plus an ALTER TABLE that must NOT produce a creates edge.",

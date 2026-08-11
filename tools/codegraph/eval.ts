@@ -16,13 +16,14 @@
  * policy. The migration is scored on its own node and its `creates` edges.
  *
  * Precision matters more than recall here, and the gold sets are written that
- * way: two of the three cases deliberately specify a nearly-empty answer, to
+ * way: two of the four cases deliberately specify a nearly-empty answer, to
  * catch a pass that invents structure rather than one that misses it.
  */
 /* eslint-disable no-console -- CLI entry point: stdout is the output. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { runSqlPass } from "./sql";
+import { runAstPass } from "./ast";
 import { runLlmPass } from "./extract";
 import type { StoredEntity, StoredRelation } from "./schema";
 
@@ -94,6 +95,15 @@ async function predictFor(
     // live-catalog snapshot (authoritative for policy->table), NOT to the
     // migration that declared the policy. The migration contributes its own
     // node and its `creates` edges. The gold set says exactly that.
+    return {
+      entities: all.entities.filter((e) => e.file_path === c.file),
+      relations: all.relations.filter((r) => r.file_path === c.file),
+    };
+  }
+  if (c.extractor === "ast") {
+    // Same provenance scoping as SQL. The pass compiles the whole program
+    // (~7s) because import/call resolution needs the full program anyway.
+    const all = runAstPass(root, "eval");
     return {
       entities: all.entities.filter((e) => e.file_path === c.file),
       relations: all.relations.filter((r) => r.file_path === c.file),
