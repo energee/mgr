@@ -1,6 +1,6 @@
 {
  "commit": "1747932bd2373ab7cbbca26308ba0bb012b87293",
- "built_at": "2026-08-11T20:18:19.197Z",
+ "built_at": "2026-08-11T20:40:43.781Z",
  "inputs": {
   "count": 1377,
   "digest": "c34c61cc15b9c3b7"
@@ -1192,7 +1192,37 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`update_updated_at` is a Postgres function in the schema and is explicitly marked as confirmed live. It is defined as part of the database migrations and acts as a shared helper for timestamp maintenance, since many table-level update procedures and triggers in different domains execute it. In practice, it is a cross-cutting data layer dependency for update hooks across a wide range of entities.",
+   "key_facts": [
+    "`update_updated_at` is created by migration `00001_initial_schema.sql`.",
+    "`update_updated_at` is also created by migration `00014_security_fixes.sql`.",
+    "`_schema_registry.update_schema_registry_updated_at` executes `update_updated_at`.",
+    "`update_updated_at` is executed by many table-specific updated_at triggers/functions, including `orders.update_orders_updated_at` and `batches.update_batches_updated_at`.",
+    "Many operational entities depend on it for row timestamp updates, including `customers.update_customers_updated_at`, `inventory_items.update_inventory_items_updated_at`, and `user_profiles.update_user_profiles_updated_at`."
+   ],
+   "files": [
+    "supabase/migrations/00001_initial_schema.sql",
+    "supabase/migrations/00003_brands.sql",
+    "supabase/migrations/00004_brew_logs.sql",
+    "supabase/migrations/00006_vessels.sql",
+    "supabase/migrations/00010_unified_allocations.sql",
+    "supabase/migrations/00011_catalog_and_recipe_junction.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00030_system_settings.sql",
+    "supabase/migrations/00035_yeast_pitches.sql",
+    "supabase/migrations/00036_user_profiles.sql",
+    "supabase/migrations/00037_enum_registry.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00091_square_integration.sql",
+    "supabase/migrations/00092_change_request_tables.sql",
+    "supabase/migrations/00099_quickbooks_integration.sql",
+    "supabase/migrations/00160_selling_format_materials.sql",
+    "supabase/migrations/00162_order_shipping_materials.sql",
+    "supabase/migrations/00190_capture_out_of_band_objects.sql",
+    "supabase/migrations/00199_capture_selling_formats_containers.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "user_has_brewery_access",
@@ -4243,7 +4273,37 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`allocations` is a Postgres table in the system (listed as present in the live catalog snapshot) and is part of the persistence layer for allocation data, with schema defined by multiple migration files. It is highly integrated into application logic: UI/report views read from it, while order, sales, reconciliation, and service flows also write to it. Access is governed by multiple allocation-related protections and its behavior is governed by several table-level triggers for revisioning, validation, and update lifecycle management.",
+   "key_facts": [
+    "`allocations` is created by both `00001_initial_schema.sql` and `00010_unified_allocations.sql`.",
+    "`allocations` is protected by multiple policies/functions: `allocations.allocation_access`, `allocations.allocations_access`, `allocations.allocations_select`, `allocations.allocations_write`, and `allocations.current_user_enabled`.",
+    "`allocations` has triggers firing on it, including `allocations.tr_allocations_revision`, `allocations.trg_validate_allocation_status`, `allocations.trg_prevent_completed_allocation_delete`, `allocations.trg_guard_allocation_availability`, and `allocations.update_allocations_updated_at`.",
+    "Several reporting pages read `allocations`, including `batch-cost`, `cogs`, `inventory-valuation`, and `trace` report pages.",
+    "Writes to `allocations` occur from multiple domains, including `src/app/(app)/sales/orders/[id]/allocations/page.tsx`, `src/domain/.../order` UI component (`order-allocation.tsx`), `src/services/consumption-service.ts`, and `src/services/inventory-count-service.ts`."
+   ],
+   "files": [
+    "src/app/(app)/reports/batch-cost/page.tsx",
+    "src/app/(app)/reports/cogs/page.tsx",
+    "src/app/(app)/reports/inventory-valuation/page.tsx",
+    "src/app/(app)/reports/trace/page.tsx",
+    "src/app/(app)/sales/orders/[id]/allocations/page.tsx",
+    "src/app/api/square/reconcile-draft-sales/route.ts",
+    "src/components/domain/inventory/fg-inventory-section.tsx",
+    "src/components/domain/order/order-allocation.tsx",
+    "src/components/domain/order/order-pick-list.tsx",
+    "src/domain/report-utils.ts",
+    "src/services/consumption-service.ts",
+    "src/services/inventory-count-service.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00001_initial_schema.sql",
+    "supabase/migrations/00010_unified_allocations.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00080_unify_packaging_formats.sql",
+    "supabase/migrations/00157_lots_view_add_item_name.sql",
+    "supabase/migrations/00189_landed_cost_inline_no_update.sql"
+   ]
   },
   {
    "name": "allocations_legacy",
@@ -4288,7 +4348,37 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`batches` is a Postgres table in the system’s schema (created in `00001_initial_schema.sql`) and is a confirmed live-catalog table. It is a central production domain entity that drives many read paths (pages, APIs, and components), and is also written to by batch API routes. Its behavior is governed by multiple database-layer protections, triggers, and validation functions, and it is a source for numerous derived reporting and analytics views.",
+   "key_facts": [
+    "`batches` is created by migration `00001_initial_schema.sql` and is present in the live catalog snapshot.",
+    "`batches` is protected by database security artifacts `batches.batch_access`, `batches.batches_select`, `batches.batches_write`, and `batches.current_user_enabled` (all `protects` edges).",
+    "Batch lifecycle/business behavior includes triggers and functions firing on `batches`, including `batches.batches_version_trigger`, `batches.trg_generate_batch_code`, `batches.trg_validate_batch_status`, `batches.trg_batches_set_completed_at`, `batches.update_batches_updated_at`, `batches.on_batch_terminated`, `batches.tr_batches_revision`, `batches.batch_status_notification`, and `batches.validate_batch_status` (all `fires_on` edges).",
+    "The table is read by multiple UI routes and API callers (for example `src/app/(app)/production/batches/[id]/readings/page.tsx`, `src/app/api/batches/route.ts`, `src/app/api/batches/[id]/route.ts`, and `src/app/(app)/reports/production-summary/page.tsx`) and written by `src/app/api/batches/route.ts` and `src/app/api/batches/[id]/route.ts`.",
+    "`batches` is a source table for many derived entities/views such as `batches_with_blend_info`, `keg_inventory_with_details`, `brew_log_metrics`, `vessel_batch_drift_check`, `ttb_in_process_beer`, and `yeast_pitches_with_details` (all `derives_from` edges)."
+   ],
+   "files": [
+    "src/app/(app)/dashboard/page.tsx",
+    "src/app/(app)/production/batches/[id]/additions/page.tsx",
+    "src/app/(app)/production/batches/[id]/readings/page.tsx",
+    "src/app/(app)/production/yeast-pitches/[id]/page.tsx",
+    "src/app/(app)/reports/batch-cost/page.tsx",
+    "src/app/(app)/reports/cogs/page.tsx",
+    "src/app/(app)/reports/production-summary/page.tsx",
+    "src/app/(app)/reports/projections/page.tsx",
+    "src/app/(app)/reports/trace/page.tsx",
+    "src/app/(app)/reports/ttb/page.tsx",
+    "src/app/api/batches/[id]/route.ts",
+    "src/app/api/batches/[id]/transfer/route.ts",
+    "src/app/api/batches/route.ts",
+    "src/app/api/chat/tools.ts",
+    "src/app/api/recipes/[id]/route.ts",
+    "src/components/dashboard/getting-started-checklist.tsx",
+    "src/components/domain/brew/brew-log-completion-dialog.tsx",
+    "src/components/domain/brew/start-brew-day-dialog.tsx",
+    "src/components/domain/packaging/packaging-batch-dialog.tsx",
+    "src/components/domain/vessel/cellar-board.tsx"
+   ]
   },
   {
    "name": "beer_order_brand_mappings",
@@ -4360,7 +4450,37 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`brands` is a Postgres table that is explicitly created by migration `00003_brands.sql` and is part of the live catalog. It is a protected core dataset, with row-level protections exposed through multiple security constructs and at least one trigger tied to update timestamps. Multiple domain views and application code paths read from it, indicating it is both a storage entity and a shared reference model in sales, planning, and dashboard flows.",
+   "key_facts": [
+    "`brands` is created by migration `(00003_brands.sql) --[creates]--> (brands)`.",
+    "Security is declared on `brands` via multiple policy artifacts: `(brands.brand_access)`, `(brands.brands_select)`, `(brands.brands_write)`, and `(brands.current_user_enabled)` each `[protects]--> (brands)`.",
+    "A trigger `(brands.update_brands_updated_at)` is configured and `[fires_on]--> (brands)`, implying timestamp-update behavior is coupled to this table.",
+    "`brands` is a source for many derived views, including `bin_contents`, `brand_packaging_summary`, `finished_goods_with_availability`, `keg_inventory_with_details`, and `product_mix_by_brand` (all `[derives_from]--> (brands)`).",
+    "`brands` is read directly by multiple application layers: pages/tools/components/domain code and hooks, including `src/app/(app)/sales/orders/[id]/allocations/page.tsx`, `src/app/api/chat/tools.ts`, `src/components/dashboard/getting-started-checklist.tsx`, `src/components/domain/order/order-pick-list.tsx`, `src/components/domain/order/pick-list-items.tsx`, `src/domain/plan-batch-from-recipe.ts`, and `src/hooks/use-catalog.ts` via `[reads_from]--> (brands)`."
+   ],
+   "files": [
+    "src/app/(app)/sales/orders/[id]/allocations/page.tsx",
+    "src/app/api/chat/tools.ts",
+    "src/components/dashboard/getting-started-checklist.tsx",
+    "src/components/domain/order/order-pick-list.tsx",
+    "src/components/domain/order/pick-list-items.tsx",
+    "src/domain/plan-batch-from-recipe.ts",
+    "src/hooks/use-catalog.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00003_brands.sql",
+    "supabase/migrations/00028_temporal_pricing_and_optimistic_lock.sql",
+    "supabase/migrations/00041_ttb_reporting.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00073_data_enhancements.sql",
+    "supabase/migrations/00074_packaging_sessions_summary_view.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00080_unify_packaging_formats.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00159_packaging_sessions_redesign.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql"
+   ]
   },
   {
    "name": "brew_log_batches",
@@ -4369,7 +4489,35 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`brew_log_batches` is a Postgres table that is created by migration `00004_brew_logs.sql` and exists in the live catalog. It is a data source/sink in the brew-log domain: multiple domain UI pages/components read from it, while specific UI flows write to it. The table is also referenced by other database objects (views/functions) that derive values from it and is protected by several policy objects.",
+   "key_facts": [
+    "`00004_brew_logs.sql` creates `brew_log_batches`, establishing its schema origin.",
+    "`batches_with_brew_info`, `brew_log_metrics`, and `brew_logs_with_batches` each derive from `brew_log_batches`, indicating downstream data derivations built on this table.",
+    "Access to `brew_log_batches` is enforced by `brew_log_batches.brew_log_batch_access`, `brew_log_batches.brew_log_batches_select`, `brew_log_batches.brew_log_batches_write`, and `brew_log_batches.current_user_enabled`.",
+    "`src/components/domain/brew/brew-log-linker.tsx` and `src/components/domain/brew/start-brew-day-dialog.tsx` write to `brew_log_batches`, while `src/app/(app)/production/batches/[id]/batch-detail-client.tsx`, `src/app/(app)/production/brew-logs/[id]/page.tsx`, `src/components/domain/batch/batch-brew-info.tsx`, `src/components/domain/batch/batch-quick-links.tsx`, `src/components/domain/brew/brew-log-linker.tsx`, `src/components/domain/brew/brew-log-split-overview.tsx`, and `src/services/consumption-service.ts` read from it."
+   ],
+   "files": [
+    "src/app/(app)/production/batches/[id]/batch-detail-client.tsx",
+    "src/app/(app)/production/brew-logs/[id]/page.tsx",
+    "src/components/domain/batch/batch-brew-info.tsx",
+    "src/components/domain/batch/batch-quick-links.tsx",
+    "src/components/domain/brew/brew-log-linker.tsx",
+    "src/components/domain/brew/brew-log-split-overview.tsx",
+    "src/components/domain/brew/start-brew-day-dialog.tsx",
+    "src/services/consumption-service.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00004_brew_logs.sql",
+    "supabase/migrations/00005_batches_cleanup.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00042_batch_cancellation.sql",
+    "supabase/migrations/00052_batch_archived_state.sql",
+    "supabase/migrations/00086_refresh_views_for_variants.sql",
+    "supabase/migrations/00101_view_correlated_subquery_fixes.sql",
+    "supabase/migrations/00104_batch_centric_brew_logs.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00204_fix_actual_og_plato_to_sg.sql"
+   ]
   },
   {
    "name": "brew_logs",
@@ -4378,7 +4526,35 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`brew_logs` is a PostgreSQL table in the codebase schema, and it is part of the data model surfaced by the live catalog snapshot. It is instantiated by migration `00004_brew_logs.sql` and is actively integrated into production brew-log workflows through reads, writes, and cache/route invalidations from UI pages, domain components, and a chat tool. Several database entities (derivative/query objects) also derive their data from this table.",
+   "key_facts": [
+    "`brew_logs` is created by the migration `(00004_brew_logs.sql)` via the `creates` edge.",
+    "`brew_logs.brew_log_access`, `brew_logs.brew_logs_select`, `brew_logs.brew_logs_write`, and `brew_logs.current_user_enabled` all `protects` entries point to `brew_logs`.",
+    "`brew_logs.trg_generate_brew_number`, `brew_logs.trg_validate_brew_log_status`, and `brew_logs.update_brew_logs_updated_at` all `fires_on` `brew_logs`.",
+    "`src/app/(app)/production/brew-logs/[id]/page.tsx` both `reads_from` and `invalidates` `brew_logs`.",
+    "`src/components/domain/brew/brew-log-timeline.tsx`, `start-brew-day-dialog.tsx`, and `brew-log-completion-dialog.tsx` use `brew_logs` through `writes_to`/`invalidates`, while `brew-log-linker.tsx` and `src/app/api/chat/tools.ts` `reads_from` it.",
+    "`batches_with_brew_info`, `brew_log_metrics`, and `brew_logs_with_batches` each `derives_from` `brew_logs`."
+   ],
+   "files": [
+    "src/app/(app)/production/brew-logs/[id]/page.tsx",
+    "src/app/api/chat/tools.ts",
+    "src/components/domain/brew/brew-log-completion-dialog.tsx",
+    "src/components/domain/brew/brew-log-linker.tsx",
+    "src/components/domain/brew/brew-log-timeline.tsx",
+    "src/components/domain/brew/start-brew-day-dialog.tsx",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00004_brew_logs.sql",
+    "supabase/migrations/00005_batches_cleanup.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00042_batch_cancellation.sql",
+    "supabase/migrations/00052_batch_archived_state.sql",
+    "supabase/migrations/00086_refresh_views_for_variants.sql",
+    "supabase/migrations/00101_view_correlated_subquery_fixes.sql",
+    "supabase/migrations/00104_batch_centric_brew_logs.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00204_fix_actual_og_plato_to_sg.sql"
+   ]
   },
   {
    "name": "brewery_shipping_defaults",
@@ -4405,7 +4581,30 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`containers` is a confirmed Postgres table in the live catalog snapshot and is part of the system’s inventory/packaging data model surface. It is created by two migrations and is referenced both by database governance objects (policies, trigger, and query-protection functions) and by multiple downstream reporting/derivation views and a dashboard UI consumer. In short, `containers` acts as a central source entity for operational and sales-related inventory views around kegs, balances, aging, transactions, and availability.",
+   "key_facts": [
+    "`containers` is created by migration `00112_restore_out_of_band_foundations.sql`.",
+    "`containers` is created by migration `00199_capture_selling_formats_containers.sql`.",
+    "`containers.current_user_enabled`, `containers.containers_select`, and `containers.containers_write` each have a `protects` relationship to `containers`.",
+    "`containers.set_containers_updated_at` has a `fires_on` edge to `containers`.",
+    "`containers` is the source of derivation for many objects, including `keg_inventory_summary` and `order_items_with_details`.",
+    "`containers` is read from by `src/components/dashboard/getting-started-checklist.tsx`."
+   ],
+   "files": [
+    "src/components/dashboard/getting-started-checklist.tsx",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00112_restore_out_of_band_foundations.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql",
+    "supabase/migrations/00190_capture_out_of_band_objects.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00199_capture_selling_formats_containers.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql",
+    "supabase/migrations/00220_keg_bin_tracking.sql",
+    "supabase/migrations/00221_sellable_inventory_view.sql",
+    "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "customer_pallet_configs",
@@ -4441,7 +4640,36 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`customers` is a Postgres table established in the initial schema and confirmed present in the live catalog snapshot. It is a protected core data source in the system, with multiple security protections defined around it, and it contributes data to numerous derived views/queries. The table is also read by application and integration paths (chat tools, dashboard UI logic, and QuickBooks sync routines).",
+   "key_facts": [
+    "The `customers` table is created by `00001_initial_schema.sql`.",
+    "The `customers` node is protected by policies/objects including `customers.current_user_enabled`, `customer_access`, `customers.customers_customer_select`, `customers.customers_select`, and `customers.customers_write`.",
+    "Several database objects are derived from `customers`, including `customer_keg_balances`, `customer_keg_transaction_history`, and `customer_revenue_summary`.",
+    "The trigger/function `customers.update_customers_updated_at` fires on `customers`.",
+    "`customers` is directly read from by `src/app/api/chat/tools.ts`, `src/components/dashboard/getting-started-checklist.tsx`, `src/integrations/quickbooks/sync-customer.ts`, and `src/integrations/quickbooks/sync-invoice.ts`."
+   ],
+   "files": [
+    "src/app/api/chat/tools.ts",
+    "src/components/dashboard/getting-started-checklist.tsx",
+    "src/integrations/quickbooks/sync-customer.ts",
+    "src/integrations/quickbooks/sync-invoice.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00001_initial_schema.sql",
+    "supabase/migrations/00027_customer_order_summary.sql",
+    "supabase/migrations/00033_customer_keg_balances.sql",
+    "supabase/migrations/00034_keg_reports.sql",
+    "supabase/migrations/00057_pick_list_tables.sql",
+    "supabase/migrations/00077_pricing_tiers_redesign.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00185_order_list_details_view.sql",
+    "supabase/migrations/00190_capture_out_of_band_objects.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql",
+    "supabase/migrations/00251_order_list_details_total.sql"
+   ]
   },
   {
    "name": "deliveries",
@@ -4495,7 +4723,37 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`finished_goods` is a Postgres table in the schema, created by migration `00010_unified_allocations.sql` and represented as present in the live catalog snapshot. It is a central inventory-related entity consumed by multiple reporting and order/picking UI pages and components. The table is protected and governed by multiple RLS/security constructs plus several row-level triggers that enforce behavior around updates, inbound/outbound workflows, and revision/broadcast logic.",
+   "key_facts": [
+    "`finished_goods` was created by migration `(00010_unified_allocations.sql) --[creates]--> (finished_goods)`.",
+    "Several PostgreSQL security artifacts are attached to `finished_goods`: `(finished_goods.current_user_enabled)`, `(finished_goods.finished_goods_access)`, `(finished_goods.finished_goods_select)`, and `(finished_goods.finished_goods_write)` each `[protects]--> (finished_goods)`.",
+    "Several triggers fire on `finished_goods`: `(finished_goods.on_finished_good_place_in_bin)`, `(finished_goods.tr_finished_goods_revision)`, `(finished_goods.trg_guard_finished_good_outbound)`, and `(finished_goods.update_finished_goods_updated_at)` each `[fires_on]--> (finished_goods)`.",
+    "Multiple derived views rely on `finished_goods`: `(finished_goods_supply_by_product)`, `(finished_goods_with_availability)`, `(finished_goods_with_ttb_class)`, `(keg_filled_contents)`, `(keg_inventory_with_details)`, `(keg_transactions_with_details)`, `(sellable_inventory)`, `(bin_contents)`, and `(brand_packaging_summary)` each `[derives_from]--> (finished_goods)`.",
+    "`finished_goods` is read by report/order UI modules: `(src/app/(app)/reports/cogs/page.tsx)`, `(src/app/(app)/reports/inventory-valuation/page.tsx)`, `(src/app/(app)/sales/orders/[id]/allocations/page.tsx)`, `(src/components/domain/order/order-allocation.tsx)`, `(src/components/domain/order/order-pick-list.tsx)`, `(src/components/domain/order/pick-list-items.tsx)` all `[reads_from]--> (finished_goods)`."
+   ],
+   "files": [
+    "src/app/(app)/reports/cogs/page.tsx",
+    "src/app/(app)/reports/inventory-valuation/page.tsx",
+    "src/app/(app)/sales/orders/[id]/allocations/page.tsx",
+    "src/components/domain/order/order-allocation.tsx",
+    "src/components/domain/order/order-pick-list.tsx",
+    "src/components/domain/order/pick-list-items.tsx",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00010_unified_allocations.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00041_ttb_reporting.sql",
+    "supabase/migrations/00051_production_planning.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00073_data_enhancements.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00080_unify_packaging_formats.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00159_packaging_sessions_redesign.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql"
+   ]
   },
   {
    "name": "fruits",
@@ -4513,7 +4771,36 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "The `hops` node is a Postgres table in the codebase, defined in migration `00011_catalog_and_recipe_junction.sql`. It is a shared data source for recipe- and batch-related calculations/views that derive data from it, and it is also consumed directly by the batch addition UI component. Access and mutation of `hops` are managed through multiple derived policy/view objects and a dedicated `update_hops_updated_at` trigger.",
+   "key_facts": [
+    "`hops` is created by migration `(00011_catalog_and_recipe_junction.sql)`.",
+    "`hops` is protected by `hops.current_user_enabled`, `hops.hops_access`, `hops.hops_select`, and `hops.hops_write` objects.",
+    "`hops.update_hops_updated_at` fires on `hops`.",
+    "`recipe_ingredients_normalized`, `recipe_variants_with_costs`, `recipes_with_cogs`, `recipes_with_estimates`, and `batch_additions_with_costs` all derive from `hops`.",
+    "`src/components/domain/batch/batch-addition-form.tsx` reads from `hops`."
+   ],
+   "files": [
+    "src/components/domain/batch/batch-addition-form.tsx",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00011_catalog_and_recipe_junction.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00021_recipe_cogs.sql",
+    "supabase/migrations/00047_refresh_recipes_view_for_is_template.sql",
+    "supabase/migrations/00049_refresh_recipes_view_again.sql",
+    "supabase/migrations/00053_ingredient_demand.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00076_refresh_recipes_view_for_status.sql",
+    "supabase/migrations/00081_add_batch_count_to_recipes_view.sql",
+    "supabase/migrations/00085_variant_cost_views.sql",
+    "supabase/migrations/00086_refresh_views_for_variants.sql",
+    "supabase/migrations/00087_cost_view_unit_conversion.sql",
+    "supabase/migrations/00101_view_correlated_subquery_fixes.sql",
+    "supabase/migrations/00103_add_pricing_tier_to_recipes_view.sql",
+    "supabase/migrations/00110_demand_subtract_confirmed_pos.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00218_recipe_ibu_tinseth.sql"
+   ]
   },
   {
    "name": "inventory_items",
@@ -4522,7 +4809,31 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`inventory_items` is a Postgres table created by the initial schema migration and present in the live catalog snapshot, indicating it is an established core data table in the system. It is tightly governed through multiple row-level protections and database triggers, and it serves as a source for several derived inventory/reporting views. The table is both queried by purchasing-related UI/service code (including order acceptance flows) and invalidated by packaging/purchasing components when related operations modify dependent state.",
+   "key_facts": [
+    "`inventory_items` is created by migration `00001_initial_schema.sql`.",
+    "The table has at least one protection surface via `inventory_items.current_user_enabled`, `inventory_items.inventory_item_access`, `inventory_items.inventory_items_select`, and `inventory_items.inventory_items_write`.",
+    "Two triggers are associated with `inventory_items`: `inventory_items.update_inventory_items_updated_at` and `inventory_items.validate_catalog_type` (via `fires_on`).",
+    "`inventory_items` is the base for derived dataset nodes `inventory_lots_with_quantities`, `inventory_low_stock_items`, `inventory_summary_by_category`, and is referenced by `bin_contents` as `derives_from`.",
+    "Code paths invalidating `inventory_items` include `src/components/domain/packaging/selling-format-bom-editor.tsx`, `src/components/domain/packaging/shipping-material-roles-editor.tsx`, `src/components/domain/purchasing/__tests__/po-accept-inventory-dialog.test.tsx`, and `src/components/domain/purchasing/po-accept-inventory-dialog.tsx`, while the dialog component also reads from it and `src/services/consumption-service.ts` reads from it."
+   ],
+   "files": [
+    "src/components/domain/packaging/selling-format-bom-editor.tsx",
+    "src/components/domain/packaging/shipping-material-roles-editor.tsx",
+    "src/components/domain/purchasing/__tests__/po-accept-inventory-dialog.test.tsx",
+    "src/components/domain/purchasing/po-accept-inventory-dialog.tsx",
+    "src/services/consumption-service.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00001_initial_schema.sql",
+    "supabase/migrations/00073_data_enhancements.sql",
+    "supabase/migrations/00080_unify_packaging_formats.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00157_lots_view_add_item_name.sql",
+    "supabase/migrations/00189_landed_cost_inline_no_update.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "inventory_lots",
@@ -4531,7 +4842,32 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`inventory_lots` is a Postgres table in the live catalog. It is a central inventory data table established by migration `00010_unified_allocations.sql` and used by reporting, purchasing, batch transfer, and inventory services for both reads and updates. Multiple derived database objects (views/objects) and row-level protections connect to it, so it sits at the core of inventory persistence and access-governed read/write flows.",
+   "key_facts": [
+    "`inventory_lots` was created by the migration `(00010_unified_allocations.sql)` (edge: `creates`).",
+    "`inventory_lots` is protected by `inventory_lots.current_user_enabled`, `inventory_lots.inventory_lots_access`, `inventory_lots.inventory_lots_select`, and `inventory_lots.inventory_lots_write` (each `protects`-edge).",
+    "Triggers/fire hooks on `inventory_lots` include `inventory_lots.tr_inventory_lots_revision` and `inventory_lots.update_inventory_lots_updated_at` (both `fires_on`).",
+    "Derived objects that derive from `inventory_lots` include `bin_contents`, `inventory_lots_with_landed_cost`, `inventory_lots_with_quantities`, and `inventory_summary_by_category` (each `derives_from` edge).",
+    "Code paths interacting with `inventory_lots` include reads from `src/app/(app)/reports/cogs/page.tsx`, `src/components/domain/batch/ship-transfer-dialog.tsx`, `src/components/domain/inventory/transfer-lines-editor.tsx`, `src/components/domain/purchasing/po-accept-inventory-dialog.tsx`, `src/domain/report-utils.ts`, and `src/services/inventory-count-service.ts`; writes from `po-accept-inventory-dialog.tsx` and `src/services/inventory-count-service.ts` (`reads_from` / `writes_to`)."
+   ],
+   "files": [
+    "src/app/(app)/reports/cogs/page.tsx",
+    "src/components/domain/batch/ship-transfer-dialog.tsx",
+    "src/components/domain/inventory/transfer-lines-editor.tsx",
+    "src/components/domain/purchasing/po-accept-inventory-dialog.tsx",
+    "src/domain/report-utils.ts",
+    "src/services/inventory-count-service.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00010_unified_allocations.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00073_data_enhancements.sql",
+    "supabase/migrations/00080_unify_packaging_formats.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00157_lots_view_add_item_name.sql",
+    "supabase/migrations/00188_inventory_lots_with_landed_cost_view.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql"
+   ]
   },
   {
    "name": "keg_owner_deposits",
@@ -4549,7 +4885,28 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`keg_owners` is a Postgres table in the live catalog snapshot, created by migration `00079_keg_owners.sql`. It is a source entity for multiple derived keg-related reporting/analytics objects and is protected in the database via multiple access policies. A row-level trigger updates timestamps, and the table is explicitly invalidated by the catalog hook when relevant catalog-related state changes.",
+   "key_facts": [
+    "`keg_owners` is created by migration `00079_keg_owners.sql`.",
+    "`keg_owners` is the source table for all listed derived objects: `customer_keg_balances`, `customer_keg_transaction_history`, `keg_aging_report`, `keg_fleet_summary`, `keg_inventory_summary`, `keg_inventory_with_details`, `keg_transactions_with_details`, and `keg_turnover_metrics`.",
+    "`keg_owners.current_user_enabled`, `keg_owners.keg_owners_select`, and `keg_owners.keg_owners_write` are marked as protective edges targeting `keg_owners`.",
+    "`keg_owners.set_updated_at` fires on `keg_owners`.",
+    "`src/hooks/use-catalog.ts` invalidates `keg_owners`."
+   ],
+   "files": [
+    "src/hooks/use-catalog.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql",
+    "supabase/migrations/00220_keg_bin_tracking.sql",
+    "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "keg_transactions",
@@ -4558,7 +4915,31 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`keg_transactions` is a Postgres table in the system and it is confirmed to exist in the live catalog snapshot. It was created by migration `00032_keg_transactions.sql`, and it appears to be a central source for multiple downstream keg-related read models and reports. The table is also actively governed by access controls and automation, with policies/triggers/functions linked directly to its operations and lifecycle events.",
+   "key_facts": [
+    "`00032_keg_transactions.sql` creates the `keg_transactions` table.",
+    "`customer_keg_balances`, `customer_keg_transaction_history`, `keg_aging_report`, `keg_filled_contents`, `keg_inventory`, `keg_inventory_with_details`, `keg_transactions_with_details`, and `keg_turnover_metrics` all derive from `keg_transactions`.",
+    "`keg_transactions.current_user_enabled`, `keg_transactions.keg_transactions_insert`, `keg_transactions.keg_transactions_select`, and `keg_transactions.keg_transactions_write` all protect `keg_transactions`.",
+    "`keg_transactions.set_keg_transaction_states_trigger`, `keg_transactions.tr_keg_transactions_revision`, and `keg_transactions.validate_keg_transaction_type` all fire on `keg_transactions`.",
+    "`keg_transactions` is confirmed present in the live catalog snapshot."
+   ],
+   "files": [
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00032_keg_transactions.sql",
+    "supabase/migrations/00033_customer_keg_balances.sql",
+    "supabase/migrations/00034_keg_reports.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql",
+    "supabase/migrations/00220_keg_bin_tracking.sql",
+    "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql",
+    "supabase/migrations/00238_keg_inventory_owner_netting.sql"
+   ]
   },
   {
    "name": "location_transfers",
@@ -4576,7 +4957,36 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`locations` is a Postgres table in the knowledge graph and is confirmed present in the live catalog snapshot. It is a foundational data entity that is populated by migration `00006_vessels.sql` and is consumed by multiple derived/location-related database objects and frontend reads. The table is also subject to multiple database protections and trigger functions, indicating both controlled access and update/validation behavior tied directly to the table.",
+   "key_facts": [
+    "`locations` is created by migration `00006_vessels.sql`.",
+    "`locations` is the source for derived objects including `available_vessels`, `bins_with_summary`, `keg_inventory_with_details`, `keg_transactions_with_details`, `location_transfers_with_details`, `locations_with_pos`, `yeast_pitches_with_details`, and `yeast_pitches_with_remaining` via `derives_from` edges.",
+    "`locations` is protected by security/access constructs `locations.current_user_enabled`, `locations.location_access`, `locations.locations_select`, and `locations.locations_write`.",
+    "`locations` has trigger relationships with `locations.update_locations_updated_at` and `locations.validate_location_type` (`fires_on`).",
+    "`locations` is read by `src/components/dashboard/getting-started-checklist.tsx` and `src/components/domain/order/pick-list-items.tsx` (`reads_from`)."
+   ],
+   "files": [
+    "src/components/dashboard/getting-started-checklist.tsx",
+    "src/components/domain/order/pick-list-items.tsx",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00006_vessels.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00035_yeast_pitches.sql",
+    "supabase/migrations/00073_data_enhancements.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00091_square_integration.sql",
+    "supabase/migrations/00109_partial_transfers.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00158_yeast_pitch_events_and_remaining_view.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql",
+    "supabase/migrations/00220_keg_bin_tracking.sql",
+    "supabase/migrations/00225_bins_with_summary_pos_columns.sql",
+    "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "malts",
@@ -4585,7 +4995,31 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`malts` is a Postgres table in the codebase, defined in migration `00011_catalog_and_recipe_junction.sql`, and it is known to exist in the live catalog snapshot. It is governed by multiple protective database policies and a timestamp-updating trigger, and it is used as an upstream data source for recipe-related derived objects (`recipe_ingredients_normalized`, `recipes_with_cogs`, and `recipes_with_estimates`).",
+   "key_facts": [
+    "`00011_catalog_and_recipe_junction.sql` creates the `malts` table.",
+    "The policy `malts.current_user_enabled` protects `malts`.",
+    "The policies `malts.malts_access`, `malts.malts_select`, and `malts.malts_write` all protect `malts`.",
+    "The trigger/function `malts.update_malts_updated_at` fires on `malts`.",
+    "`recipe_ingredients_normalized`, `recipes_with_cogs`, and `recipes_with_estimates` each derives from `malts`."
+   ],
+   "files": [
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00011_catalog_and_recipe_junction.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00021_recipe_cogs.sql",
+    "supabase/migrations/00047_refresh_recipes_view_for_is_template.sql",
+    "supabase/migrations/00049_refresh_recipes_view_again.sql",
+    "supabase/migrations/00053_ingredient_demand.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00076_refresh_recipes_view_for_status.sql",
+    "supabase/migrations/00081_add_batch_count_to_recipes_view.sql",
+    "supabase/migrations/00103_add_pricing_tier_to_recipes_view.sql",
+    "supabase/migrations/00110_demand_subtract_confirmed_pos.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00218_recipe_ibu_tinseth.sql"
+   ]
   },
   {
    "name": "mongodb_sync_log",
@@ -4648,7 +5082,35 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`order_items` is a Postgres table in the system, created by `00001_initial_schema.sql` and explicitly confirmed present in the live catalog snapshot. It is a central data source for order-related aggregates and reporting, while also being directly read from and written to by order-domain UI surfaces and a QuickBooks sync integration. The table is covered by multiple policy objects that protect access and write behavior.",
+   "key_facts": [
+    "`order_items` is a table created by migration `00001_initial_schema.sql`.",
+    "The node is marked as present in the live catalog snapshot (per its own description).",
+    "`order_items` is protected by multiple policy/view objects including `order_items.current_user_enabled`, `customer_order_items_select`, `order_items.order_items_select`, `order_items.order_item_access`, and `order_items.order_items_write`.",
+    "Multiple query/view nodes derive data from `order_items`: `customers_with_order_summary`, `order_demand_by_product`, `order_items_with_details`, `order_list_details`, `order_totals`, `orders_with_totals`, and `product_mix_by_brand`.",
+    "`order_items` is consumed by reporting and order UI/workflow code (`src/app/(app)/reports/projections/page.tsx`, `src/components/domain/order/order-allocation.tsx`, `src/components/domain/order/order-items-editor.tsx`, `src/components/domain/order/reorder.ts`) and by `src/integrations/quickbooks/sync-invoice.ts`, with explicit read/write edges from those code nodes."
+   ],
+   "files": [
+    "src/app/(app)/reports/projections/page.tsx",
+    "src/components/domain/order/order-allocation.tsx",
+    "src/components/domain/order/order-items-editor.tsx",
+    "src/components/domain/order/reorder.ts",
+    "src/integrations/quickbooks/sync-invoice.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00001_initial_schema.sql",
+    "supabase/migrations/00027_customer_order_summary.sql",
+    "supabase/migrations/00033_customer_keg_balances.sql",
+    "supabase/migrations/00051_production_planning.sql",
+    "supabase/migrations/00077_pricing_tiers_redesign.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00080_unify_packaging_formats.sql",
+    "supabase/migrations/00092_change_request_tables.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00190_capture_out_of_band_objects.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00251_order_list_details_total.sql"
+   ]
   },
   {
    "name": "order_materials",
@@ -4666,7 +5128,37 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`orders` is a Postgres table introduced in `00001_initial_schema.sql` and present in the live catalog snapshot. Multiple SQL views/functions are built from it (for customer, delivery, product, and reporting summaries), while multiple triggers, policies, and notifications are attached to it in database logic. It is also accessed by sales/reporting UI pages and order-related components/services, including both read paths (dashboard, reports, portal/order screens) and mutation/invalidation paths.",
+   "key_facts": [
+    "`orders` is created by the migration `00001_initial_schema.sql`.",
+    "The node has one or more derivatives that `derive_from` it, including `customer_revenue_summary` and `order_status_counts`.",
+    "`orders` has policy/trigger-like protections and behavior wired to it, such as `orders.orders_select`, `orders.order_access`, `orders.order_status_notification`, and `orders.trg_validate_order_status`.",
+    "UI and app layers read from `orders`, including `src/app/(app)/dashboard/sales/page.tsx`, `src/app/(app)/reports/trace/page.tsx`, and `src/app/portal/(main)/orders/page.tsx`.",
+    "Code paths also mutate/invalidate around `orders`, including `src/components/domain/order/reorder.ts` (`writes_to`) and `src/components/domain/order/change-request-review.tsx` (`invalidates`)."
+   ],
+   "files": [
+    "src/app/(app)/dashboard/sales/page.tsx",
+    "src/app/(app)/reports/projections/page.tsx",
+    "src/app/(app)/reports/trace/page.tsx",
+    "src/app/(app)/sales/orders/[id]/allocations/page.tsx",
+    "src/app/api/chat/tools.ts",
+    "src/app/portal/(main)/orders/[id]/page.tsx",
+    "src/app/portal/(main)/orders/page.tsx",
+    "src/components/domain/inventory/fg-inventory-section.tsx",
+    "src/components/domain/order/__tests__/change-request-review.test.tsx",
+    "src/components/domain/order/change-request-review.tsx",
+    "src/components/domain/order/customer-orders-relation.tsx",
+    "src/components/domain/order/order-items-editor.tsx",
+    "src/components/domain/order/order-pick-list.tsx",
+    "src/components/domain/order/reorder.ts",
+    "src/components/portal/change-request-builder.tsx",
+    "src/integrations/quickbooks/sync-invoice.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00001_initial_schema.sql",
+    "supabase/migrations/00027_customer_order_summary.sql",
+    "supabase/migrations/00033_customer_keg_balances.sql"
+   ]
   },
   {
    "name": "packages",
@@ -4684,7 +5176,29 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`packaging_sessions` is a Postgres table that is present in the live catalog snapshot and is created by migration `00010_unified_allocations.sql`. In the graph it is a heavily governed data entity: it has multiple database-level protections and trigger functions wired to it, while production packaging UI pages/components and the `use-packaging` hook read from it and invalidate related client state. A derived view named `packaging_sessions_with_summary` also depends on it.",
+   "key_facts": [
+    "`packaging_sessions` is created by migration `00010_unified_allocations.sql` (`00010_unified_allocations.sql --[creates]--> packaging_sessions`).",
+    "`packaging_sessions` is protected by multiple policy objects/functions including `packaging_sessions.current_user_enabled`, `packaging_sessions_access`, `packaging_sessions_select`, and `packaging_sessions_write` (all `[protects]` edges to `packaging_sessions`).",
+    "Several triggers/functions fire on `packaging_sessions`, including `on_packaging_session_completion`, `packaging_completion_notification`, `packaging_session_before_update`, `tr_packaging_sessions_revision`, `trg_validate_packaging_status`, `update_packaging_sessions_updated_at`, and `validate_packaging_session_status` (`... --[fires_on]--> packaging_sessions`).",
+    "A derived view exists for this table: `packaging_sessions_with_summary --[derives_from]--> packaging_sessions`.",
+    "Application code interacts directly with this table through read and cache-invalidation patterns: `src/app/(app)/production/packaging/[id]/page.tsx`, `src/components/domain/packaging/*.tsx`, and `src/hooks/use-packaging.ts` have `[reads_from]`, `[writes_to]` (where present), and `[invalidates]` edges to `packaging_sessions`."
+   ],
+   "files": [
+    "src/app/(app)/production/packaging/[id]/page.tsx",
+    "src/components/domain/packaging/add-to-packaging-session-dialog.tsx",
+    "src/components/domain/packaging/packaging-batch-dialog.tsx",
+    "src/components/domain/packaging/packaging-completion-review.tsx",
+    "src/components/domain/packaging/packaging-day-view.tsx",
+    "src/components/domain/packaging/revise-packaging-session.tsx",
+    "src/hooks/use-packaging.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00010_unified_allocations.sql",
+    "supabase/migrations/00074_packaging_sessions_summary_view.sql",
+    "supabase/migrations/00159_packaging_sessions_redesign.sql",
+    "supabase/migrations/00278_recreate_packaging_sessions_summary_view.sql"
+   ]
   },
   {
    "name": "pick_list_items",
@@ -4837,7 +5351,35 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`recipe_hops` is a Postgres table that is materialized by migration `00011_catalog_and_recipe_junction.sql`. It is guarded by multiple row-level policy objects (`current_user_enabled`, `recipe_hops_access`, `recipe_hops_select`, `recipe_hops_write`) and is referenced by several reporting/recipe/brew features through read access. The table also serves as an input to derived entities (`recipe_ingredients_normalized`, `recipes_with_cogs`, `recipes_with_estimates`) and is directly queried by multiple app/services layers.",
+   "key_facts": [
+    "`recipe_hops` is created by migration `00011_catalog_and_recipe_junction.sql`.",
+    "`recipe_hops.current_user_enabled` protects `recipe_hops`.",
+    "`recipe_hops.recipe_hops_access` protects `recipe_hops`.",
+    "`recipe_hops` is a source for `recipe_ingredients_normalized` via `derives_from`.",
+    "`recipe_hops` is read from by `src/app/(app)/reports/projections/page.tsx`, `src/components/domain/batch/planned-additions.tsx`, `src/components/domain/brew/brew-log-recipe-sheet.tsx`, and `src/services/consumption-service.ts`."
+   ],
+   "files": [
+    "src/app/(app)/reports/projections/page.tsx",
+    "src/components/domain/batch/planned-additions.tsx",
+    "src/components/domain/brew/brew-log-recipe-sheet.tsx",
+    "src/services/consumption-service.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00011_catalog_and_recipe_junction.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00021_recipe_cogs.sql",
+    "supabase/migrations/00047_refresh_recipes_view_for_is_template.sql",
+    "supabase/migrations/00049_refresh_recipes_view_again.sql",
+    "supabase/migrations/00053_ingredient_demand.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00076_refresh_recipes_view_for_status.sql",
+    "supabase/migrations/00081_add_batch_count_to_recipes_view.sql",
+    "supabase/migrations/00103_add_pricing_tier_to_recipes_view.sql",
+    "supabase/migrations/00110_demand_subtract_confirmed_pos.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00218_recipe_ibu_tinseth.sql"
+   ]
   },
   {
    "name": "recipe_malts",
@@ -4846,7 +5388,35 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`recipe_malts` is a Postgres table that exists in the live database schema and is produced by migration `00011_catalog_and_recipe_junction.sql`. It is a data source for recipe normalization, reporting, and consumption paths, and multiple database read-protection objects are associated with it. Several application layers query it directly, indicating it is part of operational flows for recipe projections, brew logging, and consumption services.",
+   "key_facts": [
+    "Migration `00011_catalog_and_recipe_junction.sql` creates the `recipe_malts` table.",
+    "`recipe_ingredients_normalized` derives from `recipe_malts`.",
+    "`recipes_with_cogs` derives from `recipe_malts`.",
+    "`recipes_with_estimates` derives from `recipe_malts`.",
+    "The table is protected by `recipe_malts.current_user_enabled`, `recipe_malts.recipe_malts_access`, `recipe_malts.recipe_malts_select`, and `recipe_malts.recipe_malts_write`.",
+    "The table is read by `src/app/(app)/reports/projections/page.tsx`, `src/components/domain/brew/brew-log-recipe-sheet.tsx`, and `src/services/consumption-service.ts`."
+   ],
+   "files": [
+    "src/app/(app)/reports/projections/page.tsx",
+    "src/components/domain/brew/brew-log-recipe-sheet.tsx",
+    "src/services/consumption-service.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00011_catalog_and_recipe_junction.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00021_recipe_cogs.sql",
+    "supabase/migrations/00047_refresh_recipes_view_for_is_template.sql",
+    "supabase/migrations/00049_refresh_recipes_view_again.sql",
+    "supabase/migrations/00053_ingredient_demand.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00076_refresh_recipes_view_for_status.sql",
+    "supabase/migrations/00081_add_batch_count_to_recipes_view.sql",
+    "supabase/migrations/00103_add_pricing_tier_to_recipes_view.sql",
+    "supabase/migrations/00110_demand_subtract_confirmed_pos.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00218_recipe_ibu_tinseth.sql"
+   ]
   },
   {
    "name": "recipe_spices",
@@ -4927,7 +5497,37 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`recipes` is a core Postgres table in this codebase, created by `00001_initial_schema.sql` and confirmed present in the live catalog snapshot. It is a central persistence node for recipe data, with write paths from API routes and recipe UI actions and read access from multiple production, dashboard, and service components. Several derived views and database triggers/policies are connected to it, indicating it is both transformed for read models and governed at the data layer.",
+   "key_facts": [
+    "`recipes` is a table node created by `00001_initial_schema.sql` and directly linked to as the live-catalog-confirmed `recipes` table.",
+    "`recipes` is a source for multiple derived database objects, including `batch_blend_details`, `batches_in_production_by_brand`, `batches_with_blend_info`, `brew_log_metrics`, `brew_logs_with_batches`, `recipes_with_cogs`, `recipes_with_estimates`, and `vessels_with_batch` via `derives_from` edges.",
+    "The table has data-layer protections via `recipes.recipe_access`, `recipes.recipes_select`, `recipes.recipes_write`, and `recipes.current_user_enabled`, each with a `protects` edge toward `recipes`.",
+    "Database triggers fire on `recipes`: `recipes.recipes_version_trigger`, `recipes.tr_recipes_revision`, `recipes.trg_validate_recipe_status`, and `recipes.update_recipes_updated_at` have `fires_on` edges from the trigger/function nodes to `recipes`.",
+    "Application and API usage is bi-directional at the data boundary: multiple producers write to `recipes` (`/api/recipes/[id]/route.ts`, `/api/recipes/route.ts`, `recipe-clone-dialog.tsx`) and many readers consume `recipes` (`production` batch/detail/list pages, additions pages, checklist, recipe editor, Square pricing integration, chat tools, and `consumption-service.ts`)."
+   ],
+   "files": [
+    "src/app/(app)/production/batches/[id]/batch-detail-client.tsx",
+    "src/app/(app)/production/batches/batches-client.tsx",
+    "src/app/(app)/production/batches/new/page.tsx",
+    "src/app/(app)/production/recipes/[id]/additions/page.tsx",
+    "src/app/api/chat/tools.ts",
+    "src/app/api/recipes/[id]/route.ts",
+    "src/app/api/recipes/route.ts",
+    "src/components/dashboard/getting-started-checklist.tsx",
+    "src/components/domain/recipe/recipe-additions-display.tsx",
+    "src/components/domain/recipe/recipe-clone-dialog.tsx",
+    "src/components/domain/recipe/recipe-editor/recipe-editor-page.tsx",
+    "src/integrations/square/pricing.ts",
+    "src/lib/__tests__/query-keys.test.ts",
+    "src/services/consumption-service.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00001_initial_schema.sql",
+    "supabase/migrations/00006_vessels.sql",
+    "supabase/migrations/00011_catalog_and_recipe_junction.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00021_recipe_cogs.sql"
+   ]
   },
   {
    "name": "sales_channels",
@@ -4954,7 +5554,36 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "The `selling_formats` node is a Postgres table, confirmed present in the live catalog snapshot, and is defined by migrations `00112_restore_out_of_band_foundations.sql` and `00199_capture_selling_formats_containers.sql`. It serves as a shared data source for multiple derived views and reporting/operational components, and is also directly consumed by API and UI code in the system. The table has governance metadata represented as protections and database triggers that fire on it, indicating controlled access and update behavior.",
+   "key_facts": [
+    "`selling_formats` is created by migration `00112_restore_out_of_band_foundations.sql` and migration `00199_capture_selling_formats_containers.sql`.",
+    "`selling_formats` is a source table for many views, including `bin_contents`, `brand_packaging_summary`, `customer_keg_balances`, `customer_keg_transaction_history`, `finished_goods_with_availability`, and `keg_turnover_metrics` (`derives_from` edges).",
+    "`selling_formats` is protected by `selling_formats.current_user_enabled`, `selling_formats.selling_formats_select`, and `selling_formats.selling_formats_write`.",
+    "The table has trigger/function fire-on edges: `selling_formats.set_selling_formats_updated_at` and `selling_formats.trg_selling_formats_pallet_quantity` fire on `selling_formats`.",
+    "Application-layer reads/invalidations include reads from `src/app/(app)/sales/orders/[id]/allocations/page.tsx`, `src/app/api/square/sync/catalog/route.ts`, `src/components/domain/order/order-pick-list.tsx`, and invalidations/reads in `src/components/domain/order/customer-pallet-configs.tsx` and `src/hooks/use-packaging.ts`."
+   ],
+   "files": [
+    "src/app/(app)/sales/orders/[id]/allocations/page.tsx",
+    "src/app/api/square/sync/catalog/route.ts",
+    "src/components/dashboard/getting-started-checklist.tsx",
+    "src/components/domain/order/customer-pallet-configs.tsx",
+    "src/components/domain/order/order-pick-list.tsx",
+    "src/components/domain/order/pick-list-items.tsx",
+    "src/hooks/use-packaging.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00112_restore_out_of_band_foundations.sql",
+    "supabase/migrations/00159_packaging_sessions_redesign.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql",
+    "supabase/migrations/00190_capture_out_of_band_objects.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00199_capture_selling_formats_containers.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql",
+    "supabase/migrations/00220_keg_bin_tracking.sql",
+    "supabase/migrations/00221_sellable_inventory_view.sql",
+    "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "session_line_items",
@@ -5071,7 +5700,29 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`system_settings` is a Postgres table in the graph that is created by migration `00030_system_settings.sql` and is confirmed present in the live catalog snapshot. It acts as shared settings/configuration data for multiple settings screens and backend integrations, with several application pages and API routes reading from and writing to it. Its access and mutation behavior is governed by multiple `system_settings_*` protections plus related logic for sensitive fields and timestamp updates.",
+   "key_facts": [
+    "Migration `00030_system_settings.sql` creates the `system_settings` table.",
+    "The brewery settings page (`src/app/(app)/settings/brewery/page.tsx`) both reads from and writes to `system_settings`.",
+    "The system settings page (`src/app/(app)/settings/system/page.tsx`) both reads from and writes to `system_settings`.",
+    "The API route `src/app/api/settings/api-key/route.ts` reads from and writes to `system_settings`, indicating runtime API-level updates to this table.",
+    "The `system_settings` table is protected by policies/functions including `current_user_enabled`, `system_settings_select`, `system_settings_insert`, `system_settings_update`, `system_settings_write`, and `system_settings_hide_sensitive`, with `system_settings_set_system_settings_updated_at` firing on `system_settings`."
+   ],
+   "files": [
+    "src/app/(app)/settings/brewery/page.tsx",
+    "src/app/(app)/settings/system/page.tsx",
+    "src/app/api/chat/route.ts",
+    "src/app/api/integrations/quickbooks/status/route.ts",
+    "src/app/api/settings/api-key/route.ts",
+    "src/app/api/settings/api-key/test/route.ts",
+    "src/integrations/mongodb/client.ts",
+    "src/integrations/quickbooks/sync-utils.ts",
+    "src/integrations/quickbooks/token-manager.ts",
+    "src/integrations/square/client.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00030_system_settings.sql"
+   ]
   },
   {
    "name": "transfer_lines",
@@ -5098,7 +5749,36 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`user_profiles` is the Postgres table that stores user-profile data and is created by migration `00036_user_profiles.sql`; it is present in the live catalog snapshot. In the system, it is a shared data node consumed by both app pages/APIs and UI components for account and user-management workflows, and updated through settings, invite, and auth routes. Its behavior is governed by dedicated triggers and policy functions that validate status and control read/update/insert/delete access patterns, indicating it is a security-critical and frequently invalidated/cached profile source.",
+   "key_facts": [
+    "Migration `00036_user_profiles.sql` is recorded as creating the `user_profiles` table.",
+    "`src/app/(app)/settings/account/page.tsx` and `src/components/domain/shared/avatar-upload.tsx` both read from and write to/invalidate `user_profiles`, showing account/profile editing paths directly mutate it.",
+    "API routes including `src/app/api/auth/dev-login/route.ts`, `src/app/api/users/[id]/route.ts`, and `src/app/api/users/invite/route.ts` read/write `user_profiles`, indicating authentication and user-management endpoints interact with it.",
+    "Security and integrity behavior is attached via table-related nodes such as `user_profiles_select`, `user_profiles_update`, `user_profiles_insert_admin`, `user_profiles_delete_admin`, `user_profiles_update_admin`, `user_profiles_update_own`, `current_user_enabled`, `user_profiles_update`/`insert` policies, and trigger-like nodes `validate_user_status`, `guard_user_profile_authorization_fields`, `update_user_profiles_updated_at` that `protects`/`fires_on` the table."
+   ],
+   "files": [
+    "src/app/(app)/layout.tsx",
+    "src/app/(app)/settings/account/page.tsx",
+    "src/app/(app)/settings/users/page.tsx",
+    "src/app/(auth)/layout.tsx",
+    "src/app/api/auth/dev-login/route.ts",
+    "src/app/api/users/[id]/route.ts",
+    "src/app/api/users/invite/route.ts",
+    "src/components/domain/batch/batch-brew-info.tsx",
+    "src/components/domain/order/customer-portal-access.tsx",
+    "src/components/domain/shared/avatar-upload.tsx",
+    "src/components/domain/shared/user-invite-dialog.tsx",
+    "src/hooks/use-user-account-status-command.ts",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00036_user_profiles.sql",
+    "supabase/migrations/00042_batch_cancellation.sql",
+    "supabase/migrations/00052_batch_archived_state.sql",
+    "supabase/migrations/00057_pick_list_tables.sql",
+    "supabase/migrations/00088_user_profiles_delete_policy.sql",
+    "supabase/migrations/00097_permission_based_roles.sql",
+    "supabase/migrations/00156_security_invoker_corrections.sql"
+   ]
   },
   {
    "name": "vessel_cleanings",
@@ -5125,7 +5805,34 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`vessels` is a Postgres table in the codebase, created by migration `00006_vessels.sql` and recorded as present in the live catalog snapshot. It is a central data entity for vessel-related domain logic, with multiple derived relation views/functions reading from it and several application components that read, write, or invalidate it. The table is protected and validated through multiple Postgres-level policies, access controls, and trigger-backed constraints in addition to being touched by batch and yeast workflows.",
+   "key_facts": [
+    "Migration `00006_vessels.sql` creates the `vessels` table.",
+    "The `vessels` table has a `current_user_enabled` policy and `vessel_access`, `vessels_select`, and `vessels_write` protections.",
+    "The `vessels` table has triggers or checks that fire `vessels.update_vessels_updated_at`, `vessels.validate_vessel_status`, and `vessels.validate_vessel_type` on it.",
+    "Several presentation/data nodes derive from `vessels`: `available_vessels`, `batches_with_brew_info`, `recent_vessel_cleanings`, `vessel_batch_drift_check`, `vessel_transfers_with_details`, `vessels_with_batch`, and `yeast_pitches_with_remaining`.",
+    "Application components reference and mutate `vessels`: `batch-cancellation-dialog` invalidates it, `vessel-transfer-dialog` reads from it, `cellar-board` both invalidates and writes it, `yeast-brinks-overview` reads from it, and `batch/presentation` reads from it."
+   ],
+   "files": [
+    "src/components/domain/batch/batch-cancellation-dialog.tsx",
+    "src/components/domain/batch/vessel-transfer-dialog.tsx",
+    "src/components/domain/vessel/cellar-board.tsx",
+    "src/components/domain/yeast/yeast-brinks-overview.tsx",
+    "src/entities/batch/presentation.tsx",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00006_vessels.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00066_vessel_transfers_with_details.sql",
+    "supabase/migrations/00086_refresh_views_for_variants.sql",
+    "supabase/migrations/00101_view_correlated_subquery_fixes.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00156_security_invoker_corrections.sql",
+    "supabase/migrations/00158_yeast_pitch_events_and_remaining_view.sql",
+    "supabase/migrations/00190_capture_out_of_band_objects.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00204_fix_actual_og_plato_to_sg.sql"
+   ]
   },
   {
    "name": "water_profiles",
@@ -5161,7 +5868,34 @@
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "snapshot"
+   "db_source": "snapshot",
+   "summary": "`yeasts` is a Postgres table defined by migration `00011_catalog_and_recipe_junction.sql` and confirmed present in the live catalog snapshot. It is a shared persistence point for yeast data that is surfaced into multiple derived query/view-like nodes and consumed by runtime code. Multiple security policies and an update-time trigger on `yeasts` indicate it is both protected and maintained at write/update boundaries.",
+   "key_facts": [
+    "`00011_catalog_and_recipe_junction.sql` creates the `yeasts` table.",
+    "`src/app/api/chat/tools.ts` reads from `yeasts`.",
+    "`src/components/domain/yeast/pitch-yeast-dialog.tsx` reads from `yeasts`.",
+    "`batch_yeast_summary`, `recipes_with_cogs`, `recipes_with_estimates`, `yeast_lineage_summary`, `yeast_pitches_with_details`, and `yeast_pitches_with_remaining` each derive from `yeasts`.",
+    "`yeasts.yeasts_access`, `yeasts.yeasts_select`, and `yeasts.yeasts_write` protect `yeasts`, while `yeasts.current_user_enabled` also protects it."
+   ],
+   "files": [
+    "src/app/api/chat/tools.ts",
+    "src/components/domain/yeast/pitch-yeast-dialog.tsx",
+    "supabase/live-catalog.snapshot.txt",
+    "supabase/migrations/00011_catalog_and_recipe_junction.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00021_recipe_cogs.sql",
+    "supabase/migrations/00035_yeast_pitches.sql",
+    "supabase/migrations/00047_refresh_recipes_view_for_is_template.sql",
+    "supabase/migrations/00049_refresh_recipes_view_again.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00076_refresh_recipes_view_for_status.sql",
+    "supabase/migrations/00081_add_batch_count_to_recipes_view.sql",
+    "supabase/migrations/00103_add_pricing_tier_to_recipes_view.sql",
+    "supabase/migrations/00158_yeast_pitch_events_and_remaining_view.sql",
+    "supabase/migrations/00190_capture_out_of_band_objects.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00218_recipe_ibu_tinseth.sql"
+   ]
   },
   {
    "name": "yeast_pitches.auto_increment_yeast_generation",
@@ -6416,7 +7150,37 @@
    "file_path": "supabase/migrations/00204_fix_actual_og_plato_to_sg.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`batches_with_brew_info` is a Postgres view in the schema defined across multiple migrations, with the latest definition in `00204_fix_actual_og_plato_to_sg.sql`. The view derives from `batches` and related entities (`brew_log_batches`, `brew_logs`, `user_profiles`, `vessels`) and is used as a central data source for batch/brew production UI and API surfaces. It is also a dependency boundary for derived views and invalidation/read paths in the application, while being chain-only (not present in the live snapshot).",
+   "key_facts": [
+    "The view `batches_with_brew_info` is created by migration files including `00005_batches_cleanup.sql`, `00014_security_fixes.sql`, `00042_batch_cancellation.sql`, `00052_batch_archived_state.sql`, `00086_refresh_views_for_variants.sql`, `00101_view_correlated_subquery_fixes.sql`, `00155_auto_generate_batch_number.sql`, and `00204_fix_actual_og_plato_to_sg.sql`.",
+    "`batches_with_brew_info` is derived from the tables/entities `batches`, `brew_log_batches`, `brew_logs`, `user_profiles`, and `vessels`.",
+    "`batches_with_blend_info` derives from `batches_with_brew_info`.",
+    "The view is read from batch production pages and API routes: `src/app/(app)/production/batches/[id]/batch-detail-client.tsx`, `src/app/(app)/production/batches/batches-client.tsx`, `src/app/(app)/production/vessel-transfers/new/page.tsx`, `src/app/api/batches/[id]/route.ts`, and `src/app/api/batches/route.ts`.",
+    "Multiple UI/hook/query-key paths invalidate or read it (`batch-cancellation-dialog`, `vessel-transfer-dialog`, `brew-log-completion-dialog`, `start-brew-day-dialog`, `packaging-batch-dialog`, `use-packaging.ts`, and `src/lib/query-keys.ts`), indicating it is part of cache-refresh and data-consistency flows."
+   ],
+   "files": [
+    "src/app/(app)/production/batches/[id]/batch-detail-client.tsx",
+    "src/app/(app)/production/batches/batches-client.tsx",
+    "src/app/(app)/production/vessel-transfers/new/page.tsx",
+    "src/app/api/batches/[id]/route.ts",
+    "src/app/api/batches/route.ts",
+    "src/components/domain/batch/batch-cancellation-dialog.tsx",
+    "src/components/domain/batch/vessel-transfer-dialog.tsx",
+    "src/components/domain/brew/brew-log-completion-dialog.tsx",
+    "src/components/domain/brew/start-brew-day-dialog.tsx",
+    "src/components/domain/packaging/packaging-batch-dialog.tsx",
+    "src/components/domain/packaging/packaging-completion-review.tsx",
+    "src/hooks/use-packaging.ts",
+    "src/lib/__tests__/query-keys.test.ts",
+    "src/lib/query-keys.ts",
+    "supabase/migrations/00005_batches_cleanup.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00042_batch_cancellation.sql",
+    "supabase/migrations/00052_batch_archived_state.sql",
+    "supabase/migrations/00063_batch_blend_views.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql"
+   ]
   },
   {
    "name": "00006_vessels.sql",
@@ -6537,7 +7301,31 @@
    "file_path": "supabase/migrations/00189_landed_cost_inline_no_update.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`inventory_lots_with_quantities` is a Postgres view defined through migration scripts, with its latest definition in `00189_landed_cost_inline_no_update.sql`. It aggregates or exposes quantity-related state by deriving from `allocations`, `inventory_items`, `inventory_lots`, and `inventory_lots_with_landed_cost`, and is consumed by inventory-related reporting, UI, and service logic. The view is described as chain-only because it is not present in the live snapshot.",
+   "key_facts": [
+    "`inventory_lots_with_quantities` is created by migration `00010_unified_allocations.sql`.",
+    "`inventory_lots_with_quantities` is created by migration `00014_security_fixes.sql`.",
+    "`inventory_lots_with_quantities` is created by migration `00157_lots_view_add_item_name.sql`.",
+    "`inventory_lots_with_quantities` is created by migration `00189_landed_cost_inline_no_update.sql`, which is also given as its latest defining migration.",
+    "`inventory_lots_with_quantities` has `derives_from` edges to `allocations`, `inventory_items`, `inventory_lots`, and `inventory_lots_with_landed_cost`.",
+    "`inventory_lots_with_quantities` is read by `src/app/(app)/reports/inventory-valuation/page.tsx` and `src/app/(app)/reports/projections/page.tsx`.",
+    "`inventory_lots_with_quantities` is read by `src/components/domain/inventory/count-adjust-dialog.tsx`, `src/components/domain/inventory/item-on-hand-cell.tsx`, and `src/services/consumption-service.ts`.",
+    "`inventory_low_stock_items` derives from `inventory_lots_with_quantities`."
+   ],
+   "files": [
+    "src/app/(app)/reports/inventory-valuation/page.tsx",
+    "src/app/(app)/reports/projections/page.tsx",
+    "src/components/domain/inventory/count-adjust-dialog.tsx",
+    "src/components/domain/inventory/item-on-hand-cell.tsx",
+    "src/services/consumption-service.ts",
+    "supabase/migrations/00010_unified_allocations.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00157_lots_view_add_item_name.sql",
+    "supabase/migrations/00189_landed_cost_inline_no_update.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "finished_goods_with_availability",
@@ -6546,7 +7334,31 @@
    "file_path": "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`finished_goods_with_availability` is a Postgres view in the codebase that serves as a derived dataset combining allocation and product-related entities, and it is used as a reporting and UI data source across inventory, ordering, and chat tooling paths. The view is defined only in migration lineage (chain) rather than in the live snapshot, so its availability depends on migration history rather than snapshot verification.",
+   "key_facts": [
+    "The view is created by multiple migrations, including `00010_unified_allocations.sql`, `00014_security_fixes.sql`, `00065_view_joins_brand_package_style.sql`, `00080_unify_packaging_formats.sql`, and `00191_capture_drifted_packaging_objects.sql`.",
+    "`finished_goods_with_availability` is a source for `finished_goods_supply_by_product` (`finished_goods_supply_by_product` derives_from `finished_goods_with_availability`).",
+    "The view derives from `allocations`, `brands`, `containers`, `finished_goods`, and `selling_formats` (each listed as a `derives_from` edge).",
+    "Several consumers read from the view: `src/app/(app)/reports/inventory-valuation/page.tsx`, `src/app/(app)/reports/trace/page.tsx`, `src/app/api/chat/tools.ts`, `src/components/domain/batch/ship-transfer-dialog.tsx`, `src/components/domain/inventory/quick-depletion-dialog.tsx`, `src/components/domain/inventory/transfer-lines-editor.tsx`, and `src/components/domain/order/order-items-editor.tsx`.",
+    "`src/components/domain/packaging/revise-packaging-session.tsx` invalidates `finished_goods_with_availability`."
+   ],
+   "files": [
+    "src/app/(app)/reports/inventory-valuation/page.tsx",
+    "src/app/(app)/reports/trace/page.tsx",
+    "src/app/api/chat/tools.ts",
+    "src/components/domain/batch/ship-transfer-dialog.tsx",
+    "src/components/domain/inventory/quick-depletion-dialog.tsx",
+    "src/components/domain/inventory/transfer-lines-editor.tsx",
+    "src/components/domain/order/order-items-editor.tsx",
+    "src/components/domain/packaging/revise-packaging-session.tsx",
+    "supabase/migrations/00010_unified_allocations.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00051_production_planning.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00080_unify_packaging_formats.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql"
+   ]
   },
   {
    "name": "batches_with_remaining_volume",
@@ -6698,7 +7510,37 @@
    "file_path": "supabase/migrations/00218_recipe_ibu_tinseth.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`recipes_with_estimates` is a Postgres view that is rebuilt by multiple migration files (including `00218_recipe_ibu_tinseth.sql`) and is described as chain-only rather than present in the live snapshot. It sits as an intermediate, recipe-centric aggregate used for serving recipe data to multiple application surfaces, including API routes and domain UI components. Other views and UI logic both depend on it (`batches_with_blend_info` derives from it) and explicitly invalidate it when recipe-related data is edited.",
+   "key_facts": [
+    "`recipes_with_estimates` is created by multiple migration scripts: `00011_catalog_and_recipe_junction.sql`, `00014_security_fixes.sql`, `00047_refresh_recipes_view_for_is_template.sql`, `00049_refresh_recipes_view_again.sql`, `00065_view_joins_brand_package_style.sql`, `00076_refresh_recipes_view_for_status.sql`, `00081_add_batch_count_to_recipes_view.sql`, `00103_add_pricing_tier_to_recipes_view.sql`, `00191_capture_drifted_packaging_objects.sql`, and `00218_recipe_ibu_tinseth.sql` via `creates` edges.",
+    "`recipes_with_estimates` derives from the core recipe/domain tables and relations `batches`, `beer_styles`, `hops`, `malts`, `recipe_hops`, `recipe_malts`, `recipes`, and `yeasts`, as shown by multiple `derives_from` edges.",
+    "`src/app/api/recipes/[id]/route.ts` and `src/app/api/recipes/route.ts` both have `reads_from` edges to `recipes_with_estimates`, indicating these endpoints source recipe data from this view.",
+    "`src/components/domain/brew/brew-log-recipe-sheet.tsx` and `src/components/domain/recipe/recipe-editor/recipe-editor-page.tsx` have `reads_from` edges to `recipes_with_estimates`, showing UI reads are driven through the view.",
+    "`src/app/(app)/production/recipes/[id]/additions/page.tsx`, `src/components/domain/recipe/recipe-additions-display.tsx`, and `src/components/domain/recipe/recipe-editor/recipe-editor-context.tsx` each `invalidate` `recipes_with_estimates`, indicating edits in these flows trigger invalidation of the view-derived data."
+   ],
+   "files": [
+    "src/app/(app)/production/recipes/[id]/additions/page.tsx",
+    "src/app/api/recipes/[id]/route.ts",
+    "src/app/api/recipes/route.ts",
+    "src/components/domain/brew/brew-log-recipe-sheet.tsx",
+    "src/components/domain/recipe/recipe-additions-display.tsx",
+    "src/components/domain/recipe/recipe-editor/recipe-editor-context.tsx",
+    "src/components/domain/recipe/recipe-editor/recipe-editor-page.tsx",
+    "supabase/migrations/00011_catalog_and_recipe_junction.sql",
+    "supabase/migrations/00014_security_fixes.sql",
+    "supabase/migrations/00047_refresh_recipes_view_for_is_template.sql",
+    "supabase/migrations/00049_refresh_recipes_view_again.sql",
+    "supabase/migrations/00063_batch_blend_views.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00076_refresh_recipes_view_for_status.sql",
+    "supabase/migrations/00081_add_batch_count_to_recipes_view.sql",
+    "supabase/migrations/00086_refresh_views_for_variants.sql",
+    "supabase/migrations/00103_add_pricing_tier_to_recipes_view.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00218_recipe_ibu_tinseth.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "beer_styles.beer_styles_access",
@@ -7070,7 +7912,23 @@
    "file_path": "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`customers_with_order_summary` is a PostgreSQL view that is chain-only (not present in the live snapshot) and last defined in `00191_capture_drifted_packaging_objects.sql`. It is established by multiple migration scripts and serves as a derived read model that combines customer and order-related sources, including balance, pricing, and channel context. The view is consumed by the chat tools API (`src/app/api/chat/tools.ts`) as a read source.",
+   "key_facts": [
+    "`customers_with_order_summary` is defined by multiple migrations, including `00027_customer_order_summary.sql`, `00033_customer_keg_balances.sql`, `00077_pricing_tiers_redesign.sql`, `00079_keg_owners.sql`, `00096_dashboard_views_and_query_optimization.sql`, and `00191_capture_drifted_packaging_objects.sql` via `creates` edges.",
+    "The view has `derives_from` edges to `customer_keg_balance_summary`, `customers`, `order_items`, `orders`, `pricing_tiers`, and `sales_channels`.",
+    "`src/app/api/chat/tools.ts` has a `reads_from` edge to `customers_with_order_summary`, indicating it is queried by that API layer component.",
+    "`customers_with_order_summary` is explicitly described as a Postgres view and is absent from the live snapshot (chain-only), per provided node description."
+   ],
+   "files": [
+    "src/app/api/chat/tools.ts",
+    "supabase/migrations/00027_customer_order_summary.sql",
+    "supabase/migrations/00033_customer_keg_balances.sql",
+    "supabase/migrations/00077_pricing_tiers_redesign.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql"
+   ]
   },
   {
    "name": "00028_temporal_pricing_and_optimistic_lock.sql",
@@ -7210,7 +8068,31 @@
    "file_path": "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`keg_inventory_summary` is a Postgres view that consolidates keg-related inventory data by combining information from `containers`, `keg_inventory`, `keg_owners`, and `selling_formats`. The view is assembled through multiple migration definitions, with its most recent definition in `00228_keg_netting_and_transfer_integrity.sql`, which indicates it is part of a versioned database-layer pipeline rather than application code. Its source metadata also notes that views are absent from the live snapshot, so this artifact is represented only in the migration chain.",
+   "key_facts": [
+    "`keg_inventory_summary` was created by migration `00031_keg_inventory.sql`.",
+    "`keg_inventory_summary` was created by migration `00032_keg_transactions.sql`.",
+    "`keg_inventory_summary` was created by migration `00079_keg_owners.sql`.",
+    "`keg_inventory_summary` was created by migration `00191_capture_drifted_packaging_objects.sql`.",
+    "`keg_inventory_summary` was created by migration `00207_keg_inventory_netting.sql`.",
+    "`keg_inventory_summary` was created by migration `00220_keg_bin_tracking.sql`.",
+    "`keg_inventory_summary` was created by migration `00228_keg_netting_and_transfer_integrity.sql`, its last defined migration.",
+    "`keg_inventory_summary` derives from `containers`.",
+    "`keg_inventory_summary` derives from `keg_inventory`.",
+    "`keg_inventory_summary` derives from `keg_owners`.",
+    "`keg_inventory_summary` derives from `selling_formats`.",
+    "`keg_inventory_summary` is chain-only because views are absent from the live snapshot."
+   ],
+   "files": [
+    "supabase/migrations/00031_keg_inventory.sql",
+    "supabase/migrations/00032_keg_transactions.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql",
+    "supabase/migrations/00220_keg_bin_tracking.sql",
+    "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql"
+   ]
   },
   {
    "name": "00032_keg_transactions.sql",
@@ -7236,7 +8118,30 @@
    "file_path": "supabase/migrations/00238_keg_inventory_owner_netting.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`keg_inventory` is a Postgres view named `keg_inventory` whose latest definition is in migration `00238_keg_inventory_owner_netting.sql`, indicating it is built through a sequence of schema changes. It is both an input and an output in view composition: it derives from `keg_transactions` and is itself used to derive `keg_fleet_summary`, `keg_inventory_summary`, and `keg_inventory_with_details`. It also has dedicated `keg_inventory_*` database objects that protect delete/insert/select/update access, and the node is described as chain-only because it is not present in the live snapshot.",
+   "key_facts": [
+    "Migration `00238_keg_inventory_owner_netting.sql` creates `keg_inventory`, and earlier migrations (`00032`, `00079`, `00168`, `00191`, `00207`, `00220`, `00228`) also create it, showing its definition has been revised multiple times.",
+    "`keg_inventory` derives from `keg_transactions`.",
+    "`keg_fleet_summary` derives from `keg_inventory`.",
+    "`keg_inventory_summary` derives from `keg_inventory`.",
+    "`keg_inventory_with_details` derives from `keg_inventory`.",
+    "`keg_inventory` is protected by `keg_inventory_delete`, `keg_inventory_insert`, `keg_inventory_select`, and `keg_inventory_update`."
+   ],
+   "files": [
+    "supabase/migrations/00031_keg_inventory.sql",
+    "supabase/migrations/00032_keg_transactions.sql",
+    "supabase/migrations/00034_keg_reports.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql",
+    "supabase/migrations/00220_keg_bin_tracking.sql",
+    "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql",
+    "supabase/migrations/00238_keg_inventory_owner_netting.sql"
+   ]
   },
   {
    "name": "00033_customer_keg_balances.sql",
@@ -7253,7 +8158,23 @@
    "file_path": "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`customer_keg_balances` is a Postgres view in the codebase’s data model, last defined in migration `00191_capture_drifted_packaging_objects.sql`, and is represented as a chain-only schema artifact (not present in the live snapshot). It is produced by multiple migration files and serves as a derived aggregation point from core customer, container, keg ownership, and transaction data. The view is then reused by other reporting/query views and directly read by a domain inventory UI component (`src/components/domain/inventory/customer-keg-balances.tsx`).",
+   "key_facts": [
+    "`customer_keg_balances` is created by migrations `00033_customer_keg_balances.sql`, `00079_keg_owners.sql`, and `00191_capture_drifted_packaging_objects.sql`.",
+    "`customer_keg_balances` derives_from `containers`, `customers`, `keg_owner_deposits`, `keg_owners`, `keg_transactions`, and `selling_formats`.",
+    "`customer_keg_balance_summary` derives from `customer_keg_balances`, and `keg_aging_report` derives from `customer_keg_balances`.",
+    "`src/components/domain/inventory/customer-keg-balances.tsx` reads_from `customer_keg_balances`.",
+    "Per the provided description, `customer_keg_balances` is a Postgres view absent from the live snapshot and only present in migration chain history."
+   ],
+   "files": [
+    "src/components/domain/inventory/customer-keg-balances.tsx",
+    "supabase/migrations/00033_customer_keg_balances.sql",
+    "supabase/migrations/00034_keg_reports.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql"
+   ]
   },
   {
    "name": "customer_keg_balance_summary",
@@ -7288,7 +8209,21 @@
    "file_path": "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`keg_aging_report` is a Postgres view node in the graph, with its latest defining migration being `00191_capture_drifted_packaging_objects.sql`. It was also created in multiple migration scripts (`00034_keg_reports.sql`, `00079_keg_owners.sql`, `00096_dashboard_views_and_query_optimization.sql`) and is described as chain-only because views are absent from the live snapshot. The view’s purpose is to synthesize data from several keg- and customer-related tables (`containers`, `customer_keg_balances`, `customers`, `keg_owner_deposits`, `keg_owners`, `keg_transactions`, and `selling_formats`).",
+   "key_facts": [
+    "`keg_aging_report` is created by migration `00034_keg_reports.sql`.",
+    "`keg_aging_report` is created by migration `00079_keg_owners.sql`.",
+    "`keg_aging_report` is created by migration `00096_dashboard_views_and_query_optimization.sql`.",
+    "`keg_aging_report` is created by migration `00191_capture_drifted_packaging_objects.sql` (its latest definition).",
+    "`keg_aging_report` derives from `containers`, `customer_keg_balances`, `customers`, `keg_owner_deposits`, `keg_owners`, `keg_transactions`, and `selling_formats`."
+   ],
+   "files": [
+    "supabase/migrations/00034_keg_reports.sql",
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00096_dashboard_views_and_query_optimization.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql"
+   ]
   },
   {
    "name": "keg_turnover_metrics",
@@ -7584,7 +8519,20 @@
    "file_path": "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`recipe_ingredients_normalized` is a Postgres view that is created by migrations `00053_ingredient_demand.sql`, `00110_demand_subtract_confirmed_pos.sql`, and `00191_capture_drifted_packaging_objects.sql`.\nIt is a normalization surface that unifies ingredient data by deriving values from both ingredient-category tables and their recipe-specific counterparts, with its latest definition tied to `00191_capture_drifted_packaging_objects.sql`.",
+   "key_facts": [
+    "`00053_ingredient_demand.sql` creates `recipe_ingredients_normalized` (edge: `00053_ingredient_demand.sql --[creates]--> recipe_ingredients_normalized`).",
+    "`00110_demand_subtract_confirmed_pos.sql` creates `recipe_ingredients_normalized` (edge: `00110_demand_subtract_confirmed_pos.sql --[creates]--> recipe_ingredients_normalized`).",
+    "`00191_capture_drifted_packaging_objects.sql` creates `recipe_ingredients_normalized` and is noted as its latest definition (edge: `00191_capture_drifted_packaging_objects.sql --[creates]--> recipe_ingredients_normalized`).",
+    "`recipe_ingredients_normalized` derives from both general ingredient tables and recipe-specific ingredient tables: `adjuncts`, `recipe_adjuncts`, `fruits`, `recipe_fruits`, `hops`, `recipe_hops`, `malts`, `recipe_malts`, `spices`, `recipe_spices`, `sugars`, and `recipe_sugars` (edges: `recipe_ingredients_normalized --[derives_from]--> ...`).",
+    "`recipe_ingredients_normalized` is a view, and it is chain-defined rather than present in the live snapshot (from provided node description)."
+   ],
+   "files": [
+    "supabase/migrations/00053_ingredient_demand.sql",
+    "supabase/migrations/00110_demand_subtract_confirmed_pos.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql"
+   ]
   },
   {
    "name": "00054_fix_ingredient_demand_batch_count.sql",
@@ -7718,7 +8666,24 @@
    "file_path": "supabase/migrations/00236_restore_missing_live_relations.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`batches_with_blend_info` is a Postgres view whose definition is linked to multiple migration files, including `00236_restore_missing_live_relations.sql` as its most recent defining migration. It is modeled as a derived query-level object built from several domain tables/views: `batch_blends`, `batches`, `batches_with_brew_info`, `recipes`, and `recipes_with_estimates`. The node is described as chain-only because the view is absent from the live snapshot.",
+   "key_facts": [
+    "The view `batches_with_blend_info` is created by `00063_batch_blend_views.sql`.",
+    "The view `batches_with_blend_info` is created by `00065_view_joins_brand_package_style.sql`.",
+    "The view `batches_with_blend_info` is created by `00076_refresh_recipes_view_for_status.sql`.",
+    "The view `batches_with_blend_info` is created by `00086_refresh_views_for_variants.sql`.",
+    "`batches_with_blend_info` was last defined in `00236_restore_missing_live_relations.sql`.",
+    "`batches_with_blend_info` derives from `batch_blends`, `batches`, `batches_with_brew_info`, `recipes`, and `recipes_with_estimates`.",
+    "`batches_with_blend_info` is marked as chain-only because views are absent from the live snapshot."
+   ],
+   "files": [
+    "supabase/migrations/00063_batch_blend_views.sql",
+    "supabase/migrations/00065_view_joins_brand_package_style.sql",
+    "supabase/migrations/00076_refresh_recipes_view_for_status.sql",
+    "supabase/migrations/00086_refresh_views_for_variants.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "00064_ai_api_key_settings.sql",
@@ -7816,7 +8781,20 @@
    "file_path": "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`bin_contents` is a Postgres view in the schema. It is defined by multiple migration files, with the latest definition recorded in `00191_capture_drifted_packaging_objects.sql`, and the provided profile notes that it is chain-only because views are absent from the live snapshot. The view’s role is to derive data from several inventory and packaging-related tables (`bin_inventory`, `bin_inventory_items`, `brands`, `finished_goods`, `inventory_items`, `inventory_lots`, and `selling_formats`).",
+   "key_facts": [
+    "`bin_contents` is created by `00073_data_enhancements.sql` (`00073_data_enhancements.sql --[creates]--> bin_contents).",
+    "`bin_contents` is created by `00080_unify_packaging_formats.sql` (`00080_unify_packaging_formats.sql --[creates]--> bin_contents).",
+    "`bin_contents` is created by `00191_capture_drifted_packaging_objects.sql` (`00191_capture_drifted_packaging_objects.sql --[creates]--> bin_contents).",
+    "`bin_contents` derives from `bin_inventory` (`bin_contents --[derives_from]--> bin_inventory).",
+    "`bin_contents` derives from `bin_inventory_items`, `brands`, `finished_goods`, `inventory_items`, `inventory_lots`, and `selling_formats` (`bin_contents --[derives_from]--> ...)."
+   ],
+   "files": [
+    "supabase/migrations/00073_data_enhancements.sql",
+    "supabase/migrations/00080_unify_packaging_formats.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql"
+   ]
   },
   {
    "name": "deliveries_with_summary",
@@ -7954,7 +8932,23 @@
    "file_path": "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`keg_inventory_with_details` is a Postgres view node in the knowledge graph that is materialized via migration scripts, with its latest definition in `00228_keg_netting_and_transfer_integrity.sql`. It sits as a denormalized join-style surface over operational keg and commercial entities, deriving from multiple core tables such as batches, inventory, ownership, transactions, and location/customer/order dimensions. The graph also indicates this view is not represented in the live snapshot, so its presence is chain-only rather than live-catalog verified.",
+   "key_facts": [
+    "`keg_inventory_with_details` is created by multiple migrations, including `00079_keg_owners.sql`, `00155_auto_generate_batch_number.sql`, `00168_recreate_keg_inventory_with_details.sql`, `00207_keg_inventory_netting.sql`, `00220_keg_bin_tracking.sql`, and `00228_keg_netting_and_transfer_integrity.sql`.",
+    "The latest definition reference is `00228_keg_netting_and_transfer_integrity.sql` (`keg_inventory_with_details` was last defined there).",
+    "`keg_inventory_with_details` derives from inventory and transaction tables: `keg_inventory` and `keg_transactions` (`derives_from` edges).",
+    "`keg_inventory_with_details` derives from asset/placement and organizational context tables: `batches`, `bins`, `locations`, and `customers` (`derives_from` edges).",
+    "`keg_inventory_with_details` derives from commercial/product descriptor tables `brands`, `containers`, `finished_goods`, `keg_owners`, `orders`, and `selling_formats` (`derives_from` edges)."
+   ],
+   "files": [
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00155_auto_generate_batch_number.sql",
+    "supabase/migrations/00168_recreate_keg_inventory_with_details.sql",
+    "supabase/migrations/00207_keg_inventory_netting.sql",
+    "supabase/migrations/00220_keg_bin_tracking.sql",
+    "supabase/migrations/00228_keg_netting_and_transfer_integrity.sql"
+   ]
   },
   {
    "name": "keg_transactions_with_details",
@@ -7963,7 +8957,18 @@
    "file_path": "supabase/migrations/00236_restore_missing_live_relations.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`keg_transactions_with_details` is a Postgres view in the codebase that is defined by database migration files, including `00236_restore_missing_live_relations.sql`. It appears as a denormalized view over multiple business entities such as transactions, customers, orders, and keg/container metadata. The node is marked as chain-only because it is missing from the live snapshot, so it is represented only in migration history.",
+   "key_facts": [
+    "`keg_transactions_with_details` is created by migration `00236_restore_missing_live_relations.sql`.",
+    "`keg_transactions_with_details` is also created by migration `00079_keg_owners.sql`.",
+    "`keg_transactions_with_details` derives its data from the `keg_transactions` relation.",
+    "`keg_transactions_with_details` derives its data from multiple reference entities: `batches`, `brands`, `containers`, `customers`, `finished_goods`, `keg_owners`, `locations`, `orders`, and `selling_formats`."
+   ],
+   "files": [
+    "supabase/migrations/00079_keg_owners.sql",
+    "supabase/migrations/00236_restore_missing_live_relations.sql"
+   ]
   },
   {
    "name": "00080_unify_packaging_formats.sql",
@@ -8029,7 +9034,20 @@
    "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`recipe_variants_with_costs` is a Postgres view defined through SQL migrations, including `00087_cost_view_unit_conversion.sql`. It serves as a derived cost-oriented view for recipe variant data by combining multiple ingredient and recipe-related source nodes (`recipe_variants`, `recipes_with_cogs`, and variant ingredient/spice/hop/fruit/adjunct tables). In the current graph snapshot, it is represented as a chain-only view artifact (not present in the live snapshot).",
+   "key_facts": [
+    "`recipe_variants_with_costs` is created by `00085_variant_cost_views.sql` (`00085_variant_cost_views.sql` --[creates]--> `recipe_variants_with_costs`).",
+    "`recipe_variants_with_costs` is created by `00086_refresh_views_for_variants.sql` (`00086_refresh_views_for_variants.sql` --[creates]--> `recipe_variants_with_costs`).",
+    "`recipe_variants_with_costs` is created by `00087_cost_view_unit_conversion.sql`, which is also noted as the view’s defining migration (`00087_cost_view_unit_conversion.sql` --[creates]--> `recipe_variants_with_costs`).",
+    "The view derives from `recipe_variants`, linking it to core recipe variant records (`recipe_variants_with_costs` --[derives_from]--> `recipe_variants`).",
+    "The view derives from `adjuncts`, `fruits`, `hops`, `recipe_variant_adjuncts`, `recipe_variant_fruits`, `recipe_variant_hops`, `recipe_variant_spices`, and `spices`, indicating ingredient-level composition inputs (`recipe_variants_with_costs` --[derives_from]--> each of those nodes)."
+   ],
+   "files": [
+    "supabase/migrations/00085_variant_cost_views.sql",
+    "supabase/migrations/00086_refresh_views_for_variants.sql",
+    "supabase/migrations/00087_cost_view_unit_conversion.sql"
+   ]
   },
   {
    "name": "batch_additions_with_costs",
@@ -8811,7 +9829,25 @@
    "file_path": "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
    "aliases": [],
    "extractor": "sql",
-   "db_source": "chain"
+   "db_source": "chain",
+   "summary": "`yeast_pitches_with_remaining` is a Postgres view used in the codebase as the data source for yeast-pitch-related production and lineage reads. It is declared in migration files and is used by both UI and domain logic, while updates in those areas explicitly invalidate it when pitch actions occur. It depends on multiple base tables/entities (`batches`, `locations`, `vessels`, `yeast_pitch_events`, `yeast_pitches`, `yeasts`) and is a chain-only view in this profile (absent from live snapshot).",
+   "key_facts": [
+    "`00158_yeast_pitch_events_and_remaining_view.sql` creates `yeast_pitches_with_remaining`.",
+    "`00191_capture_drifted_packaging_objects.sql` also creates `yeast_pitches_with_remaining`, with an explicit node-level note saying the view was last defined there.",
+    "`src/app/(app)/production/yeast-pitches/[id]/page.tsx` reads from and invalidates `yeast_pitches_with_remaining`.",
+    "`src/components/domain/yeast/pitch-yeast-dialog.tsx` and `src/components/domain/yeast/__tests__/pitch-yeast-dialog.test.tsx` both invalidate `yeast_pitches_with_remaining`.",
+    "`yeast_pitches_with_remaining` derives from `batches`, `locations`, `vessels`, `yeast_pitch_events`, `yeast_pitches`, and `yeasts`; it is also read by `yeast-brinks-overview.tsx`, `yeast-lineage-display.tsx`, and `src/domain/yeast-lineage.ts`."
+   ],
+   "files": [
+    "src/app/(app)/production/yeast-pitches/[id]/page.tsx",
+    "src/components/domain/yeast/__tests__/pitch-yeast-dialog.test.tsx",
+    "src/components/domain/yeast/pitch-yeast-dialog.tsx",
+    "src/components/domain/yeast/yeast-brinks-overview.tsx",
+    "src/components/domain/yeast/yeast-lineage-display.tsx",
+    "src/domain/yeast-lineage.ts",
+    "supabase/migrations/00158_yeast_pitch_events_and_remaining_view.sql",
+    "supabase/migrations/00191_capture_drifted_packaging_objects.sql"
+   ]
   },
   {
    "name": "00159_packaging_sessions_redesign.sql",
@@ -10709,7 +11745,36 @@
    "description": "SERVICE at src/services/types.ts.",
    "file_path": "src/services/types.ts",
    "aliases": [],
-   "extractor": "ast"
+   "extractor": "ast",
+   "summary": "`src/services/types.ts` is a shared service-layer module that many parts of the codebase depend on. Its 1-hop neighborhood shows broad coupling across UI, route, and API layers, indicating it likely provides common typing or contracts used broadly. The node appears to act as shared plumbing for multiple feature areas rather than a feature-local utility.",
+   "key_facts": [
+    "`src/services/types.ts` has import relationships from 60 listed nodes, indicating it is a widely shared dependency.",
+    "It is imported by multiple app entry surfaces, including pages/layouts such as `(src/app/(app)/dashboard/page.tsx)`, `(src/app/(app)/layout.tsx)`, and `(src/app/portal/(main)/layout.tsx)`.",
+    "It is imported by numerous API route files (for example `src/app/api/batches/[id]/transfer/route.ts`, `src/app/api/square/webhook/route.ts`, and `src/app/api/orders/[id]/change-requests/[requestId]/approve/route.ts`), showing cross-cutting server-side usage.",
+    "It is imported by a large set of domain UI components, including batch, brew, inventory, order, packaging, and purchasing components (for example `src/components/domain/order/order-items-editor.tsx`, `src/components/domain/packaging/packaging-completion-review.tsx`, and `src/components/domain/inventory/quick-depletion-dialog.tsx`)."
+   ],
+   "files": [
+    "src/app/(app)/dashboard/inventory/page.tsx",
+    "src/app/(app)/dashboard/page.tsx",
+    "src/app/(app)/dashboard/sales/page.tsx",
+    "src/app/(app)/inventory/kegs/reports/page.tsx",
+    "src/app/(app)/layout.tsx",
+    "src/app/(app)/notifications/page.tsx",
+    "src/app/(app)/production/batches/[id]/batch-detail-client.tsx",
+    "src/app/(app)/production/batches/batches-client.tsx",
+    "src/app/(app)/production/brew-logs/[id]/page.tsx",
+    "src/app/(app)/reports/batch-cost/page.tsx",
+    "src/app/(app)/reports/trace/page.tsx",
+    "src/app/(app)/reports/ttb/page.tsx",
+    "src/app/(app)/settings/notifications/page.tsx",
+    "src/app/api/batches/[id]/transfer/route.ts",
+    "src/app/api/chat/route.ts",
+    "src/app/api/chat/tools.ts",
+    "src/app/api/customers/[id]/invite/route.ts",
+    "src/app/api/customers/[id]/portal-users/[userId]/route.ts",
+    "src/app/api/customers/[id]/portal-users/route.ts",
+    "src/app/api/integrations/beer-orders/apply/route.ts"
+   ]
   },
   {
    "name": "src/services/types.ts#ok",
@@ -12057,7 +13122,32 @@
    "description": "SERVICE at src/services/entity-service.ts.",
    "file_path": "src/services/entity-service.ts",
    "aliases": [],
-   "extractor": "ast"
+   "extractor": "ast",
+   "summary": "`src/services/entity-service.ts` is a service-layer module that defines `entityService` and is used as a shared dependency across UI pages/components, API routes, and test modules. It sits as a cross-cutting orchestration point by consuming shared keys/types infrastructure and exposing behavior that callers use for entity-related operations, including mutation cache invalidation. The service is also explicitly exercised in the services test suite, indicating it is a core part of the codebase’s tested service behavior.",
+   "key_facts": [
+    "`src/services/entity-service.ts` is imported by multiple production pages and components, including `src/app/(app)/production/batches/[id]/batch-detail-client.tsx`, `src/app/(app)/production/batches/batches-client.tsx`, `src/app/(app)/production/brew-logs/[id]/page.tsx`, `src/app/api/batches/[id]/transfer/route.ts`, `src/app/api/chat/route.ts`, `src/app/api/chat/tools.ts`, `src/components/domain/brew/brew-log-completion-dialog.tsx`, `src/components/domain/order/pick-list-items.tsx`, `src/components/domain/packaging/packaging-batch-dialog.tsx`, `src/components/domain/packaging/packaging-completion-review.tsx`, `src/components/universal/entity-data-table.tsx`, and `src/components/universal/entity-detail-unified.tsx`.",
+    "`src/services/entity-service.ts` defines `entityService` (`[defines]--> (src/services/entity-service.ts#entityService)`).",
+    "`entity-service.ts` imports `src/lib/query-keys.ts`, `src/services/types.ts`, `src/types/entity.ts`, and `src/types/supabase.ts`, indicating it depends on shared query-key and type modules.",
+    "`entity-service.ts` performs cache invalidation for both `entityKeys.all` and `entityKeys.detail` (`invalidates`).",
+    "`entity-service.ts` invokes `transition_entity_atomic` and is directly covered by tests via `src/services/__tests__/entity-service.test.ts` and `src/services/__tests__/entity-transitions.test.ts`."
+   ],
+   "files": [
+    "src/app/(app)/production/batches/[id]/batch-detail-client.tsx",
+    "src/app/(app)/production/batches/batches-client.tsx",
+    "src/app/(app)/production/brew-logs/[id]/page.tsx",
+    "src/app/api/batches/[id]/transfer/route.ts",
+    "src/app/api/chat/route.ts",
+    "src/app/api/chat/tools.ts",
+    "src/components/domain/brew/brew-log-completion-dialog.tsx",
+    "src/components/domain/order/pick-list-items.tsx",
+    "src/components/domain/packaging/packaging-batch-dialog.tsx",
+    "src/components/domain/packaging/packaging-completion-review.tsx",
+    "src/components/universal/entity-data-table.tsx",
+    "src/components/universal/entity-detail-unified.tsx",
+    "src/services/__tests__/entity-service.test.ts",
+    "src/services/__tests__/entity-transitions.test.ts",
+    "src/services/entity-service.ts"
+   ]
   },
   {
    "name": "entityKeys.all",
@@ -26067,7 +27157,24 @@
    "description": "SERVICE at src/services/consumption-service.ts.",
    "file_path": "src/services/consumption-service.ts",
    "aliases": [],
-   "extractor": "ast"
+   "extractor": "ast",
+   "summary": "`src/services/consumption-service.ts` is a consumption service module that centralizes batch and consumption lifecycle logic. It defines multiple exported operations (for planning, creating, completing, reconciling, and recording consumption/loss) and is a shared dependency for several domain UI modules and tests. The service also bridges application logic and persistence by reading from many batch/recipe/inventory/session tables and writing allocation records.",
+   "key_facts": [
+    "`src/services/consumption-service.ts` is imported by multiple domain components, including `src/components/domain/batch/batch-loss-summary.tsx`, `src/components/domain/brew/brew-consumption-dialog.tsx`, `src/components/domain/inventory/quick-depletion-dialog.tsx`, and `src/components/domain/shared/record-loss-dialog.tsx`, as well as `src/components/domain/__tests__/batch-loss-summary.test.tsx`.",
+    "It defines the symbols `CATALOG_TO_INVENTORY_CATEGORY`, `buildBrewConsumptionPlan`, `completeBatchConsumption`, `consumePackagingMaterials`, `createPlannedConsumption`, `getBatchLossSummary`, `reconcileBatchLoss`, `recordBatchLoss`, and `recordQuickDepletion`.",
+    "The service imports `src/domain/consumption-planning.ts`, `src/services/types.ts`, and `src/types/supabase.ts`.",
+    "It reads from the data sources `batch_blends`, `brew_log_batches`, `inventory_items`, `inventory_lots_with_quantities`, `recipe_adjuncts`, `recipe_fruits`, `recipe_hops`, `recipe_malts`, `recipe_spices`, `recipe_sugars`, `recipes`, and `session_line_items`.",
+    "It writes to the `allocations` table and is tested by `src/services/__tests__/consumption-service.test.ts`."
+   ],
+   "files": [
+    "src/components/domain/__tests__/batch-loss-summary.test.tsx",
+    "src/components/domain/batch/batch-loss-summary.tsx",
+    "src/components/domain/brew/brew-consumption-dialog.tsx",
+    "src/components/domain/inventory/quick-depletion-dialog.tsx",
+    "src/components/domain/shared/record-loss-dialog.tsx",
+    "src/services/__tests__/consumption-service.test.ts",
+    "src/services/consumption-service.ts"
+   ]
   },
   {
    "name": "src/services/consumption-service.ts#CATALOG_TO_INVENTORY_CATEGORY",

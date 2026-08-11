@@ -130,7 +130,11 @@ tables — `entities`, `relations`, `aliases` — and moving off JSON touches on
 ## Known gaps
 
 - Views are chain-only (`db_source: "chain"`), never snapshot-confirmed.
-- `brews` is queried by application code but exists in neither the snapshot nor the
-  migration chain — a real stale reference the graph surfaced.
+- An earlier draft here claimed application code queries a stale `brews` relation.
+  Investigated 2026-08-11 and unreproducible: the only `.from("brews")` in the
+  repo's entire history is synthetic code inside a template-literal fixture in
+  `src/services/__tests__/transition-call-sites.test.ts` (invisible to the AST
+  pass, which walks call expressions, not string contents), and no committed
+  `graph.json` has ever contained a `brews` node or edge.
 - `avatars` (storage bucket) and `fixture` (test artifact) are correctly absent.
 - The LLM pass has low recall by design; absence of an edge is not evidence of absence.
