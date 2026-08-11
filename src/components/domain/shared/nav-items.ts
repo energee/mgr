@@ -72,7 +72,6 @@ export const navigation: NavEntry[] = [
     items: [
       { label: "Batches", href: "/production/batches", icon: AnimatedBatches },
       { label: "Recipes", href: "/production/recipes", icon: AnimatedFileText },
-      { label: "Planning", href: "/production/planning", icon: AnimatedCalendarClock },
       { label: "Cellar", href: "/production/cellar", icon: AnimatedWarehouse },
       { label: "Vessels", href: "/production/vessels", icon: AnimatedContainer },
       { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: AnimatedArrowRightLeft },
