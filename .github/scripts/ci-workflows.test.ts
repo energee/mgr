@@ -180,6 +180,10 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).not.toContain("--shard=");
     expect(workflow).not.toContain("--merge-reports");
     expect(workflow).toContain("bunx vitest run --coverage");
+    // The codegraph extractor eval's deterministic passes run on every PR;
+    // the LLM cases stay local-only (CI has no codex subscription).
+    expect(workflow).toContain("bun tools/codegraph/eval.ts --ast");
+    expect(workflow).toContain("bun tools/codegraph/eval.ts --sql");
     // No paths-ignore: an always-report check has to report on docs-only PRs
     // too. ("Always-report", not "required" — none of these is a required
     // status check today; see the note above this `it`.)
