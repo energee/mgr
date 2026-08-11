@@ -5,11 +5,7 @@ export type OwnerDeposit = {
   deposit_amount: number;
 }
 
-type DepositUpsert = {
-  keg_owner_id: string;
-  selling_format_id: string;
-  deposit_amount: number;
-}
+type DepositUpsert = Omit<OwnerDeposit, "id">;
 
 /**
  * Decide which dirty fields become an upsert vs. a delete.

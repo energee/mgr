@@ -101,26 +101,27 @@ export function KegOwnerDepositsEditor({
     mutationFn: async () => {
       const { upserts, deletes } = planDepositSave(kegOwnerId, dirtyKeys, deposits, existingDeposits);
 
-      // Perform deletes
-      if (deletes.length > 0) {
-        await unwrap(
-          supabase
-            .from("keg_owner_deposits")
-            .delete()
-            .in("id", deletes),
-        );
-      }
-
-      // Perform upserts
-      if (upserts.length > 0) {
-        await unwrap(
-          supabase
-            .from("keg_owner_deposits")
-            .upsert(upserts, {
-              onConflict: "keg_owner_id,selling_format_id",
-            }),
-        );
-      }
+      // Deletes and upserts target disjoint rows (a dirty format is either
+      // cleared or set, never both), so they can run concurrently.
+      await Promise.all([
+        deletes.length > 0
+          ? unwrap(
+              supabase
+                .from("keg_owner_deposits")
+                .delete()
+                .in("id", deletes),
+            )
+          : Promise.resolve(),
+        upserts.length > 0
+          ? unwrap(
+              supabase
+                .from("keg_owner_deposits")
+                .upsert(upserts, {
+                  onConflict: "keg_owner_id,selling_format_id",
+                }),
+            )
+          : Promise.resolve(),
+      ]);
     },
     onSuccess: () => {
       setDirtyKeys(new Set());
