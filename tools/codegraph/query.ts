@@ -179,7 +179,7 @@ function main(): void {
   const hopsIdx = argv.indexOf("--hops");
   const hops = hopsIdx >= 0 ? Number(argv[hopsIdx + 1]) : 2;
   const query = argv
-    .filter((a, i) => !a.startsWith("--") && i !== hopsIdx + 1)
+    .filter((a, i) => !a.startsWith("--") && !(hopsIdx >= 0 && i === hopsIdx + 1))
     .join(" ")
     .trim();
 
