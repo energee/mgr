@@ -125,9 +125,9 @@ export function aggregateUnitsByBatch(
  * leaves `allocations` unwindowed — so `costByBatch` is the batch's full
  * cost — must pass an unwindowed `totalUnitsByBatch` too, or the proportional
  * cost is inflated by `totalUnits / unitsInWindow` and double-counted across
- * adjacent report windows. Defaults to deriving from `fgRows` when omitted,
- * which is only correct if `fgRows` already contains every finished-goods row
- * for every batch referenced (true for an unwindowed caller).
+ * adjacent report windows. When `fgRows` is already unwindowed (contains
+ * every finished-goods row for every batch referenced), pass
+ * `aggregateUnitsByBatch(fgRows)`.
  *
  * For batches whose finished goods are all in `fgRows`, the proportional
  * costs of a batch sum back to that batch's total cost.
@@ -139,7 +139,7 @@ export function buildSkuCostRows(
   fgRows: SkuFinishedGoodRow[],
   allocations: CogsAllocationRow[],
   batchInfo: { id: string; batch_code: string }[],
-  totalUnitsByBatch: Map<string, number> = aggregateUnitsByBatch(fgRows)
+  totalUnitsByBatch: Map<string, number>
 ): CogsSkuRow[] {
   // Aggregate total cost per batch
   const costByBatch = aggregateCostByKey(allocations, (a) => a.destination_id);

@@ -284,12 +284,8 @@ export default function CogsReportPage() {
       // Get batch number info (allocations come from shared data, but we need
       // batch numbers for display and may have FG referencing batches outside
       // the shared query's date range, so fetch fresh here). Also fetch each
-      // batch's full (unwindowed) packaged-unit count: `allocations` here is
-      // each batch's total cost regardless of date, so the proportional-cost
-      // denominator must likewise cover every unit the batch ever packaged —
-      // not just the ones inside [fromDate, toDate] — or a batch whose
-      // packaging spans the window boundary gets its cost inflated and
-      // double-counted across adjacent report windows (see cogs.ts).
+      // batch's full (unwindowed) packaged-unit count for totalUnitsByBatch —
+      // see buildSkuCostRows in cogs.ts for why this must be unwindowed.
       const [{ data: allocations, error: allocErr }, { data: batchInfo }, { data: allFgForBatches, error: allFgErr }] =
         await Promise.all([
           supabase
