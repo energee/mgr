@@ -19,6 +19,24 @@ bun tools/codegraph/query.ts --answer "which policies protect batches"
 
 `graph.json` is committed, so querying works from a clean clone with no build step.
 
+## Staying fresh
+
+`query.ts` rebuilds the graph automatically when it is stale, so you never query
+stale data and never have to remember to refresh. Pass `--no-refresh` to opt out.
+
+Staleness is decided by a **content fingerprint of the input set**, not by comparing
+commit hashes. Hash comparison is wrong in both directions: it fires on every commit
+including ones touching files the graph never reads (`docs/progress/`, CI config), so
+the warning becomes noise; and it reports "fresh" for uncommitted working-tree edits,
+which is the most common way a graph goes wrong mid-session. The fingerprint takes
+tracked blob SHAs straight from git's index (no file reads) and overlays anything git
+reports as modified, so it survives 50 unrelated commits and goes stale the moment you
+edit a source file.
+
+Auto-refresh runs the deterministic passes only (~7s, offline). LLM edges are carried
+over from the existing graph rather than re-run, since those need a subscription --
+refresh them explicitly with `bun tools/codegraph/update.ts --llm`.
+
 ## Commands
 
 | Command | Does | Cost |

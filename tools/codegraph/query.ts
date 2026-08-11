@@ -21,7 +21,11 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { load, type Graph } from "./store";
+import { load, isStale, save, gitCommit, type Graph } from "./store";
+import { runAstPass } from "./ast";
+import { runSqlPass } from "./sql";
+import { merge } from "./store";
+import { resolveGraph } from "./resolve";
 import type { StoredEntity, StoredRelation } from "./schema";
 
 export type Subgraph = {
@@ -186,7 +190,29 @@ function main(): void {
     process.exit(2);
   }
 
-  const graph = load(process.cwd());
+  let graph = load(process.cwd());
+
+  // Auto-refresh rather than warn. The deterministic passes take ~7s and run
+  // offline, so a stale answer is never worth saving that. LLM edges (~1% of
+  // the graph) are preserved from the existing file rather than re-run, since
+  // that needs a subscription; `update.ts --llm` refreshes those explicitly.
+  if (!argv.includes("--no-refresh") && isStale(process.cwd(), graph)) {
+    const root = process.cwd();
+    const head = gitCommit(root);
+    const llm = {
+      entities: graph.nodes.filter((n) => n.extractor === "llm"),
+      relations: graph.links.filter((l) => l.extractor === "llm"),
+    };
+    const { graph: merged } = merge([
+      runSqlPass(root, head),
+      runAstPass(root, head),
+      llm,
+    ]);
+    const { graph: resolved } = resolveGraph(merged);
+    save(root, resolved, head);
+    graph = load(root);
+    console.error(`# graph was stale; rebuilt in-place (llm edges preserved)`);
+  }
   const seed = findSeed(graph, query, exact);
   if (!seed) {
     console.error(

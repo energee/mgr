@@ -20,7 +20,15 @@ The command prints sorted `(source) --[predicate]--> (target)` triples. Reason o
 those directly — do **not** pass `--answer`, which spends a model call to do what
 you are already doing.
 
-If the graph looks stale, refresh it: `bun tools/codegraph/update.ts` (~7s, offline).
+The graph refreshes itself: `query.ts` compares a content fingerprint of every file
+the passes read, and rebuilds the deterministic passes (~7s, offline) if anything
+changed -- including uncommitted edits. You do not need to refresh it manually, and
+you should not assume it is stale just because commits have landed.
+
+One exception: auto-refresh carries LLM edges over rather than re-running them
+(they need a subscription). If a webhook handler or doc changed and you need its
+`triggered_by` / `documented_in` edges current, run
+`bun tools/codegraph/update.ts --llm`.
 
 ## Rules for answering
 
