@@ -159,7 +159,16 @@ export type EntityProfile = z.infer<typeof EntityProfile>;
 
 // --- LLM-facing subset -------------------------------------------------
 //
-// Measured on 2026-08-11: given the full enum, both gpt-5.6-luna and -terra
+// Benchmarked 2026-08-11 on one 6KB webhook file, identical prompt + schema:
+//   gpt-5.3-codex-spark @ low  11s  25 ent / 42 rel  <- fastest and richest
+//   gpt-5.6-terra       @ low  15s  12 / 9
+//   gpt-5.6-luna        @ low  28s  17 / 23
+//   claude -p haiku            65s  ~10, fenced output, no schema enforcement
+// Caveat: spark scored best partly by READING THE REPO (codex is agentic under
+// -s read-only), not purely by extracting from the prompt text. Pin that down
+// in extract.ts rather than assuming the 11s figure extrapolates.
+//
+// Given the full enum, both gpt-5.6-luna and -terra
 // emitted `calls`/`derives_from` edges the AST and SQL passes already produce
 // exactly, and misapplied `derives_from` (a VIEW->TABLE predicate) to module
 // constants. Restricting the enum the model is allowed to return removes that

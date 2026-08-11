@@ -155,6 +155,21 @@ export function runAstPass(repoRoot: string, commit: string) {
         }
       }
 
+      // --- helper-wrapped RPC: dynamicRpc(client, "fn_name", args) ---
+      // This repo reaches 9 database functions only through this wrapper, so
+      // matching just `.rpc("name")` misses them - and they are precisely the
+      // side-effect targets a "webhook -> what happens" question needs.
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        /Rpc$/.test(node.expression.text)
+      ) {
+        const fnArg = node.arguments[1];
+        if (fnArg && ts.isStringLiteral(fnArg)) {
+          rel({ source: path, predicate: "invokes", target: fnArg.text, file_path: path, commit, extractor: "ast" });
+        }
+      }
+
       // --- React Query cache keys -> invalidates ---
       // Two shapes in this repo (44 factories, ~548 call sites):
       //   entityKeys.all("batches")  -> table-scoped: edge points at the TABLE
