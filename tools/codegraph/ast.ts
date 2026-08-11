@@ -15,6 +15,29 @@ import { relative, basename, dirname, sep } from "node:path";
 import type { EntityType, StoredEntity, StoredRelation } from "./schema";
 
 const WRITE_METHODS = new Set(["insert", "update", "upsert", "delete"]);
+
+/** Cache methods whose key argument constitutes an invalidation. */
+const INVALIDATION_METHODS = new Set([
+  "invalidateQueries",
+  "refetchQueries",
+  "resetQueries",
+  "removeQueries",
+  "cancelQueries",
+]);
+
+/** True when `node` sits inside a queryClient.invalidateQueries(...)-style call. */
+function insideInvalidationCall(node: ts.Node): boolean {
+  for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
+    if (
+      ts.isCallExpression(cur) &&
+      ts.isPropertyAccessExpression(cur.expression) &&
+      INVALIDATION_METHODS.has(cur.expression.name.text)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 const HTTP_VERBS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
 
 /** Classify a file by its path — mirrors the repo's own layout conventions. */
@@ -161,7 +184,7 @@ export function runAstPass(repoRoot: string) {
       if (
         ts.isCallExpression(node) &&
         ts.isIdentifier(node.expression) &&
-        /Rpc$/.test(node.expression.text)
+        node.expression.text === "dynamicRpc"
       ) {
         const fnArg = node.arguments[1];
         if (fnArg && ts.isStringLiteral(fnArg)) {
@@ -180,7 +203,11 @@ export function runAstPass(repoRoot: string) {
         ts.isCallExpression(node) &&
         ts.isPropertyAccessExpression(node.expression) &&
         ts.isIdentifier(node.expression.expression) &&
-        /^[a-z][A-Za-z]*Keys$/.test(node.expression.expression.text)
+        /^[a-z][A-Za-z]*Keys$/.test(node.expression.expression.text) &&
+        // Only calls that feed an actual cache-invalidation method count.
+        // Without this guard every read site (`queryKey: entityKeys.list(...)`)
+        // registered as an invalidator and masked real missing invalidations.
+        insideInvalidationCall(node)
       ) {
         const factory = node.expression.expression.text;
         const method = node.expression.name.text;

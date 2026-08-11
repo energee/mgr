@@ -26,7 +26,7 @@
 /* eslint-disable no-console -- CLI entry point: stdout is the output. */
 import { execFileSync } from "node:child_process";
 import { runLlmPass, llmCorpus } from "./extract";
-import { rebuild, gitCommit, tryLoad, GRAPH_PATH, type GraphPart } from "./store";
+import { rebuild, gitCommit, tryLoad, isStale, GRAPH_PATH, type GraphPart } from "./store";
 
 /** Files changed between `ref` and HEAD, repo-relative. */
 function changedFiles(repoRoot: string, ref: string): string[] {
@@ -46,7 +46,8 @@ async function main(): Promise<void> {
   const explicitRef = argv.find((a) => !a.startsWith("--"));
 
   const head = gitCommit(root);
-  const previous = tryLoad(root)?.commit;
+  const prev = tryLoad(root);
+  const previous = prev?.commit;
 
   const ref = explicitRef ?? previous;
   let changed: string[] = [];
@@ -58,8 +59,11 @@ async function main(): Promise<void> {
     }
   }
 
-  if (ref === head && !withLlm) {
-    console.log(`graph is already at ${head.slice(0, 8)}; nothing to do`);
+  // Same commit is NOT the same inputs: uncommitted working-tree edits are the
+  // most common way a graph goes stale mid-session, and isStale() exists for
+  // exactly that. Only skip when the fingerprint matches too.
+  if (ref === head && !withLlm && prev && !isStale(root, prev)) {
+    console.log(`graph is already at ${head.slice(0, 8)} and matches the working tree; nothing to do`);
     return;
   }
 

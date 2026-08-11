@@ -149,6 +149,12 @@ async function main(): Promise<void> {
   const exact = argv.includes("--exact");
   const hopsIdx = argv.indexOf("--hops");
   const hops = hopsIdx >= 0 ? Number(argv[hopsIdx + 1]) : 2;
+  // NaN would silently skip the BFS and report a seed-only, zero-edge subgraph
+  // as if the entity had no relationships - fail loudly instead.
+  if (!Number.isInteger(hops) || hops < 0) {
+    console.error(`--hops requires a non-negative integer, got: ${argv[hopsIdx + 1] ?? "(nothing)"}`);
+    process.exit(2);
+  }
   const query = argv
     .filter((a, i) => !a.startsWith("--") && !(hopsIdx >= 0 && i === hopsIdx + 1))
     .join(" ")

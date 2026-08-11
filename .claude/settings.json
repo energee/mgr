@@ -32,7 +32,18 @@
           },
           {
             "type": "command",
-            "command": "if jq -r '.tool_input.command // \"\"' | grep -qE '(^|[;&|] *)gh +pr +create'; then d=$(git rev-parse --git-dir 2>/dev/null); if [ -f \"$d/pr-review-ok\" ]; then rm -f \"$d/pr-review-ok\"; else printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Pre-PR gate: run /simplify and /code-review on this branch first, then run: touch $(git rev-parse --git-dir)/pr-review-ok and retry gh pr create.\"}}'; fi; fi"
+            "command": "if [ -z \"$GITHUB_ACTIONS\" ] && jq -r '.tool_input.command // \"\"' | grep -qE '(^|[;&|] *)gh +pr +create' && [ ! -f \"$(git rev-parse --git-dir 2>/dev/null)/pr-review-ok\" ]; then printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Pre-PR gate: run /simplify and /code-review on this branch first, then run: touch $(git rev-parse --git-dir)/pr-review-ok and retry gh pr create.\"}}'; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if jq -r '.tool_input.command // \"\"' | grep -qE '(^|[;&|] *)gh +pr +create'; then rm -f \"$(git rev-parse --git-dir 2>/dev/null)/pr-review-ok\"; fi"
           }
         ]
       }

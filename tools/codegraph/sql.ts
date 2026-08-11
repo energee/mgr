@@ -21,19 +21,47 @@ export type SqlPassResult = {
   relations: StoredRelation[];
 };
 
-/** Mask dollar-quoted function bodies so statement splitting is not fooled. */
-function maskDollarQuoted(sql: string): string {
-  return sql.replace(/\$\$[\s\S]*?\$\$/g, (m) => " ".repeat(m.length));
-}
-
+/**
+ * Split on ';' only outside -- comments, block comments, 'string' literals
+ * (with '' escapes), and dollar-quoted bodies with arbitrary tags ($$, $function$, …).
+ * A single left-to-right scan; an unterminated construct swallows the rest of the file.
+ */
 function statements(sql: string): string[] {
-  const masked = maskDollarQuoted(sql);
   const out: string[] = [];
   let start = 0;
-  for (let i = 0; i < masked.length; i++) {
-    if (masked[i] === ";") {
-      out.push(sql.slice(start, i));
-      start = i + 1;
+  let i = 0;
+  while (i < sql.length) {
+    const c = sql[i];
+    if (c === "-" && sql[i + 1] === "-") {
+      const nl = sql.indexOf("\n", i);
+      i = nl === -1 ? sql.length : nl + 1;
+    } else if (c === "/" && sql[i + 1] === "*") {
+      const end = sql.indexOf("*/", i + 2);
+      i = end === -1 ? sql.length : end + 2;
+    } else if (c === "'") {
+      i++;
+      while (i < sql.length) {
+        if (sql[i] === "'") {
+          if (sql[i + 1] === "'") { i += 2; continue; }
+          i++;
+          break;
+        }
+        i++;
+      }
+    } else if (c === "$") {
+      const tag = /^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/.exec(sql.slice(i))?.[0];
+      if (tag) {
+        const end = sql.indexOf(tag, i + tag.length);
+        i = end === -1 ? sql.length : end + tag.length;
+      } else {
+        i++;
+      }
+    } else {
+      if (c === ";") {
+        out.push(sql.slice(start, i));
+        start = i + 1;
+      }
+      i++;
     }
   }
   if (start < sql.length) out.push(sql.slice(start));
