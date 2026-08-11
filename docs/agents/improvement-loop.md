@@ -27,9 +27,10 @@ straight scheduled runs (07-27 through 08-02) went green with no
 `error_max_turns`, opening PRs that mostly merged, and the 07-26
 revise-candidate flag was retired on that basis — in still-unmerged PR #732.
 But the underlying cause was never diagnosed, only outlasted: starting 08-03
-the pattern resumed on 3 of the next 6 scheduled runs. 08-05 hit
+the pattern resumed on 4 of the next 6 scheduled runs. 08-05 hit
 `error_max_turns` again (81 turns, 10 permission denials) and 08-08 did too
-(18 denials — the highest yet). The other two failures in that window (08-04,
+(18 denials — the most since the pattern's 08-03 recurrence, though still
+below 07-26's 20). The other two failures in that window (08-04,
 08-07) are a distinct, newly observed mode: the agent finishes cleanly —
 `is_error: false`, 0-10 permission denials, well under the turn cap — but the
 run still ends with **no PR and no `quiet-run.md`**, so
@@ -53,9 +54,9 @@ run still ends with **no PR and no `quiet-run.md`**, so
    guardrail rather than left implicit.
 
 Falsifies if two more consecutive scheduled runs land a PR or `quiet-run.md`
-with zero permission denials; stays failed — and the retire/revise question
-should be reopened, not re-closed under the 07-26 framing — if either failure
-mode recurs again after two more scheduled runs.)
+with zero permission denials. Stays failed if either failure mode recurs
+after two more scheduled runs — and if so, the retire/revise question should
+be reopened, not re-closed under the 07-26 framing.)
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether

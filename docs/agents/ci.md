@@ -151,20 +151,20 @@ job in this repo has) and the `id-token: write` OIDC minting endpoint. Neither
 can write to this repository. What is gone is the push-capable
 `GITHUB_TOKEN` — #645's stated impact.
 
-**The pack step has been failing on most scheduled runs since that split
-landed, independent of what the agent decided (recurring; first found
-2026-08-02, still failing 2026-08-08 — a near-identical diagnosis also sits in
-still-unmerged PR #732, which this entry supersedes with a week of further
-evidence).** `/outbox/` is gitignored (`.gitignore:114`, deliberately, so the
-artifact directory never gets committed), and the "Pack the agent outbox"
-step's `git add -A -- . ':(exclude)outbox' ':(exclude)sentry-outcome.md'`
+**The pack step has been failing on most scheduled runs since the credential
+split (#690, merged 2026-07-30) landed, independent of what the agent decided
+(recurring; first found 2026-08-02, still failing 2026-08-08 — a
+near-identical diagnosis also sits in still-unmerged PR #732, which this
+entry supersedes with a week of further evidence).** `/outbox/` is gitignored
+(`.gitignore:114`, deliberately, so the artifact directory never gets
+committed), and the "Pack the agent outbox" step's
+`git add -A -- . ':(exclude)outbox' ':(exclude)sentry-outcome.md'`
 (`sentry-harness.yml:274`) exits 1 under the step's `set -euo pipefail`: git
 treats naming an ignored directory inside `:(exclude)` pathspec magic the same
 as an explicit add of an ignored path — `"The following paths are ignored by
 one of your .gitignore files: outbox"` / `"hint: Use -f if you really want to
 add them"` — and errors out before `outbox/fix.patch` is ever written. Sampled
-across every scheduled run since the credential split (#690, merged
-2026-07-30):
+across every scheduled run since the split:
 
 - **07-30** (job 90957329205, MGR-K): a real classification-(A) patch the
   agent spent its full budget producing was discarded outright — `land-fix`'s
@@ -186,8 +186,9 @@ scheduled runs for over a week even when the agent's diagnosis and outbox
 contract were both correct. **Do not read a `sentry-harness.yml` red X as "the
 agent got it wrong"** without opening the "Fix error" step log and checking
 for this exact ignored-path message first — and do not read the loop as
-unhealthy from Actions-tab history alone; check the PR list instead (10 of 10
-`sentry-fix` PRs opened since 2026-07-12 have merged, per the loop
+unhealthy from Actions-tab history alone; check the PR list instead (`gh pr
+list --state open --label sentry-fix --json number,createdAt,statusCheckRollup`;
+10 of 10 `sentry-fix` PRs opened since 2026-07-12 have merged, per the loop
 scoreboard). **Not fixable from here**, since it requires a workflow-file
 change: the likely fix is to drop the redundant `:(exclude)outbox` pathspec
 (the directory is already gitignored, so a plain `git add -A -- .` already
