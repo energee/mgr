@@ -45,8 +45,10 @@ export const inventoryService = {
     limit?: number
   ): Promise<ServiceResult<ExpiringLot[]>> {
     try {
+      // UTC setters, not local getDate()/setDate() — mixing with the UTC
+      // toISOString() read below shifts the result a day across DST.
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() + daysAhead);
+      cutoff.setUTCDate(cutoff.getUTCDate() + daysAhead);
       const cutoffStr = cutoff.toISOString().split("T")[0];
 
       let query = dynamicFrom(supabase, "inventory_lots_with_quantities")

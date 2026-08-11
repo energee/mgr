@@ -165,6 +165,7 @@ const CATEGORIES = [
   { key: "sales_revenue", label: "Sales Revenue" },
   { key: "cogs", label: "Cost of Goods Sold" },
   { key: "shipping", label: "Shipping Expense" },
+  { key: "tax", label: "Tax Expense" },
   { key: "accounts_receivable", label: "Accounts Receivable" },
   { key: "accounts_payable", label: "Accounts Payable" },
 ];

@@ -107,15 +107,17 @@ describe("buildSkuCostRows", () => {
   ];
 
   it("returns [] for empty input", () => {
-    expect(buildSkuCostRows([], [], [])).toEqual([]);
+    expect(buildSkuCostRows([], [], [], new Map())).toEqual([]);
   });
 
   it("allocates a batch's cost proportionally to units per SKU", () => {
     // Batch b1 cost: 100. Units: SKU A = 60, SKU B = 40.
+    const fgRows = [fg("b1", 60, "Hazy", "6-pack"), fg("b1", 40, "Hazy", "Keg")];
     const rows = buildSkuCostRows(
-      [fg("b1", 60, "Hazy", "6-pack"), fg("b1", 40, "Hazy", "Keg")],
+      fgRows,
       [alloc("b1", 10, 10)],
-      batchInfo
+      batchInfo,
+      aggregateUnitsByBatch(fgRows)
     );
 
     const a = rows.find((r) => r.format_name === "6-pack")!;
@@ -136,7 +138,12 @@ describe("buildSkuCostRows", () => {
       fg("b1", 5, "Other", "Can"),
       fg("b2", 9, "Hazy", "6-pack"),
     ];
-    const rows = buildSkuCostRows(fgRows, allocations, batchInfo);
+    const rows = buildSkuCostRows(
+      fgRows,
+      allocations,
+      batchInfo,
+      aggregateUnitsByBatch(fgRows)
+    );
 
     const totalAllocated = rows.reduce((sum, r) => sum + r.total_cost, 0);
     const totalBatchCost = allocations.reduce(
@@ -147,14 +154,16 @@ describe("buildSkuCostRows", () => {
   });
 
   it("groups by brand + format, tracks batch breakdown, and sorts by cost desc", () => {
+    const fgRows = [
+      fg("b1", 50, "Hazy", "6-pack", "Can"),
+      fg("b2", 50, "Hazy", "6-pack"),
+      fg("b2", 50, "Pils", "Keg"),
+    ];
     const rows = buildSkuCostRows(
-      [
-        fg("b1", 50, "Hazy", "6-pack", "Can"),
-        fg("b2", 50, "Hazy", "6-pack"),
-        fg("b2", 50, "Pils", "Keg"),
-      ],
+      fgRows,
       [alloc("b1", 1, 100), alloc("b2", 1, 200)],
-      batchInfo
+      batchInfo,
+      aggregateUnitsByBatch(fgRows)
     );
 
     expect(rows).toHaveLength(2);
@@ -171,10 +180,12 @@ describe("buildSkuCostRows", () => {
   });
 
   it("merges repeated finished-goods rows for the same batch + SKU", () => {
+    const fgRows = [fg("b1", 30, "Hazy", "6-pack"), fg("b1", 70, "Hazy", "6-pack")];
     const rows = buildSkuCostRows(
-      [fg("b1", 30, "Hazy", "6-pack"), fg("b1", 70, "Hazy", "6-pack")],
+      fgRows,
       [alloc("b1", 1, 50)],
-      batchInfo
+      batchInfo,
+      aggregateUnitsByBatch(fgRows)
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].total_units).toBe(100);
@@ -185,20 +196,24 @@ describe("buildSkuCostRows", () => {
   });
 
   it("assigns zero cost when a batch has zero packaged units", () => {
+    const fgRows = [fg("b1", 0, "Hazy", "6-pack")];
     const rows = buildSkuCostRows(
-      [fg("b1", 0, "Hazy", "6-pack")],
+      fgRows,
       [alloc("b1", 1, 100)],
-      batchInfo
+      batchInfo,
+      aggregateUnitsByBatch(fgRows)
     );
     expect(rows[0].total_cost).toBe(0);
     expect(rows[0].avg_cost_per_unit).toBeNull();
   });
 
   it("skips rows without a batch_id and labels missing joins as Unknown", () => {
+    const fgRows = [fg(null, 10, "Hazy", "6-pack"), fg("b1", 10, null, null)];
     const rows = buildSkuCostRows(
-      [fg(null, 10, "Hazy", "6-pack"), fg("b1", 10, null, null)],
+      fgRows,
       [alloc("b1", 1, 30)],
-      [] // no batch info -> "??" batch_code
+      [], // no batch info -> "??" batch_code
+      aggregateUnitsByBatch(fgRows)
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].sku_name).toBe("Unknown - Unknown");
@@ -206,11 +221,30 @@ describe("buildSkuCostRows", () => {
     expect(rows[0].total_cost).toBeCloseTo(30);
   });
 
-  it("computes avg_cost_per_unit from totals", () => {
+  it("uses a caller-supplied totalUnitsByBatch instead of fgRows when fgRows is a windowed subset, so a report window that only sees part of a batch's packaging doesn't inflate cost-per-unit", () => {
+    // Batch b1 costs 1000 total and packaged 1000 units overall, but this
+    // report window's fgRows only contains 400 of those units (the rest
+    // packaged outside [fromDate, toDate]). The batch's full cost (1000)
+    // must be divided by the batch's full unit count (1000), not the 400
+    // visible in this window, or the windowed cost-per-unit is inflated by
+    // totalUnits/unitsInWindow and double-counts across adjacent windows.
     const rows = buildSkuCostRows(
-      [fg("b1", 25, "Hazy", "6-pack")],
+      [fg("b1", 400, "Hazy", "6-pack")],
+      [alloc("b1", 1, 1000)],
+      batchInfo,
+      new Map([["b1", 1000]])
+    );
+    expect(rows[0].total_cost).toBeCloseTo(400); // 1000 * 400/1000, not 1000 * 400/400
+    expect(rows[0].avg_cost_per_unit).toBeCloseTo(1); // $1/unit, not $2.50/unit
+  });
+
+  it("computes avg_cost_per_unit from totals", () => {
+    const fgRows = [fg("b1", 25, "Hazy", "6-pack")];
+    const rows = buildSkuCostRows(
+      fgRows,
       [alloc("b1", 1, 100)],
-      batchInfo
+      batchInfo,
+      aggregateUnitsByBatch(fgRows)
     );
     expect(rows[0].avg_cost_per_unit).toBeCloseTo(4); // 100 / 25
     expect(rows[0].avg_cost_per_bbl).toBeNull();

@@ -273,6 +273,42 @@ describe("syncBill — happy paths (characterization)", () => {
     await expect(syncBill(PO_ID)).rejects.toThrow(/has no line items/);
     expect(mockedPost).not.toHaveBeenCalled();
   });
+
+  it("adds tax as its own Bill line so the posted total isn't understated", async () => {
+    useTables(makeTables({ purchase_orders: { data: { ...basePO, tax: 40 }, error: null } }));
+    mockedPost.mockResolvedValue({ Bill: { Id: "B-9" } });
+
+    await syncBill(PO_ID);
+
+    const taxLine = postedBill().Line.find((l) => l.Description === "Tax");
+    expect(taxLine).toMatchObject({
+      Amount: 40,
+      DetailType: "AccountBasedExpenseLineDetail",
+      AccountBasedExpenseLineDetail: { AccountRef: { value: "ACC-COGS" } },
+    });
+    const total = postedBill().Line.reduce((sum, l) => sum + l.Amount, 0);
+    expect(total).toBe(55 + 60 + 25 + 40); // line items + shipping + tax
+  });
+
+  it("does not refuse an otherwise-empty PO that only has tax to bill", async () => {
+    useTables(
+      makeTables({
+        purchase_orders: { data: { ...basePO, shipping_cost: 0, tax: 15 }, error: null },
+        po_line_items: { data: [], error: null },
+      })
+    );
+    mockedPost.mockResolvedValue({ Bill: { Id: "B-9" } });
+
+    await expect(syncBill(PO_ID)).resolves.toEqual({ qboId: "B-9", action: "create" });
+    expect(postedBill().Line).toEqual([
+      {
+        Amount: 15,
+        Description: "Tax",
+        DetailType: "AccountBasedExpenseLineDetail",
+        AccountBasedExpenseLineDetail: { AccountRef: { value: "ACC-COGS" } },
+      },
+    ]);
+  });
 });
 
 // -----------------------------------------------------------------------------

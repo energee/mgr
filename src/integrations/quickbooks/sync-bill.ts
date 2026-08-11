@@ -32,6 +32,38 @@ function parsePaymentTermsDays(terms: string | null | undefined): number {
   return digits ? parseInt(digits, 10) : NaN;
 }
 
+/**
+ * Resolves the QBO account mapped to `category` (e.g. "shipping", "tax"),
+ * falling back to `fallbackAccountRef` when it's unconfigured or the read
+ * fails — logging which case happened, since the two failure modes stay
+ * observable in sync logs (audit SF-7). The Bill total is right either way;
+ * only the P&L categorization diverges.
+ */
+async function resolveExtraCostAccount(
+  admin: Awaited<ReturnType<typeof createAdminClient>>,
+  category: string,
+  fallbackAccountRef: { value: string },
+  purchaseOrderId: string
+): Promise<{ value: string }> {
+  const { data: mapping, error } = await admin
+    .from("qbo_account_mappings")
+    .select("qbo_account_id")
+    .eq("category", category)
+    .maybeSingle();
+  if (error) {
+    logger.warn(
+      { err: error.message, purchaseOrderId },
+      `QBO sync: failed to read '${category}' account mapping; posting ${category} to the COGS account`
+    );
+  } else if (!mapping?.qbo_account_id) {
+    logger.warn(
+      { purchaseOrderId },
+      `QBO sync: no '${category}' account mapping configured; posting ${category} to the COGS account`
+    );
+  }
+  return mapping?.qbo_account_id ? { value: mapping.qbo_account_id } : fallbackAccountRef;
+}
+
 export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string; action: "create" | "update" }> {
   const admin = await createAdminClient();
 
@@ -90,46 +122,36 @@ export async function syncBill(purchaseOrderId: string): Promise<{ qboId: string
     },
   }));
 
-  if (!lines.length && !Number(po.shipping_cost || 0)) {
+  const shippingCost = Number(po.shipping_cost || 0);
+  const taxAmount = Number(po.tax || 0);
+
+  if (!lines.length && !shippingCost && !taxAmount) {
     throw new Error(
       `Purchase order ${po.po_number || purchaseOrderId} has no line items. Cannot create an empty bill in QuickBooks.`
     );
   }
 
-  // Add shipping cost as extra line if present. Shipping falls back to the
-  // COGS account either way, but a failed lookup and a genuinely
-  // unconfigured mapping log distinct warnings (audit SF-7) — the Bill total
-  // stays right; only the P&L categorization diverges.
-  const shippingCost = Number(po.shipping_cost || 0);
-  if (shippingCost > 0) {
-    const { data: shippingMapping, error: shippingMappingError } = await admin
-      .from("qbo_account_mappings")
-      .select("qbo_account_id")
-      .eq("category", "shipping")
-      .maybeSingle();
-    if (shippingMappingError) {
-      logger.warn(
-        { err: shippingMappingError.message, purchaseOrderId },
-        "QBO sync: failed to read 'shipping' account mapping; posting shipping to the COGS account"
-      );
-    } else if (!shippingMapping?.qbo_account_id) {
-      logger.warn(
-        { purchaseOrderId },
-        "QBO sync: no 'shipping' account mapping configured; posting shipping to the COGS account"
-      );
-    }
+  // Post shipping and tax as their own lines rather than folding them into
+  // COGS. `purchase_orders.tax` is a real vendor-payable amount (allocated
+  // into per-unit landed cost elsewhere) — omitting it understates the Bill
+  // total by exactly the tax amount, as this sync used to. Each falls back
+  // to the COGS account per resolveExtraCostAccount (audit SF-7).
+  const extraCosts = [
+    { category: "shipping", description: "Shipping", amount: shippingCost },
+    { category: "tax", description: "Tax", amount: taxAmount },
+  ].filter((cost) => cost.amount > 0);
 
+  const extraAccountRefs = await Promise.all(
+    extraCosts.map((cost) => resolveExtraCostAccount(admin, cost.category, accountRef, purchaseOrderId))
+  );
+  extraCosts.forEach((cost, i) => {
     lines.push({
-      Amount: shippingCost,
-      Description: "Shipping",
+      Amount: cost.amount,
+      Description: cost.description,
       DetailType: "AccountBasedExpenseLineDetail",
-      AccountBasedExpenseLineDetail: {
-        AccountRef: shippingMapping?.qbo_account_id
-          ? { value: shippingMapping.qbo_account_id }
-          : accountRef,
-      },
+      AccountBasedExpenseLineDetail: { AccountRef: extraAccountRefs[i] },
     });
-  }
+  });
 
   // Get supplier for payment terms. A failed read falls back to the default
   // terms (due-date only), but is logged so the divergence is observable
