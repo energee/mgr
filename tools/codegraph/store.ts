@@ -5,9 +5,10 @@
  * edges, and writes NetworkX node-link JSON to tools/codegraph/graph.json so
  * Python tooling can load it with networkx.node_link_graph() unchanged.
  *
- * Every edge carries provenance (file_path + commit + extractor). The shape
+ * Every edge carries provenance (file_path + extractor; the commit is stamped
+ * once at the top level, so rebuilds do not rewrite every line). The shape
  * maps 1:1 onto three Postgres tables - entities(name, type, description,
- * file_path, summary), relations(source, target, predicate, file_path, commit,
+ * file_path, summary), relations(source, target, predicate, file_path,
  * extractor), aliases(entity, alias) - so moving off JSON later touches only
  * this file.
  */
@@ -182,4 +183,54 @@ export function load(repoRoot: string): Graph {
     throw new Error(`No graph at ${GRAPH_PATH}. Run: bun tools/codegraph/build.ts`);
   }
   return JSON.parse(readFileSync(p, "utf8")) as Graph;
+}
+
+/** load(), or undefined when no graph exists yet (first build). */
+export function tryLoad(repoRoot: string): Graph | undefined {
+  try {
+    return load(repoRoot);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The LLM-extracted slice of a previous graph, as a mergeable part.
+ *
+ * Every rebuild path MUST include this (minus any files the LLM pass is about
+ * to re-extract), because the deterministic passes cannot reproduce LLM facts
+ * and a merge without them silently deletes them — which is exactly how the
+ * committed graph lost all its LLM edges once: build.ts merged [sql, ast] and
+ * nobody noticed until an audit counted zero.
+ */
+export function llmPart(prev: Graph | undefined, excludeFiles?: Set<string>): GraphPart {
+  if (!prev) return { entities: [], relations: [] };
+  const keep = (fp: string) => !excludeFiles?.has(fp);
+  return {
+    entities: prev.nodes.filter((n) => n.extractor === "llm" && keep(n.file_path)),
+    relations: prev.links.filter((l) => l.extractor === "llm" && keep(l.file_path)),
+  };
+}
+
+/**
+ * Copy summarize.ts hub profiles (summary/key_facts/files) from a previous
+ * graph onto same-named nodes of a rebuilt one, in place. Without this every
+ * rebuild — including query.ts's auto-refresh — discards all profiles, since
+ * the passes mint fresh nodes. Profiles carried this way can lag the edges
+ * they describe; re-run summarize.ts to refresh them.
+ */
+export function carryProfiles(
+  prev: Graph | undefined,
+  graph: Omit<Graph, "commit" | "built_at">,
+): void {
+  if (!prev) return;
+  const profiled = new Map(prev.nodes.filter((n) => n.summary).map((n) => [n.name, n]));
+  for (const n of graph.nodes) {
+    const p = profiled.get(n.name);
+    if (p && !n.summary) {
+      n.summary = p.summary;
+      n.key_facts = p.key_facts;
+      n.files = p.files;
+    }
+  }
 }

@@ -189,7 +189,6 @@ function runCodex(
 
 export type LlmPassOptions = {
   files: string[];
-  commit: string;
   concurrency?: number;
   timeoutMs?: number;
   /** Endpoint names the AST pass found. LLM endpoints not in here are dropped. */
@@ -239,7 +238,6 @@ export async function runLlmPass(
         predicate: r.predicate,
         target,
         file_path: relPath,
-        commit: opts.commit,
         extractor: "llm",
       });
     }

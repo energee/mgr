@@ -9,15 +9,19 @@
 /* eslint-disable no-console -- CLI entry point: stdout is the output. */
 import { runAstPass } from "./ast";
 import { runSqlPass } from "./sql";
-import { merge, save, gitCommit, GRAPH_PATH } from "./store";
+import { merge, save, gitCommit, tryLoad, llmPart, carryProfiles, GRAPH_PATH } from "./store";
 
 const root = process.cwd();
 const commit = gitCommit(root);
 const t0 = Date.now();
 
-const sql = runSqlPass(root, commit);
-const ast = runAstPass(root, commit);
-const { graph, report } = merge([sql, ast]);
+// LLM edges and hub profiles come from paid passes the deterministic build
+// cannot reproduce — carry them from the existing graph or they are deleted.
+const prev = tryLoad(root);
+const sql = runSqlPass(root);
+const ast = runAstPass(root);
+const { graph, report } = merge([sql, ast, llmPart(prev)]);
+carryProfiles(prev, graph);
 save(root, graph, commit);
 
 const secs = ((Date.now() - t0) / 1000).toFixed(1);

@@ -29,7 +29,7 @@ import { runAstPass } from "./ast";
 import { runSqlPass } from "./sql";
 import { runLlmPass, llmCorpus } from "./extract";
 import { resolveGraph } from "./resolve";
-import { merge, save, load, gitCommit, GRAPH_PATH } from "./store";
+import { merge, save, gitCommit, tryLoad, llmPart, carryProfiles, GRAPH_PATH } from "./store";
 
 /** Files changed between `ref` and HEAD, repo-relative. */
 function changedFiles(repoRoot: string, ref: string): string[] {
@@ -49,12 +49,8 @@ async function main(): Promise<void> {
   const explicitRef = argv.find((a) => !a.startsWith("--"));
 
   const head = gitCommit(root);
-  let previous: string | undefined;
-  try {
-    previous = load(root).commit;
-  } catch {
-    previous = undefined; // no graph yet - this is a first build
-  }
+  const prevGraph = tryLoad(root);
+  const previous = prevGraph?.commit;
 
   const ref = explicitRef ?? previous;
   let changed: string[] = [];
@@ -78,8 +74,8 @@ async function main(): Promise<void> {
   );
 
   const t0 = Date.now();
-  const sql = runSqlPass(root, head);
-  const ast = runAstPass(root, head);
+  const sql = runSqlPass(root);
+  const ast = runAstPass(root);
   const parts = [sql, ast];
   // The AST pass is the authority on which endpoints exist; the LLM pass is
   // held to it so it cannot invent routes.
@@ -89,6 +85,7 @@ async function main(): Promise<void> {
       .map((e) => e.name),
   );
 
+  const reExtracted = new Set<string>();
   if (withLlm) {
     const corpus = llmCorpus(root);
     // Filter to changed files when we have a diff; otherwise run the whole
@@ -99,10 +96,10 @@ async function main(): Promise<void> {
       console.log("  llm: no corpus files changed");
     } else {
       console.log(`  llm: ${targets.length} file(s) (cache skips unchanged)`);
+      for (const f of targets) reExtracted.add(f);
       parts.push(
         await runLlmPass(root, {
           files: targets,
-          commit: head,
           knownEndpoints,
           onProgress: (d, t, f, cached) =>
             console.log(`    [${d}/${t}] ${cached ? "cached" : "ran   "} ${f}`),
@@ -111,8 +108,12 @@ async function main(): Promise<void> {
     }
   }
 
+  // Carry prior LLM facts for every file not re-extracted this run (all of
+  // them, without --llm), and hub profiles — no pass reproduces either.
+  parts.push(llmPart(prevGraph, reExtracted));
   const { graph: mergedGraph } = merge(parts);
   const { graph, report } = resolveGraph(mergedGraph);
+  carryProfiles(prevGraph, graph);
   save(root, graph, head);
 
   const secs = ((Date.now() - t0) / 1000).toFixed(1);

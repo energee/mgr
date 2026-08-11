@@ -122,8 +122,10 @@ exist to catch over-extraction, not misses.
 ## Storage
 
 NetworkX node-link JSON (`networkx.node_link_graph()` reads it unchanged). Every
-edge carries `file_path`, `commit`, and `extractor` (`ast` | `sql` | `llm`), so a
-query can filter to parser-only edges. The shape maps 1:1 onto three Postgres
+edge carries `file_path` and `extractor` (`ast` | `sql` | `llm`), so a query can
+filter to parser-only edges; the commit is stamped once at the top level rather
+than per edge, so a rebuild at a new commit does not rewrite all ~8,400 lines of
+the committed `graph.json` (which made every parallel branch a merge conflict). The shape maps 1:1 onto three Postgres
 tables — `entities`, `relations`, `aliases` — and moving off JSON touches only
 `store.ts`.
 

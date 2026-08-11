@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { load, isStale, save, gitCommit, type Graph } from "./store";
 import { runAstPass } from "./ast";
 import { runSqlPass } from "./sql";
-import { merge } from "./store";
+import { merge, llmPart, carryProfiles } from "./store";
 import { resolveGraph } from "./resolve";
 import type { StoredEntity, StoredRelation } from "./schema";
 
@@ -199,16 +199,13 @@ function main(): void {
   if (!argv.includes("--no-refresh") && isStale(process.cwd(), graph)) {
     const root = process.cwd();
     const head = gitCommit(root);
-    const llm = {
-      entities: graph.nodes.filter((n) => n.extractor === "llm"),
-      relations: graph.links.filter((l) => l.extractor === "llm"),
-    };
     const { graph: merged } = merge([
-      runSqlPass(root, head),
-      runAstPass(root, head),
-      llm,
+      runSqlPass(root),
+      runAstPass(root),
+      llmPart(graph),
     ]);
     const { graph: resolved } = resolveGraph(merged);
+    carryProfiles(graph, resolved);
     save(root, resolved, head);
     graph = load(root);
     console.error(`# graph was stale; rebuilt in-place (llm edges preserved)`);

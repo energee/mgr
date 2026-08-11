@@ -83,7 +83,7 @@ async function predictFor(
   c: GoldCase,
 ): Promise<{ entities: StoredEntity[]; relations: StoredRelation[] }> {
   if (c.extractor === "sql") {
-    const all = runSqlPass(root, "eval");
+    const all = runSqlPass(root);
     // Scope by PROVENANCE, not topology. Every fact carries the file it was
     // read from, and that is precisely "what this file contributes" - so the
     // eval scores exactly that. Two earlier attempts got this wrong: filtering
@@ -103,13 +103,13 @@ async function predictFor(
   if (c.extractor === "ast") {
     // Same provenance scoping as SQL. The pass compiles the whole program
     // (~7s) because import/call resolution needs the full program anyway.
-    const all = runAstPass(root, "eval");
+    const all = runAstPass(root);
     return {
       entities: all.entities.filter((e) => e.file_path === c.file),
       relations: all.relations.filter((r) => r.file_path === c.file),
     };
   }
-  return runLlmPass(root, { files: [c.file], commit: "eval" });
+  return runLlmPass(root, { files: [c.file] });
 }
 
 async function main(): Promise<void> {

@@ -11,7 +11,9 @@
  *   predicates drift ("calls"/"invokes"/"uses" for one edge) and make
  *   multi-hop traversal unreliable. We trade exotic-edge recall for
  *   queryability.
- * - Every relation carries provenance (`file_path`, `commit`, `extractor`).
+ * - Every relation carries provenance (`file_path`, `extractor`); the commit
+ *   is stamped once at the top level of the graph, not per edge, so a rebuild
+ *   at a new commit does not rewrite every line of graph.json.
  *   `extractor` lets a query filter to only-precise edges and tells the
  *   eval which pass to blame for a regression.
  * - Field names are chosen to map onto three Postgres tables later
@@ -137,7 +139,6 @@ export type StoredEntity = Entity & {
 /** A relation as stored: the triple plus where it came from. */
 export type StoredRelation = Relation & {
   file_path: string;
-  commit: string;
   extractor: Extractor;
 };
 

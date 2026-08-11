@@ -33,7 +33,7 @@ function isComponentName(name: string): boolean {
   return /^[A-Z][A-Za-z0-9]*$/.test(name);
 }
 
-export function runAstPass(repoRoot: string, commit: string) {
+export function runAstPass(repoRoot: string) {
   const cfgPath = ts.findConfigFile(repoRoot, ts.sys.fileExists, "tsconfig.json");
   if (!cfgPath) throw new Error("tsconfig.json not found");
   const cfg = ts.readConfigFile(cfgPath, ts.sys.readFile);
@@ -77,7 +77,7 @@ export function runAstPass(repoRoot: string, commit: string) {
       const parent = dirname(dirname(path));
       for (const ext of [".ts", ".tsx"]) {
         const cand = `${parent}/${subject.replace(/\.tsx?$/, ext)}`;
-        rel({ source: cand, predicate: "tested_by", target: path, file_path: path, commit, extractor: "ast" });
+        rel({ source: cand, predicate: "tested_by", target: path, file_path: path, extractor: "ast" });
       }
     }
 
@@ -89,7 +89,7 @@ export function runAstPass(repoRoot: string, commit: string) {
         if (decl && inRepo(decl.fileName) && !decl.isDeclarationFile) {
           const target = relOf(decl.fileName);
           if (target.startsWith("src/")) {
-            rel({ source: path, predicate: "imports", target, file_path: path, commit, extractor: "ast" });
+            rel({ source: path, predicate: "imports", target, file_path: path, extractor: "ast" });
           }
         }
       }
@@ -120,7 +120,7 @@ export function runAstPass(repoRoot: string, commit: string) {
             aliases: [name],
             extractor: "ast",
           });
-          rel({ source: path, predicate: "defines", target: qualified, file_path: path, commit, extractor: "ast" });
+          rel({ source: path, predicate: "defines", target: qualified, file_path: path, extractor: "ast" });
         }
       }
 
@@ -131,7 +131,7 @@ export function runAstPass(repoRoot: string, commit: string) {
         if ((method === "from" || method === "rpc") && arg && ts.isStringLiteral(arg)) {
           const target = arg.text;
           if (method === "rpc") {
-            rel({ source: path, predicate: "invokes", target, file_path: path, commit, extractor: "ast" });
+            rel({ source: path, predicate: "invokes", target, file_path: path, extractor: "ast" });
           } else {
             // Walk the fluent chain to decide read vs write.
             let write = false;
@@ -148,7 +148,6 @@ export function runAstPass(repoRoot: string, commit: string) {
               predicate: write ? "writes_to" : "reads_from",
               target,
               file_path: path,
-              commit,
               extractor: "ast",
             });
           }
@@ -166,7 +165,7 @@ export function runAstPass(repoRoot: string, commit: string) {
       ) {
         const fnArg = node.arguments[1];
         if (fnArg && ts.isStringLiteral(fnArg)) {
-          rel({ source: path, predicate: "invokes", target: fnArg.text, file_path: path, commit, extractor: "ast" });
+          rel({ source: path, predicate: "invokes", target: fnArg.text, file_path: path, extractor: "ast" });
         }
       }
 
@@ -187,7 +186,7 @@ export function runAstPass(repoRoot: string, commit: string) {
         const method = node.expression.name.text;
         const first = node.arguments[0];
         if (factory === "entityKeys" && first && ts.isStringLiteral(first)) {
-          rel({ source: path, predicate: "invalidates", target: first.text, file_path: path, commit, extractor: "ast" });
+          rel({ source: path, predicate: "invalidates", target: first.text, file_path: path, extractor: "ast" });
         } else {
           const key = `${factory}.${method}`;
           add({
@@ -198,7 +197,7 @@ export function runAstPass(repoRoot: string, commit: string) {
             aliases: [],
             extractor: "ast",
           });
-          rel({ source: path, predicate: "invalidates", target: key, file_path: path, commit, extractor: "ast" });
+          rel({ source: path, predicate: "invalidates", target: key, file_path: path, extractor: "ast" });
         }
       }
 
@@ -216,7 +215,7 @@ export function runAstPass(repoRoot: string, commit: string) {
           if (df && inRepo(df.fileName) && !df.isDeclarationFile) {
             const tp = relOf(df.fileName);
             if (tp.startsWith("src/") && tp !== path) {
-              rel({ source: path, predicate: "calls", target: `${tp}#${id.text}`, file_path: path, commit, extractor: "ast" });
+              rel({ source: path, predicate: "calls", target: `${tp}#${id.text}`, file_path: path, extractor: "ast" });
             }
           }
         }

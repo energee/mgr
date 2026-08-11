@@ -45,7 +45,7 @@ function decomment(sql: string): string {
   return sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
 }
 
-export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
+export function runSqlPass(repoRoot: string): SqlPassResult {
   const entities = new Map<string, StoredEntity>();
   const relations: StoredRelation[] = [];
   const addEntity = (e: StoredEntity) => {
@@ -93,7 +93,7 @@ export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
         extractor: "sql",
         db_source: "snapshot",
       });
-      addRel({ source: qp, predicate: "protects", target: table, file_path: snapPath, commit, extractor: "sql" });
+      addRel({ source: qp, predicate: "protects", target: table, file_path: snapPath, extractor: "sql" });
     } else if (f[0] === "TRIG" && f[1] && f[2]) {
       // TRIG|trigger_name|table|hash
       const [, trig, table] = f;
@@ -107,7 +107,7 @@ export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
         extractor: "sql",
         db_source: "snapshot",
       });
-      addRel({ source: qt, predicate: "fires_on", target: table, file_path: snapPath, commit, extractor: "sql" });
+      addRel({ source: qt, predicate: "fires_on", target: table, file_path: snapPath, extractor: "sql" });
     }
   }
 
@@ -135,7 +135,7 @@ export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
       if (pol) {
         const [, policyRaw, table] = pol;
         const policy = `${table}.${policyRaw}`;
-        addRel({ source: mig, predicate: "creates", target: policy, file_path: rel, commit, extractor: "sql" });
+        addRel({ source: mig, predicate: "creates", target: policy, file_path: rel, extractor: "sql" });
         // policy may predate the snapshot node (dropped later) — only edge if known
         if (!entities.has(policy)) {
           addEntity({
@@ -147,7 +147,7 @@ export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
             extractor: "sql",
             db_source: "chain",
           });
-          addRel({ source: policy, predicate: "protects", target: table, file_path: rel, commit, extractor: "sql" });
+          addRel({ source: policy, predicate: "protects", target: table, file_path: rel, extractor: "sql" });
         }
         for (const m of stmt.matchAll(/user_has_permission\(\s*'([a-z0-9_:]+)'\s*\)/gi)) {
           const perm = m[1];
@@ -159,7 +159,7 @@ export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
             aliases: [],
             extractor: "sql",
           });
-          addRel({ source: policy, predicate: "requires", target: perm, file_path: rel, commit, extractor: "sql" });
+          addRel({ source: policy, predicate: "requires", target: perm, file_path: rel, extractor: "sql" });
         }
         continue;
       }
@@ -169,9 +169,9 @@ export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
       if (trg) {
         const [, triggerRaw, trigTable, fn] = trg;
         const trigger = `${trigTable}.${triggerRaw}`;
-        addRel({ source: mig, predicate: "creates", target: trigger, file_path: rel, commit, extractor: "sql" });
+        addRel({ source: mig, predicate: "creates", target: trigger, file_path: rel, extractor: "sql" });
         if (entities.has(trigger) && entities.has(fn)) {
-          addRel({ source: trigger, predicate: "executes", target: fn, file_path: rel, commit, extractor: "sql" });
+          addRel({ source: trigger, predicate: "executes", target: fn, file_path: rel, extractor: "sql" });
         }
         continue;
       }
@@ -190,12 +190,12 @@ export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
           extractor: "sql",
           db_source: "chain",
         });
-        addRel({ source: mig, predicate: "creates", target: view, file_path: rel, commit, extractor: "sql" });
+        addRel({ source: mig, predicate: "creates", target: view, file_path: rel, extractor: "sql" });
         const bases = new Set<string>();
         for (const m of body.matchAll(/\b(?:from|join)\s+"?(?:public\.)?([a-z0-9_]+)"?/gi)) bases.add(m[1]);
         for (const base of bases) {
           if (base === view) continue;
-          addRel({ source: view, predicate: "derives_from", target: base, file_path: rel, commit, extractor: "sql" });
+          addRel({ source: view, predicate: "derives_from", target: base, file_path: rel, extractor: "sql" });
         }
         continue;
       }
@@ -203,12 +203,12 @@ export function runSqlPass(repoRoot: string, commit: string): SqlPassResult {
       // CREATE TABLE / FUNCTION -> provenance edges only (nodes come from snapshot)
       const tbl = /create\s+table\s+(?:if\s+not\s+exists\s+)?"?(?:public\.)?([a-z0-9_]+)"?/i.exec(stmt);
       if (tbl && entities.has(tbl[1])) {
-        addRel({ source: mig, predicate: "creates", target: tbl[1], file_path: rel, commit, extractor: "sql" });
+        addRel({ source: mig, predicate: "creates", target: tbl[1], file_path: rel, extractor: "sql" });
         continue;
       }
       const fn = /create\s+(?:or\s+replace\s+)?function\s+"?(?:public\.)?([a-z0-9_]+)"?/i.exec(stmt);
       if (fn && entities.has(fn[1])) {
-        addRel({ source: mig, predicate: "creates", target: fn[1], file_path: rel, commit, extractor: "sql" });
+        addRel({ source: mig, predicate: "creates", target: fn[1], file_path: rel, extractor: "sql" });
       }
     }
   }
