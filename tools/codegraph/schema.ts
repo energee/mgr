@@ -174,25 +174,29 @@ export type EntityProfile = z.infer<typeof EntityProfile>;
 // constants. Restricting the enum the model is allowed to return removes that
 // entire failure class at the API boundary.
 
-/** Predicates only the LLM can supply — no deterministic pass produces these. */
+/** Predicates only the LLM can supply.
+ *
+ * Measured on an 8-file slice 2026-08-11: given `handles` and `syncs_with`,
+ * gpt-5.3-codex-spark pushed ordinary call edges through them — 233 of 262
+ * edges were call-graph facts the AST pass already resolves exactly
+ * ("syncMalts handles upsertRows"). Restricting the enum stopped wrong TYPES,
+ * not wrong SEMANTICS; the model routes around a denied predicate rather than
+ * declining to emit the edge. Only these three survived the slice clean. */
 export const LLM_PREDICATES = [
-  "handles",
   "triggered_by",
-  "syncs_with",
   "documented_in",
   "verifies",
 ] as const;
 
 /** Entity types the LLM may introduce. Database objects are excluded: those
- *  come from the live catalog snapshot, which cannot be hallucinated. */
+ *  come from the live catalog snapshot, which cannot be hallucinated. MODULE,
+ *  SERVICE, JOB and CONFIG_KEY are excluded for the same reason as the dropped
+ *  predicates: in the slice they became stand-ins for code symbols the AST pass
+ *  already owns (33 sync functions typed JOB, TypeScript types typed MODULE). */
 export const LLM_ENTITY_TYPES = [
-  "MODULE",
   "API_ENDPOINT",
   "WEBHOOK",
-  "SERVICE",
   "EXTERNAL_SYSTEM",
-  "CONFIG_KEY",
-  "JOB",
   "DOC",
   "FEATURE",
 ] as const;
