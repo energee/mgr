@@ -142,7 +142,9 @@ function main(): void {
     console.log(`  [${i + 1}/${hubs.length}] ${profile ? "ok  " : "fail"} ${hub.name}`);
   }
 
-  save(root, { nodes: graph.nodes, links: graph.links }, graph.commit);
+  // Pass the loaded fingerprint through: this run only annotated nodes, so
+  // re-stamping inputs from the current tree would mark a stale graph fresh.
+  save(root, { nodes: graph.nodes, links: graph.links }, graph.commit, graph.inputs);
   console.log(`wrote ${written} profile(s) into ${GRAPH_PATH}`);
 }
 

@@ -79,14 +79,25 @@ export function inputFingerprint(repoRoot: string): { count: number; digest: str
   const dirty = new Set(
     git(["diff", "--name-only", "--", ...INPUT_GLOBS]).split("\n").filter(Boolean),
   );
-  const entries = staged.map((e) => {
-    if (!dirty.has(e.path)) return `${e.path}:${e.sha}`;
+  const hashOnDisk = (path: string) => {
     try {
-      return `${e.path}:${createHash("sha256").update(readFileSync(join(repoRoot, e.path))).digest("hex")}`;
+      return `${path}:${createHash("sha256").update(readFileSync(join(repoRoot, path))).digest("hex")}`;
     } catch {
-      return `${e.path}:DELETED`;
+      return `${path}:DELETED`;
     }
-  });
+  };
+  const entries = staged.map((e) =>
+    dirty.has(e.path) ? hashOnDisk(e.path) : `${e.path}:${e.sha}`,
+  );
+
+  // Untracked files are invisible to both commands above, yet a brand-new
+  // source file changes the graph as much as an edit does - without this a
+  // never-added file leaves the graph reporting "fresh" forever.
+  for (const path of git(["ls-files", "-o", "--exclude-standard", "--", ...INPUT_GLOBS])
+    .split("\n")
+    .filter(Boolean)) {
+    entries.push(hashOnDisk(path));
+  }
 
   entries.sort();
   return {
@@ -166,15 +177,24 @@ export function merge(parts: GraphPart[]): {
   };
 }
 
+/**
+ * `inputs` (the staleness fingerprint) is recomputed from the current tree by
+ * default, which is correct ONLY when the extraction passes just ran. A caller
+ * that merely annotates a loaded graph (summarize.ts) MUST pass the loaded
+ * graph's own `inputs` through - re-stamping from a tree that changed since
+ * the build would mark a stale graph fresh and permanently disable
+ * auto-refresh for it.
+ */
 export function save(
   repoRoot: string,
   graph: Omit<Graph, "commit" | "built_at">,
   commit: string,
+  inputs?: Graph["inputs"],
 ): Graph {
   const out: Graph = {
     commit,
     built_at: new Date().toISOString(),
-    inputs: inputFingerprint(repoRoot),
+    inputs: inputs ?? inputFingerprint(repoRoot),
     ...graph,
   };
   writeFileSync(join(repoRoot, GRAPH_PATH), JSON.stringify(out, null, 1));

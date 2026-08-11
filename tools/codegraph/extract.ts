@@ -22,7 +22,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { MODEL, codexExec } from "./codex";
 import {
@@ -159,7 +159,7 @@ export type LlmPassOptions = {
 export async function runLlmPass(
   repoRoot: string,
   opts: LlmPassOptions,
-): Promise<{ entities: StoredEntity[]; relations: StoredRelation[] }> {
+): Promise<{ entities: StoredEntity[]; relations: StoredRelation[]; failed: string[] }> {
   const cacheDir = join(repoRoot, CACHE_DIR);
   mkdirSync(cacheDir, { recursive: true });
 
@@ -167,6 +167,8 @@ export async function runLlmPass(
   writeFileSync(schemaPath, JSON.stringify(jsonSchema()));
 
   const entities: StoredEntity[] = [];
+  /** Files whose extraction failed on every attempt - NOT re-extracted. */
+  const failed: string[] = [];
   const relations: StoredRelation[] = [];
   const concurrency = opts.concurrency ?? 6;
   const timeoutMs = opts.timeoutMs ?? 240_000;
@@ -228,10 +230,17 @@ export async function runLlmPass(
       const cachePath = join(cacheDir, `${key}.json`);
 
       if (existsSync(cachePath)) {
-        const cached = LlmExtractedGraph.safeParse(
-          JSON.parse(readFileSync(cachePath, "utf8")).graph,
-        );
-        if (cached.success) {
+        // A corrupt entry (e.g. a write interrupted before the atomic rename
+        // existed) is a cache miss, not a crash that aborts the whole pass.
+        let cached: ReturnType<typeof LlmExtractedGraph.safeParse> | undefined;
+        try {
+          cached = LlmExtractedGraph.safeParse(
+            JSON.parse(readFileSync(cachePath, "utf8")).graph,
+          );
+        } catch {
+          cached = undefined;
+        }
+        if (cached?.success) {
           absorb(relPath, cached.data);
           opts.onProgress?.(++done, opts.files.length, relPath, true);
           continue;
@@ -262,8 +271,11 @@ export async function runLlmPass(
       }
 
       if (parsed) {
+        // Write-then-rename so an interrupted run never leaves a truncated
+        // cache entry behind.
+        const tmpPath = `${cachePath}.tmp`;
         writeFileSync(
-          cachePath,
+          tmpPath,
           JSON.stringify({
             file_path: relPath,
             content_sha: sha(raw),
@@ -271,7 +283,12 @@ export async function runLlmPass(
             graph: parsed,
           }),
         );
+        renameSync(tmpPath, cachePath);
         absorb(relPath, parsed);
+      } else {
+        // Both attempts failed: record it so callers do not treat this file as
+        // re-extracted - llmPart() would otherwise drop its cached facts.
+        failed.push(relPath);
       }
       opts.onProgress?.(++done, opts.files.length, relPath, false);
     }
@@ -282,7 +299,7 @@ export async function runLlmPass(
     Array.from({ length: Math.min(concurrency, queue.length) }, () => worker(queue)),
   );
 
-  return { entities, relations };
+  return { entities, relations, failed };
 }
 
 /** The LLM corpus: files a parser cannot interpret. Everything else is

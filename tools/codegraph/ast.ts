@@ -76,6 +76,17 @@ export function runAstPass(repoRoot: string) {
   const inRepo = (f: string) => f.startsWith(repoRoot) && !f.includes("node_modules");
   const relOf = (f: string) => relative(repoRoot, f);
 
+  // For tested_by resolution: the set of real source paths, and non-test
+  // sources indexed by basename for tests that are not directory-adjacent.
+  const srcPaths = files.map(relOf).filter((p) => p.startsWith("src/"));
+  const srcSet = new Set(srcPaths);
+  const byBasename = new Map<string, string[]>();
+  for (const p of srcPaths) {
+    if (classify(p) === "TEST") continue;
+    const b = basename(p);
+    (byBasename.get(b) ?? byBasename.set(b, []).get(b)!).push(p);
+  }
+
   for (const sf of program.getSourceFiles()) {
     if (sf.isDeclarationFile || !inRepo(sf.fileName)) continue;
     const path = relOf(sf.fileName);
@@ -94,13 +105,24 @@ export function runAstPass(repoRoot: string) {
       extractor: "ast",
     });
 
-    // tested_by: src/foo/bar.ts <- src/foo/__tests__/bar.test.ts
+    // tested_by: prefer the directory-adjacent subject
+    // (src/foo/__tests__/bar.test.ts -> src/foo/bar.ts); when none exists,
+    // fall back to a unique-basename match anywhere under src/ - unique,
+    // because guessing between two same-named files would mint a wrong edge in
+    // an exact-by-construction pass. Known limit: flow tests with no same-named
+    // subject (src/__tests__/integration/*) get no edge - name matching cannot
+    // say what a multi-module test covers.
     if (kind === "TEST") {
       const subject = basename(path).replace(/\.(test|spec)\.(tsx?)$/, ".$2");
-      const parent = dirname(dirname(path));
-      for (const ext of [".ts", ".tsx"]) {
-        const cand = `${parent}/${subject.replace(/\.tsx?$/, ext)}`;
-        rel({ source: cand, predicate: "tested_by", target: path, file_path: path, extractor: "ast" });
+      const adjacent = [".ts", ".tsx"]
+        .map((ext) => `${dirname(dirname(path))}/${subject.replace(/\.tsx?$/, ext)}`)
+        .find((cand) => srcSet.has(cand));
+      const matches = [".ts", ".tsx"].flatMap(
+        (ext) => byBasename.get(subject.replace(/\.tsx?$/, ext)) ?? [],
+      );
+      const target = adjacent ?? (matches.length === 1 ? matches[0] : undefined);
+      if (target) {
+        rel({ source: target, predicate: "tested_by", target: path, file_path: path, extractor: "ast" });
       }
     }
 

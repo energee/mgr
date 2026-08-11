@@ -132,6 +132,16 @@ async function main(): Promise<void> {
   ) as { cases: GoldCase[] };
 
   const cases = only ? gold.cases.filter((c) => c.extractor === only) : gold.cases;
+  // A gate that scores nothing must not pass: a typo'd flag ("--asy") or a
+  // renamed extractor field would otherwise print "0 case(s)" and exit 0.
+  if (cases.length === 0) {
+    console.error(
+      only
+        ? `no gold cases for extractor "${only}" - known: ${[...new Set(gold.cases.map((c) => c.extractor))].join(", ")}`
+        : "gold.json contains no cases",
+    );
+    process.exit(2);
+  }
   const rows: { label: string; ent: Score; rel: Score }[] = [];
 
   for (const c of cases) {
@@ -162,11 +172,13 @@ async function main(): Promise<void> {
   console.log(`  entity   F1 ${pct(mean(rows.map((r) => r.ent.f1)))}`);
   console.log(`  relation F1 ${pct(mean(rows.map((r) => r.rel.f1)))}`);
 
-  // Non-zero exit on any regression to zero, so this can gate CI later.
-  const broken = rows.filter((r) => r.ent.f1 === 0 || r.rel.f1 === 0);
+  // The gold sets are exact specifications and score 100% by construction, so
+  // ANY drop is a regression - gating only on f1 === 0 let an 80% edge loss
+  // ride through green.
+  const broken = rows.filter((r) => r.ent.f1 < 1 || r.rel.f1 < 1);
   if (broken.length) {
     console.error(
-      `\n${broken.length} case(s) scored zero: ${broken.map((b) => b.label).join(", ")}`,
+      `\n${broken.length} case(s) scored below 100%: ${broken.map((b) => b.label).join(", ")}`,
     );
     process.exit(1);
   }

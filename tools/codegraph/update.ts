@@ -28,15 +28,26 @@ import { execFileSync } from "node:child_process";
 import { runLlmPass, llmCorpus } from "./extract";
 import { rebuild, gitCommit, tryLoad, isStale, GRAPH_PATH, type GraphPart } from "./store";
 
-/** Files changed between `ref` and HEAD, repo-relative. */
+/**
+ * Files changed since `ref`, repo-relative: the committed diff PLUS the
+ * working tree (uncommitted edits and untracked files). Committed-only was a
+ * bug: an uncommitted rewrite of a corpus file kept its stale LLM edges while
+ * this tool reported success.
+ */
 function changedFiles(repoRoot: string, ref: string): string[] {
   // execFile with an argument array - `ref` comes from argv, so never build a
   // shell string out of it.
-  const out = execFileSync("git", ["diff", "--name-only", `${ref}..HEAD`], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
-  return out.split("\n").filter(Boolean);
+  const run = (args: string[]) =>
+    execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" })
+      .split("\n")
+      .filter(Boolean);
+  return [
+    ...new Set([
+      ...run(["diff", "--name-only", `${ref}..HEAD`]),
+      ...run(["diff", "--name-only", "HEAD"]),
+      ...run(["ls-files", "-o", "--exclude-standard"]),
+    ]),
+  ];
 }
 
 async function main(): Promise<void> {
@@ -92,14 +103,20 @@ async function main(): Promise<void> {
             return { fresh: none, reExtracted: new Set<string>() };
           }
           console.log(`  llm: ${targets.length} file(s) (cache skips unchanged)`);
+          const fresh = await runLlmPass(root, {
+            files: targets,
+            knownEndpoints,
+            onProgress: (d, t, f, cached) =>
+              console.log(`    [${d}/${t}] ${cached ? "cached" : "ran   "} ${f}`),
+          });
+          // Only files that actually produced output count as re-extracted:
+          // marking a failed file re-extracted would make llmPart() drop its
+          // previously cached facts on a run that reports success.
+          const failed = new Set(fresh.failed);
+          for (const f of fresh.failed) console.error(`  llm: FAILED ${f} (cached facts kept)`);
           return {
-            fresh: await runLlmPass(root, {
-              files: targets,
-              knownEndpoints,
-              onProgress: (d, t, f, cached) =>
-                console.log(`    [${d}/${t}] ${cached ? "cached" : "ran   "} ${f}`),
-            }),
-            reExtracted: new Set(targets),
+            fresh,
+            reExtracted: new Set(targets.filter((f) => !failed.has(f))),
           };
         }
       : undefined,
