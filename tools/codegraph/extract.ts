@@ -120,11 +120,25 @@ const typeOk = (want: string, got: string | undefined): boolean => {
   return got === want;
 };
 
-/** A DOC must be an actual document path; a FEATURE an actual tracker id.
- *  Without this the model uses them as generic buckets for code symbols. */
-function entityShapeOk(e: { name: string; type: string }): boolean {
+/** A DOC must be an actual document path; a FEATURE an actual tracker id; an
+ *  endpoint must be one the AST pass actually found on disk.
+ *
+ *  The endpoint check is not paranoia. On the first full run the model produced
+ *  `POST /api/webhooks/qbo` and `POST /functions/v1/square-webhook` - neither
+ *  exists - plus `Square payment webhook`, a prose label rather than a path.
+ *  A fabricated endpoint node is the worst thing this graph can contain: every
+ *  multi-hop answer routed through it inherits the fiction. The AST pass has
+ *  already enumerated every real route, so the set is free and exact. */
+function entityShapeOk(
+  e: { name: string; type: string },
+  knownEndpoints?: Set<string>,
+): boolean {
   if (e.type === "DOC") return /\.(md|mdx)$/i.test(e.name);
   if (e.type === "FEATURE") return /^F\d{3}$/.test(e.name);
+  if (e.type === "API_ENDPOINT" || e.type === "WEBHOOK") {
+    if (!knownEndpoints) return /^[A-Z]+ \//.test(e.name);
+    return knownEndpoints.has(e.name);
+  }
   return true;
 }
 
@@ -178,6 +192,8 @@ export type LlmPassOptions = {
   commit: string;
   concurrency?: number;
   timeoutMs?: number;
+  /** Endpoint names the AST pass found. LLM endpoints not in here are dropped. */
+  knownEndpoints?: Set<string>;
   onProgress?: (done: number, total: number, file: string, cached: boolean) => void;
 };
 
@@ -198,7 +214,7 @@ export async function runLlmPass(
   let done = 0;
 
   const absorb = (relPath: string, parsed: LlmExtractedGraph) => {
-    const kept = parsed.entities.filter(entityShapeOk);
+    const kept = parsed.entities.filter((e) => entityShapeOk(e, opts.knownEndpoints));
     const typeOfName = new Map(kept.map((e) => [e.name, e.type as string]));
 
     const accepted: StoredRelation[] = [];

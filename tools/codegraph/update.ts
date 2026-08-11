@@ -78,7 +78,16 @@ async function main(): Promise<void> {
   );
 
   const t0 = Date.now();
-  const parts = [runSqlPass(root, head), runAstPass(root, head)];
+  const sql = runSqlPass(root, head);
+  const ast = runAstPass(root, head);
+  const parts = [sql, ast];
+  // The AST pass is the authority on which endpoints exist; the LLM pass is
+  // held to it so it cannot invent routes.
+  const knownEndpoints = new Set(
+    ast.entities
+      .filter((e) => e.type === "API_ENDPOINT" || e.type === "WEBHOOK")
+      .map((e) => e.name),
+  );
 
   if (withLlm) {
     const corpus = llmCorpus(root);
@@ -94,6 +103,7 @@ async function main(): Promise<void> {
         await runLlmPass(root, {
           files: targets,
           commit: head,
+          knownEndpoints,
           onProgress: (d, t, f, cached) =>
             console.log(`    [${d}/${t}] ${cached ? "cached" : "ran   "} ${f}`),
         }),
