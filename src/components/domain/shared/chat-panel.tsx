@@ -2,9 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { isToolUIPart } from "ai";
 import type { ToolUIPart, DynamicToolUIPart } from "ai";
-import { User, Maximize2, Minimize2, ExternalLink } from "lucide-react";
+import {
+  User,
+  Maximize2,
+  Minimize2,
+  ExternalLink,
+  Check,
+  X,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -45,6 +54,8 @@ import {
 } from "@/components/ai-elements/tool";
 import { cn } from "@/lib/utils";
 import { useChatContext } from "@/contexts/chat-context";
+import { batchKeys } from "@/lib/query-keys";
+import type { ConfirmWriteIntent } from "@/lib/schemas/chat-write";
 
 function isNavigationIntent(result: unknown): result is NavigationIntent {
   return (
@@ -52,6 +63,96 @@ function isNavigationIntent(result: unknown): result is NavigationIntent {
     result !== null &&
     "action" in result &&
     (result as Record<string, unknown>).action === "navigate"
+  );
+}
+
+function isConfirmWriteIntent(result: unknown): result is ConfirmWriteIntent {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "action" in result &&
+    (result as Record<string, unknown>).action === "confirm_write"
+  );
+}
+
+type ConfirmWriteStatus = "idle" | "saving" | "saved" | "dismissed";
+
+/**
+ * Confirmation gate for AI-proposed writes (Phase 4C). The tool only
+ * proposed the write; nothing is persisted until the user clicks Confirm,
+ * which POSTs the pending payload to /api/chat/write (executed under the
+ * user's session, so RLS is the authority).
+ *
+ * ponytail: status lives in component state, so a remount (panel closed and
+ * reopened mid-conversation) re-offers Confirm on an already-saved card;
+ * readings are append-only, worst case is a duplicate reading the user can
+ * delete. Persist confirmed toolCallIds in the chat context if that bites.
+ */
+function ConfirmWriteCard({ intent }: { intent: ConfirmWriteIntent }) {
+  const [status, setStatus] = useState<ConfirmWriteStatus>("idle");
+  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const confirm = async () => {
+    setStatus("saving");
+    setError(null);
+    try {
+      const res = await fetch("/api/chat/write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          writeAction: intent.writeAction,
+          params: intent.params,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error?.message ?? `Request failed (${res.status})`);
+      }
+      setStatus("saved");
+      queryClient.invalidateQueries({
+        queryKey: batchKeys.readings(intent.params.batchId),
+      });
+    } catch (e) {
+      setStatus("idle");
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    }
+  };
+
+  return (
+    <div className="rounded-lg border bg-muted/50 p-3 text-sm">
+      <p className="mb-2 text-foreground">{intent.description}</p>
+      {status === "saved" ? (
+        <p className="flex items-center gap-1.5 text-emerald-600">
+          <Check className="h-3.5 w-3.5" /> Saved
+        </p>
+      ) : status === "dismissed" ? (
+        <p className="text-muted-foreground">Dismissed — nothing was saved.</p>
+      ) : (
+        <>
+          {error && <p className="mb-2 text-destructive">{error}</p>}
+          <div className="flex gap-2">
+            <Button size="sm" onClick={confirm} disabled={status === "saving"}>
+              {status === "saving" ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Check className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Confirm
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setStatus("dismissed")}
+              disabled={status === "saving"}
+            >
+              <X className="mr-1.5 h-3.5 w-3.5" />
+              Cancel
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -85,6 +186,8 @@ const TOOL_TITLES: Record<string, string> = {
   transitionBatch: "Transition Batch",
   addBatchReading: "Add Reading",
   createPackagingSession: "Create Packaging Session",
+  // Confirm-gated write tools
+  recordBatchReading: "Record Reading",
 };
 
 export function ChatPanel() {
@@ -187,6 +290,19 @@ export function ChatPanel() {
                         const toolPart = part as
                           | ToolUIPart
                           | DynamicToolUIPart;
+
+                        // ConfirmWriteIntent outputs render as confirm cards
+                        if (
+                          toolPart.state === "output-available" &&
+                          isConfirmWriteIntent(toolPart.output)
+                        ) {
+                          return (
+                            <ConfirmWriteCard
+                              key={`${message.id}-${i}`}
+                              intent={toolPart.output}
+                            />
+                          );
+                        }
 
                         // NavigationIntent outputs render as action cards
                         if (
