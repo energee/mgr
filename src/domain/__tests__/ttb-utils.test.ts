@@ -629,7 +629,7 @@ describe("summary card scope note (issue #670)", () => {
 
 describe("disclosure text shared by screen, CSV and print (issue #618)", () => {
   it("describes the in-process figures as period-end balances from the audit trail, naming the period", () => {
-    // Migration 00286 keys the in-process terms on batch status *history*
+    // Migration 00287 keys the in-process terms on batch status *history*
     // (entity_revisions) at the period boundaries, so the old "current
     // snapshot" caveat would now be false: closed months ARE reproducible.
     const note = getInProcessBalanceNote("June 2026");

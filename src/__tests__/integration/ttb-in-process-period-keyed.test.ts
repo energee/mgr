@@ -3,14 +3,14 @@
  * (issue #618).
  *
  * Behavioral (real Postgres) regression for the Form 5130.9 beer-in-process
- * line. Pre-00286, `get_ttb_inventory_summary`'s `ip_ending` summed
+ * line. Pre-00287, `get_ttb_inventory_summary`'s `ip_ending` summed
  * `batches.volume_bbl` for every batch *currently* in fermenting/conditioning/
  * packaging with no date filter at all, and `ip_beginning` filtered that same
  * present-tense set by `created_at` — so re-running a closed month returned a
  * different number every time a batch changed status, and a month's ending
  * never had to equal the next month's beginning.
  *
- * Migration 00286 reconstructs each batch's recorded status at the period
+ * Migration 00287 reconstructs each batch's recorded status at the period
  * boundaries from `entity_revisions` (the audit trail migration 00019 has kept
  * on batches since before any TTB data existed), which is issue #618's
  * option 1: closed months become reproducible, and both boundaries are the
@@ -132,7 +132,7 @@ describe("get_ttb_inventory_summary — period-keyed in-process terms (issue #61
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      // Pre-00286 ip_beginning required the batch's CURRENT status to be
+      // Pre-00287 ip_beginning required the batch's CURRENT status to be
       // in-process; a batch fermenting on March 1 that completed on March 20
       // was dropped from March's beginning balance.
       await seedBatchHistory(client, "TTB618B", 7.5, [

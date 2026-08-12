@@ -65,11 +65,11 @@ export function getTaxClassLabel(taxClass: string): string {
 
 /**
  * Label for the in-process (cellar) volume line, shared by the report page, the
- * CSV export, and the print view. Since migration 00286 (issue #618) the figure
+ * CSV export, and the print view. Since migration 00287 (issue #618) the figure
  * is a genuine period-end balance: batch status is reconstructed at the period
  * boundary from the audit trail (`entity_revisions`), so re-running a closed
  * month returns the same number no matter what has happened to those batches
- * since. (Before 00286 this line was labelled "Current Snapshot", because the
+ * since. (Before 00287 this line was labelled "Current Snapshot", because the
  * old SQL summed whatever is fermenting/conditioning/packaging *right now*.)
  */
 export const IN_PROCESS_LABEL = "In Process (End of Period)";
@@ -274,7 +274,7 @@ export function validateEndingInventory(row: TTBReportRow): boolean {
  * trains the reader to ignore the one signal that would catch a real arithmetic
  * break in the keg/bottled rows.
  *
- * The in-process terms themselves ARE period-keyed since migration 00286
+ * The in-process terms themselves ARE period-keyed since migration 00287
  * (issue #618): batch status is reconstructed at each period boundary from
  * `entity_revisions`, so closed months are reproducible and a month's
  * in-process ending equals the next month's beginning. Cellar nevertheless

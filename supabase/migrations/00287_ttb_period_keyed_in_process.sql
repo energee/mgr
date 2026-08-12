@@ -1,5 +1,5 @@
 -- =============================================================================
--- 00286: TTB in-process terms — period-keyed history, not a status snapshot
+-- 00287: TTB in-process terms — period-keyed history, not a status snapshot
 -- =============================================================================
 -- Issue #618 (unblocks #698). NOT applied live from this branch — deploy via
 -- scripts/db-push.sh after merge.

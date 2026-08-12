@@ -180,7 +180,7 @@ export function buildTTBReportCSV(
     createDataRow("Ending Inventory", reportData, "ending_inventory_bbl"),
     labelRow(""),
     // In-process volumes are period-end balances reconstructed from the batch
-    // audit trail (migration 00286, issue #618).
+    // audit trail (migration 00287, issue #618).
     labelRow("BEER IN PROCESS (END OF PERIOD)"),
     createDataRow(IN_PROCESS_LABEL, reportData, "in_process_ending_bbl"),
   ];

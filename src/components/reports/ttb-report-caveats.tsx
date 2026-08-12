@@ -7,7 +7,7 @@
  *  1. the in-process note (`inProcessNote`) — how the in-process figure was
  *     measured. The `get_ttb_report` card passes `getInProcessBalanceNote`
  *     (period-end balances reconstructed from the batch audit trail, migration
- *     00286 / issue #618); the legacy batch-volume fallback passes
+ *     00287 / issue #618); the legacy batch-volume fallback passes
  *     `getLegacyInProcessSnapshotCaveat`, because its figure is still a live
  *     client-side snapshot;
  *  2. the accounting-identity disclosure — which tax classes were *not* checked,

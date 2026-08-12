@@ -21,7 +21,7 @@
  * reference, and beer leaves the cellar by being packaged, a movement the
  * removals lines deliberately do not report. The in-process columns themselves
  * are period-end balances reconstructed from the batch audit trail (migration
- * 00286, issue #618) on the get_ttb_report path; the legacy fallback's figure
+ * 00287, issue #618) on the get_ttb_report path; the legacy fallback's figure
  * is still a live client-side batch sum, so the two cards carry different
  * in-process notes via TTBReportCaveats. Exempt tax classes are labelled as
  * "not checked" in the UI instead of raising the warning, which would otherwise

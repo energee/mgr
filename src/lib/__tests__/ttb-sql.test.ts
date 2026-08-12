@@ -71,7 +71,7 @@ describe("get_ttb_inventory_summary in-process period keying (issue #618)", () =
   const body = latestFunctionBody("get_ttb_inventory_summary");
 
   it("derives the in-process terms from batch status HISTORY, not the live batches table", () => {
-    // Pre-00286, ip_ending summed `batches.volume_bbl WHERE status IN (...)`
+    // Pre-00287, ip_ending summed `batches.volume_bbl WHERE status IN (...)`
     // with no date filter at all — a live snapshot, so re-running a closed
     // month returned a different number every time a batch changed status.
     // The period-keyed definition reconstructs status at the period boundaries

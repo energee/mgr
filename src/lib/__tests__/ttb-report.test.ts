@@ -419,7 +419,7 @@ describe("buildTTBReportCSV", () => {
   ];
 
   it("labels the in-process line as an end-of-period balance", () => {
-    // Period-keyed since migration 00286 (issue #618): the CSV comes from
+    // Period-keyed since migration 00287 (issue #618): the CSV comes from
     // get_ttb_report, whose in-process terms are reconstructed at the period
     // boundaries from the batch audit trail — not a live snapshot.
     const csv = buildTTBReportCSV(rows, 2026, 6);
