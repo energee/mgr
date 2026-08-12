@@ -12,17 +12,20 @@
  *
  * Each row is run through the form's two accounting identities
  * (checkRowIdentities from @/domain/ttb-utils) unless its tax class is on the
- * exemption list; failures render a visible warning so a non-balancing report is
- * never silently filed.
+ * exemption list, and the Total column is cross-footed as a whole
+ * (checkTotalColumnCrossFoot, issue #698); failures render a visible warning so
+ * a non-balancing report is never silently filed.
  *
- * The cellar row is the one exempt class — exempt rather than passed: its volume
- * lives in the in-process columns, which the identities do not reference, and
- * those columns are a live snapshot of batches currently in fermenting/
- * conditioning/packaging — not a period-end balance (issue #618). Exempt tax
- * classes are labelled as "not checked" in the UI instead of raising the
- * warning, which would otherwise fire on every month an active brewery has.
- * Both summary cards below (the get_ttb_report table and the legacy fallback)
- * carry that caveat via TTBReportCaveats.
+ * The cellar row is the one exempt class — exempt rather than passed: its
+ * volume lives in the in-process columns, which the identities do not
+ * reference, and beer leaves the cellar by being packaged, a movement the
+ * removals lines deliberately do not report. The in-process columns themselves
+ * are period-end balances reconstructed from the batch audit trail (migration
+ * 00287, issue #618) on the get_ttb_report path; the legacy fallback's figure
+ * is still a live client-side batch sum, so the two cards carry different
+ * in-process notes via TTBReportCaveats. Exempt tax classes are labelled as
+ * "not checked" in the UI instead of raising the warning, which would otherwise
+ * fire on every month an active brewery has.
  *
  * The Total column is scoped per line, not per column (issue #670, see
  * TOTAL_SCOPE_BY_COLUMN in @/domain/ttb-utils). Part I's inventory and
@@ -47,14 +50,18 @@ import {
   MONTHS,
   calculateTotals,
   checkRowIdentities,
+  checkTotalColumnCrossFoot,
   collectIdentityFailures,
   collectIdentityExemptions,
   formatIdentityExemptionDisclosure,
+  getInProcessBalanceNote,
+  getLegacyInProcessSnapshotCaveat,
   getSummaryCardScopeNote,
   getTotalScopeCaveat,
   totalScopedLineLabel,
   TOTAL_COLUMN_LABEL,
-  IN_PROCESS_SNAPSHOT_LABEL,
+  IN_PROCESS_LABEL,
+  LEGACY_IN_PROCESS_SNAPSHOT_LABEL,
   EMPTY_TOTALS,
   type TTBReportRow,
 } from "@/domain/ttb-utils";
@@ -264,7 +271,15 @@ export default function TTBReportPage() {
   // legacy fallback (no rows) renders neither.
   const totalScopeCaveat = getTotalScopeCaveat(reportData ?? []);
   const summaryCardScopeNote = getSummaryCardScopeNote(reportData ?? []);
-  const identityFailures = collectIdentityFailures(identityChecks);
+  // The Total column's own cross-foot check (issue #698): ending must equal
+  // available − removals once the exempt classes' removals — which draw down
+  // the beer-in-process line, not packaged inventory — are added back. Surfaced
+  // through the same "review before filing" alert as the per-row identities.
+  const crossFootFailure = checkTotalColumnCrossFoot(reportData ?? []);
+  const identityFailures = [
+    ...collectIdentityFailures(identityChecks),
+    ...(crossFootFailure ? [crossFootFailure] : []),
+  ];
   const identityExemptions = collectIdentityExemptions(identityChecks);
 
   return (
@@ -678,11 +693,11 @@ export default function TTBReportPage() {
                 {/* In-Process — a live snapshot, not a period-end balance (#618) */}
                 <TableRow className="bg-muted/50">
                   <TableCell colSpan={reportData.length + 2} className="font-semibold">
-                    Beer in Process (Cellar) — current snapshot
+                    Beer in Process (Cellar) — end of period
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell>{IN_PROCESS_SNAPSHOT_LABEL}</TableCell>
+                  <TableCell>{IN_PROCESS_LABEL}</TableCell>
                   {reportData.map((row) => (
                     <TableCell key={row.ttb_tax_class} className="text-right font-mono">
                       {formatTtbBbl(row.in_process_ending_bbl)}
@@ -696,7 +711,7 @@ export default function TTBReportPage() {
             </Table>
             </div>
             <TTBReportCaveats
-              periodLabel={`${monthName} ${year}`}
+              inProcessNote={getInProcessBalanceNote(`${monthName} ${year}`)}
               identityDisclosure={formatIdentityExemptionDisclosure(identityExemptions)}
               totalColumnCaveat={totalScopeCaveat ?? undefined}
             />
@@ -749,18 +764,22 @@ export default function TTBReportPage() {
                     <TableCell></TableCell>
                   </TableRow>
                   <TableRow>
-                    {/* Snapshot of batches in process now, not a month-end balance (#618) */}
-                    <TableCell className="pl-6">{IN_PROCESS_SNAPSHOT_LABEL}</TableCell>
+                    {/* The fallback's figure is a live client-side batch sum —
+                        a snapshot, unlike the period-keyed get_ttb_report card
+                        above (#618) — so it keeps the snapshot label. */}
+                    <TableCell className="pl-6">{LEGACY_IN_PROCESS_SNAPSHOT_LABEL}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatTtbBbl(batchData?.inProgressVolume)}
                     </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
-              {/* Same caveat the get_ttb_report card carries: the honest label
-                  never ships without the honest explanation (issue #618). */}
+              {/* The honest label never ships without the honest explanation
+                  (issue #618) — and this card's explanation is the SNAPSHOT
+                  one, because the fallback figure is a live batch sum, not the
+                  period-keyed SQL balance. */}
               <TTBReportCaveats
-                periodLabel={`${monthName} ${year}`}
+                inProcessNote={getLegacyInProcessSnapshotCaveat(`${monthName} ${year}`)}
                 identityDisclosure={LEGACY_NO_IDENTITY_CHECKS_NOTE}
               />
               </>

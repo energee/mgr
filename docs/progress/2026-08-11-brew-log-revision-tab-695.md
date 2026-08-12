@@ -1,0 +1,1 @@
+- **2026-08-11 (brew-log revision tab removed).** Deleted the permanently-empty Revision History section from `src/entities/brew-log/presentation.tsx` — `brew_logs` has no `log_entity_revision()` trigger, so the tab could never show data (#695).

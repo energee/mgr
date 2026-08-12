@@ -1,0 +1,323 @@
+/**
+ * LLM extraction pass.
+ *
+ * Runs only on files no parser can interpret, and is allowed to emit only the
+ * predicates and entity types no parser can produce (LLM_PREDICATES /
+ * LLM_ENTITY_TYPES in schema.ts). The AST and SQL passes own every structural
+ * and data-access edge exactly, so letting the model restate them would add
+ * competing, occasionally-wrong duplicates.
+ *
+ * Transport is `codex exec` rather than an HTTP API: it authenticates against
+ * the ChatGPT subscription already on this machine (no ANTHROPIC_API_KEY is
+ * present here), and its --output-schema flag enforces the JSON Schema
+ * server-side, which is what `claude -p` cannot do.
+ *
+ * Two hard-won invocation details, both measured 2026-08-11:
+ *   - stdin MUST be closed. Without it codex blocks forever on
+ *     "Reading additional input from stdin..." and never calls the API.
+ *   - `minimal` effort does not exist on these models; `low` is the floor.
+ *
+ * Results are cached by content hash so re-runs and incremental updates skip
+ * unchanged files entirely.
+ */
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { MODEL, codexExec } from "./codex";
+import {
+  LLM_ENTITY_TYPES,
+  LLM_PREDICATES,
+  LlmExtractedGraph,
+  type StoredEntity,
+  type StoredRelation,
+} from "./schema";
+
+/** Bumping this invalidates every cache entry - do it when the prompt changes. */
+const PROMPT_VERSION = 3;
+
+const CACHE_DIR = "tools/codegraph/llm-cache";
+
+/** Per-file input cap. Larger files are truncated with an explicit marker so
+ *  the model knows it is seeing a prefix rather than silently inventing the
+ *  rest - that truncation is what sent spark off reading the repo in testing. */
+const MAX_BYTES = 40_000;
+
+const SYSTEM = `Extract a knowledge graph from one file of a brewery-management codebase (Next.js + Supabase).
+
+Extract ONLY what this file makes true. Every relation must connect two entities you extracted. Descriptions are one line, grounded in this file, written to disambiguate it from same-named things elsewhere. Use identifiers that literally appear in the file - never invent or abbreviate a name. Bias hard toward precision: a wrong edge propagates through multi-hop queries, a missing one does not.
+
+Name an API_ENDPOINT or WEBHOOK as "VERB /path" (e.g. "POST /api/square/webhook") so handlers in different routes never collide.
+
+A WEBHOOK is a handler for an event originating outside this system; give it a triggered_by edge from the EXTERNAL_SYSTEM that fires it.
+
+Do not describe imports, function calls, database reads/writes, or SQL objects. Those are extracted separately by a parser and are not yours to report.
+
+Do NOT relate two things defined inside this same file to each other - that is the parser's job, and dressing a function call up as one of the predicates above corrupts the graph. Every relation you emit should cross a boundary this file sits on: an external system that triggers it, a document that describes it, or a feature it verifies.
+
+Most files yield only one or two entities, and many yield no relations at all. Returning empty arrays is the correct answer far more often than not.`;
+
+function jsonSchema(): unknown {
+  const entity = {
+    type: "object",
+    additionalProperties: false,
+    required: ["name", "type", "description", "file_path"],
+    properties: {
+      name: { type: "string" },
+      type: { type: "string", enum: [...LLM_ENTITY_TYPES] },
+      description: { type: "string" },
+      file_path: { type: "string" },
+    },
+  };
+  const relation = {
+    type: "object",
+    additionalProperties: false,
+    required: ["source", "predicate", "target"],
+    properties: {
+      source: { type: "string" },
+      predicate: { type: "string", enum: [...LLM_PREDICATES] },
+      target: { type: "string" },
+    },
+  };
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["entities", "relations"],
+    properties: {
+      entities: { type: "array", items: entity },
+      relations: { type: "array", items: relation },
+    },
+  };
+}
+
+
+/**
+ * Typed-edge constraints.
+ *
+ * Each LLM predicate has exactly one legal (domain, range) pair. In the slice
+ * every `triggered_by` came back reversed ("Square triggered_by the webhook"),
+ * so rather than re-prompt for direction we flip anything that matches the
+ * inverse and drop what matches neither. Deterministic, and it cannot regress.
+ */
+const EDGE_TYPES: Record<string, { from: string; to: string }> = {
+  // The handler is triggered by the outside system, never the reverse.
+  triggered_by: { from: "WEBHOOK", to: "EXTERNAL_SYSTEM" },
+  // The thing points at the doc that describes it. The source must NOT itself
+  // be a DOC: "db-security.md documented_in architecture.md" is a true citation
+  // but the wrong predicate - documented_in means "this code or database object
+  // is described in that doc". Doc-to-doc citation would need its own predicate.
+  documented_in: { from: "!DOC", to: "DOC" },
+  // A feature is verified by a test/doc, so the feature is the source.
+  verifies: { from: "FEATURE", to: "*" },
+};
+
+/** `*` = any known type, `!X` = any known type except X, otherwise exact match. */
+const typeOk = (want: string, got: string | undefined): boolean => {
+  if (got === undefined) return false;
+  if (want === "*") return true;
+  if (want.startsWith("!")) return got !== want.slice(1);
+  return got === want;
+};
+
+/** A DOC must be an actual document path; a FEATURE an actual tracker id; an
+ *  endpoint must be one the AST pass actually found on disk.
+ *
+ *  The endpoint check is not paranoia. On the first full run the model produced
+ *  `POST /api/webhooks/qbo` and `POST /functions/v1/square-webhook` - neither
+ *  exists - plus `Square payment webhook`, a prose label rather than a path.
+ *  A fabricated endpoint node is the worst thing this graph can contain: every
+ *  multi-hop answer routed through it inherits the fiction. The AST pass has
+ *  already enumerated every real route, so the set is free and exact. */
+function entityShapeOk(
+  e: { name: string; type: string },
+  knownEndpoints?: Set<string>,
+): boolean {
+  if (e.type === "DOC") return /\.(md|mdx)$/i.test(e.name);
+  if (e.type === "FEATURE") return /^F\d{3}$/.test(e.name);
+  if (e.type === "API_ENDPOINT" || e.type === "WEBHOOK") {
+    if (!knownEndpoints) return /^[A-Z]+ \//.test(e.name);
+    return knownEndpoints.has(e.name);
+  }
+  return true;
+}
+
+const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+
+function cacheKey(relPath: string, content: string): string {
+  return sha(`${PROMPT_VERSION} ${MODEL} ${relPath} ${content}`);
+}
+
+export type LlmPassOptions = {
+  files: string[];
+  concurrency?: number;
+  timeoutMs?: number;
+  /** Endpoint names the AST pass found. LLM endpoints not in here are dropped. */
+  knownEndpoints?: Set<string>;
+  onProgress?: (done: number, total: number, file: string, cached: boolean) => void;
+};
+
+export async function runLlmPass(
+  repoRoot: string,
+  opts: LlmPassOptions,
+): Promise<{ entities: StoredEntity[]; relations: StoredRelation[]; failed: string[] }> {
+  const cacheDir = join(repoRoot, CACHE_DIR);
+  mkdirSync(cacheDir, { recursive: true });
+
+  const schemaPath = join(cacheDir, "_schema.json");
+  writeFileSync(schemaPath, JSON.stringify(jsonSchema()));
+
+  const entities: StoredEntity[] = [];
+  /** Files whose extraction failed on every attempt - NOT re-extracted. */
+  const failed: string[] = [];
+  const relations: StoredRelation[] = [];
+  const concurrency = opts.concurrency ?? 6;
+  const timeoutMs = opts.timeoutMs ?? 240_000;
+  let done = 0;
+
+  const absorb = (relPath: string, parsed: LlmExtractedGraph) => {
+    const kept = parsed.entities.filter((e) => entityShapeOk(e, opts.knownEndpoints));
+    const typeOfName = new Map(kept.map((e) => [e.name, e.type as string]));
+
+    const accepted: StoredRelation[] = [];
+    for (const r of parsed.relations) {
+      // No orphaned edges: the model is told this, but enforce it too.
+      if (!typeOfName.has(r.source) || !typeOfName.has(r.target)) continue;
+      const rule = EDGE_TYPES[r.predicate];
+      if (!rule) continue;
+      const st = typeOfName.get(r.source);
+      const tt = typeOfName.get(r.target);
+      let { source, target } = r;
+      if (!(typeOk(rule.from, st) && typeOk(rule.to, tt))) {
+        // Reversed? Flip it. Otherwise the edge is unsalvageable - drop it.
+        if (typeOk(rule.from, tt) && typeOk(rule.to, st)) {
+          [source, target] = [r.target, r.source];
+        } else {
+          continue;
+        }
+      }
+      accepted.push({
+        source,
+        predicate: r.predicate,
+        target,
+        file_path: relPath,
+        extractor: "llm",
+      });
+    }
+
+    // Drop entities left with no surviving edge. This pass exists to contribute
+    // boundary RELATIONS; a node it introduced that connects to nothing adds no
+    // reachability and is usually a passing mention the model turned into a
+    // node (a doc citing another doc, an integration named in prose). The
+    // file's own node is exempt - it is the anchor even when nothing links it.
+    const connected = new Set(accepted.flatMap((r) => [r.source, r.target]));
+    for (const e of kept) {
+      if (connected.has(e.name) || e.name === relPath) {
+        entities.push({ ...e, aliases: [], extractor: "llm" });
+      }
+    }
+    relations.push(...accepted);
+  };
+
+  const worker = async (queue: string[]) => {
+    for (;;) {
+      const relPath = queue.shift();
+      if (!relPath) return;
+
+      const abs = join(repoRoot, relPath);
+      if (!existsSync(abs)) continue;
+      const raw = readFileSync(abs, "utf8");
+      const key = cacheKey(relPath, raw);
+      const cachePath = join(cacheDir, `${key}.json`);
+
+      if (existsSync(cachePath)) {
+        // A corrupt entry (e.g. a write interrupted before the atomic rename
+        // existed) is a cache miss, not a crash that aborts the whole pass.
+        let cached: ReturnType<typeof LlmExtractedGraph.safeParse> | undefined;
+        try {
+          cached = LlmExtractedGraph.safeParse(
+            JSON.parse(readFileSync(cachePath, "utf8")).graph,
+          );
+        } catch {
+          cached = undefined;
+        }
+        if (cached?.success) {
+          absorb(relPath, cached.data);
+          opts.onProgress?.(++done, opts.files.length, relPath, true);
+          continue;
+        }
+      }
+
+      const truncated = raw.length > MAX_BYTES;
+      const body = truncated ? raw.slice(0, MAX_BYTES) : raw;
+      const prompt =
+        `${SYSTEM}\n\nfile_path: ${relPath}\n` +
+        (truncated ? `(NOTE: truncated to the first ${MAX_BYTES} bytes)\n` : "") +
+        `---\n${body}`;
+      const outPath = join(cacheDir, `_out_${key}.json`);
+
+      let parsed: LlmExtractedGraph | undefined;
+      // One retry: the schema is enforced server-side, so a failure here is a
+      // transport or timeout problem, not a malformed-output problem.
+      for (let attempt = 0; attempt < 2 && !parsed; attempt++) {
+        try {
+          await codexExec(prompt, { schemaPath, outPath, cwd: repoRoot, timeoutMs });
+          const result = LlmExtractedGraph.safeParse(
+            JSON.parse(readFileSync(outPath, "utf8")),
+          );
+          if (result.success) parsed = result.data;
+        } catch {
+          // fall through to retry, then give up on this file
+        }
+      }
+
+      if (parsed) {
+        // Write-then-rename so an interrupted run never leaves a truncated
+        // cache entry behind.
+        const tmpPath = `${cachePath}.tmp`;
+        writeFileSync(
+          tmpPath,
+          JSON.stringify({
+            file_path: relPath,
+            content_sha: sha(raw),
+            model: MODEL,
+            graph: parsed,
+          }),
+        );
+        renameSync(tmpPath, cachePath);
+        absorb(relPath, parsed);
+      } else {
+        // Both attempts failed: record it so callers do not treat this file as
+        // re-extracted - llmPart() would otherwise drop its cached facts.
+        failed.push(relPath);
+      }
+      opts.onProgress?.(++done, opts.files.length, relPath, false);
+    }
+  };
+
+  const queue = [...opts.files];
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, queue.length) }, () => worker(queue)),
+  );
+
+  return { entities, relations, failed };
+}
+
+/** The LLM corpus: files a parser cannot interpret. Everything else is
+ *  deterministic and must not be sent to a model. */
+export function llmCorpus(repoRoot: string): string[] {
+  const list = (args: string[]) =>
+    execFileSync("find", args, { cwd: repoRoot, encoding: "utf8" })
+      .split("\n")
+      .filter(Boolean);
+
+  return [
+    // Docs that describe architecture. docs/progress is session history, not
+    // architecture, and is deliberately excluded.
+    ...list(["docs/agents", "docs/spec", "docs/data-model", "-name", "*.md"]),
+    "README.md",
+    "AGENTS.md",
+    // Boundary code: intent here is not recoverable from syntax.
+    ...list(["src/app/api", "-name", "route.ts"]),
+    ...list(["src/integrations", "-name", "*.ts", "-not", "-path", "*__tests__*"]),
+  ];
+}

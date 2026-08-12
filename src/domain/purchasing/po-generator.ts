@@ -191,7 +191,13 @@ export async function createDraftPO(draft: PODraft): Promise<string> {
   if (lineError) {
     log.error("Error creating PO line items:", lineError);
     // Delete the PO if line items creation fails
-    await supabase.from("purchase_orders").delete().eq("id", po.id);
+    const { error: cleanupError } = await supabase
+      .from("purchase_orders")
+      .delete()
+      .eq("id", po.id);
+    if (cleanupError) {
+      log.error(`Failed to clean up orphaned PO ${po.id} after line item insert failure:`, cleanupError);
+    }
     throw lineError;
   }
 

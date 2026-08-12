@@ -74,7 +74,7 @@ export function BatchCell({
 
   return (
     <Select value={currentBatchId} onValueChange={onSelect}>
-      <SelectTrigger className="h-8">
+      <SelectTrigger className="h-8 max-md:h-11">
         <SelectValue placeholder="Select batch" />
       </SelectTrigger>
       <SelectContent>
@@ -160,8 +160,8 @@ export function FormatCell({
         onFilter={formatFilter}
         placeholder="Select format"
         emptyText="No formats found"
-        anchorClassName="h-8"
-        inputClassName="h-8"
+        anchorClassName="h-8 max-md:h-11"
+        inputClassName="h-8 max-md:h-11"
       >
         {packagingFormats?.map((f) => (
           <ComboboxItem key={f.id} value={f.id} label={f.name}>
@@ -189,8 +189,8 @@ export function FormatCell({
           onFilter={ownerFilter}
           placeholder="Keg owner (optional)"
           emptyText="No owners found"
-          anchorClassName="h-8"
-          inputClassName="h-8"
+          anchorClassName="h-8 max-md:h-11"
+          inputClassName="h-8 max-md:h-11"
         >
           {kegOwners?.map((o) => (
             <ComboboxItem key={o.id} value={o.id} label={o.name}>

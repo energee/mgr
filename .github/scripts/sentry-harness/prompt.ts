@@ -77,6 +77,11 @@ fails the run red — so these are hard rules, not preferences:
   \`Makefile\`, \`scripts/\`, \`package.json\`, \`bun.lock\`, \`bunfig.toml\`,
   \`.claude/\`, \`.agents/\` — is rejected. If a fix genuinely needs one of
   those, use the \`issue\` path and say so.
+- A patch that adds or edits any test file other than a NEW
+  \`src/**/<name>.sentry.test.ts\` (or \`.tsx\`) is rejected — no other
+  \`*.test.*\` or \`*.spec.*\` file, nothing under \`e2e/\` or
+  \`src/__tests__/integration/\`, and no edits to existing tests (#699; see
+  step 5).
 - A \`comment\` may only target an issue this harness filed: the lander re-reads
   the target's labels and refuses one that is not labelled \`sentry-fix\`.
 
@@ -210,7 +215,7 @@ If — and only if — the root cause genuinely lies in app code, proceed:
 2. **Root cause analysis** — determine *why* the error occurs. Null safety? Race condition? Stale state? Missing error boundary? Write the analysis out before fixing. Restate why this is (A) and not (B)/(C).
 3. **Pattern scan** — use Grep to find similar vulnerabilities elsewhere in the codebase. If found, include them in the fix scope.
 4. **Implement the fix** — minimal and targeted. Follow the conventions in AGENTS.md and the topic docs under \`docs/agents/\`: entity configs, universal components, centralized query keys from \`src/lib/query-keys.ts\`, no hardcoded status maps (DEC-007), no empty-string Select values (DEC-008), security_invoker on views, RLS on new tables.
-5. **Add tests** — write a Vitest test that reproduces the error condition. Confirm it fails on the original code, then passes on the fix.
+5. **Add tests** — write a Vitest test that reproduces the error condition, as a NEW file named \`<name>.sentry.test.ts\` (or \`.tsx\`) under \`src/\`, next to the code it exercises (e.g. \`src/lib/foo.sentry.test.ts\`). Confirm it fails on the original code, then passes on the fix. The name is load-bearing (#699): the lander rejects a patch that adds or edits any other test file, and CI excludes \`*.sentry.test.*\` on the unreviewed fix PR — your test runs here in this job, locally, and on every run after the PR is reviewed and merged, but never in CI before review.
 6. **Validate** — run \`bun run typecheck\`, \`bun run test\`, \`bun lint\`. All three must pass.
 7. **Simplify** — invoke \`/simplify\` to review the changed code for reuse, quality, and efficiency. Apply fixes.
 8. **Re-validate** — if step 7 changed anything, run \`bun run typecheck\`, \`bun run test\`, \`bun lint\` again.

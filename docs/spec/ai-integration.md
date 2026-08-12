@@ -173,9 +173,17 @@ Navigation tools validate inputs server-side, then return a `NavigationIntent` o
 | `transitionBatch` | Open batch transition dialog (fermentation, cancel, archive) or navigate to detail page for simple transitions | `batchId?`, `batchNumber?`, `toState: enum` |
 | `addBatchReading` | Open readings page with form auto-shown | `batchId?`, `batchNumber?` |
 
+### Confirm-Gated Write Tools (Direct Writes, Phase 4C)
+
+Confirm-gated tools return a `ConfirmWriteIntent` (`action: "confirm_write"`) instead of writing. The chat panel renders it as a Confirm/Cancel card; on confirm, the client POSTs the pending payload to `POST /api/chat/write`, which re-validates it against `chatWriteRequestSchema` (`src/lib/schemas/chat-write.ts`) and executes it with the caller's session Supabase client — RLS is the authority, and `withPermission("batches:write")` surfaces a friendly 403 before a raw RLS denial would.
+
+| Tool | Description | Input |
+|------|-------------|-------|
+| `recordBatchReading` | Record a fermentation reading directly on an active batch (saved to `batch_logs` as a `measurement` after user confirmation) | `batchId?`, `batchNumber?`, `readingType`, `value`, `unit?`, `notes?` |
+
 ### Current Limitations
 
-- **Write tools are navigation-only** — the assistant pre-fills forms but the user must review and submit
+- **Most write tools are navigation-only** — the assistant pre-fills forms but the user must review and submit. Only batch readings use the direct confirm-gated write path so far.
 - **No recipe creation tools** — deferred to future expansion
 - **No order management tools** — deferred to future expansion
 

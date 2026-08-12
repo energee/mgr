@@ -255,6 +255,41 @@ describe("validatePatch", () => {
     expect(validatePatch(prPlan(), paths.map(diff).join("")).sort()).toEqual([...paths].sort());
   });
 
+  // #699: prompt step 5 requires a reproducing test, and that file used to run
+  // in CI on the unreviewed fix PR under test.yml — agent code reaching an
+  // executor one hop later. Agent tests are therefore quarantined by name:
+  // NEW `src/**/*.sentry.test.ts(x)` files only (vitest.config.ts excludes
+  // that glob when the head ref is `sentry-fix/*`), and every other path CI
+  // would select as a test is rejected, including edits to existing tests.
+  it("accepts a quarantine-named repro test next to the fix", () => {
+    const paths = ["src/lib/foo.ts", "src/lib/foo.sentry.test.ts"];
+    expect(validatePatch(prPlan(), paths.map(diff).join("")).sort()).toEqual([...paths].sort());
+    expect(validatePatch(prPlan(), diff("src/components/bar.sentry.test.tsx"))).toEqual([
+      "src/components/bar.sentry.test.tsx",
+    ]);
+  });
+
+  it.each([
+    // an ordinary unit test executes on the fix PR under test.yml
+    "src/lib/foo.test.ts",
+    "src/components/bar.spec.tsx",
+    // Playwright runs everything under e2e/ on every PR — the quarantine name
+    // does not help there, and spec helpers are imported by specs that run
+    "e2e/foo.spec.ts",
+    "e2e/bar.sentry.test.ts",
+    // the "setup" project matches *.setup.ts, not *.test.*/*.spec.* — only
+    // the directory check (not TEST_FILE_RE) catches this one
+    "e2e/auth.setup.ts",
+    // db-lint.yml executes the integration suite when the patch also carries a
+    // migration (which the prefix list allows)
+    "src/__tests__/integration/foo.test.ts",
+    "src/__tests__/integration/foo.sentry.test.ts",
+    // quarantine suffix outside src/ is not quarantined by vitest's glob roots
+    "packages/foo.sentry.test.ts",
+  ])("refuses a test file CI would execute on the unreviewed PR (%s)", (path) => {
+    expect(() => validatePatch(prPlan(), diff(path))).toThrow(/test files CI would execute/);
+  });
+
   it("refuses a patch over the size ceiling", () => {
     const huge = `${diff("src/lib/foo.ts")}${"+x\n".repeat(MAX_PATCH_BYTES)}`;
     expect(() => validatePatch(prPlan(), huge)).toThrow(/over the .* ceiling/);

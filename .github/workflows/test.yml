@@ -122,6 +122,14 @@ jobs:
       - name: Run tests with coverage thresholds
         run: bunx vitest run --coverage
 
+      # Deterministic extractor evals only (--ast, --sql): offline, exact,
+      # exits non-zero on regression. The LLM cases need a codex subscription
+      # that CI does not have, so they stay local-only.
+      - name: Codegraph extractor eval
+        run: |
+          bun tools/codegraph/eval.ts --ast
+          bun tools/codegraph/eval.ts --sql
+
   build:
     # Nightly/dispatch only, and the ONLY event-gated job here. It builds
     # against the HOSTED Supabase credentials, which fork pull requests cannot

@@ -16,9 +16,18 @@ import {
 import { syncSupplier } from "./sync-supplier";
 import type { QBOBill, QBOBillLine, QBOEntityResponse } from "./types";
 
-/** Extract numeric days from a payment terms string like "Net 30" or "COD". Returns NaN if no number found. */
+/**
+ * Extract numeric days from a payment terms string like "Net 30" or "COD".
+ * Prefers the number after "Net" so a discount-terms string like the
+ * supplier form's own example, "2% 10 Net 30", reads the 30-day net term
+ * rather than concatenating every digit run into "21030" days. Falls back to
+ * stripping all digits for a plain numeric entry with no "Net" keyword.
+ * Returns NaN if no number found.
+ */
 function parsePaymentTermsDays(terms: string | null | undefined): number {
   if (!terms) return NaN;
+  const netMatch = /net\s*(\d+)/i.exec(terms);
+  if (netMatch) return parseInt(netMatch[1], 10);
   const digits = terms.replace(/\D+/g, "");
   return digits ? parseInt(digits, 10) : NaN;
 }

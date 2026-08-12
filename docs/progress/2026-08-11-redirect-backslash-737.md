@@ -1,0 +1,1 @@
+- **2026-08-11 (fix backslash open redirect).** `isValidRedirect()` now rejects any value containing a backslash — WHATWG URL parsing treats `\` as `/` for http(s), so `/\evil.example.com` resolved off-origin via dev-login's `new URL(path, origin)`; regression tests added (#737).

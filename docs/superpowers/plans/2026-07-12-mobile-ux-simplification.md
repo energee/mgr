@@ -30,7 +30,7 @@
 **Interfaces:**
 - Produces: `export type NavEntry = NavItem | NavSection`, `export function isNavSection(entry: NavEntry): entry is NavSection`, `export const navigation: NavEntry[]`. Task 3's tab bar links to hrefs asserted in the test.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/components/domain/shared/__tests__/nav-items.test.ts`:
 
@@ -106,12 +106,12 @@ describe("navigation structure", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test nav-items`
 Expected: FAIL — `isNavSection` is not exported / structure mismatch.
 
-- [ ] **Step 3: Rewrite `nav-items.ts`**
+- [x] **Step 3: Rewrite `nav-items.ts`**
 
 Replace the whole file with:
 
@@ -239,7 +239,7 @@ export const navigation: NavEntry[] = [
 
 The removed icons (`AnimatedGauge`, `AnimatedChartLine`, `AnimatedArrowLeft`, `AnimatedLayers`, `AnimatedPackage`, `AnimatedFolderOpen`, `AnimatedShieldCheck`, `AnimatedHandCoins`, `AnimatedCircleDollarSign`, `AnimatedTelescope`, `AnimatedCog`) leave the import list — lint will flag any leftover unused import.
 
-- [ ] **Step 4: Update `app-sidebar.tsx`**
+- [x] **Step 4: Update `app-sidebar.tsx`**
 
 Remove: the `Collapsible/CollapsibleContent/CollapsibleTrigger` import, `AnimatedChevronDown` from the icons import, the entire `AnimatedSectionHeader` component, the `openSections` `useState`, and the `activeSection` computation. Change the nav import to `import { navigation, isNavSection } from "@/components/domain/shared/nav-items";` and drop the `NavSection` type import if now unused.
 
@@ -288,7 +288,7 @@ Replace the `<SidebarContent>` nav block (currently the `navigation.map((section
 
 Update the module comment (sections are always open — no collapse; nav is a `NavEntry[]` union). `AnimatedNavLink`, header, and footer stay as-is.
 
-- [ ] **Step 5: Update `command-palette.tsx`**
+- [x] **Step 5: Update `command-palette.tsx`**
 
 Change the import at line 70 to `import { navigation, isNavSection } from "@/components/domain/shared/nav-items";` and add `import type { NavItem } from "@/components/domain/shared/nav-items";`. Replace the nav rendering block (lines 367–381, the `navigation.map((section) => …)` loop) with:
 
@@ -326,12 +326,12 @@ Change the import at line 70 to `import { navigation, isNavSection } from "@/com
 
 (Note the type-guard filter — a plain `!isNavSection(entry)` predicate does NOT narrow to `NavItem[]`.)
 
-- [ ] **Step 6: Run gates**
+- [x] **Step 6: Run gates**
 
 Run: `bun run test nav-items` → PASS. Then `bun run lint && bun run typecheck && bun run test`
 Expected: all green (existing `command-palette.test.ts` doesn't touch `navigation` — if it fails, read the failure; do not weaken it).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/components/domain/shared/nav-items.ts src/components/domain/shared/app-sidebar.tsx src/components/domain/shared/command-palette.tsx src/components/domain/shared/__tests__/nav-items.test.ts
@@ -350,7 +350,7 @@ git commit -m "feat(nav): simplify navigation to 2 direct links + 4 always-open 
 **Interfaces:**
 - Produces: `export function DashboardSwitcher(): JSX.Element` — link pills for the three dashboards, `aria-current` on the active one. No props.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 `src/components/dashboard/dashboard-switcher.tsx` (pattern copied from the Planning page's Shortfalls/Orders/Timeline pills at `src/app/(app)/production/planning/page.tsx:127-140`):
 
@@ -412,7 +412,7 @@ Add to `src/components/dashboard/index.ts`:
 export { DashboardSwitcher } from "./dashboard-switcher";
 ```
 
-- [ ] **Step 2: Wire into the three dashboard pages**
+- [x] **Step 2: Wire into the three dashboard pages**
 
 Each page adds `DashboardSwitcher` to its existing `@/components/dashboard` import. Header edits (title row only — PeriodSelector/"View All" links untouched):
 
@@ -432,12 +432,12 @@ Each page adds `DashboardSwitcher` to its existing `@/components/dashboard` impo
 
 `dashboard/sales/page.tsx` (line ~274): the row is currently `flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between` — change to `flex flex-wrap items-center justify-between gap-2` and wrap `<h1>` + `<DashboardSwitcher />` in the same inner `<div className="flex flex-wrap items-center gap-3">`.
 
-- [ ] **Step 3: Run gates**
+- [x] **Step 3: Run gates**
 
 Run: `bun run lint && bun run typecheck && bun run test`
 Expected: green (no existing tests cover these page headers).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/dashboard/dashboard-switcher.tsx src/components/dashboard/index.ts "src/app/(app)/dashboard/page.tsx" "src/app/(app)/dashboard/inventory/page.tsx" "src/app/(app)/dashboard/sales/page.tsx"
@@ -459,7 +459,7 @@ git commit -m "feat(dashboard): in-page switcher pills replace the 3 dashboard n
 - Consumes: hrefs guaranteed by Task 1's test (`/production/batches`, `/inventory/items`, `/sales/pick-lists`); `useSidebar().setOpenMobile` from `@/components/ui/sidebar`.
 - Produces: `export function isTabActive(pathname: string, href: string): boolean`; `export function MobileTabBar(): JSX.Element`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/components/domain/shared/__tests__/mobile-tab-bar.test.ts`:
 
@@ -484,12 +484,12 @@ describe("isTabActive", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `bun run test mobile-tab-bar`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Create the component**
+- [x] **Step 3: Create the component**
 
 `src/components/domain/shared/mobile-tab-bar.tsx`:
 
@@ -561,7 +561,7 @@ export function MobileTabBar() {
 }
 ```
 
-- [ ] **Step 4: Wire into the app shell**
+- [x] **Step 4: Wire into the app shell**
 
 `src/app/(app)/layout.tsx` — import `MobileTabBar` from `@/components/domain/shared/mobile-tab-bar` and change the render to:
 
@@ -586,12 +586,12 @@ export function MobileTabBar() {
 
 (was `bottom-[calc(1.5rem+env(safe-area-inset-bottom))]`; 3.5rem tab bar + 1rem gap). Update the FAB comment block (lines ~270-276) to mention the tab-bar offset.
 
-- [ ] **Step 5: Run gates**
+- [x] **Step 5: Run gates**
 
 Run: `bun run test mobile-tab-bar` → PASS, then `bun run lint && bun run typecheck && bun run test`
 Expected: green. (`entity-mobile-card-list` has characterization tests — if one pins the old `bottom-` class, update the assertion to the new value.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/domain/shared/mobile-tab-bar.tsx src/components/domain/shared/__tests__/mobile-tab-bar.test.ts "src/app/(app)/layout.tsx" src/components/domain/shared/app-header.tsx src/components/universal/entity-mobile-card-list.tsx
@@ -609,7 +609,7 @@ git commit -m "feat(mobile): bottom tab bar (Batches/Inventory/Picks/More) repla
 **Interfaces:**
 - Produces: no API change — pure CSS. Every `DialogContent` consumer inherits the behavior.
 
-- [ ] **Step 1: Edit `DialogContent`**
+- [x] **Step 1: Edit `DialogContent`**
 
 In the `cn(...)` first argument (line 64), append these classes (keep everything existing):
 
@@ -619,25 +619,25 @@ max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-w-full max-sm:translate
 
 Why this works: `max-sm:` variants are emitted later in the Tailwind output than the base utilities, so on <640px `top-auto`/`bottom-0`/`translate-*-0` win over `top-[50%]`/`translate-[-50%]` and the dialog anchors to the bottom edge full-width with internal scrolling. The existing zoom/fade animation is kept; the slide-from-bottom is additive on mobile. Add one comment line above `DialogContent` documenting the mobile bottom-sheet behavior.
 
-- [ ] **Step 2: Edit `DialogFooter`**
+- [x] **Step 2: Edit `DialogFooter`**
 
 Line 106, append `max-sm:[&_button]:min-h-11` to the class list — primary/cancel actions get ≥44px touch targets on phones (they're already full-width there via the existing `flex-col-reverse`).
 
-- [ ] **Step 3: Edit `Input`**
+- [x] **Step 3: Edit `Input`**
 
 Line 12: append `max-sm:h-11 max-sm:text-base` to the class string containing `h-8 … text-sm`. `text-base` (16px) also stops iOS Safari's auto-zoom on input focus — 14px inputs zoom the whole page.
 
-- [ ] **Step 4: Run gates**
+- [x] **Step 4: Run gates**
 
 Run: `bun run lint && bun run typecheck && bun run test`
 Expected: green. If a test pins these exact class strings, update the assertion to include the new classes — nothing else.
 
-- [ ] **Step 5: Visual check (dev server)**
+- [x] **Step 5: Visual check (dev server)**
 
 Run the app (`bun run dev`), open any entity list at 390×844 (device toolbar), trigger a dialog (e.g., a batch state transition with `transitionFields`).
 Expected: dialog rises from the bottom edge, full-width, scrolls internally, close button reachable; desktop (≥640px) unchanged — centered modal.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/ui/dialog.tsx src/components/ui/input.tsx
@@ -655,12 +655,12 @@ git commit -m "feat(mobile): dialogs render as bottom sheets on phones; 44px inp
 - Consumes: `useIsMobile` from `@/hooks/use-mobile` (768px breakpoint — matches where list pages switch to cards).
 - Produces: no API change.
 
-- [ ] **Step 1: Stack the header on mobile**
+- [x] **Step 1: Stack the header on mobile**
 
 Line 1218: `className="flex items-start justify-between"` → `className="flex items-start justify-between max-sm:flex-col max-sm:gap-3"`.
 Line 1238: `className="flex items-center gap-1.5"` → `className="flex items-center gap-1.5 max-sm:flex-wrap"`.
 
-- [ ] **Step 2: Collapse header action buttons into the Actions menu on mobile**
+- [x] **Step 2: Collapse header action buttons into the Actions menu on mobile**
 
 Import `useIsMobile`. Near the existing `headerButtonActions`/`dropdownActions` split (~line 831), add:
 
@@ -677,7 +677,7 @@ Import `useIsMobile`. Near the existing `headerButtonActions`/`dropdownActions` 
 
 In the returned JSX: `headerButtonActions.map(…)` (line ~1269) → `visibleHeaderActions.map(…)`; the dropdown-visibility condition `(dropdownActions.length > 0 || rawTransitions.length > 0)` (line ~1290) → `(menuActions.length > 0 || rawTransitions.length > 0)`; and every use of `dropdownActions` INSIDE the `<DropdownMenuContent>` block becomes `menuActions`. Nothing else in the action-dispatch logic changes — `runAction` already handles both kinds. Update the module comment lines 10-14 (visible header buttons collapse into the menu on mobile).
 
-- [ ] **Step 3: Make the tab strip scrollable on mobile**
+- [x] **Step 3: Make the tab strip scrollable on mobile**
 
 Line ~1599, wrap `TabsList`:
 
@@ -692,17 +692,17 @@ Line ~1599, wrap `TabsList`:
 
 (Relation tables need NO change — `ui/table.tsx` already wraps every table in `overflow-x-auto`; just verify in Step 5.)
 
-- [ ] **Step 4: Run gates**
+- [x] **Step 4: Run gates**
 
 Run: `bun run lint && bun run typecheck && bun run test`
 Expected: green (`useIsMobile` returns `false` in jsdom, so existing action-rendering tests keep desktop behavior).
 
-- [ ] **Step 5: Visual check**
+- [x] **Step 5: Visual check**
 
 Dev server at 390×844: open a batch detail page.
 Expected: title/badge on top, actions row below wrapping cleanly, configured actions inside the "Actions" menu, tab strip pans horizontally, relation tables scroll inside their own wrapper. Desktop unchanged.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/universal/entity-detail-unified.tsx
@@ -718,7 +718,7 @@ git commit -m "feat(mobile): entity detail pages stack header, collapse actions,
 
 **Interfaces:** none — behavior-preserving layout fixes only.
 
-- [ ] **Step 1: Measure first (repo guardrail — invoke the `measure-first` skill BEFORE any edit here)**
+- [x] **Step 1: Measure first (repo guardrail — invoke the `measure-first` skill BEFORE any edit here)**
 
 Dev server, device toolbar 390×844, walk each screen and record pass/fail per check:
 
@@ -728,16 +728,16 @@ Dev server, device toolbar 390×844, walk each screen and record pass/fail per c
 | Packaging day view + line-item editor | Line-item add/edit possible without horizontal scrolling; numeric inputs ≥44px (Task 4's input change should cover); action buttons reachable one-handed |
 | PO receive dialog (accept a PO) | Renders correctly as a bottom sheet (Task 4); per-line qty inputs usable; submit reachable without scroll traps |
 
-- [ ] **Step 2: Fix only failing checks, smallest diff**
+- [x] **Step 2: Fix only failing checks, smallest diff**
 
 Allowed fix vocabulary (all `max-sm:` scoped, matching repo idiom): `max-sm:flex-col` / `max-sm:grid-cols-1` to stack columns; `max-sm:min-h-11` on tap targets; `max-sm:overflow-x-auto` wrappers. No behavior changes, no refactors. Re-measure at 390×844 after each fix (never claim fixed without re-capturing).
 
-- [ ] **Step 3: Run gates**
+- [x] **Step 3: Run gates**
 
 Run: `bun run lint && bun run typecheck && bun run test`
 Expected: green — these files have characterization tests (`session-line-items-editor.test.tsx`); layout-only class changes must not break them.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A src/components/domain
@@ -753,21 +753,21 @@ git commit -m "fix(mobile): floor-screen touch/layout fixes from 390px verificat
 **Files:**
 - Modify: `PROGRESS.md` (milestone bullet). No code changes expected.
 
-- [ ] **Step 1: Full gates**
+- [x] **Step 1: Full gates**
 
 Run: `bun run lint && bun run typecheck && bun run test`
 Expected: all green, suite count ≥ baseline.
 
-- [ ] **Step 2: Browser verification sweep (verify skill) at 390×844 AND ≥1280px**
+- [x] **Step 2: Browser verification sweep (verify skill) at 390×844 AND ≥1280px**
 
 Mobile: tab bar navigates to all three targets + More opens the full nav sheet; nav sheet shows 2 direct links + 4 sections; dashboard switcher pills navigate between the three dashboards; a transition dialog renders as a bottom sheet; batch detail page per Task 5; the three floor screens per Task 6; content never hides behind the tab bar (scroll each page to the end); FAB floats above the tab bar.
 Desktop: sidebar shows all sections always-open; no tab bar; no hamburger; dialogs centered; cmd+K palette shows "Pages" group + the 4 sections.
 
-- [ ] **Step 3: Update PROGRESS.md**
+- [x] **Step 3: Update PROGRESS.md**
 
 Add the newest bullet under `## Current state` summarizing: branch, what shipped (nav restructure, tab bar, dialog bottom sheets, detail-page mobile pass, floor-screen fixes), suite count, and that no migrations are involved.
 
-- [ ] **Step 4: Push and open PR**
+- [x] **Step 4: Push and open PR**
 
 ```bash
 git push -u origin feat/mobile-ux-simplification

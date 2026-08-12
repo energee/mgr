@@ -22,6 +22,42 @@ allowlist explicitly and, like every scheduled agentic workflow, ends in the
 `require-durable-outcome` gate; the once-promised scheduled-agent replacement
 was never built and that route is retired.)
 
+(Bug Patrol's 07-26 permission-denial pattern receded, then came back. Seven
+straight scheduled runs (07-27 through 08-02) went green with no
+`error_max_turns`, opening PRs that mostly merged, and the 07-26
+revise-candidate flag was retired on that basis — in still-unmerged PR #732.
+But the underlying cause was never diagnosed, only outlasted: starting 08-03
+the pattern resumed on 4 of the next 6 scheduled runs. 08-05 hit
+`error_max_turns` again (81 turns, 10 permission denials) and 08-08 did too
+(18 denials — the most since the pattern's 08-03 recurrence, though still
+below 07-26's 20). The other two failures in that window (08-04,
+08-07) are a distinct, newly observed mode: the agent finishes cleanly —
+`is_error: false`, 0-10 permission denials, well under the turn cap — but the
+run still ends with **no PR and no `quiet-run.md`**, so
+`require-durable-outcome` fails it red anyway. Two separate gaps, not one:
+
+1. Something in the task still reaches for a disallowed tool on a large
+   minority of runs, and the diagnostic step recommended on 07-26 — "audit
+   which tool that is" — has not happened in two weeks, because
+   `claude-code-action`'s job log hides full agent output by design
+   (`"Running Claude Code via SDK (full output hidden for security)"`), so the
+   tool name behind `permission_denials_count` is not visible in any run log
+   sampled. Confirming it needs either a one-off run with `show_full_output:
+   true` or an equivalent way to surface the denied tool name, not another
+   `--max-turns` increase.
+2. Even a clean run does not reliably leave the durable-outcome artifact the
+   gate requires. `sentry-harness.yml`'s prompt carries an explicit closing
+   guardrail for exactly this case — *"Whatever the outcome, end by writing
+   `outbox/plan.json`... A run that ends without it fails red"* — and
+   `bug-patrol.yml`'s prompt should carry the equivalent: finishing with
+   nothing to fix still requires writing `quiet-run.md`, stated as a
+   guardrail rather than left implicit.
+
+Falsifies if two more consecutive scheduled runs land a PR or `quiet-run.md`
+with zero permission denials. Stays failed if either failure mode recurs
+after two more scheduled runs — and if so, the retire/revise question should
+be reopened, not re-closed under the 07-26 framing.)
+
 (Bug Patrol's 2026-07-26 revise-candidate flag is retired as of 2026-08-02:
 its own falsification clause fired. The two `error_max_turns` runs on
 07-25/07-26 were followed by seven consecutive green scheduled runs
@@ -72,6 +108,22 @@ observable behavior it should change and the recurrence signal that would mark
 it failed, and every weekly PR must also propose retirements (gotchas entries
 now enforced by gates, routes to removed things, promotions that changed
 nothing). Enforced knowledge accumulates; prose must not.
+
+**A zero-merge stretch on the scoreboard has two different causes — check
+which one before naming a retire/revise candidate.** Observed 2026-08-09: 8
+automated PRs sat open, green across every check, and unreviewed — spanning
+`bug-patrol`, `sentry-fix`, `quality-regrade`, this loop's own #732, and one
+dependabot bump, open 0-9 days. #722 was the last PR of any kind to merge, on
+07-31, a 9-day gap as of this writing. That is a review-capacity gap,
+not a loop-quality signal, and it would produce exactly the same flat merge
+line the scoreboard uses to flag a failing loop. Before naming a loop a
+retire/revise candidate on a falling merge rate, check `gh pr list --state
+open --json number,createdAt,statusCheckRollup` for that loop's label: if the
+open PRs are clean and mergeable, the signal is a human backlog, and the
+fix is "clear the queue," not "revise the prompt." Falsifies if next week's
+scoreboard shows merges resuming without a queue-clearing session; stays a
+live risk to scoreboard-reading — recheck it every week — as long as 5+
+mergeable automated PRs stay open past 7 days.
 
 ## Worker epochs
 

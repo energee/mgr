@@ -9,10 +9,10 @@ workflow change, or the unit suite fails.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `test.yml` | Every PR to main (docs-only included — a check has to report on every PR to be usable as a required one) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-deploy-state` / `check-agent-config`. Playwright E2E runs on every PR too as of 2026-07-30 (#437) — see [Why E2E runs on pull requests](#why-e2e-runs-on-pull-requests) for the shape and the reasoning, including why it never did before, despite #506 having been written to do it. Only `Production Build` stays nightly / `workflow_dispatch`: it compiles against the **hosted** Supabase credentials that fork PRs cannot read, and it is also the only job that runs `bun audit`, so the **dependency audit is a nightly signal, not a PR-time one**. PRs are not left without build coverage — the E2E job runs its own `bun run build` against its local stack. E2E boots an isolated local Supabase, builds against it (`NEXT_PUBLIC_*` are inlined at build time, so the hosted-credential build artifact cannot serve it), and runs Playwright against `bun start` — the shipped artifact, not a dev server. Because that server is a production build, the job sets `E2E_DEV_LOGIN: "1"` so `/api/auth/dev-login` (how `e2e/auth.setup.ts` gets a session, absent any hosted E2E credentials) answers instead of 404ing; the flag belongs to this job alone and must never be set on a deployed environment. The flag is not sufficient by itself — on that path the route also requires the Supabase project URL to have a **loopback hostname**, which this job satisfies via its own local stack. That narrows a stray `E2E_DEV_LOGIN=1` to databases reachable only on the serving machine (#656); it is not a guarantee that no real data is reachable, since a self-hosted Supabase, a sidecar, a tunnel or a local proxy can all sit behind a loopback name. The URL is resolved through `getSupabaseUrl()` — the same accessor `createAdminClient()` uses — precisely so a build-time-inlined `NEXT_PUBLIC_*` literal cannot make the gate disagree with the database the route actually connects to. The route's separate `NODE_ENV === "development"` path now requires the same loopback hostname by default, with `DEV_LOGIN_ALLOW_REMOTE_DB=1` as an explicit per-developer opt-in for a hosted project (#679); that variable must never be set in a workflow — a contract test asserts it appears in none. Full reasoning, including what is *not* guaranteed, is in the route's docstring (`src/app/api/auth/dev-login/route.ts`). |
+| `test.yml` | Every PR to main (docs-only included — a check has to report on every PR to be usable as a required one) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-deploy-state` / `check-agent-config`, plus the deterministic codegraph extractor evals (`bun tools/codegraph/eval.ts --ast` / `--sql` — offline, no LLM). Playwright E2E runs on every PR too as of 2026-07-30 (#437) — see [Why E2E runs on pull requests](#why-e2e-runs-on-pull-requests) for the shape and the reasoning, including why it never did before, despite #506 having been written to do it. Only `Production Build` stays nightly / `workflow_dispatch`: it compiles against the **hosted** Supabase credentials that fork PRs cannot read, and it is also the only job that runs `bun audit`, so the **dependency audit is a nightly signal, not a PR-time one**. PRs are not left without build coverage — the E2E job runs its own `bun run build` against its local stack. E2E boots an isolated local Supabase, builds against it (`NEXT_PUBLIC_*` are inlined at build time, so the hosted-credential build artifact cannot serve it), and runs Playwright against `bun start` — the shipped artifact, not a dev server. Because that server is a production build, the job sets `E2E_DEV_LOGIN: "1"` so `/api/auth/dev-login` (how `e2e/auth.setup.ts` gets a session, absent any hosted E2E credentials) answers instead of 404ing; the flag belongs to this job alone and must never be set on a deployed environment. The flag is not sufficient by itself — on that path the route also requires the Supabase project URL to have a **loopback hostname**, which this job satisfies via its own local stack. That narrows a stray `E2E_DEV_LOGIN=1` to databases reachable only on the serving machine (#656); it is not a guarantee that no real data is reachable, since a self-hosted Supabase, a sidecar, a tunnel or a local proxy can all sit behind a loopback name. The URL is resolved through `getSupabaseUrl()` — the same accessor `createAdminClient()` uses — precisely so a build-time-inlined `NEXT_PUBLIC_*` literal cannot make the gate disagree with the database the route actually connects to. The route's separate `NODE_ENV === "development"` path now requires the same loopback hostname by default, with `DEV_LOGIN_ALLOW_REMOTE_DB=1` as an explicit per-developer opt-in for a hosted project (#679); that variable must never be set in a workflow — a contract test asserts it appears in none. Full reasoning, including what is *not* guaranteed, is in the route's docstring (`src/app/api/auth/dev-login/route.ts`). |
 | `db-lint.yml` | PR touching `supabase/migrations/**` or `supabase/config.toml` | Replays the full migration chain from scratch (`ON_ERROR_STOP`) and runs the RLS integration tests against it. |
 | `shell-lint.yml` | PR touching `scripts/**` | `bash -n` + shellcheck over every shebang-bearing file under `scripts/` (selection is by shebang, not extension, so extensionless scripts like `scripts/agent-worktree` are covered). No database, no build. |
-| `live-drift.yml` | Daily schedule + dispatch | Watchdog comparing the live database catalog to `supabase/live-catalog.snapshot.txt` — catches out-of-band drift no PR would surface. Missing/changed objects FAIL; additions WARN. Two tracking issues, deliberately distinct: `live-drift` (real drift) and `watchdog-down` (the check never reached the database — missing secret, billing block, connection error). While `watchdog-down` is open there is **no** drift detection at all. |
+| `live-drift.yml` | Daily schedule + dispatch | Watchdog comparing the live database catalog to `supabase/live-catalog.snapshot.txt` — catches out-of-band drift no PR would surface. Missing/changed objects FAIL; additions WARN. Also diffs the migration chain (`supabase/migrations/*.sql` version prefixes) against `supabase_migrations.schema_migrations` on live (#693): a committed-but-unapplied migration FAILs (the catalog diff alone is blind to it — snapshot and live are both post-apply artifacts); versions applied on live but absent from the chain WARN. Comparison core: `scripts/compare-migration-versions.sh` (unit-tested DB-free via `make check-agent-config`). Two tracking issues, deliberately distinct: `live-drift` (real drift) and `watchdog-down` (the check never reached the database — missing secret, billing block, connection error). While `watchdog-down` is open there is **no** drift detection at all. |
 | `nightly-watch.yml` | `workflow_run` completion of scheduled Test runs, or dispatch with a simulated `conclusion` | Opens/updates ONE `nightly-red` tracking issue when the nightly fails; closes it on the next green run. Dispatch exists so the watchdog can be exercised without waiting for a red nightly. |
 | `prod-health.yml` | Schedule every 15 min + dispatch | Post-deploy verification: probes `${vars.PRODUCTION_URL}/api/health` (HTTP 200 **and** body `status: "ok"` — a 200 carrying `degraded` is a failure) and `/login` (the auth wall), retrying 3× with backoff. Maintains ONE `prod-down` issue; closes it on recovery. Checkout-free, `issues: write` only. A missing `PRODUCTION_URL` variable fails the run loudly rather than skipping. |
 | `progress.yml` | Push to main touching `docs/progress/**` | Regenerates `PROGRESS.md` via `scripts/build-progress.sh` and lands it through an auto-merged bot PR. This is why PROGRESS.md must never be edited on a branch (AGENTS.md constraint 18). |
@@ -181,6 +181,54 @@ job in this repo has) and the `id-token: write` OIDC minting endpoint. Neither
 can write to this repository. What is gone is the push-capable
 `GITHUB_TOKEN` — #645's stated impact.
 
+**The pack step has been failing on most scheduled runs since the credential
+split (#690, merged 2026-07-30) landed, independent of what the agent decided
+(recurring; first found 2026-08-02, still failing 2026-08-08 — a
+near-identical diagnosis also sits in still-unmerged PR #732, which this
+entry supersedes with a week of further evidence).** `/outbox/` is gitignored
+(`.gitignore:114`, deliberately, so the artifact directory never gets
+committed), and the "Pack the agent outbox" step's
+`git add -A -- . ':(exclude)outbox' ':(exclude)sentry-outcome.md'`
+(`sentry-harness.yml:274`) exits 1 under the step's `set -euo pipefail`: git
+treats naming an ignored directory inside `:(exclude)` pathspec magic the same
+as an explicit add of an ignored path — `"The following paths are ignored by
+one of your .gitignore files: outbox"` / `"hint: Use -f if you really want to
+add them"` — and errors out before `outbox/fix.patch` is ever written. Sampled
+across every scheduled run since the split:
+
+- **07-30** (job 90957329205, MGR-K): a real classification-(A) patch the
+  agent spent its full budget producing was discarded outright — `land-fix`'s
+  own contract check caught the empty result: `"plan.json asks for a PR but
+  the packed patch is empty."` Nothing retries it; the next scheduled run
+  scores fresh issues, not the one that just failed to land.
+- **07-31** (job 91225679847, classification B): same pack-step failure,
+  harmless here because no patch was needed.
+- **08-03** (job 91766123955): worse than a dropped patch — `land-fix` itself
+  errored, `"[land-sentry-fix] outbox: classification must be one of A, B, C,
+  D (got undefined)"`, meaning the `plan.json` the agent wrote never reached
+  the lander intact either.
+- **08-07** (job 92949470812, MGR-K again): the agent correctly triaged a
+  stale re-delivery as a quiet run, wrote a valid `outbox/plan.json` and
+  `outbox/evidence.md` — and the pack step still failed the same way.
+
+The net effect: this workflow's own run conclusion has read red on most
+scheduled runs for over a week even when the agent's diagnosis and outbox
+contract were both correct. **Do not read a `sentry-harness.yml` red X as "the
+agent got it wrong"** without opening the "Fix error" step log and checking
+for this exact ignored-path message first — and do not read the loop as
+unhealthy from Actions-tab history alone; check the PR list instead (`gh pr
+list --state open --label sentry-fix --json number,createdAt,statusCheckRollup`;
+10 of 10 `sentry-fix` PRs opened since 2026-07-12 have merged, per the loop
+scoreboard). **Not fixable from here**, since it requires a workflow-file
+change: the likely fix is to drop the redundant `:(exclude)outbox` pathspec
+(the directory is already gitignored, so a plain `git add -A -- .` already
+skips it without an explicit exclude) or to write the patch to `$RUNNER_TEMP`
+instead of an in-tree gitignored directory. **Watch for:** this exact message
+recurring in a future "Pack the agent outbox" step log, or a `land-fix`
+failure reading "packed patch is empty" or "classification must be one of A,
+B, C, D" against a plan the agent actually wrote correctly — either means the
+fix hasn't landed yet.
+
 **The outbox is itself a publishing channel, by construction.** `pr-body.md`,
 `issue-body.md` and `comment-body.md` are agent-authored free text that a
 credentialed job publishes verbatim to a public repository. Splitting the
@@ -195,10 +243,23 @@ comment rather than describing the job as "cannot write".
 
 The patch denylist is the same kind of claim and deserves the same honesty. It
 refuses the build and automation surface — the files that get *executed* rather
-than reviewed. It is **not** a general defense against a hostile patch: a test
-file the agent adds runs in CI on the resulting PR like any other file (prompt
-step 5 requires one), which is #699's residual, not something this list closes.
-Do not describe it as closing "the one path".
+than reviewed. It is **not** a general defense against a hostile patch, and the
+test file prompt step 5 requires used to be the disclosed gap: it ran in CI on
+the resulting PR like any other file (#699). That path is now closed by a
+quarantine, not by this list: the lander only accepts agent tests as NEW files
+named `src/**/<name>.sentry.test.ts(x)` (`outbox.ts`, `SENTRY_TEST_FILE_RE` —
+every other test path CI selects is rejected, including edits to existing
+tests, `e2e/`, and the integration suite `db-lint.yml` runs), and
+`vitest.config.ts` excludes `**/*.sentry.test.{ts,tsx}` exactly when
+`GITHUB_HEAD_REF` is a `sentry-fix/*` branch. The repro test therefore runs in
+the agent's own job (schedule/dispatch has no head ref), locally, and on every
+CI run after review and merge — but never in CI on the unreviewed fix PR. Both
+halves are pinned: the config guard by `ci-workflows.test.ts` ("sentry-fix PR
+test quarantine"), the lander rule by `outbox.test.ts`. What this does **not**
+close: the patch's *source* changes still execute on the fix PR under the
+pre-existing tests that import them — that is code a reviewer reads as the
+diff, not a file executing sight-unseen, and closing it entirely would take
+the sandboxed-CI option #699 priced and declined.
 
 Every other agent job still holds a push-capable token: `bug-patrol`,
 `feedback-distill` and `quality-regrade` legitimately push from inside the

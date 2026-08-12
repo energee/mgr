@@ -18,6 +18,11 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({ rpc: rpcMock, from: fromMock }),
 }));
 
+const { logErrorMock } = vi.hoisted(() => ({ logErrorMock: vi.fn() }));
+vi.mock("@/lib/client-logger", () => ({
+  log: { info: vi.fn(), warn: vi.fn(), error: logErrorMock, debug: vi.fn() },
+}));
+
 import { groupShortfallsBySupplier, createDraftPO, type PODraft } from "../po-generator";
 import { makeShortfall } from "./fixtures";
 
@@ -86,6 +91,8 @@ describe("createDraftPO", () => {
     singleMock.mockReset();
     insertPOMock.mockClear();
     insertLineItemsMock.mockReset();
+    deleteEqMock.mockReset();
+    logErrorMock.mockReset();
     fromMock.mockClear();
     rpcMock.mockResolvedValueOnce({ data: "PO-2026-001", error: null });
     singleMock.mockResolvedValueOnce({ data: { id: "po-1" }, error: null });
@@ -103,6 +110,26 @@ describe("createDraftPO", () => {
         order_date: "2026-03-02",
         expected_date: "2026-03-09",
       })
+    );
+  });
+
+  it("logs when the compensating delete also fails after a line-item insert error", async () => {
+    // If po_line_items insert fails (e.g. a catalog row was deleted out from
+    // under a stale shortfall), createDraftPO tries to delete the
+    // already-created purchase_orders row. If that delete also fails, the
+    // failure must be logged — otherwise a draft PO with a burned PO number
+    // and zero line items is silently orphaned with no trace anywhere.
+    insertLineItemsMock.mockReset();
+    insertLineItemsMock.mockResolvedValueOnce({ error: { message: "insert failed" } });
+    deleteEqMock.mockResolvedValueOnce({ error: { message: "delete failed" } });
+
+    await expect(createDraftPO(draft)).rejects.toEqual({ message: "insert failed" });
+
+    expect(deleteMock).toHaveBeenCalledWith();
+    expect(deleteEqMock).toHaveBeenCalledWith("id", "po-1");
+    expect(logErrorMock).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to clean up orphaned PO po-1"),
+      { message: "delete failed" }
     );
   });
 });

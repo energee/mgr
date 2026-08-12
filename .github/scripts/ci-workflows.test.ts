@@ -6,7 +6,9 @@ import {
   agentWriteScopeInventory,
   auditWorkflowEgress,
   readOnlyMintContradictions,
+  unscopedGhApiGrants,
 } from "./workflow-egress";
+import { EXECUTED_TEST_DIRS, fixBranch, SENTRY_TEST_FILE_RE } from "./sentry-harness/outbox";
 
 function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
@@ -67,10 +69,11 @@ function jobBlocks(workflow: string): Map<string, string> {
  * deletion of the code it describes. That is the same defect this file's E2E
  * contracts exist to catch, one level up.
  */
-function uncommented(block: string): string {
+function uncommented(block: string, marker: "#" | "//" = "#"): string {
+  const commentStart = marker === "#" ? /^\s*#/ : /^\s*\/\//;
   return block
     .split("\n")
-    .filter((line) => !/^\s*#/.test(line))
+    .filter((line) => !commentStart.test(line))
     .join("\n");
 }
 
@@ -180,6 +183,10 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).not.toContain("--shard=");
     expect(workflow).not.toContain("--merge-reports");
     expect(workflow).toContain("bunx vitest run --coverage");
+    // The codegraph extractor eval's deterministic passes run on every PR;
+    // the LLM cases stay local-only (CI has no codex subscription).
+    expect(workflow).toContain("bun tools/codegraph/eval.ts --ast");
+    expect(workflow).toContain("bun tools/codegraph/eval.ts --sql");
     // No paths-ignore: an always-report check has to report on docs-only PRs
     // too. ("Always-report", not "required" — none of these is a required
     // status check today; see the note above this `it`.)
@@ -1142,6 +1149,14 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).toContain("docs/agents/quality.md");
   });
 
+  // Issue #736: an unscoped `Bash(gh api:*)` grant is a raw REST client that,
+  // with the job's write-capable token, reaches the PR-merge and Contents
+  // APIs — defeating "never merge, never touch code" prompts that are
+  // otherwise prose-only. See `unscopedGhApiGrants` for the rule.
+  it("never grants unscoped gh api in any workflow's --allowedTools", () => {
+    expect(workflows.flatMap((path) => unscopedGhApiGrants(path, read(path)))).toEqual([]);
+  });
+
   // The weekly distillation is the loop that gardens the other loops: it must
   // see deterministic acceptance data (loop-scoreboard), propose retirements
   // (not only additions), and make every promotion falsifiable.
@@ -1195,6 +1210,65 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).not.toContain("pull-requests:");
     expect(workflow).not.toContain("actions/checkout");
     expect(workflow).toContain("timeout-minutes:");
+  });
+
+  // #699 (the #668 residual): prompt step 5 makes the Sentry agent add a
+  // Vitest test, and that file used to execute under test.yml on the
+  // unreviewed fix PR — agent-authored code reaching an executor one hop after
+  // the credential split. The fix is a quarantine, not a workflow step: the
+  // lander only accepts agent tests named `src/**/*.sentry.test.ts(x)`
+  // (outbox.ts, covered by outbox.test.ts), and vitest.config.ts excludes that
+  // pattern exactly when the CI run's head ref is a `sentry-fix/*` branch.
+  // This contract pins the config half so it cannot be dropped without the
+  // suite going red.
+  describe("sentry-fix PR test quarantine (#699)", () => {
+    // A comment restating the guard must not satisfy the contract, so strip
+    // TS `//` comments before matching (uncommented() defaults to YAML `#`).
+    const config = uncommented(read("vitest.config.ts"), "//");
+
+    it("keys the exclusion off the branch prefix the lander actually pushes", () => {
+      // fixBranch() is what names the fix PR's head ref; if it ever changes,
+      // the config's prefix check must move with it.
+      expect(fixBranch("12345").startsWith("sentry-fix/")).toBe(true);
+      expect(config).toContain("GITHUB_HEAD_REF");
+      expect(config).toContain('startsWith("sentry-fix/")');
+    });
+
+    it("excludes the quarantine glob only on sentry-fix PR runs", () => {
+      // The glob must exist, and must be spread conditionally — an
+      // unconditional exclude would silence the repro tests everywhere,
+      // including after review and merge.
+      const conditional = config
+        .split("\n")
+        .find((line) => line.includes("**/*.sentry.test.{ts,tsx}"));
+      expect(conditional, "vitest.config.ts no longer excludes **/*.sentry.test.{ts,tsx}").toBeDefined();
+      expect(conditional).toMatch(/\?\s*\[/);
+      expect(conditional).toContain(": []");
+    });
+
+    it("quarantine-named files are ones the exclusion glob and the lander agree on", () => {
+      // The lander's shape (asserted against its exported regex) sits under
+      // src/, inside the vitest include roots, where the glob above reaches.
+      expect("src/lib/foo.sentry.test.ts").toMatch(SENTRY_TEST_FILE_RE);
+      expect("src/components/bar.sentry.test.tsx").toMatch(SENTRY_TEST_FILE_RE);
+      // Playwright's tree is not covered by a vitest exclude, so the lander
+      // must never quarantine-bless a path there.
+      expect("e2e/foo.sentry.test.ts").not.toMatch(SENTRY_TEST_FILE_RE);
+    });
+
+    // EXECUTED_TEST_DIRS is a hardcoded allowlist of "CI executes this as a
+    // test regardless of filename" directories. Nothing else ties it back to
+    // the configs it's describing, so a rename here would silently open a
+    // hole. Pin both halves directly against the config values.
+    it("stays in sync with the configs it describes", () => {
+      expect(EXECUTED_TEST_DIRS).toContain("e2e/");
+      expect(read("playwright.config.ts")).toContain('testDir: "./e2e"');
+
+      expect(EXECUTED_TEST_DIRS).toContain("src/__tests__/integration/");
+      expect(read("vitest.integration.config.ts")).toContain(
+        'include: ["src/__tests__/integration/**/*.test.ts"]',
+      );
+    });
   });
 
   // Routing freshness: docs/agents/ci.md's workflow table went stale in the

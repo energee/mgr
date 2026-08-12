@@ -147,8 +147,8 @@ export function AddLineItemRow({
           onValueChange={handleBatchChange}
           onFilter={batchFilter}
         >
-          <ComboboxAnchor className="h-8">
-            <ComboboxInput className="h-8" placeholder="Select batch" />
+          <ComboboxAnchor className="h-8 max-md:h-11">
+            <ComboboxInput className="h-8 max-md:h-11" placeholder="Select batch" />
             <ComboboxTrigger />
           </ComboboxAnchor>
           <ComboboxContent>
@@ -201,8 +201,8 @@ export function AddLineItemRow({
             }
             onFilter={brandFilter}
           >
-            <ComboboxAnchor className="h-8">
-              <ComboboxInput className="h-8" placeholder="Select brand" />
+            <ComboboxAnchor className="h-8 max-md:h-11">
+              <ComboboxInput className="h-8 max-md:h-11" placeholder="Select brand" />
               <ComboboxTrigger />
             </ComboboxAnchor>
             <ComboboxContent>
@@ -243,7 +243,7 @@ export function AddLineItemRow({
               planned_quantity: parseIntOrNull(e.target.value),
             })
           }
-          className="h-8 w-full"
+          className="h-8 w-full max-md:h-11"
           placeholder="Planned"
         />
       </TableCell>
@@ -260,7 +260,7 @@ export function AddLineItemRow({
               actual_quantity: parseIntOrNull(e.target.value),
             })
           }
-          className="h-8 w-full"
+          className="h-8 w-full max-md:h-11"
           placeholder="Actual"
         />
       </TableCell>
@@ -273,7 +273,7 @@ export function AddLineItemRow({
         <Button
           size="icon"
           aria-label="Add line item"
-          className="h-8 w-8"
+          className="h-8 w-8 max-md:h-11 max-md:w-full"
           onClick={onAdd}
           disabled={isPending}
         >
