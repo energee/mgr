@@ -20,7 +20,6 @@
  */
 
 import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
@@ -34,7 +33,7 @@ import {
   ComboboxItem,
   ComboboxTrigger,
 } from "@/components/ui/combobox";
-import { Plus, Loader2 } from "lucide-react";
+import { AddLineButton } from "@/components/domain/shared/line-items-editor";
 import {
   usePackagableBatches,
   useSellingFormatFillVolumes,
@@ -270,19 +269,12 @@ export function AddLineItemRow({
 
       {/* Add button */}
       <TableCell>
-        <Button
-          size="icon"
-          aria-label="Add line item"
-          className="h-8 w-8 max-md:h-11 max-md:w-full"
+        <AddLineButton
+          label="Add line item"
           onClick={onAdd}
-          disabled={isPending}
-        >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
-        </Button>
+          isPending={isPending}
+          className="h-8 w-8 max-md:h-11 max-md:w-full"
+        />
       </TableCell>
     </TableRow>
   );

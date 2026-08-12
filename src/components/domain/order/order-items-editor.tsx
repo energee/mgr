@@ -615,7 +615,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 ) : (
                   <LineItemEditInput
                     edits={edits}
-                    id={item.id}
+                    rowId={item.id}
                     field="quantity"
                     savedValue={item.quantity}
                     type="number"
@@ -631,7 +631,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   <div className="flex items-center gap-1">
                     <LineItemEditInput
                       edits={edits}
-                      id={item.id}
+                      rowId={item.id}
                       field="unit_price"
                       savedValue={item.unit_price}
                       type="number"
@@ -840,13 +840,11 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 ${(newItem.quantity * newItem.unit_price).toFixed(2)}
               </TableCell>
               <TableCell>
-                <div className="flex gap-1">
-                  <AddLineButton
-                    label="Add item"
-                    onClick={handleAdd}
-                    isPending={addItem.isPending}
-                  />
-                </div>
+                <AddLineButton
+                  label="Add item"
+                  onClick={handleAdd}
+                  isPending={addItem.isPending}
+                />
               </TableCell>
             </TableRow>
           )}

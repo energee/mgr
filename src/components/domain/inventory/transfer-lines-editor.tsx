@@ -426,7 +426,7 @@ export function TransferLinesEditor({
                 {editable ? (
                   <LineItemEditInput
                     edits={edits}
-                    id={line.id}
+                    rowId={line.id}
                     field="quantity"
                     savedValue={line.quantity}
                     type="number"
@@ -513,7 +513,7 @@ export function TransferLinesEditor({
                   label="Add line"
                   onClick={handleAdd}
                   isPending={addLine.isPending}
-                  disabled={addLine.isPending || !selectedKey}
+                  disabled={!selectedKey}
                 />
               </TableCell>
             </TableRow>

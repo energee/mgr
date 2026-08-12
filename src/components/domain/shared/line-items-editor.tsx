@@ -10,6 +10,24 @@
  * Cancel button below the table. This module owns that shape; the per-entity
  * columns, queries and mutations stay in each editor.
  *
+ * Scope — deliberately four, not five. `selling-format-bom-editor` looks like a
+ * sibling but shares none of this machinery: it adds rows through a
+ * Popover/Command picker (so no add row, no Cancel), its empty state replaces
+ * the table rather than being a row in it, and its "N per M" ratio pair writes
+ * two inputs into a single stored decimal, which the one-input-per-`savedValue`
+ * buffer here cannot express. It is left alone on purpose.
+ *
+ * Why this is not in `universal/`, and why the shell is narrow:
+ * `ui-systems-expert.md` records a prior campaign that tried to generalize
+ * these editors and found a shared *shell* to be a near-empty passthrough.
+ * That verdict still holds for layout, which is why `LineItemsEditorShell`
+ * claims only the heading/Add/Cancel chrome and leaves every table, column and
+ * `colSpan` with the caller. What it did not cover is the buffered-commit
+ * state machine, which was genuinely triplicated and is the real payload here
+ * (`useLineItemEdits`). `universal/` is for the config-driven entity engine;
+ * this module reads no `EntityConfig` and is imported by name, so it belongs in
+ * `domain/shared/` alongside the other cross-domain, non-config UI.
+ *
  * What lives here:
  * - `useAddRow` — add-row visibility (open/close, with an optional reset on close).
  * - `useLineItemEdits` — the `Record<"<id>:<field>", string>` buffer plus the
@@ -53,6 +71,12 @@ export type AddRowController = {
  * `onClose` runs on every close (Cancel button or a programmatic `close()`
  * after a successful insert), so editors that reset draft form state on cancel
  * declare that reset once here instead of duplicating it at both call sites.
+ *
+ * Only `transfer-lines-editor` needs it today: Cancel lives inside the shell,
+ * so an editor whose draft state must reset on Cancel has no other hook. Order
+ * and PO reset their draft explicitly before calling `close()` (they reset on
+ * insert but deliberately not on Cancel), and the session editor has nothing
+ * to reset — so `addRow.close()` alone does not tell you whether a reset ran.
  */
 export function useAddRow(options?: { onClose?: () => void }): AddRowController {
   const [showAddRow, setShowAddRow] = useState(false);
@@ -95,6 +119,11 @@ export type LineItemEditsController<F extends string> = {
  *
  * `parse` returns `null` for input that should revert (empty/NaN/out of range);
  * `onCommit` performs the actual write.
+ *
+ * Buffer entries are dropped on commit but not on row deletion, so a row
+ * deleted mid-edit leaves its key behind for the editor's lifetime. Harmless
+ * and pre-existing: row ids are UUIDs, so a stale key can never be re-read by
+ * a different row, and the map dies with the component.
  */
 export function useLineItemEdits<F extends string>({
   parse,
@@ -131,11 +160,15 @@ export function useLineItemEdits<F extends string>({
 
 type LineItemEditInputProps<F extends string> = Omit<
   ComponentProps<typeof Input>,
-  "value" | "onChange" | "onBlur" | "onKeyDown"
+  "value" | "onChange" | "onBlur" | "onKeyDown" | "id"
 > & {
   edits: LineItemEditsController<F>;
-  /** Row id — half of the buffer key. */
-  id: string;
+  /**
+   * Row id — half of the buffer key. Deliberately not named `id`: that would
+   * collide with the DOM `id` attribute, so a caller adding `id="qty-1"` for a
+   * `<label htmlFor>` would silently repoint the buffer key with no type error.
+   */
+  rowId: string;
   field: F;
   /** Value currently stored for this cell; shown whenever nothing is buffered. */
   savedValue: number | null;
@@ -147,17 +180,17 @@ type LineItemEditInputProps<F extends string> = Omit<
  */
 export function LineItemEditInput<F extends string>({
   edits,
-  id,
+  rowId,
   field,
   savedValue,
   ...inputProps
 }: LineItemEditInputProps<F>) {
-  const commit = () => edits.commit(id, field, savedValue);
+  const commit = () => edits.commit(rowId, field, savedValue);
   return (
     <Input
       {...inputProps}
-      value={edits.valueFor(id, field) ?? savedValue ?? ""}
-      onChange={(e) => edits.setEdit(id, field, e.target.value)}
+      value={edits.valueFor(rowId, field) ?? savedValue ?? ""}
+      onChange={(e) => edits.setEdit(rowId, field, e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === "Enter") commit();
@@ -171,8 +204,6 @@ export function LineItemEditInput<F extends string>({
 // =============================================================================
 
 type LineItemsEditorShellProps = {
-  /** Heading above the table. */
-  title?: string;
   /** Label for the Add button (e.g. "Add Item", "Add Line"). */
   addLabel: string;
   /** Whether the Add button is offered at all (false in read-only/locked states). */
@@ -191,7 +222,6 @@ type LineItemsEditorShellProps = {
  * The table itself stays with the caller — column shapes differ per entity.
  */
 export function LineItemsEditorShell({
-  title = "Line Items",
   addLabel,
   canAdd,
   addDisabled,
@@ -202,7 +232,7 @@ export function LineItemsEditorShell({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">{title}</h3>
+        <h3 className="text-lg font-medium">Line Items</h3>
         {canAdd && !addRow.showAddRow && (
           <Button
             size="sm"
@@ -235,7 +265,15 @@ export function LineItemsEditorShell({
   );
 }
 
-/** Centered spinner shown while the line-item query is in flight. */
+/**
+ * Centered spinner shown while the line-item query is in flight.
+ *
+ * Deliberately a bare `Loader2` rather than the `ui/spinner` primitive: that
+ * primitive carries `role="status" aria-label="Loading"`, which would add a
+ * live region to the accessible tree that these four editors did not previously
+ * expose. This extraction is behavior-preserving, so the swap (an improvement,
+ * but a user-visible one for screen readers) belongs in its own change.
+ */
 export function LineItemsLoading() {
   return (
     <div className="flex items-center justify-center py-8">
@@ -266,14 +304,14 @@ export function LineItemsTotalFooter({
   labelColSpan,
   label,
   amount,
-  trailingCell = false,
+  trailingCell,
 }: {
   /** Columns the label spans before the amount cell. */
   labelColSpan: number;
   label: string;
   amount: number;
   /** Renders a trailing empty cell to line up with the actions column. */
-  trailingCell?: boolean;
+  trailingCell: boolean;
 }) {
   return (
     <TableFooter>
@@ -296,22 +334,30 @@ export function AddLineButton({
   onClick,
   isPending,
   disabled,
+  className = "h-8 w-8",
 }: {
   /** Accessible name, e.g. "Add line item". */
   label: string;
   onClick: () => void;
   isPending: boolean;
-  /** Defaults to `isPending` when omitted. */
+  /**
+   * Extra disable condition, OR-ed with `isPending` — the pending guard is
+   * always applied, so a caller cannot accidentally drop it.
+   */
   disabled?: boolean;
+  /** Sizing/positioning classes. */
+  className?: string;
 }) {
   return (
     <Button
       size="icon"
       aria-label={label}
-      className="h-8 w-8"
+      className={className}
       onClick={onClick}
-      disabled={disabled ?? isPending}
+      disabled={disabled || isPending}
     >
+      {/* Decorative: the button already carries the accessible name, so this
+          stays a bare icon rather than a role="status" Spinner. */}
       {isPending ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (

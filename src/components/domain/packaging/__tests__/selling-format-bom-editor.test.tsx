@@ -3,7 +3,12 @@
  * Characterization tests for SellingFormatBOMEditor.
  *
  * The only line-item editor of the family without coverage before the shared
- * <LineItemsEditor> refactor. Pins its render + commit behavior: the empty
+ * line-items-editor extraction, and the one editor that extraction deliberately
+ * left alone — its Popover/Command add flow and "N per M" ratio inputs fit none
+ * of the shared primitives (see the scope note in
+ * `src/components/domain/shared/line-items-editor.tsx`). This coverage exists so
+ * that decision is pinned rather than assumed. Pins its render + commit
+ * behavior: the empty
  * state, the row-per-material table, the QtyEditor branch (whole-unit "X per
  * Y" ratio inputs vs single decimal input), commit-on-blur semantics for
  * quantity (invalid/zero/unchanged input does NOT write), notes-on-blur

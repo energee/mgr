@@ -342,7 +342,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 ) : (
                   <LineItemEditInput
                     edits={edits}
-                    id={item.id}
+                    rowId={item.id}
                     field="quantity"
                     savedValue={item.quantity}
                     type="number"
@@ -374,7 +374,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 ) : (
                   <LineItemEditInput
                     edits={edits}
-                    id={item.id}
+                    rowId={item.id}
                     field="unit_price"
                     savedValue={item.unit_price}
                     type="number"

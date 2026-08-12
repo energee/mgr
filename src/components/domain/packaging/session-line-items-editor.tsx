@@ -204,7 +204,7 @@ export function SessionLineItemsEditor({
       addLabel="Add Line Item"
       canAdd={!readOnly}
       addRow={addRow}
-      buttonClassName={cn(isTouch && "min-h-[44px]")}
+      buttonClassName={isTouch ? "min-h-[44px]" : undefined}
     >
       {isMobile ? (
         <div className="space-y-3">
