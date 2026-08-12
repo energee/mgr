@@ -163,10 +163,19 @@ export { convertIngredientQuantity } from "@/domain/units";
  * Aggregate material consumption for a packaging session:
  * BOM lines x actual packaged quantity, summed per inventory item.
  *
- * Mirrors the planned-quantity math in useSessionMaterialPreview
- * (src/hooks/use-material-planning.ts): whole-unit materials (each/case)
+ * Mirrors the planned-quantity math in `computeSessionMaterialRequirements`
+ * (src/domain/material-planning.ts): whole-unit materials (each/case)
  * use exact integer ratios recovered from the 4-decimal stored value when
  * possible, and are ceiled at the end — you cannot consume half a tray.
+ *
+ * The two are deliberately NOT merged. This one is the actual-quantity
+ * depletion path and differs on four axes: it skips `actual_quantity <= 0`,
+ * drops zero-valued results, returns a `Map<string, number>` rather than
+ * display rows, and does no batch grouping — the per-batch ceiling lives in
+ * its caller (src/services/consumption-service.ts). Merging would move a
+ * grouping responsibility across a module boundary, which is a rewrite, not a
+ * dedup. `WHOLE_UNIT_PARITY_CASES` is what keeps the shared ratio/ceiling rule
+ * from drifting between them.
  *
  * Line items without a format or actual quantity are skipped (they did not
  * produce finished goods and consumed nothing attributable).

@@ -8,16 +8,22 @@
  * Every implementation of the rule must therefore recover the exact integer
  * ratio behind the stored decimal BEFORE ceiling.
  *
- * There are three such implementations, and they must agree exactly:
+ * There are four such implementations, and they must agree exactly:
  * - `computeBomConsumption` (src/domain/consumption-planning.ts) — the TS
- *   reference, used by the preview the operator approves,
+ *   reference for the actual-quantity depletion path,
+ * - `computeSessionMaterialRequirements` (src/domain/material-planning.ts) —
+ *   the planned-quantity preview the operator approves. Deliberately not
+ *   merged with the above (different zero-row, grouping and return
+ *   semantics); this table is what stops the shared ratio/ceiling rule
+ *   drifting between them,
  * - `whole_unit_material_qty()` (migration 00217) — used by the revise RPC,
  * - `exact_material_qty()` (migration 00279) — the non-ceiling core shared by
  *   the above and by `transition_entity_atomic`'s completion depletion.
  *
  * This table is the single source of truth those parity assertions read, so a
  * formula change on one side cannot quietly diverge from the others:
- * - src/domain/__tests__/consumption-planning.test.ts (TS side)
+ * - src/domain/__tests__/consumption-planning.test.ts (TS, depletion)
+ * - src/domain/__tests__/material-planning.test.ts (TS, planned preview)
  * - src/__tests__/integration/packaging-material-consumption.test.ts (SQL side)
  */
 
