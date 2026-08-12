@@ -1,17 +1,25 @@
 // @vitest-environment node
 /**
- * Tests for the brewing water-chemistry calculations (sulfate:chloride
- * ratio, salt ion contributions, resulting-profile math) in
- * src/domain/water-chemistry.ts.
+ * Tests for the brewing water-chemistry calculations in
+ * src/domain/water-chemistry.ts: sulfate:chloride ratio and its flavor
+ * bands, salt ion contributions, resulting-profile math, the greedy
+ * source→target salt solver, nullable-row normalization, and the
+ * SaltAdditions → recipe_additions item mapping consumed by the recipe
+ * additions "Apply to Recipe" write path.
  */
 
 import { describe, it, expect } from "vitest";
 import {
   calculateSulfateChlorideRatio,
   formatRatio,
+  getRatioDescription,
   calculateIonContribution,
   calculateResultingProfile,
+  calculateAdditions,
+  toWaterProfile,
+  mapSaltAdditionsToItems,
   SALT_CONTRIBUTIONS,
+  SALT_ADDITIVE_MAP,
   type WaterProfile,
   type SaltAdditions,
 } from "@/domain/water-chemistry";
@@ -119,5 +127,191 @@ describe("calculateResultingProfile", () => {
     expect(result.calcium_ppm).toBe(205);
     expect(result.sulfate_ppm).toBe(491.3);
     expect(result.chloride_ppm).toBe(0);
+  });
+});
+
+describe("getRatioDescription", () => {
+  // The five bands are inclusive at their lower bound; these cases pin each
+  // boundary so a threshold tweak can't slide a ratio into the wrong band.
+  it.each([
+    [10, "Very Hoppy"],
+    [2.5, "Very Hoppy"],
+    [2.4, "Hoppy"],
+    [1.5, "Hoppy"],
+    [1.4, "Balanced"],
+    [0.8, "Balanced"],
+    [0.7, "Malty"],
+    [0.4, "Malty"],
+    [0.3, "Very Malty"],
+    [0, "Very Malty"],
+  ])("labels ratio %s as %s", (ratio, label) => {
+    expect(getRatioDescription(ratio).label).toBe(label);
+  });
+
+  it("returns a non-empty character blurb alongside every label", () => {
+    for (const ratio of [3, 2, 1, 0.5, 0]) {
+      expect(getRatioDescription(ratio).character.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("calculateAdditions", () => {
+  it("derives gypsum from the sulfate delta and calcium chloride from the chloride delta", () => {
+    const target: WaterProfile = {
+      ...ZERO_PROFILE,
+      sulfate_ppm: 100,
+      chloride_ppm: 50,
+    };
+    const result = calculateAdditions(ZERO_PROFILE, target, 10);
+
+    expect(result.gypsum_g).toBe(
+      Math.round((1000 / SALT_CONTRIBUTIONS.gypsum.sulfate) * 10) / 10
+    );
+    expect(result.calcium_chloride_g).toBe(
+      Math.round((500 / SALT_CONTRIBUTIONS.calcium_chloride.chloride) * 10) / 10
+    );
+  });
+
+  it("adds nothing when the target is at or below the source (deltas floor at zero)", () => {
+    const source: WaterProfile = {
+      calcium_ppm: 100,
+      magnesium_ppm: 20,
+      sodium_ppm: 30,
+      sulfate_ppm: 200,
+      chloride_ppm: 100,
+      bicarbonate_ppm: 50,
+    };
+    expect(calculateAdditions(source, ZERO_PROFILE, 10)).toEqual(ZERO_ADDITIONS);
+  });
+
+  it("uses epsom salt for magnesium and baking soda for bicarbonate", () => {
+    const target: WaterProfile = {
+      ...ZERO_PROFILE,
+      magnesium_ppm: 10,
+      bicarbonate_ppm: 60,
+    };
+    const result = calculateAdditions(ZERO_PROFILE, target, 10);
+
+    expect(result.epsom_salt_g).toBe(
+      Math.round((100 / SALT_CONTRIBUTIONS.epsom_salt.magnesium) * 10) / 10
+    );
+    expect(result.baking_soda_g).toBe(
+      Math.round((600 / SALT_CONTRIBUTIONS.baking_soda.bicarbonate) * 10) / 10
+    );
+  });
+
+  it("only reaches for table salt when the sodium delta exceeds 50 ppm", () => {
+    const atThreshold = calculateAdditions(
+      ZERO_PROFILE,
+      { ...ZERO_PROFILE, sodium_ppm: 50 },
+      10
+    );
+    expect(atThreshold.table_salt_g).toBe(0);
+
+    const aboveThreshold = calculateAdditions(
+      ZERO_PROFILE,
+      { ...ZERO_PROFILE, sodium_ppm: 60 },
+      10
+    );
+    expect(aboveThreshold.table_salt_g).toBe(
+      Math.round((600 / SALT_CONTRIBUTIONS.table_salt.sodium) * 10) / 10
+    );
+  });
+
+  it("never suggests chalk or magnesium chloride (the greedy pass has no branch for them)", () => {
+    const target: WaterProfile = {
+      calcium_ppm: 150,
+      magnesium_ppm: 20,
+      sodium_ppm: 80,
+      sulfate_ppm: 250,
+      chloride_ppm: 120,
+      bicarbonate_ppm: 100,
+    };
+    const result = calculateAdditions(ZERO_PROFILE, target, 10);
+    expect(result.chalk_g).toBe(0);
+    expect(result.magnesium_chloride_g).toBe(0);
+  });
+});
+
+describe("toWaterProfile", () => {
+  it("coerces null and missing ppm columns to 0 while preserving real values", () => {
+    expect(
+      toWaterProfile({
+        calcium_ppm: 50,
+        magnesium_ppm: null,
+        sodium_ppm: 0,
+        sulfate_ppm: 120.5,
+      })
+    ).toEqual({
+      calcium_ppm: 50,
+      magnesium_ppm: 0,
+      sodium_ppm: 0,
+      sulfate_ppm: 120.5,
+      chloride_ppm: 0,
+      bicarbonate_ppm: 0,
+    });
+  });
+
+  it("maps an all-null row to the zero profile", () => {
+    expect(
+      toWaterProfile({
+        calcium_ppm: null,
+        magnesium_ppm: null,
+        sodium_ppm: null,
+        sulfate_ppm: null,
+        chloride_ppm: null,
+        bicarbonate_ppm: null,
+      })
+    ).toEqual(ZERO_PROFILE);
+  });
+});
+
+describe("mapSaltAdditionsToItems", () => {
+  const catalog = Object.entries(SALT_ADDITIVE_MAP).map(([field, name]) => ({
+    id: `id-${field}`,
+    name,
+  }));
+
+  it("emits one mash-timed gram item per non-zero salt, in SALT_ADDITIVE_MAP order", () => {
+    const items = mapSaltAdditionsToItems(
+      { ...ZERO_ADDITIONS, calcium_chloride_g: 3.9, gypsum_g: 6.8 },
+      catalog
+    );
+    expect(items).toEqual([
+      { additive_id: "id-gypsum_g", amount: 6.8, unit: "g", timing: "mash", target: "mash" },
+      {
+        additive_id: "id-calcium_chloride_g",
+        amount: 3.9,
+        unit: "g",
+        timing: "mash",
+        target: "mash",
+      },
+    ]);
+  });
+
+  it("skips zero and negative amounts", () => {
+    expect(
+      mapSaltAdditionsToItems(
+        { ...ZERO_ADDITIONS, gypsum_g: 0, epsom_salt_g: -1 },
+        catalog
+      )
+    ).toEqual([]);
+  });
+
+  it("matches catalog names case-insensitively", () => {
+    const items = mapSaltAdditionsToItems({ ...ZERO_ADDITIONS, gypsum_g: 2 }, [
+      { id: "lower", name: "gypsum" },
+    ]);
+    expect(items).toEqual([
+      { additive_id: "lower", amount: 2, unit: "g", timing: "mash", target: "mash" },
+    ]);
+  });
+
+  it("drops salts with no matching catalog entry rather than failing", () => {
+    expect(
+      mapSaltAdditionsToItems({ ...ZERO_ADDITIONS, chalk_g: 5 }, [
+        { id: "id-gypsum_g", name: "Gypsum" },
+      ])
+    ).toEqual([]);
   });
 });

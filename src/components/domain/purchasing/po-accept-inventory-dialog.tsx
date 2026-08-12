@@ -14,26 +14,21 @@
  * item, resolved through the existing chain
  * inventory_lots.po_receive_id → po_receives.po_line_item_id →
  * po_line_items.catalog_type/catalog_id — so repeat receipts don't re-ask
- * for the same mapping. Bin placement writes a structured
- * bin_inventory_items row (lot ↔ bin ↔ quantity); the legacy free-text
- * inventory_lots.location column is only mirrored with the canonical bin
- * name so existing location display/search keeps working.
+ * for the same mapping.
  *
- * The received unit is copied verbatim onto the created lot, so when it
- * differs from the selected inventory item's unit (alias-tolerant compare
- * via unitsEquivalent) a non-blocking warning is shown — a lot stored in
- * "sack" can never reconcile with demand planned in the item's unit.
+ * This file owns the dialog chrome, data fetching, and row-selection
+ * state. The row grid (desktop table / mobile cards, item + bin pickers)
+ * lives in po-accept-receive-grid.tsx, and the accept write path (lot
+ * creation + bin placement + cache invalidation) in
+ * use-po-accept-mutation.ts.
  *
  * Hands-on receiving support (audit F-38): a keyboard-wedge scan field
  * (shared/scan-input.tsx) matches scanned lot numbers against the
- * unaccepted receives and selects them; below the md breakpoint
- * (useIsMobile) the 7-column table is replaced by stacked cards, and on
- * coarse-pointer devices (useIsTouch) checkboxes and the per-row
- * comboboxes get enlarged hit areas.
+ * unaccepted receives and selects them.
  */
 
-import { useState, useCallback, useMemo, useEffect, useId } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicRpc } from "@/services/types";
 import { unwrap } from "@/lib/supabase/query-helpers";
@@ -46,64 +41,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FormActions } from "@/components/ui/form-actions";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ComboboxField, ComboboxItem } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PackageCheck, AlertCircle, AlertTriangle } from "lucide-react";
+import { PackageCheck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { resolveCatalogNames } from "@/entities/po-line-item";
-import { unitsEquivalent } from "@/domain/inventory-units";
-import {
-  poReceiveKeys,
-  entityKeys,
-  binKeys,
-  inventoryKeys,
-} from "@/lib/query-keys";
-import { inventoryLotCore } from "@/entities/inventory-lot/core";
-import { log } from "@/lib/client-logger";
-import { cn } from "@/lib/utils";
-import { useIsMobile, useIsTouch } from "@/hooks/use-mobile";
+import { poReceiveKeys, entityKeys, binKeys } from "@/lib/query-keys";
 import { ScanInput } from "@/components/domain/shared/scan-input";
 import { matchScanCode } from "@/components/domain/shared/scan-match";
 import {
   buildMappingDefaults,
-  buildBinPlacements,
   catalogKey,
   type PriorLotRow,
+  type UnacceptedReceive,
+  type RowState,
 } from "@/domain/purchasing/po-accept-utils";
-
-// =============================================================================
-// Types
-// =============================================================================
-
-type UnacceptedReceive = {
-  receive_id: string;
-  po_line_item_id: string;
-  catalog_type: string;
-  catalog_id: string;
-  catalog_name: string; // resolved client-side
-  quantity: number;
-  unit: string;
-  unit_price: number | null;
-  lot_number: string | null;
-  expiration_date: string | null;
-  received_date: string | null;
-}
-
-type RowState = {
-  selected: boolean;
-  inventory_item_id: string;
-  /** Storage bin (bins.id); writes a bin_inventory_items row on accept */
-  bin_id: string;
-}
+import { useIsMobile, useIsTouch } from "@/hooks/use-mobile";
+import { POAcceptReceiveGrid } from "./po-accept-receive-grid";
+import { usePoAcceptMutation } from "./use-po-accept-mutation";
 
 type POAcceptInventoryDialogProps = {
   poId: string;
@@ -111,25 +65,16 @@ type POAcceptInventoryDialogProps = {
   onClose: () => void;
 }
 
-/** Error message used when lots were created but bin placement failed */
-const PLACEMENT_FAILED_MESSAGE =
-  "Items were accepted, but bin placement failed — assign bins from the bin pages.";
-
-// =============================================================================
-// Component
-// =============================================================================
-
 export function POAcceptInventoryDialog({
   poId,
   open,
   onClose,
 }: POAcceptInventoryDialogProps) {
   const supabase = createClient();
-  const queryClient = useQueryClient();
+  // Subscribed here and passed down as props so the grid stays free of
+  // matchMedia — see the header of po-accept-receive-grid.tsx.
   const isMobile = useIsMobile();
   const isTouch = useIsTouch();
-  // Unique id base for mobile-card checkbox/label association
-  const selectAllId = useId();
 
   // Per-row user overrides; rows the user hasn't touched fall back to
   // defaultRowState (prefilled from the last acceptance of the same
@@ -298,7 +243,7 @@ export function POAcceptInventoryDialog({
 
   const allSelected = useMemo(
     () =>
-      receives &&
+      !!receives &&
       receives.length > 0 &&
       receives.every((r) => getRowState(r).selected),
     [receives, getRowState]
@@ -357,102 +302,14 @@ export function POAcceptInventoryDialog({
     );
   }, [selectedReceives, getRowState]);
 
-  // Mutation: create inventory_lots, then structured bin placements
-  const acceptMutation = useMutation({
-    mutationFn: async () => {
-      const lotsToInsert = selectedReceives.map((r) => {
-        const state = getRowState(r);
-        return {
-          inventory_item_id: state.inventory_item_id,
-          po_receive_id: r.receive_id,
-          quantity: r.quantity,
-          unit: r.unit,
-          unit_cost: r.unit_price,
-          lot_number: r.lot_number,
-          expiration_date: r.expiration_date,
-          received_date: r.received_date,
-          // Legacy text column mirrors the canonical bin name so existing
-          // location display/search keeps working; the structured placement
-          // lives in bin_inventory_items (inserted below).
-          location: state.bin_id
-            ? binNameById.get(state.bin_id) ?? null
-            : null,
-        };
-      });
-
-      const { data: insertedLots, error } = await supabase
-        .from("inventory_lots")
-        .insert(lotsToInsert)
-        .select("id, po_receive_id");
-
-      if (error) throw error;
-
-      // Structured lot↔bin placement rows (quantity = full lot quantity)
-      const placementByReceiveId = new Map(
-        selectedReceives.flatMap((r) => {
-          const state = getRowState(r);
-          return state.bin_id
-            ? ([[r.receive_id, { bin_id: state.bin_id, quantity: r.quantity }]] as const)
-            : [];
-        })
-      );
-      const placements = buildBinPlacements(
-        insertedLots ?? [],
-        placementByReceiveId
-      );
-      if (placements.length > 0) {
-        const { error: placementError } = await supabase
-          .from("bin_inventory_items")
-          .insert(placements);
-        if (placementError) {
-          // Lots are already accepted at this point — surface a precise
-          // message instead of the generic failure toast.
-          log.error("Bin placement insert error:", placementError);
-          throw new Error(PLACEMENT_FAILED_MESSAGE);
-        }
-      }
-    },
-    onSuccess: () => {
-      const count = selectedReceives.length;
-      toast.success(
-        `${count} item${count !== 1 ? "s" : ""} accepted into inventory`
-      );
+  // Accept write path (lot creation + bin placement + invalidation)
+  const acceptMutation = usePoAcceptMutation({
+    selectedReceives,
+    getRowState,
+    binNameById,
+    onAccepted: () => {
       setRowStates({});
       onClose();
-    },
-    onError: (error) => {
-      log.error("Accept into inventory error:", error);
-      toast.error(
-        error instanceof Error && error.message === PLACEMENT_FAILED_MESSAGE
-          ? PLACEMENT_FAILED_MESSAGE
-          : "Failed to accept items into inventory"
-      );
-    },
-    // Invalidate on settled (not just success): the lots insert may have
-    // succeeded even when bin placement subsequently failed. The whole
-    // po-receives namespace is invalidated so mapping defaults pick up
-    // this acceptance as the newest mapping.
-    onSettled: () => {
-      queryClient.invalidateQueries({
-        queryKey: poReceiveKeys.all(),
-      });
-      // Both the base table and the view: the lots list/detail pages key off
-      // `viewTable ?? table`, so they cache under
-      // `inventory_lots_with_quantities` and the base-table key alone reaches
-      // nothing (issue #615, same class as #560). Derived from the entity core
-      // rather than typed literals so a view rename keeps the pair correct —
-      // this mirrors invalidationKeys() in entity-service.ts, which this raw
-      // insert bypasses.
-      queryClient.invalidateQueries({
-        queryKey: entityKeys.all(inventoryLotCore.table),
-      });
-      queryClient.invalidateQueries({
-        queryKey: entityKeys.all(inventoryLotCore.viewTable!),
-      });
-      // Aggregates summed over lot rows.
-      queryClient.invalidateQueries({ queryKey: inventoryKeys.itemOnHand() });
-      queryClient.invalidateQueries({ queryKey: inventoryKeys.lots() });
-      queryClient.invalidateQueries({ queryKey: binKeys.all() });
     },
   });
 
@@ -487,188 +344,18 @@ export function POAcceptInventoryDialog({
               placeholder="Scan or type a lot number to select…"
               ariaLabel="Scan lot number"
             />
-            {isMobile ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 px-1">
-                  <Checkbox
-                    id={selectAllId}
-                    className="size-5"
-                    checked={allSelected ?? false}
-                    onCheckedChange={toggleAll}
-                  />
-                  <label
-                    htmlFor={selectAllId}
-                    className="text-sm text-muted-foreground"
-                  >
-                    Select all
-                  </label>
-                </div>
-                {receives.map((r) => {
-                  const state = getRowState(r);
-                  const itemUnit = state.inventory_item_id
-                    ? itemUnitById.get(state.inventory_item_id)
-                    : undefined;
-                  return (
-                    <div
-                      key={r.receive_id}
-                      className={cn(
-                        "space-y-3 rounded-lg border p-4",
-                        state.selected && "border-primary/50 bg-primary/5"
-                      )}
-                    >
-                      {/* Whole header is the (≥44px) selection target */}
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          id={`${selectAllId}-${r.receive_id}`}
-                          className="mt-0.5 size-5"
-                          checked={state.selected}
-                          onCheckedChange={(checked) =>
-                            updateRow(r, { selected: !!checked })
-                          }
-                        />
-                        <label
-                          htmlFor={`${selectAllId}-${r.receive_id}`}
-                          className="min-w-0 flex-1"
-                        >
-                          <span className="block font-medium">
-                            {r.catalog_name}
-                          </span>
-                          <span className="block text-sm text-muted-foreground">
-                            {r.quantity} {r.unit}
-                            {r.lot_number ? ` · Lot ${r.lot_number}` : ""}
-                            {r.expiration_date
-                              ? ` · Exp ${r.expiration_date}`
-                              : ""}
-                          </span>
-                        </label>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Inventory Item
-                        </span>
-                        <CellCombobox
-                          value={state.inventory_item_id}
-                          options={itemOptions}
-                          onChange={(v) =>
-                            updateRow(r, { inventory_item_id: v })
-                          }
-                          placeholder="Search items..."
-                          emptyText="No items found"
-                          ariaLabel={`Inventory item for ${r.catalog_name}`}
-                          tall
-                        />
-                        <ReceivedUnitNote
-                          itemUnit={itemUnit}
-                          receivedUnit={r.unit}
-                          quantity={r.quantity}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Bin
-                        </span>
-                        <CellCombobox
-                          value={state.bin_id}
-                          options={binOptions}
-                          onChange={(v) => updateRow(r, { bin_id: v })}
-                          placeholder="Search bins..."
-                          emptyText="No bins found"
-                          ariaLabel={`Bin for ${r.catalog_name}`}
-                          clearable
-                          tall
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        className={cn(isTouch && "size-5")}
-                        checked={allSelected ?? false}
-                        onCheckedChange={toggleAll}
-                        aria-label="Select all"
-                      />
-                    </TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead>Lot #</TableHead>
-                    <TableHead>Expiration</TableHead>
-                    <TableHead className="min-w-[200px]">
-                      Inventory Item
-                    </TableHead>
-                    <TableHead className="min-w-[160px]">Bin</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {receives.map((r) => {
-                    const state = getRowState(r);
-                    const itemUnit = state.inventory_item_id
-                      ? itemUnitById.get(state.inventory_item_id)
-                      : undefined;
-
-                    return (
-                      <TableRow key={r.receive_id}>
-                        <TableCell>
-                          <Checkbox
-                            className={cn(isTouch && "size-5")}
-                            checked={state.selected}
-                            onCheckedChange={(checked) =>
-                              updateRow(r, {
-                                selected: !!checked,
-                              })
-                            }
-                            aria-label={`Select ${r.catalog_name}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {r.catalog_name}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {r.quantity} {r.unit}
-                        </TableCell>
-                        <TableCell>{r.lot_number || "—"}</TableCell>
-                        <TableCell>{r.expiration_date || "—"}</TableCell>
-                        <TableCell>
-                          <CellCombobox
-                            value={state.inventory_item_id}
-                            options={itemOptions}
-                            onChange={(v) =>
-                              updateRow(r, { inventory_item_id: v })
-                            }
-                            placeholder="Search items..."
-                            emptyText="No items found"
-                            ariaLabel={`Inventory item for ${r.catalog_name}`}
-                            tall={isTouch}
-                          />
-                          <ReceivedUnitNote
-                            itemUnit={itemUnit}
-                            receivedUnit={r.unit}
-                            quantity={r.quantity}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <CellCombobox
-                            value={state.bin_id}
-                            options={binOptions}
-                            onChange={(v) => updateRow(r, { bin_id: v })}
-                            placeholder="Search bins..."
-                            emptyText="No bins found"
-                            ariaLabel={`Bin for ${r.catalog_name}`}
-                            clearable
-                            tall={isTouch}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
+            <POAcceptReceiveGrid
+              receives={receives}
+              getRowState={getRowState}
+              updateRow={updateRow}
+              allSelected={allSelected}
+              toggleAll={toggleAll}
+              itemOptions={itemOptions}
+              binOptions={binOptions}
+              itemUnitById={itemUnitById}
+              isMobile={isMobile}
+              isTouch={isTouch}
+            />
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -696,120 +383,5 @@ export function POAcceptInventoryDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// =============================================================================
-// ReceivedUnitNote — unit context under the inventory-item picker
-// =============================================================================
-
-/**
- * Non-blocking note under the inventory-item picker, shared by the table
- * and mobile-card layouts. Shows the selected item's tracking unit,
- * escalating to a warning when it differs from the received unit
- * (alias-tolerant compare via unitsEquivalent): the lot is created in the
- * received unit, so quantities won't reconcile with the item's unit.
- */
-function ReceivedUnitNote({
-  itemUnit,
-  receivedUnit,
-  quantity,
-}: {
-  itemUnit: string | undefined;
-  receivedUnit: string;
-  quantity: number;
-}) {
-  if (!itemUnit) return null;
-  const unitMismatch =
-    !!receivedUnit && !unitsEquivalent(itemUnit, receivedUnit);
-  return (
-    <p
-      className={
-        unitMismatch
-          ? "mt-1 flex items-start gap-1 text-xs text-amber-600 dark:text-amber-400"
-          : "mt-1 text-xs text-muted-foreground"
-      }
-    >
-      {unitMismatch && <AlertTriangle className="h-3.5 w-3.5 shrink-0" />}
-      {unitMismatch
-        ? `Received in ${receivedUnit}, but this item is tracked in ${itemUnit} — the lot will be stored as ${quantity} ${receivedUnit} and won't reconcile with ${itemUnit} planning.`
-        : `Item tracked in ${itemUnit}`}
-    </p>
-  );
-}
-
-// =============================================================================
-// CellCombobox — compact searchable picker for table cells
-// =============================================================================
-
-/**
- * Table-cell-sized searchable picker for table cells. Wraps the shared
- * {@link ComboboxField} primitive, which owns the "control inputValue from
- * the selected label" fix (the diceui Combobox doesn't sync its display text
- * when `value` changes programmatically — which happens here when rows are
- * prefilled from prior mappings).
- */
-function CellCombobox({
-  value,
-  options,
-  onChange,
-  placeholder,
-  emptyText,
-  ariaLabel,
-  clearable = false,
-  tall = false,
-}: {
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
-  placeholder: string;
-  emptyText: string;
-  ariaLabel: string;
-  /** Show an X button to clear the selection (for optional pickers) */
-  clearable?: boolean;
-  /** Larger hit area (h-10) for touch devices / mobile cards */
-  tall?: boolean;
-}) {
-  const labelByValue = useMemo(
-    () => new Map(options.map((o) => [o.value, o.label])),
-    [options]
-  );
-
-  const resolvedLabel = value ? (labelByValue.get(value) ?? "") : "";
-
-  const onFilter = useMemo(
-    () => (values: string[], inputValue: string) => {
-      const q = inputValue.trim().toLowerCase();
-      if (!q) return values;
-      return values.filter((v) =>
-        (labelByValue.get(v) ?? "").toLowerCase().includes(q)
-      );
-    },
-    [labelByValue]
-  );
-
-  return (
-    <ComboboxField
-      value={value || undefined}
-      selectedLabel={resolvedLabel}
-      onValueChange={(v) => onChange(v || "")}
-      onFilter={onFilter}
-      placeholder={placeholder}
-      emptyText={emptyText}
-      anchorClassName={tall ? "h-10" : "h-8"}
-      inputClassName={tall ? "h-10" : "h-8"}
-      inputProps={{ "aria-label": ariaLabel }}
-      onClear={clearable ? () => onChange("") : undefined}
-    >
-      {options.map((option) => (
-        <ComboboxItem
-          key={option.value}
-          value={option.value}
-          label={option.label}
-        >
-          {option.label}
-        </ComboboxItem>
-      ))}
-    </ComboboxField>
   );
 }

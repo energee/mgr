@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 /**
- * Characterization tests for the pure presentational sub-components of
- * RecipeAdditionsDisplay: `AdditionsTable` and `OtherAdditionsSection`.
+ * Characterization tests for the pure presentational components extracted from
+ * RecipeAdditionsDisplay: `AdditionsTable` (additions-table.tsx),
+ * `OtherAdditionsSection` (other-additions-section.tsx), and
+ * `WaterChemistrySummary` / `CalculatedAdditionsSection`
+ * (water-chemistry-summary.tsx).
  *
  * The top-level `RecipeAdditionsDisplay` is a data-fetching container (Supabase
  * + react-query + useCatalog/useResolvedUnitPreferences), so its branch logic is covered
@@ -27,12 +30,12 @@ vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 // CalculatedAdditionsSection reads the display volume unit via this hook.
 vi.mock("@/hooks/use-unit-preferences", () => ({ useResolvedUnitPreferences: () => ({ volume_unit: "bbl" }) }));
 
+import { AdditionsTable } from "../additions-table";
+import { OtherAdditionsSection } from "../other-additions-section";
 import {
-  AdditionsTable,
-  OtherAdditionsSection,
   WaterChemistrySummary,
   CalculatedAdditionsSection,
-} from "../recipe-additions-display";
+} from "../water-chemistry-summary";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;

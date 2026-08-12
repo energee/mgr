@@ -20,9 +20,9 @@ src/components/domain/packaging/add-to-packaging-session-dialog.tsx
 src/components/domain/packaging/packaging-batch-dialog.tsx
 src/components/domain/pricing/format-management.tsx
 src/components/domain/pricing/pricing-matrix-view.tsx
-src/components/domain/purchasing/po-accept-inventory-dialog.tsx
 src/components/domain/purchasing/po-line-items-editor.tsx
 src/components/domain/purchasing/supplier-catalog-section.tsx
+src/components/domain/purchasing/use-po-accept-mutation.ts
 src/components/domain/recipe/recipe-clone-dialog.tsx
 src/components/domain/shared/avatar-upload.tsx
 src/domain/purchasing/po-generator.ts
