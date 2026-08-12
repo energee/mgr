@@ -77,7 +77,6 @@ const nextConfig: NextConfig = {
       "lucide-react",
       "recharts",
       "date-fns",
-      "motion",
     ],
   },
 };

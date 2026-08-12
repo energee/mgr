@@ -37,7 +37,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ComponentType } from "react";
+import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { usePermissions } from "@/contexts/permissions";
@@ -55,24 +55,24 @@ import { purchaseOrderEntity } from "@/entities/purchase-order";
 import { inventoryLotEntity } from "@/entities/inventory-lot";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 import {
-  AnimatedBatches,
-  AnimatedChartColumn,
-  AnimatedChartLine,
-  AnimatedCircleDollarSign,
-  AnimatedCog,
-  AnimatedFileCheck,
-  AnimatedFileStack,
-  AnimatedFileText,
-  AnimatedHandCoins,
-  AnimatedHelpCircle,
-  AnimatedPackage,
-  AnimatedRoute,
-  AnimatedSettings,
-  AnimatedShieldCheck,
-  AnimatedShoppingCart,
-  AnimatedTelescope,
-  AnimatedUsers,
-} from "@/components/icons/animated";
+  Box,
+  ChartColumnIncreasing,
+  ChartLine,
+  CircleDollarSign,
+  CircleHelp,
+  Cog,
+  FileCheck,
+  FileStack,
+  FileText,
+  HandCoins,
+  Route,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  Telescope,
+  Users,
+  Waves,
+} from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -98,7 +98,7 @@ const RESULTS_PER_ENTITY = 5;
 const SEARCH_DEBOUNCE_MS = 200;
 
 type AnyEntityConfig = EntityConfig<Record<string, unknown>>;
-type IconComponent = ComponentType<{ className?: string }>;
+type IconComponent = LucideIcon;
 
 type SearchEntityDescriptor = {
   entity: AnyEntityConfig;
@@ -114,12 +114,12 @@ type SearchEntityDescriptor = {
  * resolvable routes, title field present).
  */
 export const SEARCH_ENTITIES: SearchEntityDescriptor[] = [
-  { entity: batchEntity as unknown as AnyEntityConfig, permission: "batches:read", icon: AnimatedBatches },
-  { entity: recipeEntity as unknown as AnyEntityConfig, permission: "recipes:read", icon: AnimatedFileText },
-  { entity: orderEntity as unknown as AnyEntityConfig, permission: "orders:read", icon: AnimatedFileCheck },
-  { entity: customerEntity as unknown as AnyEntityConfig, permission: "customers:read", icon: AnimatedUsers },
-  { entity: purchaseOrderEntity as unknown as AnyEntityConfig, permission: "purchasing:read", icon: AnimatedShoppingCart },
-  { entity: inventoryLotEntity as unknown as AnyEntityConfig, permission: "inventory:read", icon: AnimatedFileStack },
+  { entity: batchEntity as unknown as AnyEntityConfig, permission: "batches:read", icon: Waves },
+  { entity: recipeEntity as unknown as AnyEntityConfig, permission: "recipes:read", icon: FileText },
+  { entity: orderEntity as unknown as AnyEntityConfig, permission: "orders:read", icon: FileCheck },
+  { entity: customerEntity as unknown as AnyEntityConfig, permission: "customers:read", icon: Users },
+  { entity: purchaseOrderEntity as unknown as AnyEntityConfig, permission: "purchasing:read", icon: ShoppingCart },
+  { entity: inventoryLotEntity as unknown as AnyEntityConfig, permission: "inventory:read", icon: FileStack },
 ];
 
 const SEARCH_ENTITY_ICONS = new Map<string, IconComponent>(
@@ -209,18 +209,18 @@ function toSearchResult(
  * to them without re-adding nav clutter. Exported for tests.
  */
 export const DASHBOARD_PAGES: NavItem[] = [
-  { label: "Inventory Dashboard", href: "/dashboard/inventory", icon: AnimatedPackage },
-  { label: "Sales Dashboard", href: "/dashboard/sales", icon: AnimatedChartLine },
+  { label: "Inventory Dashboard", href: "/dashboard/inventory", icon: Box },
+  { label: "Sales Dashboard", href: "/dashboard/sales", icon: ChartLine },
 ];
 
 export const REPORT_PAGES: NavItem[] = [
-  { label: "TTB Report", href: "/reports/ttb", icon: AnimatedShieldCheck },
-  { label: "Production Summary", href: "/reports/production-summary", icon: AnimatedChartColumn },
-  { label: "Inventory Valuation", href: "/reports/inventory-valuation", icon: AnimatedHandCoins },
-  { label: "Batch Cost", href: "/reports/batch-cost", icon: AnimatedCircleDollarSign },
-  { label: "Projections", href: "/reports/projections", icon: AnimatedTelescope },
-  { label: "COGS", href: "/reports/cogs", icon: AnimatedCog },
-  { label: "Batch Trace", href: "/reports/trace", icon: AnimatedRoute },
+  { label: "TTB Report", href: "/reports/ttb", icon: ShieldCheck },
+  { label: "Production Summary", href: "/reports/production-summary", icon: ChartColumnIncreasing },
+  { label: "Inventory Valuation", href: "/reports/inventory-valuation", icon: HandCoins },
+  { label: "Batch Cost", href: "/reports/batch-cost", icon: CircleDollarSign },
+  { label: "Projections", href: "/reports/projections", icon: Telescope },
+  { label: "COGS", href: "/reports/cogs", icon: Cog },
+  { label: "Batch Trace", href: "/reports/trace", icon: Route },
 ];
 
 // =============================================================================
@@ -246,21 +246,21 @@ export const QUICK_ACTIONS: QuickAction[] = [
     label: "New Batch",
     href: `${resolveEntityBasePath(batchEntity)}/new`,
     permission: "batches:write",
-    icon: AnimatedBatches,
+    icon: Waves,
     keywords: "create batch production",
   },
   {
     label: "New Order",
     href: `${resolveEntityBasePath(orderEntity)}/new`,
     permission: "orders:write",
-    icon: AnimatedFileCheck,
+    icon: FileCheck,
     keywords: "create order sales",
   },
   {
     label: "Receive PO",
     href: `${resolveEntityBasePath(purchaseOrderEntity)}`,
     permission: "purchasing:write",
-    icon: AnimatedShoppingCart,
+    icon: ShoppingCart,
     keywords: "receive purchase order purchasing",
   },
 ];
@@ -475,12 +475,12 @@ export function CommandPalette() {
         </CommandGroup>
         <CommandGroup heading="General">
           <CommandItem value="Help" onSelect={() => navigate("/help")}>
-            <AnimatedHelpCircle className="h-4 w-4" />
+            <CircleHelp className="h-4 w-4" />
             <span>Help</span>
           </CommandItem>
           {can("settings:manage") && (
             <CommandItem value="Settings" onSelect={() => navigate("/settings")}>
-              <AnimatedSettings className="h-4 w-4" />
+              <Settings className="h-4 w-4" />
               <span>Settings</span>
             </CommandItem>
           )}

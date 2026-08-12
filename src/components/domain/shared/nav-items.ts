@@ -12,48 +12,47 @@
  */
 
 import {
-  AnimatedLayoutDashboard,
-  AnimatedFlask,
-  AnimatedDollarSign,
-  AnimatedFileText,
-  AnimatedUsers,
-  AnimatedClipboardList,
-  AnimatedBarChart3,
-  AnimatedTruck,
-  AnimatedShoppingCart,
-  AnimatedTrendingUp,
-  AnimatedChartColumn,
-  AnimatedPackageCheck,
-  AnimatedWarehouse,
-  AnimatedBuilding2,
-  AnimatedArrowRightLeft,
-  AnimatedContainer,
-  AnimatedBatches,
-  AnimatedUpload,
-  AnimatedDownload,
-  AnimatedDroplet,
-  AnimatedFileStack,
-  AnimatedWaypoints,
-  AnimatedDrum,
-  AnimatedRoute,
-  AnimatedShip,
-  AnimatedFileCheck,
-  AnimatedCheckCheck,
-  AnimatedBoxes,
-} from "@/components/icons/animated";
-import type { AnimatedIconProps } from "@/components/icons/animated";
+  ArrowRight,
+  Boxes,
+  ChartBarIncreasing,
+  ChartColumnIncreasing,
+  CheckCheck,
+  CircleCheck,
+  ClipboardCheck,
+  DollarSign,
+  Droplet,
+  Drum,
+  FileCheck,
+  FileStack,
+  FileText,
+  FlaskConical,
+  HardDriveDownload,
+  HardDriveUpload,
+  Home,
+  LayoutPanelTop,
+  Route,
+  Ship,
+  ShoppingCart,
+  SquareStack,
+  TrendingUp,
+  Truck,
+  Users,
+  Waves,
+  Waypoints,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-export type AnimatedIcon = React.ComponentType<AnimatedIconProps>;
+export type NavIcon = LucideIcon;
 
 export type NavItem = {
   label: string;
   href: string;
-  icon: AnimatedIcon;
+  icon: NavIcon;
 }
 
 export type NavSection = {
   label: string;
-  icon: AnimatedIcon;
+  icon: NavIcon;
   items: NavItem[];
 }
 
@@ -65,53 +64,53 @@ export function isNavSection(entry: NavEntry): entry is NavSection {
 }
 
 export const navigation: NavEntry[] = [
-  { label: "Dashboard", href: "/dashboard", icon: AnimatedLayoutDashboard },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutPanelTop },
   {
     label: "Production",
-    icon: AnimatedFlask,
+    icon: FlaskConical,
     items: [
-      { label: "Batches", href: "/production/batches", icon: AnimatedBatches },
-      { label: "Recipes", href: "/production/recipes", icon: AnimatedFileText },
-      { label: "Cellar", href: "/production/cellar", icon: AnimatedWarehouse },
-      { label: "Vessels", href: "/production/vessels", icon: AnimatedContainer },
-      { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: AnimatedArrowRightLeft },
-      { label: "Brew Logs", href: "/production/brew-logs", icon: AnimatedClipboardList },
-      { label: "Yeast Pitches", href: "/production/yeast-pitches", icon: AnimatedDroplet },
-      { label: "Packaging", href: "/production/packaging", icon: AnimatedPackageCheck },
+      { label: "Batches", href: "/production/batches", icon: Waves },
+      { label: "Recipes", href: "/production/recipes", icon: FileText },
+      { label: "Cellar", href: "/production/cellar", icon: Boxes },
+      { label: "Vessels", href: "/production/vessels", icon: SquareStack },
+      { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: ArrowRight },
+      { label: "Brew Logs", href: "/production/brew-logs", icon: ClipboardCheck },
+      { label: "Yeast Pitches", href: "/production/yeast-pitches", icon: Droplet },
+      { label: "Packaging", href: "/production/packaging", icon: CircleCheck },
     ],
   },
   {
     label: "Inventory",
-    icon: AnimatedWarehouse,
+    icon: Boxes,
     items: [
-      { label: "Raw Materials", href: "/inventory/items", icon: AnimatedUpload },
-      { label: "Finished Goods", href: "/inventory/finished-goods", icon: AnimatedDownload },
-      { label: "Lots", href: "/inventory/lots", icon: AnimatedFileStack },
-      { label: "Kegs", href: "/inventory/kegs", icon: AnimatedDrum },
-      { label: "Bins", href: "/inventory/bins", icon: AnimatedBoxes },
-      { label: "Transfers", href: "/inventory/transfers", icon: AnimatedRoute },
-      { label: "Allocations", href: "/inventory/allocations", icon: AnimatedWaypoints },
+      { label: "Raw Materials", href: "/inventory/items", icon: HardDriveUpload },
+      { label: "Finished Goods", href: "/inventory/finished-goods", icon: HardDriveDownload },
+      { label: "Lots", href: "/inventory/lots", icon: FileStack },
+      { label: "Kegs", href: "/inventory/kegs", icon: Drum },
+      { label: "Bins", href: "/inventory/bins", icon: Boxes },
+      { label: "Transfers", href: "/inventory/transfers", icon: Route },
+      { label: "Allocations", href: "/inventory/allocations", icon: Waypoints },
     ],
   },
   {
     label: "Purchasing",
-    icon: AnimatedTruck,
+    icon: Truck,
     items: [
-      { label: "Purchase Orders", href: "/purchasing/pos", icon: AnimatedShoppingCart },
-      { label: "Suppliers", href: "/purchasing/suppliers", icon: AnimatedBuilding2 },
-      { label: "Material Planning", href: "/purchasing/material-planning", icon: AnimatedChartColumn },
-      { label: "Ingredient Demand", href: "/purchasing/demand", icon: AnimatedTrendingUp },
+      { label: "Purchase Orders", href: "/purchasing/pos", icon: ShoppingCart },
+      { label: "Suppliers", href: "/purchasing/suppliers", icon: Home },
+      { label: "Material Planning", href: "/purchasing/material-planning", icon: ChartColumnIncreasing },
+      { label: "Ingredient Demand", href: "/purchasing/demand", icon: TrendingUp },
     ],
   },
   {
     label: "Sales",
-    icon: AnimatedDollarSign,
+    icon: DollarSign,
     items: [
-      { label: "Orders", href: "/sales/orders", icon: AnimatedFileCheck },
-      { label: "Pick Lists", href: "/sales/pick-lists", icon: AnimatedCheckCheck },
-      { label: "Deliveries", href: "/inventory/deliveries", icon: AnimatedShip },
-      { label: "Customers", href: "/sales/customers", icon: AnimatedUsers },
+      { label: "Orders", href: "/sales/orders", icon: FileCheck },
+      { label: "Pick Lists", href: "/sales/pick-lists", icon: CheckCheck },
+      { label: "Deliveries", href: "/inventory/deliveries", icon: Ship },
+      { label: "Customers", href: "/sales/customers", icon: Users },
     ],
   },
-  { label: "Reports", href: "/reports", icon: AnimatedBarChart3 },
+  { label: "Reports", href: "/reports", icon: ChartBarIncreasing },
 ];

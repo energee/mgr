@@ -8,10 +8,7 @@
  */
 
 import { useState } from "react";
-import { Check, CheckCheck, X, ExternalLink } from "lucide-react";
-import { AnimatedBell } from "@/components/icons/animated";
-import type { AnimatedIconHandle } from "@/components/icons/animated";
-import { useRef } from "react";
+import { Bell, Check, CheckCheck, X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -206,8 +203,6 @@ export function NotificationBell() {
     }
   };
 
-  const bellRef = useRef<AnimatedIconHandle>(null);
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -216,10 +211,8 @@ export function NotificationBell() {
           size="icon"
           className="relative"
           aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-          onMouseEnter={() => bellRef.current?.startAnimation()}
-          onMouseLeave={() => bellRef.current?.stopAnimation()}
         >
-          <AnimatedBell ref={bellRef} className="h-5 w-5" />
+          <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
               {unreadCount > 99 ? "99+" : unreadCount}
@@ -256,7 +249,7 @@ export function NotificationBell() {
             </div>
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-              <AnimatedBell className="h-8 w-8 mb-2 opacity-50" aria-hidden="true" />
+              <Bell className="h-8 w-8 mb-2 opacity-50" aria-hidden="true" />
               <p className="text-sm">No notifications</p>
             </div>
           ) : (

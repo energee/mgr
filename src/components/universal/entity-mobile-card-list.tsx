@@ -40,7 +40,7 @@ import Link from "next/link";
 import { useMemo, useState, useCallback, type ReactNode } from "react";
 import type { EntityConfig, EntityColumnDef, EntityActionDef } from "@/types/entity";
 import { StatusBadge } from "@/components/universal/status-badge";
-import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
+import { ActionMenuItem } from "@/components/universal/action-menu-item";
 import { formatValue } from "@/lib/format";
 import { getApplicableActions } from "@/lib/entity-actions";
 import { UnitDisplay } from "@/components/ui/unit-input";
@@ -426,7 +426,7 @@ function EntityMobileCard({
             {actions.map((action) => {
               const disabledReason = action.disabledWhen?.(row);
               return (
-                <AnimatedActionMenuItem
+                <ActionMenuItem
                   key={action.name}
                   icon={action.icon}
                   label={action.label}

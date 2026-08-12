@@ -5,16 +5,15 @@
  *
  * Main navigation sidebar for the application.
  * Uses shadcn Sidebar components for mobile responsiveness.
- * Animated icons on hover. Sections (Production, Inventory, Purchasing,
- * Sales) render always-open — no collapse/expand state — per the
- * 2026-07-12 mobile-UX nav simplification.
+ * Sections (Production, Inventory, Purchasing, Sales) render always-open —
+ * no collapse/expand state — per the 2026-07-12 mobile-UX nav simplification.
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useContext, useRef } from "react";
+import { useContext } from "react";
+import { CircleHelp, Keyboard, Settings } from "lucide-react";
 import { usePermissions } from "@/contexts/permissions";
-import { AnimatedKeyboard } from "@/components/icons/animated";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -35,39 +34,27 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  AnimatedSettings,
-  AnimatedHelpCircle,
-} from "@/components/icons/animated";
-import type { AnimatedIconHandle } from "@/components/icons/animated";
 // Navigation structure is shared with the cmd+K command palette and the
 // mobile bottom tab bar — a NavEntry[] union of direct links and sections.
 import { navigation, isNavSection } from "@/components/domain/shared/nav-items";
-import type { AnimatedIcon } from "@/components/domain/shared/nav-items";
+import type { NavIcon } from "@/components/domain/shared/nav-items";
 
-function AnimatedNavLink({
+function NavLink({
   href,
   icon: Icon,
   label,
   isActive,
 }: {
   href: string;
-  icon: AnimatedIcon;
+  icon: NavIcon;
   label: string;
   isActive: boolean;
 }) {
-  const iconRef = useRef<AnimatedIconHandle>(null);
-
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton
-        asChild
-        isActive={isActive}
-        onMouseEnter={() => iconRef.current?.startAnimation()}
-        onMouseLeave={() => iconRef.current?.stopAnimation()}
-      >
+      <SidebarMenuButton asChild isActive={isActive}>
         <Link href={href}>
-          <Icon ref={iconRef} className="h-4 w-4" />
+          <Icon className="h-4 w-4" />
           <span>{label}</span>
         </Link>
       </SidebarMenuButton>
@@ -79,7 +66,6 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { can } = usePermissions();
   const { openHelp } = useContext(KeyboardShortcutsContext);
-  const keyboardIconRef = useRef<AnimatedIconHandle>(null);
 
   return (
     <Sidebar>
@@ -97,10 +83,8 @@ export function AppSidebar() {
                 size="icon"
                 className="h-7 w-7 hover:bg-transparent hover:text-current"
                 onClick={openHelp}
-                onMouseEnter={() => keyboardIconRef.current?.startAnimation()}
-                onMouseLeave={() => keyboardIconRef.current?.stopAnimation()}
               >
-                <AnimatedKeyboard ref={keyboardIconRef} className="h-4 w-4" />
+                <Keyboard className="h-4 w-4" />
                 <span className="sr-only">Keyboard shortcuts</span>
               </Button>
             </TooltipTrigger>
@@ -122,7 +106,7 @@ export function AppSidebar() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   {entry.items.map((item) => (
-                    <AnimatedNavLink
+                    <NavLink
                       key={item.href}
                       href={item.href}
                       icon={item.icon}
@@ -136,7 +120,7 @@ export function AppSidebar() {
           ) : (
             <SidebarGroup key={entry.href}>
               <SidebarMenu>
-                <AnimatedNavLink
+                <NavLink
                   href={entry.href}
                   icon={entry.icon}
                   label={entry.label}
@@ -152,16 +136,16 @@ export function AppSidebar() {
       {/* Footer */}
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
-          <AnimatedNavLink
+          <NavLink
             href="/help"
-            icon={AnimatedHelpCircle}
+            icon={CircleHelp}
             label="Help"
             isActive={pathname.startsWith("/help")}
           />
           {can("settings:manage") && (
-            <AnimatedNavLink
+            <NavLink
               href="/settings"
-              icon={AnimatedSettings}
+              icon={Settings}
               label="Settings"
               isActive={pathname.startsWith("/settings")}
             />

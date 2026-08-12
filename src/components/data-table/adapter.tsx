@@ -30,10 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MoreHorizontal } from "lucide-react";
-import {
-  AnimatedActionMenuItem,
-  AnimatedLinkActionMenuItem,
-} from "@/components/universal/animated-action-menu-item";
+import { ActionMenuItem } from "@/components/universal/action-menu-item";
 import { getApplicableActions } from "@/lib/entity-actions";
 import { UnitDisplay } from "@/components/ui/unit-input";
 import { memo } from "react";
@@ -266,12 +263,12 @@ export function buildActionsColumn<T>(
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <AnimatedLinkActionMenuItem icon="view" label="View" href={`${basePath}/${id}`} />
+            <ActionMenuItem icon="view" label="View" href={`${basePath}/${id}`} />
             {/* showWhen/fromStates visibility shared with the mobile card menu */}
             {getApplicableActions(entity, record).map((action) => {
               const disabledReason = action.disabledWhen?.(record);
               return (
-                <AnimatedActionMenuItem
+                <ActionMenuItem
                   key={action.name}
                   icon={action.icon}
                   label={action.label}
