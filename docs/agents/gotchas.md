@@ -247,3 +247,22 @@ required context that never reports cannot be cleared. No workflow-side design
 can close this (the shim in `db-lint.yml` covers path filtering, not run
 suppression). Never put `[skip ci]` in a commit that will become a PR;
 `progress.yml` already avoids it deliberately for this reason.
+
+**`make check | tail` reports `tail`'s exit code, not `make`'s — so a failing
+gate looks green.** A pipeline's status is its *last* command's, so
+`make check 2>&1 | tail -20` exits 0 even when `make check` failed. Observed
+2026-08-12: three consecutive runs were reported as "exit code 0" while the
+build step was actually failing. Capture the real status:
+
+```sh
+set -o pipefail && make check > /tmp/check.log 2>&1; echo "EXIT=$?"
+```
+
+`${PIPESTATUS[0]}` also works, but only when read immediately — it is reset by
+the next command, including the `echo` you were about to inspect it with.
+
+**Two `make check` runs in the same worktree collide.** `next build` refuses to
+start while another `next build` is running and exits 1 with "Another next
+build process is already running", which reads exactly like a real build
+failure. Serialize them; if one is wedged, `pkill -f "<worktree>/node_modules/.bin/next build"`
+before retrying.
