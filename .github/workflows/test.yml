@@ -180,17 +180,13 @@ jobs:
       - name: Check for dependency vulnerabilities
         # Exception requirements: docs/security/dependency-policy.md
         #
-        # GHSA-mh99-v99m-4gvg (brace-expansion <=5.0.7) is patched ONLY in
-        # 5.0.8 — there is no 1.x backport. The reachable copy is 1.1.17 (the
-        # newest 1.x), required by the whole dev-only ESLint 9 chain: eslint
-        # itself, @eslint/config-array and @eslint/eslintrc pin minimatch
-        # ^3.1.5, and eslint-plugin-{import,jsx-a11y,react} pin ^3.1.2 — while
-        # minimatch 3.x requires brace-expansion ^1.1.7. Dev-only, expiry
-        # 2026-08-29; the dated exception record lives in the policy doc.
-        #
-        # Every id listed here MUST have a matching policy record —
+        # No active exceptions. Any `--ignore` added here MUST name a concrete
+        # GHSA/CVE id with a matching dated policy record —
         # .github/scripts/ci-workflows.test.ts fails the build otherwise.
-        run: bun audit --audit-level=high --ignore GHSA-mh99-v99m-4gvg
+        # (The last one, GHSA-mh99-v99m-4gvg for brace-expansion, was removed
+        # 2026-08-11 after the advisory narrowed its range per major line —
+        # the pinned 1.1.18 backport is no longer flagged. #653)
+        run: bun audit --audit-level=high
 
   # Runs on EVERY event this workflow has, pull requests included (#437).
   # Boots an isolated local Supabase stack instead of pointing Playwright at
