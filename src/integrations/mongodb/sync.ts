@@ -190,6 +190,31 @@ async function upsertRows(
   return { synced, failed, errors };
 }
 
+/**
+ * Chunked `.in("id", …)` select. Unbounded selects silently truncate at
+ * PostgREST's 1000-row response cap; chunking by the ids we actually need
+ * keeps reads complete and bounded. Chunks run in parallel.
+ */
+async function selectRowsByIds<T>(
+  admin: AdminClient,
+  table: string,
+  columns: string,
+  ids: string[]
+): Promise<T[]> {
+  const CHUNK = 200;
+  const results = await Promise.all(
+    Array.from({ length: Math.ceil(ids.length / CHUNK) }, (_, i) =>
+      dynamicFrom(admin, table).select(columns).in("id", ids.slice(i * CHUNK, (i + 1) * CHUNK))
+    )
+  );
+  const rows: T[] = [];
+  for (const result of results) {
+    if (result.error) throw new Error(`Failed to read ${table}: ${result.error.message}`);
+    rows.push(...((result.data ?? []) as T[]));
+  }
+  return rows;
+}
+
 /** Call an aggregate reconciliation RPC and preserve phase/entity/operation context. */
 async function reconcileAggregate(
   admin: AdminClient,
@@ -633,17 +658,10 @@ async function syncBatches(): Promise<SyncResult> {
   // against a PG batch that completed fails the whole upsert chunk
   // ("Invalid state transition: completed -> fermenting", 2026-08-12 sync).
   // Mongo still sets status on first insert of a batch PG has never seen.
-  const existingStatuses = new Map<string, string>();
-  const allIds = rows.map((row) => row.id as string);
-  for (let i = 0; i < allIds.length; i += 200) {
-    const { data, error } = await dynamicFrom(admin, "batches")
-      .select("id, status")
-      .in("id", allIds.slice(i, i + 200));
-    if (error) throw new Error(`Failed to read existing batch statuses: ${error.message}`);
-    for (const b of (data ?? []) as Array<{ id: string; status: string }>) {
-      existingStatuses.set(b.id, b.status);
-    }
-  }
+  const existingBatches = await selectRowsByIds<{ id: string; status: string }>(
+    admin, "batches", "id, status", rows.map((row) => row.id as string)
+  );
+  const existingStatuses = new Map(existingBatches.map((b) => [b.id, b.status]));
   for (const row of rows) {
     const current = existingStatuses.get(row.id as string);
     if (current !== undefined) (row as Record<string, unknown>).status = current;
@@ -830,27 +848,29 @@ async function syncPackagingSessions(): Promise<SyncResult> {
   const mongoBatchIdToRecipe = new Map(
     mongoBatches.filter((b) => b.recipe).map((b) => [b._id.toString(), b.recipe!.toString()])
   );
-  const mongoRecipeIdToBeer = new Map(
-    (await db.collection<MongoRecipe>("recipes").find().toArray())
-      .filter((r) => r.beer)
-      .map((r) => [r._id.toString(), r.beer!.toString()])
-  );
-  const [pgBatchesResult, pgRecipesResult] = await Promise.all([
-    dynamicFrom(admin, "batches").select("id, recipe_id"),
-    dynamicFrom(admin, "recipes").select("id, brand_id"),
+  const referencedPgBatchIds = [...new Set(
+    docs.flatMap((d) => (d.products ?? [])
+      .filter((p) => p.batch)
+      .map((p) => objectIdToUuid(p.batch!.toString())))
+  )];
+  const [mongoRecipeDocs, pgBatchRows] = await Promise.all([
+    db.collection<MongoRecipe>("recipes").find().toArray(),
+    selectRowsByIds<{ id: string; recipe_id: string | null }>(
+      admin, "batches", "id, recipe_id", referencedPgBatchIds
+    ),
   ]);
-  if (pgBatchesResult.error || pgRecipesResult.error) {
-    throw new Error(
-      `Failed to read batch/recipe brand fallback data: ${pgBatchesResult.error?.message ?? pgRecipesResult.error?.message}`
-    );
-  }
+  const mongoRecipeIdToBeer = new Map(
+    mongoRecipeDocs.filter((r) => r.beer).map((r) => [r._id.toString(), r.beer!.toString()])
+  );
+  const pgRecipeRows = await selectRowsByIds<{ id: string; brand_id: string | null }>(
+    admin, "recipes", "id, brand_id",
+    [...new Set(pgBatchRows.map((b) => b.recipe_id).filter((id): id is string => !!id))]
+  );
   const pgRecipeIdToBrandId = new Map(
-    ((pgRecipesResult.data ?? []) as Array<{ id: string; brand_id: string | null }>)
-      .filter((r) => r.brand_id)
-      .map((r) => [r.id, r.brand_id as string])
+    pgRecipeRows.filter((r) => r.brand_id).map((r) => [r.id, r.brand_id as string])
   );
   const pgBatchIdToBrandId = new Map<string, string>();
-  for (const b of (pgBatchesResult.data ?? []) as Array<{ id: string; recipe_id: string | null }>) {
+  for (const b of pgBatchRows) {
     const brandId = b.recipe_id ? pgRecipeIdToBrandId.get(b.recipe_id) : undefined;
     if (brandId) pgBatchIdToBrandId.set(b.id, brandId);
   }
@@ -970,30 +990,28 @@ async function syncPackagingSessions(): Promise<SyncResult> {
         continue;
       }
 
-      const pgBatchId = product.batch ? objectIdToUuid(product.batch.toString()) : null;
+      const pgBatchId = objectIdToUuid(product.batch.toString());
 
       // Resolve brand_id (NOT NULL): batch → beer → brand, falling back to
       // batch → recipe → beer → brand, then the PG batch → recipe → brand map.
       let pgBrandId: string | null = null;
-      let brandFailure = "unresolvable";
-      {
-        const mongoBatchId = product.batch.toString();
-        const beerId = mongoBatchIdToBeer.get(mongoBatchId)
-          ?? mongoRecipeIdToBeer.get(mongoBatchIdToRecipe.get(mongoBatchId) ?? "");
-        if (beerId) {
-          const beerName = mongoBeerIdToName.get(beerId);
-          if (beerName) {
-            pgBrandId = brandNameToId.get(beerName) ?? null;
-            brandFailure = `beer "${beerName}" has no matching PG brand`;
-          } else {
-            brandFailure = `beer ${beerId} not found in beers collection`;
-          }
+      let brandFailure: string;
+      const mongoBatchId = product.batch.toString();
+      const beerId = mongoBatchIdToBeer.get(mongoBatchId)
+        ?? mongoRecipeIdToBeer.get(mongoBatchIdToRecipe.get(mongoBatchId) ?? "");
+      if (beerId) {
+        const beerName = mongoBeerIdToName.get(beerId);
+        if (beerName) {
+          pgBrandId = brandNameToId.get(beerName) ?? null;
+          brandFailure = `beer "${beerName}" has no matching PG brand`;
         } else {
-          brandFailure = `batch ${mongoBatchId} has no beer or recipe→beer link`;
+          brandFailure = `beer ${beerId} not found in beers collection`;
         }
-        if (!pgBrandId && pgBatchId) {
-          pgBrandId = pgBatchIdToBrandId.get(pgBatchId) ?? null;
-        }
+      } else {
+        brandFailure = `batch ${mongoBatchId} has no beer or recipe→beer link`;
+      }
+      if (!pgBrandId) {
+        pgBrandId = pgBatchIdToBrandId.get(pgBatchId) ?? null;
       }
 
       if (!pgBrandId) {
