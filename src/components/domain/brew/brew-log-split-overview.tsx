@@ -21,7 +21,7 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { batchEntity } from "@/entities/batch";
 import { Beer, FlaskConical } from "lucide-react";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { useVolumeUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatVolume } from "@/domain/units";
 
 // Segment colors for the volume bar
@@ -60,7 +60,7 @@ type LinkedBatch = {
 export function BrewLogSplitOverview({ data }: BrewLogSplitOverviewProps) {
   const brewLogId = data.id;
   const supabase = createClient();
-  const volumeUnit = useVolumeUnit();
+  const volumeUnit = useResolvedUnitPreferences().volume_unit;
 
   // Fetch linked batches
   const { data: linkedBatches, isLoading: batchesLoading } = useQuery({

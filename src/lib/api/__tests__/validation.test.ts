@@ -1,5 +1,5 @@
 /**
- * Tests for API validation utilities: validateBody, validateParams, validateSearchParams.
+ * Tests for API validation utilities: validateBody, validateSearchParams.
  *
  * Exercises Zod-based parsing and error mapping to ApiError without requiring
  * live database or external service connections.
@@ -8,7 +8,7 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
 
-import { validateBody, validateParams, validateSearchParams } from "../validation";
+import { validateBody, validateSearchParams } from "../validation";
 import { ApiError } from "../errors";
 
 // =============================================================================
@@ -84,37 +84,6 @@ describe("validateBody", () => {
     });
 
     await expect(validateBody(schema, request)).rejects.toThrow(ApiError);
-  });
-});
-
-// =============================================================================
-// validateParams
-// =============================================================================
-
-describe("validateParams", () => {
-  const schema = z.object({
-    id: z.string().uuid(),
-  });
-
-  it("parses valid params", () => {
-    const id = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-    const result = validateParams(schema, { id });
-    expect(result).toEqual({ id });
-  });
-
-  it("throws ApiError for invalid params", () => {
-    expect(() => validateParams(schema, { id: "not-a-uuid" })).toThrow(ApiError);
-    try {
-      validateParams(schema, { id: "not-a-uuid" });
-    } catch (err) {
-      const apiErr = err as ApiError;
-      expect(apiErr.code).toBe("VALIDATION_ERROR");
-      expect(apiErr.status).toBe(422);
-    }
-  });
-
-  it("throws ApiError when params are empty", () => {
-    expect(() => validateParams(schema, {})).toThrow(ApiError);
   });
 });
 

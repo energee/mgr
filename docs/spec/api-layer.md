@@ -47,7 +47,6 @@ Postgres errors are auto-mapped: unique violation → 409, FK violation → 409,
 
 ```typescript
 validateBody(zodSchema, request)      // Parse JSON body, throw 422 on failure
-validateParams(zodSchema, params)     // Validate route params
 validateSearchParams(zodSchema, req)  // Validate URL query params
 ```
 

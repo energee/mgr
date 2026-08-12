@@ -20,7 +20,7 @@ import { setupRenderHarness } from "@/test/react-harness";
 const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
 
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ rpc: rpcMock }) }));
-vi.mock("@/hooks/use-unit-preferences", () => ({ useVolumeUnit: () => "bbl" }));
+vi.mock("@/hooks/use-unit-preferences", () => ({ useResolvedUnitPreferences: () => ({ volume_unit: "bbl" }) }));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));

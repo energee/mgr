@@ -10,6 +10,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import type { ZodIssue } from "zod";
 
+import { PG_ERROR_TABLE } from "@/lib/pg-error-codes";
+
 // =============================================================================
 // Database Type Aliases
 // =============================================================================
@@ -87,28 +89,17 @@ export function err<T>(error: ServiceError): ServiceResult<T> {
 /**
  * Parse a Supabase/PostgREST error into a typed ServiceError.
  *
- * Maps common PostgreSQL error codes to specific ServiceError variants:
+ * PG codes are classified via the shared PG_ERROR_TABLE (`serviceCode` field):
  * - 23503 (FK violation) → FK_VIOLATION
  * - 23505 (unique constraint) → UNIQUE_VIOLATION
  * - 42501 (insufficient privilege) → RLS_DENIED
- * - PGRST116 (no rows) → NOT_FOUND
- * - Everything else → UNKNOWN
+ * PGRST116 (PostgREST .single() with no match) → NOT_FOUND; anything else → UNKNOWN.
  */
 export function parseSupabaseError(
   error: { code?: string; message: string; details?: string },
   context?: { table?: string; id?: string }
 ): ServiceError {
   const message = error.message;
-
-  // Foreign key violation
-  if (error.code === "23503") {
-    return { code: "FK_VIOLATION", message };
-  }
-
-  // RLS / insufficient privilege
-  if (error.code === "42501") {
-    return { code: "RLS_DENIED", message };
-  }
 
   // No rows returned (PostgREST .single() with no match)
   if (error.code === "PGRST116") {
@@ -119,9 +110,9 @@ export function parseSupabaseError(
     };
   }
 
-  // Unique constraint violation (e.g., duplicate name, number, or key)
-  if (error.code === "23505") {
-    return { code: "UNIQUE_VIOLATION", message };
+  const serviceCode = error.code ? PG_ERROR_TABLE[error.code]?.serviceCode : undefined;
+  if (serviceCode) {
+    return { code: serviceCode, message };
   }
 
   return { code: "UNKNOWN", message, cause: error };

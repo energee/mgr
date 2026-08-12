@@ -40,7 +40,7 @@ import {
 } from "@/components/dashboard";
 import { BatchActivityHeatmapLazy } from "@/components/dashboard/batch-activity-heatmap-lazy";
 import { bucketWeekly } from "@/components/dashboard/heatmap-utils";
-import { useVolumeUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { convertVolume, formatVolume, UNIT_LABELS } from "@/domain/units";
 import { log } from "@/lib/client-logger";
 import { unwrap } from "@/lib/supabase/query-helpers";
@@ -80,7 +80,7 @@ const MAX_BATCHES_SHOWN = 8;
 
 export default function DashboardPage() {
   const supabase = createClient();
-  const volumeUnit = useVolumeUnit();
+  const volumeUnit = useResolvedUnitPreferences().volume_unit;
 
   // Fetch active batches (not completed or cancelled)
   const { data: activeBatches = [], isLoading: batchesLoading } = useQuery({
@@ -307,7 +307,7 @@ function ProductionTrendsSkeleton() {
 export function ProductionTrends() {
   const supabase = createClient();
   const period = usePeriod();
-  const volumeUnit = useVolumeUnit();
+  const volumeUnit = useResolvedUnitPreferences().volume_unit;
   const volumeLabel = UNIT_LABELS[volumeUnit];
 
   // Single 365-day fetch covers both the period-scoped delta cards (sliced

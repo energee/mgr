@@ -15,13 +15,10 @@
  */
 
 import { z } from "zod";
-import {
-  withPermission,
-  validateBody,
-  successResponse,
-  errorResponse,
-  ApiError,
-} from "@/lib/api";
+import { successResponse, errorResponse } from "@/lib/api/response";
+import { withPermission } from "@/lib/api/auth";
+import { validateBody } from "@/lib/api/validation";
+import { ApiError } from "@/lib/api/errors";
 import { rateLimit, getClientIp } from "@/lib/api/rate-limit";
 import { createAdminClient } from "@/lib/supabase/server";
 import { escapeIlikePattern, unwrap } from "@/lib/supabase/query-helpers";

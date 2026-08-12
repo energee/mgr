@@ -9,59 +9,17 @@
 
 import type { PostgrestError } from "@supabase/supabase-js";
 
-import { PG_ERROR_CODES, PG_ERROR_MESSAGES } from "./pg-error-codes";
+import { PG_ERROR_CODES, PG_ERROR_TABLE } from "./pg-error-codes";
 
-// Re-export for backwards compatibility
-export { PG_ERROR_CODES, PG_ERROR_MESSAGES };
-
-// =============================================================================
-// Custom Error Types
-// =============================================================================
-
-/**
- * Optimistic locking conflict error.
- */
-export class ConcurrentModificationError extends Error {
-  constructor() {
-    super("Record was modified by another user. Please refresh and try again.");
-    this.name = "ConcurrentModificationError";
-  }
-}
+// Re-exported for the client components that consume the codes through this module.
+export { PG_ERROR_CODES };
 
 /**
  * Map specific constraint names to user-friendly messages.
- * Add entries here as constraints are created in migrations.
+ * Only constraints that exist in migrations AND whose curated message beats
+ * the generic code-level fallback belong here.
  */
 export const CONSTRAINT_MESSAGES: Record<string, string> = {
-  // Quantity constraints
-  chk_quantity_positive: "Quantity must be greater than zero",
-  chk_volume_positive: "Volume must be greater than zero",
-  chk_amount_positive: "Amount must be greater than zero",
-  chk_price_non_negative: "Price cannot be negative",
-
-  // Batch constraints
-  chk_batch_volume: "Batch volume must be greater than zero",
-  chk_batch_dates: "End date must be after start date",
-
-  // Recipe constraints
-  chk_efficiency_range: "Mash efficiency must be between 0 and 100",
-  chk_abv_range: "ABV must be between 0 and 100",
-
-  // Order constraints
-  chk_order_quantity: "Order quantity must be at least 1",
-
-  // Inventory constraints
-  chk_lot_quantity: "Lot quantity must be positive",
-  chk_available_quantity: "Available quantity cannot be negative",
-
-  // Status constraints
-  chk_valid_status: "Invalid status value",
-
-  // Foreign key constraints (common patterns)
-  fk_batch_recipe: "Recipe is required for this batch",
-  fk_order_customer: "Customer is required for this order",
-  fk_po_supplier: "Supplier is required for this purchase order",
-
   // Unique hand-typed identifier fields (constraint names from migrations
   // 00002/00004/00010) — these collide when users type a number that exists
   purchase_orders_po_number_key: "This PO number is already in use",
@@ -161,13 +119,14 @@ export function parsePostgresErrorDetailed(
   }
 
   // Use standard message mapping
-  if (error.code && PG_ERROR_MESSAGES[error.code]) {
-    return { message: PG_ERROR_MESSAGES[error.code] };
+  const tableMessage = error.code ? PG_ERROR_TABLE[error.code]?.message : undefined;
+  if (tableMessage) {
+    return { message: tableMessage };
   }
 
-  // Check for RLS/permission issues
-  if (error.message?.includes("row-level security") || error.code === PG_ERROR_CODES.INSUFFICIENT_PRIVILEGE) {
-    return { message: "You don't have permission to perform this action" };
+  // RLS denials that surface without a mapped code
+  if (error.message?.includes("row-level security")) {
+    return { message: PG_ERROR_TABLE[PG_ERROR_CODES.INSUFFICIENT_PRIVILEGE].message };
   }
 
   // Fallback to original message (cleaned up)

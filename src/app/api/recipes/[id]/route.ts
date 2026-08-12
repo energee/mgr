@@ -1,9 +1,6 @@
-import {
-  withPermission,
-  successResponse,
-  errorResponse,
-  validateBody,
-} from "@/lib/api";
+import { successResponse, errorResponse } from "@/lib/api/response";
+import { withPermission } from "@/lib/api/auth";
+import { validateBody } from "@/lib/api/validation";
 import { recipeUpdateSchema } from "@/lib/schemas/recipe";
 
 export const GET = withPermission("recipes:read", async (request, { supabase, params }) => {

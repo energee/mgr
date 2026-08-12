@@ -259,7 +259,7 @@ describe("handleApiError", () => {
   });
 
   it("maps unrecognized Postgres error codes to INTERNAL_ERROR via Error fallback", () => {
-    // An object with .code that isn't in PG_ERROR_MAP but is still a Postgres-like error
+    // An object with .code that isn't in PG_ERROR_TABLE but is still a Postgres-like error
     // Falls through isPostgresError check but has no mapping, then hits Error check
     const pgError = { code: "99999", message: "unusual pg error" };
     const result = handleApiError(pgError);

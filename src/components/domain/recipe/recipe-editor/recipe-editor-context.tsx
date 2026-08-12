@@ -206,7 +206,6 @@ export function RecipeEditorProvider({
   const handleSaveError = useCallback((error: Error) => {
     const msg = error.message ?? "";
     const isConflict =
-      error.name === "ConcurrentModificationError" ||
       msg.includes("version") ||
       msg.includes("conflict") ||
       msg.includes("modified by another user");

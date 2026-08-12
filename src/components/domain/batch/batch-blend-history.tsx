@@ -26,7 +26,7 @@ import Link from "next/link";
 import { getStateLabel } from "@/types/entity";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { useGravityUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatGravityFromSg } from "@/domain/units";
 
 // =============================================================================
@@ -72,7 +72,7 @@ type BlendInfoRow = {
 export function BatchBlendHistory({ data }: BatchBlendHistoryProps) {
   const supabase = createClient();
   const batchId = data.id;
-  const gravityUnit = useGravityUnit();
+  const gravityUnit = useResolvedUnitPreferences().gravity_unit;
 
   const { data: blends, isLoading } = useQuery({
     queryKey: entityKeys.related("batch_blends", "blend_batch_id", batchId),

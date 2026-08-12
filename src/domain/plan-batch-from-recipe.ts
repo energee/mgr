@@ -13,7 +13,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { setPrefill } from "@/contexts/prefill-store";
 
 /** Destination consumed by callers after the prefill is staged. */
 export const NEW_BATCH_PATH = "/production/batches/new";
@@ -51,7 +51,7 @@ export async function preparePlanBatchPrefill(
     }
   }
 
-  usePrefillStore.getState().setPrefill({
+  setPrefill({
     recipe_id: recipe.id,
     name: batchName,
     ...(recipe.batch_size_bbl != null

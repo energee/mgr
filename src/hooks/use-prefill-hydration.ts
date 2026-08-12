@@ -23,7 +23,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { consumePrefill } from "@/contexts/prefill-store";
 
 type PrefillHydrationState = {
   ready: boolean;
@@ -40,7 +40,7 @@ export function usePrefillHydration({
 
   useEffect(() => {
     if (!enabled) return;
-    const { prefillData } = usePrefillStore.getState().consume();
+    const { prefillData } = consumePrefill();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only read from sessionStorage-backed store; functional updater prevents overwrite on Strict Mode's second invocation
     setState((prev) =>
       prev.ready ? prev : { ready: true, defaultValues: prefillData ?? undefined },

@@ -39,7 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useVolumeUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { convertVolume, formatVolume } from "@/domain/units";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -575,7 +575,7 @@ export function CalculatedAdditionsSection({
     ([key]) => additions[key as keyof SaltAdditions] > 0
   );
 
-  const volumeUnit = useVolumeUnit();
+  const volumeUnit = useResolvedUnitPreferences().volume_unit;
 
   if (nonZeroSalts.length === 0) return null;
 

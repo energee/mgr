@@ -46,7 +46,7 @@ import {
   reorderWithPositions,
 } from "@/components/ui/sortable-drag-preview";
 import { UnitInput } from "@/components/ui/unit-input";
-import { useTemperatureUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatTemperature } from "@/domain/units";
 import { Plus, Trash2, GripVertical, ChevronDown, FlaskConical, ChevronRight } from "lucide-react";
 
@@ -154,7 +154,7 @@ export function FermentationScheduleEditor({
   onChange,
   disabled = false,
 }: FermentationScheduleEditorProps) {
-  const tempUnit = useTemperatureUnit();
+  const tempUnit = useResolvedUnitPreferences().temperature_unit;
   // Backfill IDs once if legacy data lacks them — required for stable drag-and-drop.
   // One-shot guard prevents re-running on parent re-renders (which can happen when
   // onChange has an unstable identity).

@@ -1,8 +1,6 @@
-import {
-  withPermission,
-  successResponse,
-  ApiError,
-} from "@/lib/api";
+import { successResponse } from "@/lib/api/response";
+import { withPermission } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/errors";
 import { createAdminClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 

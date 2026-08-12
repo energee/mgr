@@ -22,7 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { useGravityUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { convertVolume, formatGravityFromSg } from "@/domain/units";
 
 // =============================================================================
@@ -124,7 +124,7 @@ export function BrewLogRecipeSheet({
   onOpenChange,
 }: BrewLogRecipeSheetProps) {
   const supabase = createClient();
-  const gravityUnit = useGravityUnit();
+  const gravityUnit = useResolvedUnitPreferences().gravity_unit;
 
   // Recipe details + estimates + schedules
   const { data: recipe, isLoading: recipeLoading } = useQuery({

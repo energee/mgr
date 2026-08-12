@@ -31,7 +31,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import type { BatchReading } from "@/domain/batch-readings";
 import { convertGravity } from "@/domain/batch-readings";
-import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import {
   platoToSg,
   convertTemperature,
@@ -90,8 +90,7 @@ export function BatchReadingsChart({
   className,
 }: BatchReadingsChartProps) {
   const [activeMetric, setActiveMetric] = useState<ChartMetric>("gravity");
-  const gravityUnit = useGravityUnit();
-  const tempUnit = useTemperatureUnit();
+  const { gravity_unit: gravityUnit, temperature_unit: tempUnit } = useResolvedUnitPreferences();
 
   // Filter and transform readings for the chart
   const chartData = useMemo(() => {

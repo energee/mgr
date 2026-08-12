@@ -68,7 +68,7 @@ import { entityKeys, revisionKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
 import { CACHE_DURATIONS } from "@/lib/constants";
 import { useEntityRecord } from "@/hooks/use-entity-record";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { setPrefill } from "@/contexts/prefill-store";
 import { usePrefillHydration } from "@/hooks/use-prefill-hydration";
 import { updateWithOptimisticLock } from "@/lib/optimistic-lock";
 import { useSubmitShortcut } from "@/hooks/use-submit-shortcut";
@@ -1278,11 +1278,9 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
     // bypasses the page-level onAction override. An entity-declared action
     // named "duplicate" with its own handler still takes the normal path.
     if (action.name === "duplicate" && !action.handler && entity.excludeOnDuplicate) {
-      usePrefillStore
-        .getState()
-        .setPrefill(
-          buildDuplicateDefaults(entity, displayData as Record<string, unknown>)
-        );
+      setPrefill(
+        buildDuplicateDefaults(entity, displayData as Record<string, unknown>)
+      );
       router.push(`${path}/new`);
       return;
     }

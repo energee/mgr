@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, CalendarPlus, Copy, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useGravityUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatGravityFromSg } from "@/domain/units";
 
 type RecipeEditorPageProps = {
@@ -88,7 +88,7 @@ function RecipeEditorSections() {
 
 function MobileEstimatesBar() {
   const { estimates } = useRecipeEditor();
-  const gravityUnit = useGravityUnit();
+  const gravityUnit = useResolvedUnitPreferences().gravity_unit;
   const og = formatGravityFromSg(estimates.og, gravityUnit);
   const fg = formatGravityFromSg(estimates.fg, gravityUnit);
   return (

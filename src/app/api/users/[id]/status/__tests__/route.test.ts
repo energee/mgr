@@ -8,10 +8,10 @@ const changeUserAccountStatus = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/supabase/server", () => ({ createAdminClient }));
 vi.mock("@/services/user-account-status", () => ({ changeUserAccountStatus }));
-vi.mock("@/lib/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api")>();
+vi.mock("@/lib/api/auth", async () => {
+  const { ApiError } = await import("@/lib/api/errors");
+  const { errorResponse } = await import("@/lib/api/response");
   return {
-    ...actual,
     withPermission:
       (_permission: string, handler: (...args: never[]) => unknown) =>
       async (request: NextRequest, context?: { params?: Promise<Record<string, string>> }) => {
@@ -21,8 +21,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
             params: context?.params ? await context.params : undefined,
           } as never);
         } catch (error) {
-          if (!(error instanceof actual.ApiError)) throw error;
-          return actual.errorResponse(
+          if (!(error instanceof ApiError)) throw error;
+          return errorResponse(
             error.code,
             error.message,
             error.details,

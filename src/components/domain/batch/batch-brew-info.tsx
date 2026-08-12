@@ -15,8 +15,8 @@ import { unwrap } from "@/lib/supabase/query-helpers";
 import { BrewLogLinker } from "@/components/domain/brew/brew-log-linker";
 import { Badge } from "@/components/ui/badge";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { extractBrewMeasurements } from "@/domain/brew-events";
-import { useBrewMeasurementUnits } from "@/hooks/use-unit-preferences";
+import { extractBrewMeasurements, toBrewMeasurementUnits } from "@/domain/brew-events";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import type { BrewEvent } from "@/types/domain";
 import Link from "next/link";
 
@@ -49,7 +49,7 @@ type BrewSummaryLink = {
 
 export function BatchBrewInfo({ data }: BatchBrewInfoProps) {
   const supabase = createClient();
-  const measurementUnits = useBrewMeasurementUnits();
+  const measurementUnits = toBrewMeasurementUnits(useResolvedUnitPreferences());
 
   // Fetch linked brew logs with events data
   const { data: linkedBrews = [], isLoading } = useQuery({

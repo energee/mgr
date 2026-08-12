@@ -4,7 +4,7 @@
  * Custom error class and error mapping utilities for API route handlers.
  */
 
-import { PG_ERROR_CODES } from "../pg-error-codes";
+import { PG_ERROR_TABLE } from "../pg-error-codes";
 
 export type ApiErrorCode =
   | "UNAUTHORIZED"
@@ -50,45 +50,11 @@ function defaultStatusForCode(code: ApiErrorCode): number {
 }
 
 /**
- * PostgreSQL error code to friendly API error mapping.
- *
- * Error codes are sourced from the shared PG_ERROR_CODES constants.
- * Messages here are API-specific (may differ from client-side messages).
- */
-const PG_ERROR_MAP: Record<
-  string,
-  { code: ApiErrorCode; status: number; message: string }
-> = {
-  [PG_ERROR_CODES.UNIQUE_VIOLATION]: {
-    code: "CONFLICT",
-    status: 409,
-    message: "A record with this value already exists",
-  },
-  [PG_ERROR_CODES.FOREIGN_KEY_VIOLATION]: {
-    code: "CONFLICT",
-    status: 409,
-    message: "This record is referenced by other data and cannot be modified",
-  },
-  [PG_ERROR_CODES.NOT_NULL_VIOLATION]: {
-    code: "VALIDATION_ERROR",
-    status: 422,
-    message: "A required field is missing",
-  },
-  [PG_ERROR_CODES.CHECK_VIOLATION]: {
-    code: "VALIDATION_ERROR",
-    status: 422,
-    message: "A field value violates a constraint",
-  },
-  [PG_ERROR_CODES.INSUFFICIENT_PRIVILEGE]: {
-    code: "FORBIDDEN",
-    status: 403,
-    message: "Insufficient permissions for this operation",
-  },
-};
-
-/**
  * Catch-all error handler that maps known error types to structured API errors.
  * Returns an ApiError suitable for building an error response.
+ *
+ * PG error code → API error mapping (code/status/API-specific message) lives
+ * in the shared PG_ERROR_TABLE (`api` field) in ../pg-error-codes.
  */
 export function handleApiError(error: unknown): ApiError {
   if (error instanceof ApiError) {
@@ -96,9 +62,9 @@ export function handleApiError(error: unknown): ApiError {
   }
 
   if (isPostgresError(error)) {
-    const mapped = PG_ERROR_MAP[error.code];
+    const mapped = PG_ERROR_TABLE[error.code]?.api;
     if (mapped) {
-      return new ApiError(mapped.code, mapped.message, mapped.status, {
+      return new ApiError(mapped.code, mapped.message, undefined, {
         pg_code: error.code,
       });
     }

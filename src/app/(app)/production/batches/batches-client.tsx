@@ -33,7 +33,7 @@ import { StartBrewDayDialog } from "@/components/domain/brew/start-brew-day-dial
 import { PackagingBatchDialog } from "@/components/domain/packaging/packaging-batch-dialog";
 import { VesselTransferDialog } from "@/components/domain/batch/vessel-transfer-dialog";
 import { useBrewConsumptionFlow } from "@/components/domain/brew/use-brew-consumption-flow";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { setPrefill } from "@/contexts/prefill-store";
 import { entityService } from "@/services/entity-service";
 import { formatServiceError } from "@/services/types";
 
@@ -107,7 +107,7 @@ export function BatchesClient() {
     // route there and let the prefill store auto-open the matching dialog
     // (same silent no-op bug class as transfer, cheapest correct fix).
     if (actionName === "pitch_yeast" || actionName === "harvest_yeast") {
-      usePrefillStore.getState().setPrefill({}, actionName);
+      setPrefill({}, actionName);
       router.push(`/production/batches/${(record as unknown as BatchRecord).id}`);
       return true;
     }

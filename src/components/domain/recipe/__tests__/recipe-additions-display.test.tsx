@@ -4,13 +4,13 @@
  * RecipeAdditionsDisplay: `AdditionsTable` and `OtherAdditionsSection`.
  *
  * The top-level `RecipeAdditionsDisplay` is a data-fetching container (Supabase
- * + react-query + useCatalog/useVolumeUnit), so its branch logic is covered
+ * + react-query + useCatalog/useResolvedUnitPreferences), so its branch logic is covered
  * separately. The reusable *rendering* logic — additive name/Unknown fallback,
  * type/timing/target label maps with raw fallbacks, the conditional Target
  * column, timing grouping and count pluralization — lives in these two
  * hook-free sub-components and is pinned here so a B3 refactor can be checked
  * behavior-preserving. (WaterChemistrySummary + CalculatedAdditionsSection
- * remain uncovered — they need water-chemistry domain data / a useVolumeUnit
+ * remain uncovered — they need water-chemistry domain data / a unit-preferences
  * mock.)
  *
  * Follows the repo's render-test idiom (createRoot + act; no
@@ -25,7 +25,7 @@ import { setupRenderHarness } from "@/test/react-harness";
 // it to keep the import (and the test) free of Supabase/env setup.
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 // CalculatedAdditionsSection reads the display volume unit via this hook.
-vi.mock("@/hooks/use-unit-preferences", () => ({ useVolumeUnit: () => "bbl" }));
+vi.mock("@/hooks/use-unit-preferences", () => ({ useResolvedUnitPreferences: () => ({ volume_unit: "bbl" }) }));
 
 import {
   AdditionsTable,

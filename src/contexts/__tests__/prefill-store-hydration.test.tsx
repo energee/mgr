@@ -1,7 +1,7 @@
 /**
  * Tests for prefill-store hydration safety (SENTRY-7477285482 / MGR-7).
  *
- * Root cause: usePrefillStore.consume() reads from sessionStorage, which is
+ * Root cause: consumePrefill() reads from sessionStorage, which is
  * unavailable during SSR. When called during render (instead of in useEffect),
  * it produces different values on the server (null) vs client (sessionStorage
  * data), causing React hydration mismatches.
@@ -15,15 +15,13 @@
  *    survives Strict Mode double-invocation, and — with `enabled: false`
  *    (EntityDetailUnified in detail/edit mode) — never touches the store.
  *
- * The store is a plain sessionStorage-backed singleton (no in-memory zustand
- * state), so per-test resets are just sessionStorage.clear(); see
- * src/contexts/__tests__/prefill-store.test.ts for the full store
- * characterization suite.
+ * The store is a pair of plain sessionStorage-backed functions (no in-memory
+ * state), so per-test resets are just sessionStorage.clear().
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { StrictMode } from "react";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { setPrefill, consumePrefill } from "@/contexts/prefill-store";
 import { usePrefillHydration } from "@/hooks/use-prefill-hydration";
 import { setupRenderHarness } from "@/test/react-harness";
 
@@ -35,7 +33,7 @@ beforeEach(() => {
 
 describe("prefill-store sessionStorage persistence", () => {
   it("setPrefill writes dialog key to sessionStorage", () => {
-    usePrefillStore.getState().setPrefill({}, "pitch_yeast");
+    setPrefill({}, "pitch_yeast");
 
     const raw = sessionStorage.getItem(STORAGE_KEY);
     expect(raw).not.toBeNull();
@@ -49,12 +47,12 @@ describe("prefill-store sessionStorage persistence", () => {
       JSON.stringify({ prefillData: null, openDialog: "pitch_yeast" }),
     );
 
-    const { openDialog } = usePrefillStore.getState().consume();
+    const { openDialog } = consumePrefill();
     expect(openDialog).toBe("pitch_yeast");
   });
 
   it("consume() returns null openDialog when sessionStorage is empty (SSR scenario)", () => {
-    const { openDialog, prefillData } = usePrefillStore.getState().consume();
+    const { openDialog, prefillData } = consumePrefill();
     expect(openDialog).toBeNull();
     expect(prefillData).toBeNull();
   });
@@ -65,11 +63,11 @@ describe("prefill-store sessionStorage persistence", () => {
       JSON.stringify({ prefillData: null, openDialog: "blend" }),
     );
 
-    const first = usePrefillStore.getState().consume();
+    const first = consumePrefill();
     expect(first.openDialog).toBe("blend");
 
     // Second consume() should return null — store was cleared
-    const second = usePrefillStore.getState().consume();
+    const second = consumePrefill();
     expect(second.openDialog).toBeNull();
     expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   });
@@ -81,7 +79,7 @@ describe("prefill-store sessionStorage persistence", () => {
       JSON.stringify({ prefillData: prefill, openDialog: null }),
     );
 
-    const { prefillData } = usePrefillStore.getState().consume();
+    const { prefillData } = consumePrefill();
     expect(prefillData).toEqual(prefill);
   });
 });
@@ -97,14 +95,14 @@ describe("hydration safety invariant", () => {
       STORAGE_KEY,
       JSON.stringify({ prefillData: null, openDialog: "pitch_yeast" }),
     );
-    const clientResult = usePrefillStore.getState().consume();
+    const clientResult = consumePrefill();
     expect(clientResult.openDialog).toBe("pitch_yeast"); // client gets the value
 
     // Server scenario: sessionStorage unavailable → the store's read() catches
     // and returns the EMPTY snapshot. jsdom can't remove sessionStorage, but
     // an empty one exercises the same code path (read() → EMPTY).
     sessionStorage.removeItem(STORAGE_KEY);
-    const serverResult = usePrefillStore.getState().consume();
+    const serverResult = consumePrefill();
     expect(serverResult.openDialog).toBeNull(); // server gets null
     // → If both are read during render, server renders dialog=false,
     //   client renders dialog=true → hydration mismatch.
@@ -141,7 +139,7 @@ function Probe({
 describe("usePrefillHydration", () => {
   it("gates ready=false on first paint, then consumes once and exposes defaultValues (Strict Mode safe)", () => {
     const prefill = { recipe_id: "abc-123" };
-    usePrefillStore.getState().setPrefill(prefill);
+    setPrefill(prefill);
 
     const log: HookState[] = [];
     const container = harness.render(
@@ -175,7 +173,7 @@ describe("usePrefillHydration", () => {
 
   it("enabled:false (EntityDetailUnified detail/edit mode) is ready immediately and never consumes", () => {
     const prefill = { recipe_id: "abc-123" };
-    usePrefillStore.getState().setPrefill(prefill);
+    setPrefill(prefill);
 
     const log: HookState[] = [];
     harness.render(
@@ -188,6 +186,6 @@ describe("usePrefillHydration", () => {
     expect(log[0]).toEqual({ ready: true, defaultValues: undefined });
     expect(log[log.length - 1]).toEqual({ ready: true, defaultValues: undefined });
     // The pending prefill is left for the create route to drain.
-    expect(usePrefillStore.getState().prefillData).toEqual(prefill);
+    expect(consumePrefill().prefillData).toEqual(prefill);
   });
 });

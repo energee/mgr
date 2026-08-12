@@ -20,7 +20,7 @@ import { setupRenderHarness } from "@/test/react-harness";
 import type { MashStep } from "../mash-schedule-editor";
 
 vi.mock("@/hooks/use-unit-preferences", () => ({
-  useTemperatureUnit: () => "F",
+  useResolvedUnitPreferences: () => ({ temperature_unit: "F" }),
 }));
 vi.mock("@/components/ui/unit-input", () => ({
   UnitInput: ({ value }: { value: number | null }) => (

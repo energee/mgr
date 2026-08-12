@@ -1,11 +1,16 @@
 /**
  * Shared PostgreSQL Error Code Constants
  *
- * Single source of truth for PG error codes and their user-friendly messages.
- * Used by both client-side error parsing (errors.ts) and API error handling (api/errors.ts).
+ * Single source of truth for PG error codes and how each layer presents them:
+ * one `PG_ERROR_TABLE` maps code → { message, api?, serviceCode? }, and thin
+ * adapters consume it — client-side parsing (errors.ts) reads `message`, API
+ * route handling (api/errors.ts) reads `api`, and the service layer
+ * (services/types.ts) reads `serviceCode`.
  *
  * @see https://www.postgresql.org/docs/current/errcodes-appendix.html
  */
+
+import type { ApiErrorCode } from "./api/errors";
 
 /**
  * Semantic names for commonly encountered PostgreSQL error codes.
@@ -50,44 +55,100 @@ export const PG_ERROR_CODES = {
 export type PgErrorCode = (typeof PG_ERROR_CODES)[keyof typeof PG_ERROR_CODES];
 
 /**
- * Map PostgreSQL error codes to user-friendly messages.
+ * API-layer classification for a PG error. The HTTP status is derived from
+ * `code` by the ApiError constructor (see DEFAULT_STATUS_BY_CODE).
  */
-export const PG_ERROR_MESSAGES: Record<string, string> = {
+export type PgApiMapping = {
+  code: ApiErrorCode;
+  message: string;
+};
+
+/** Service-layer discriminant for a PG error (see ServiceError in services/types.ts). */
+export type PgServiceCode = "FK_VIOLATION" | "UNIQUE_VIOLATION" | "RLS_DENIED";
+
+export type PgErrorEntry = {
+  /** Client-facing message (toasts, inline form errors). */
+  message: string;
+  /** API route mapping — only for codes API routes translate to structured errors. */
+  api?: PgApiMapping;
+  /** Service-layer error code — only for codes parseSupabaseError distinguishes. */
+  serviceCode?: PgServiceCode;
+};
+
+/**
+ * The unified code → presentation table. API messages are intentionally
+ * allowed to differ from client messages where the audience differs.
+ */
+export const PG_ERROR_TABLE: Record<string, PgErrorEntry> = {
   // Class 23 - Integrity Constraint Violation
-  [PG_ERROR_CODES.INTEGRITY_CONSTRAINT]: "Data integrity violation",
-  [PG_ERROR_CODES.RESTRICT_VIOLATION]: "Restriction violation",
-  [PG_ERROR_CODES.NOT_NULL_VIOLATION]: "Required field cannot be empty",
-  [PG_ERROR_CODES.FOREIGN_KEY_VIOLATION]:
-    "Cannot delete: this record is referenced by other data",
-  [PG_ERROR_CODES.UNIQUE_VIOLATION]:
-    "A record with this value already exists",
-  [PG_ERROR_CODES.CHECK_VIOLATION]: "Value does not meet requirements",
+  [PG_ERROR_CODES.INTEGRITY_CONSTRAINT]: { message: "Data integrity violation" },
+  [PG_ERROR_CODES.RESTRICT_VIOLATION]: { message: "Restriction violation" },
+  [PG_ERROR_CODES.NOT_NULL_VIOLATION]: {
+    message: "Required field cannot be empty",
+    api: {
+      code: "VALIDATION_ERROR",
+      message: "A required field is missing",
+    },
+  },
+  [PG_ERROR_CODES.FOREIGN_KEY_VIOLATION]: {
+    message: "Cannot delete: this record is referenced by other data",
+    api: {
+      code: "CONFLICT",
+      message: "This record is referenced by other data and cannot be modified",
+    },
+    serviceCode: "FK_VIOLATION",
+  },
+  [PG_ERROR_CODES.UNIQUE_VIOLATION]: {
+    message: "A record with this value already exists",
+    api: {
+      code: "CONFLICT",
+      message: "A record with this value already exists",
+    },
+    serviceCode: "UNIQUE_VIOLATION",
+  },
+  [PG_ERROR_CODES.CHECK_VIOLATION]: {
+    message: "Value does not meet requirements",
+    api: {
+      code: "VALIDATION_ERROR",
+      message: "A field value violates a constraint",
+    },
+  },
 
   // Class 22 - Data Exception
-  [PG_ERROR_CODES.DATA_EXCEPTION]: "Invalid data format",
-  [PG_ERROR_CODES.STRING_DATA_RIGHT_TRUNCATION]:
-    "Value is too long for this field",
-  [PG_ERROR_CODES.NUMERIC_VALUE_OUT_OF_RANGE]: "Number out of range",
-  [PG_ERROR_CODES.INVALID_DATETIME_FORMAT]: "Invalid date/time format",
-  [PG_ERROR_CODES.DIVISION_BY_ZERO]: "Cannot divide by zero",
-  [PG_ERROR_CODES.INVALID_TEXT_REPRESENTATION]: "Invalid number format",
+  [PG_ERROR_CODES.DATA_EXCEPTION]: { message: "Invalid data format" },
+  [PG_ERROR_CODES.STRING_DATA_RIGHT_TRUNCATION]: {
+    message: "Value is too long for this field",
+  },
+  [PG_ERROR_CODES.NUMERIC_VALUE_OUT_OF_RANGE]: { message: "Number out of range" },
+  [PG_ERROR_CODES.INVALID_DATETIME_FORMAT]: { message: "Invalid date/time format" },
+  [PG_ERROR_CODES.DIVISION_BY_ZERO]: { message: "Cannot divide by zero" },
+  [PG_ERROR_CODES.INVALID_TEXT_REPRESENTATION]: { message: "Invalid number format" },
 
   // Class 42 - Syntax/Access Error
-  [PG_ERROR_CODES.INSUFFICIENT_PRIVILEGE]:
-    "You don't have permission to perform this action",
-  [PG_ERROR_CODES.SYNTAX_ERROR]: "Invalid query syntax",
-  [PG_ERROR_CODES.UNDEFINED_COLUMN]: "Unknown field",
-  [PG_ERROR_CODES.UNDEFINED_TABLE]: "Table not found",
+  [PG_ERROR_CODES.INSUFFICIENT_PRIVILEGE]: {
+    message: "You don't have permission to perform this action",
+    api: {
+      code: "FORBIDDEN",
+      message: "Insufficient permissions for this operation",
+    },
+    serviceCode: "RLS_DENIED",
+  },
+  [PG_ERROR_CODES.SYNTAX_ERROR]: { message: "Invalid query syntax" },
+  [PG_ERROR_CODES.UNDEFINED_COLUMN]: { message: "Unknown field" },
+  [PG_ERROR_CODES.UNDEFINED_TABLE]: { message: "Table not found" },
 
   // Class 40 - Transaction Rollback
-  [PG_ERROR_CODES.SERIALIZATION_FAILURE]:
-    "Transaction conflict. Please try again.",
-  [PG_ERROR_CODES.DEADLOCK_DETECTED]:
-    "Deadlock detected. Please try again.",
+  [PG_ERROR_CODES.SERIALIZATION_FAILURE]: {
+    message: "Transaction conflict. Please try again.",
+  },
+  [PG_ERROR_CODES.DEADLOCK_DETECTED]: {
+    message: "Deadlock detected. Please try again.",
+  },
 
   // Class 53 - Insufficient Resources
-  [PG_ERROR_CODES.INSUFFICIENT_RESOURCES]:
-    "Server resources temporarily unavailable",
-  [PG_ERROR_CODES.DISK_FULL]: "Disk full",
-  [PG_ERROR_CODES.OUT_OF_MEMORY]: "Out of memory",
+  [PG_ERROR_CODES.INSUFFICIENT_RESOURCES]: {
+    message: "Server resources temporarily unavailable",
+  },
+  [PG_ERROR_CODES.DISK_FULL]: { message: "Disk full" },
+  [PG_ERROR_CODES.OUT_OF_MEMORY]: { message: "Out of memory" },
 };

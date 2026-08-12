@@ -213,19 +213,6 @@ export const consumptionKeys = {
 };
 
 // =============================================================================
-// Customer Keys
-// =============================================================================
-
-export const customerKeys = {
-  all: () => ["customers"] as const,
-  list: (filters?: Record<string, unknown>) =>
-    filters ? (["customers", "list", filters] as const) : (["customers", "list"] as const),
-  detail: (id: string) => ["customers", id] as const,
-  orders: (id: string) => ["customers", id, "orders"] as const,
-  kegBalance: (id: string) => ["customers", id, "keg-balance"] as const,
-};
-
-// =============================================================================
 // User/Settings Keys
 // =============================================================================
 

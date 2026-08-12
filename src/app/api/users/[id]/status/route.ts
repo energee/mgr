@@ -7,12 +7,10 @@
  */
 
 import { z } from "zod";
-import {
-  ApiError,
-  successResponse,
-  validateBody,
-  withPermission,
-} from "@/lib/api";
+import { successResponse } from "@/lib/api/response";
+import { withPermission } from "@/lib/api/auth";
+import { validateBody } from "@/lib/api/validation";
+import { ApiError } from "@/lib/api/errors";
 import { createAdminClient } from "@/lib/supabase/server";
 import { changeUserAccountStatus } from "@/services/user-account-status";
 

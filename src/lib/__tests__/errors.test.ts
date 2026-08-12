@@ -73,14 +73,14 @@ describe("parsePostgresErrorDetailed", () => {
     expect(parsed.message).toBe("A record with this value already exists");
   });
 
-  it("returns no field for check violations", () => {
+  it("returns no field and the generic message for uncurated check violations", () => {
     const error = makePostgresError(
       "23514",
-      'violates check constraint "chk_quantity_positive"'
+      'violates check constraint "chk_some_unknown_constraint"'
     );
     const parsed = parsePostgresErrorDetailed(error);
     expect(parsed.field).toBeUndefined();
-    expect(parsed.message).toBe("Quantity must be greater than zero");
+    expect(parsed.message).toBe("Value does not meet requirements");
   });
 
   it("maps keg transaction check constraints to friendly messages", () => {

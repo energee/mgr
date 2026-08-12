@@ -49,7 +49,7 @@ import {
   reorderWithPositions,
 } from "@/components/ui/sortable-drag-preview";
 import { UnitInput } from "@/components/ui/unit-input";
-import { useTemperatureUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatTemperature, formatTemperatureRange } from "@/domain/units";
 import { Plus, Trash2, GripVertical, ChevronDown, Thermometer } from "lucide-react";
 
@@ -138,7 +138,7 @@ export function MashScheduleEditor({
   onChange,
   disabled = false,
 }: MashScheduleEditorProps) {
-  const tempUnit = useTemperatureUnit();
+  const tempUnit = useResolvedUnitPreferences().temperature_unit;
   const [, setEditingId] = useState<string | null>(null);
 
   // Backfill IDs once if legacy data lacks them — required for stable drag-and-drop.
