@@ -14,7 +14,7 @@ Owns the presentation layer's layering discipline. Optimizes for keeping the ent
 ## Must-know gotchas
 - **Layer rules by directory**: `universal/` (~8,300 LOC) is the entity-agnostic rendering engine — `entity-data-table.tsx` (~1,576 LOC), `entity-detail-unified.tsx` (~2,048 LOC), `entity-list.tsx`, `entity-kanban.tsx`, `entity-mobile-card-list.tsx`, `entity-relation-table.tsx`, `entity-mobile-filter-sheet.tsx`. These read `EntityConfig` objects (created via `createEntityConfig()` in `src/entities/<entity>/{core,presentation}.ts`, ~39 entity dirs) — they are NOT hardcoded per entity. Anything entity-specific (custom cell renderers, `relationComponents` map entries) belongs in `src/entities/*/presentation.tsx`, not here. `entity-data-table.tsx`'s header comment (lines 1-37) is the best architecture doc in the tree — read it before touching pagination/selection/transition logic.
 - `domain/` (~41,000 LOC, the majority of the tree) is bespoke, feature-specific UI grouped by business domain (`batch/`, `brew/`, `recipe/`, `order/`, `purchasing/`, `packaging/`, `pricing/`, `yeast/`, `reports/`, `shared/`). Do NOT try to generalize these into `universal/` — a prior campaign explicitly tried and the resulting shared abstractions were reverse-engineered as not viable; state models, add-mechanisms, and footers diverge enough between similar-looking editors that a shared shell would be a near-empty passthrough.
-- `ui/` (~14,900 LOC) is shadcn-style design-system primitives, PLUS (surprisingly) 48 of the 50 animated icon wrappers. `icons/` holds only the aggregator (`animated.tsx`) plus `flask.tsx`, `ship.tsx`, `mgr-logo.tsx` — an inconsistent home for new icons, not a functional bug, but flag it in review when adding a new animated icon.
+- `ui/` is shadcn-style design-system primitives only. The 50-file animated-icon farm that used to live here (plus its `icons/animated.tsx` aggregator and the `motion` dependency) was retired in PR #771 — icons are now plain `lucide-react` imports at the point of use. `icons/` holds only `mgr-logo.tsx`. Do NOT reintroduce per-icon wrapper components or hover-animation refs; import the lucide icon directly and size it with `className="h-4 w-4"`.
 - `data-table/` (~2,000 LOC) is generic TanStack/Dice-UI plumbing (`adapter.tsx`, filter/sort/pagination lists) consumed only by `universal/entity-data-table.tsx`. Paired with `src/lib/data-table-config.ts` (operator/variant enums, pure data) and `src/lib/data-table.ts` (`getColumnPinningStyle`, `getFilterOperators`/`getDefaultFilterOperator`).
 - **`src/lib/form-resolver.ts` quirk**: its one export, `zodResolver<T>()`, exists solely because Zod v4's `z.coerce` widens input types to `unknown`, breaking `@hookform/resolvers` generic inference. It casts internally so call sites don't need `as any` scattered everywhere. **Convention: always import this wrapper, never `zodResolver` from `@hookform/resolvers/zod` directly** — grep for direct imports in review.
 - **Recharts v3 quirks** (`src/components/ui/chart.tsx`): `ChartTooltipContent`/`ChartLegendContent` type their `payload` prop via `React.ComponentProps<typeof RechartsPrimitive.DefaultTooltipContent>`/`DefaultLegendContent` — the old top-level `payload` type doesn't exist in v3. Chart consumers (`dashboard/trend-chart.tsx`, `domain/batch/batch-readings-chart.tsx`, `domain/reports/cogs-period-chart.tsx`) each have a paired `*-lazy.tsx` `next/dynamic` wrapper (`ssr:false` + `Skeleton` fallback) to keep recharts out of the initial bundle — new chart components should follow the same pairing.
@@ -24,7 +24,7 @@ Owns the presentation layer's layering discipline. Optimizes for keeping the ent
 ## Review checklist
 1. New `zodResolver` imports use `@/lib/form-resolver`, never `@hookform/resolvers/zod` directly.
 2. New business-logic components go in `domain/<area>/`, not `universal/`.
-3. New animated icons — decide and note whether they belong in `ui/` (current majority) or `icons/`.
+3. Icons are imported directly from `lucide-react` — no new per-icon wrapper components under `ui/` or `icons/`, and no `motion`-based hover animation.
 4. New chart components pair with a `-lazy.tsx` dynamic wrapper (`ssr:false` + `Skeleton`).
 5. No entity name literals inside `universal/*.tsx`.
 6. Helper functions/components are defined before their first use in a file (Turbopack HMR hoisting hazard).
@@ -39,4 +39,4 @@ Owns the presentation layer's layering discipline. Optimizes for keeping the ent
 - `src/lib/data-table-config.ts`
 - `src/lib/data-table.ts`
 - `src/components/domain/recipe/` (largest domain example, ~8,500 LOC)
-- `src/components/icons/animated.tsx`
+- `src/components/universal/action-menu-item.tsx`
