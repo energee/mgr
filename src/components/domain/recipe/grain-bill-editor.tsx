@@ -114,12 +114,10 @@ export function GrainBillEditor({
       <div className="flex items-center justify-end">
         <CatalogAddPopover
           catalog={maltCatalog}
-          getId={(malt) => malt.id}
           excludeIds={addedMaltIds}
           getGroup={(malt) => malt.type}
           groupLabels={MALT_TYPE_LABELS}
           getSearchValue={(malt) => `${malt.name} ${malt.maltster || ""}`}
-          getLabel={(malt) => malt.name}
           getDetail={(malt) => (
             <span className="text-xs text-muted-foreground">
               {malt.maltster}

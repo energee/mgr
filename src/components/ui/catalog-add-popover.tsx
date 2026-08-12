@@ -15,7 +15,7 @@
  * still gets the popover dismissed.
  */
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -32,20 +32,20 @@ import {
 } from "@/components/ui/popover";
 import { Plus, ChevronsUpDown } from "lucide-react";
 
-type CatalogAddPopoverProps<T> = {
+/** Every catalog this wraps is a named, id'd row, so those two fields are the contract. */
+type CatalogEntry = { id: string; name: string };
+
+type CatalogAddPopoverProps<T extends CatalogEntry> = {
   /** Full catalog, already filtered of anything the caller wants hidden. */
   catalog: T[];
-  /** Stable id per catalog entry; entries whose id is in `excludeIds` are hidden. */
-  getId: (item: T) => string;
+  /** Entries whose `id` is in this set are hidden. */
   excludeIds?: Set<string>;
   /** Grouping key (e.g. malt/hop/additive `type`). */
   getGroup: (item: T) => string;
   /** Display label per group key; falls back to the raw key. */
   groupLabels?: Record<string, string>;
-  /** Search haystack for `cmdk`. */
-  getSearchValue: (item: T) => string;
-  /** Primary line for a catalog entry. */
-  getLabel: (item: T) => React.ReactNode;
+  /** Search haystack for `cmdk`. Defaults to the entry's name. */
+  getSearchValue?: (item: T) => string;
   /** Muted secondary line; return null to omit it. */
   getDetail?: (item: T) => React.ReactNode;
   onSelect: (item: T) => void;
@@ -56,14 +56,12 @@ type CatalogAddPopoverProps<T> = {
   disabled?: boolean;
 };
 
-export function CatalogAddPopover<T>({
+export function CatalogAddPopover<T extends CatalogEntry>({
   catalog,
-  getId,
   excludeIds,
   getGroup,
   groupLabels = {},
-  getSearchValue,
-  getLabel,
+  getSearchValue = (item) => item.name,
   getDetail,
   onSelect,
   triggerLabel,
@@ -74,18 +72,14 @@ export function CatalogAddPopover<T>({
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  const groups = useMemo(() => {
-    const byGroup: Record<string, T[]> = {};
-    for (const item of catalog) {
-      if (excludeIds?.has(getId(item))) continue;
-      const key = getGroup(item) || "other";
-      (byGroup[key] ??= []).push(item);
-    }
-    return byGroup;
-    // `getId`/`getGroup` are inline arrow props; depending on them would defeat
-    // the memo, and they are pure projections of `item` in every caller.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, excludeIds]);
+  // Grouping is an O(catalog) pass over a few dozen rows and only runs while the
+  // popover is mounted, so it is cheaper to redo than to memoize around the
+  // inline-arrow props the callers pass.
+  const groups: Record<string, T[]> = {};
+  for (const item of catalog) {
+    if (excludeIds?.has(item.id)) continue;
+    (groups[getGroup(item) || "other"] ??= []).push(item);
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -109,7 +103,7 @@ export function CatalogAddPopover<T>({
               <CommandGroup key={key} heading={groupLabels[key] || key}>
                 {entries.map((item) => (
                   <CommandItem
-                    key={getId(item)}
+                    key={item.id}
                     value={getSearchValue(item)}
                     onSelect={() => {
                       onSelect(item);
@@ -119,7 +113,7 @@ export function CatalogAddPopover<T>({
                     className="flex items-center justify-between"
                   >
                     <div className="flex flex-col">
-                      <span>{getLabel(item)}</span>
+                      <span>{item.name}</span>
                       {getDetail?.(item)}
                     </div>
                   </CommandItem>

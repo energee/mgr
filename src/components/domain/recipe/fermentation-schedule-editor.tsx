@@ -209,7 +209,6 @@ export function FermentationScheduleEditor({
       </div>
 
       <SortableRows
-        as="stack"
         items={stages}
         onReorder={rows.reorder}
         disabled={disabled}

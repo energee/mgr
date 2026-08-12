@@ -150,11 +150,9 @@ export function HopScheduleEditor({
       <div className="flex items-center justify-end">
         <CatalogAddPopover
           catalog={hopCatalog}
-          getId={(hop) => hop.id}
           getGroup={(hop) => hop.type || "dual"}
           groupLabels={HOP_TYPE_LABELS}
           getSearchValue={(hop) => `${hop.name} ${hop.origin || ""}`}
-          getLabel={(hop) => hop.name}
           getDetail={(hop) => (
             <span className="text-xs text-muted-foreground">
               {hop.origin}

@@ -14,14 +14,17 @@
  * domain, so that is the one thing callers still supply.
  *
  * - `useSortableRows` — the mutation kernel + ID backfill.
- * - `SortableRows` — the scaffold, in two shapes: a `<Table>` (`as="table"`,
- *   the default) or a stack of cards (`as="stack"`, used by the fermentation
- *   editor whose rows are collapsibles, not table rows).
+ * - `SortableRows` — the scaffold, in two shapes selected by whether `columns`
+ *   is supplied: a `<Table>` under those headers, or a stack of cards (used by
+ *   the fermentation editor, whose rows are collapsibles rather than table
+ *   rows).
  * - `SortableRowHandle` / `RemoveRowButton` — the bracketing controls.
  *
  * Behavior is deliberately identical to what the five editors did before
  * extraction; the characterization tests under
- * `src/components/domain/{recipe,batch}/__tests__/` pin it.
+ * `src/components/domain/{recipe,batch}/__tests__/` pin it per editor, and
+ * `__tests__/sortable-rows.test.tsx` pins the kernel and the one-shot backfill
+ * directly.
  */
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -49,8 +52,12 @@ export type SortableRow = {
   position: number;
 };
 
-/** Re-stamp `position` to match array order. Every mutation funnels through this. */
-export function reorderWithPositions<T extends { position?: number }>(items: T[]): T[] {
+/**
+ * Re-stamp `position` to match array order. Every mutation funnels through
+ * this, and it stays module-private so no caller can renumber outside the
+ * kernel and drift from it.
+ */
+function reorderWithPositions<T extends { position?: number }>(items: T[]): T[] {
   return items.map((item, i) => ({ ...item, position: i }));
 }
 
@@ -191,7 +198,7 @@ export function SortableDragPreview({
   );
 }
 
-/** A column definition for the `as="table"` scaffold. */
+/** A column definition for the table shape. */
 export type SortableRowsColumn = {
   /** Header text; omit for the grip and trash gutters. */
   label?: string;
@@ -206,22 +213,25 @@ type SortableRowsProps<T> = {
   disabled?: boolean;
   /** Rendered instead of the list when `items` is empty. */
   empty: React.ReactNode;
-  /** Row body — table cells for `as="table"`, a card for `as="stack"`. */
+  /** Row body — a `<TableRow>` in the table shape, a card in the stack shape. */
   children: (item: T, index: number) => React.ReactNode;
   /** Contents of the drag overlay for the row currently being dragged. */
   overlay?: (item: T | undefined) => React.ReactNode;
   /** Rendered after the list, inside the `Sortable` (e.g. a totals bar). */
   footer?: React.ReactNode;
-} & (
-  | { as?: "table"; columns: SortableRowsColumn[] }
-  | { as: "stack"; columns?: never }
-);
+  /**
+   * Table headers. Supplying them selects the table shape, in which `children`
+   * must return a `<TableRow>` and `footer` a `<TableFooter>`; omitting them
+   * selects the stack shape, where both are plain nodes.
+   */
+  columns?: SortableRowsColumn[];
+};
 
 /**
  * The `Sortable` scaffold: empty state, drag context, list container, and drag
- * overlay. `as="table"` wraps rows in `<Table>` with a `columns` header and an
- * optional `<TableFooter>`-shaped `footer`; `as="stack"` renders a vertical
- * stack of cards and places `footer` below it.
+ * overlay. With `columns`, rows are wrapped in a `<Table>` under those headers
+ * with an optional `<TableFooter>`-shaped `footer`; without, they render as a
+ * vertical stack of cards with `footer` below.
  */
 export function SortableRows<T extends SortableRow>({
   items,
@@ -232,12 +242,11 @@ export function SortableRows<T extends SortableRow>({
   children,
   overlay,
   footer,
-  ...rest
+  columns,
 }: SortableRowsProps<T>) {
   if (items.length === 0) return <>{empty}</>;
 
   const itemValue = getItemValue ?? ((item: T) => item.id!);
-  const asTable = rest.as !== "stack";
 
   const rows = items.map((item, index) => (
     <SortableItem key={itemValue(item)} value={itemValue(item)} asChild disabled={disabled}>
@@ -246,18 +255,12 @@ export function SortableRows<T extends SortableRow>({
   ));
 
   return (
-    // Pinned to `SortableRow` because `SortableProps` gates `getItemValue` behind
-    // a `T extends object` conditional that TS defers while `T` is still generic.
-    <Sortable<SortableRow>
-      value={items}
-      onValueChange={onReorder as (items: SortableRow[]) => void}
-      getItemValue={itemValue as (item: SortableRow) => string}
-    >
-      {asTable ? (
+    <Sortable<T> value={items} onValueChange={onReorder} getItemValue={itemValue}>
+      {columns ? (
         <Table>
           <TableHeader>
             <TableRow>
-              {(rest as { columns: SortableRowsColumn[] }).columns.map((col, i) => (
+              {columns.map((col, i) => (
                 <TableHead key={i} className={col.className}>
                   {col.label}
                 </TableHead>

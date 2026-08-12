@@ -104,8 +104,12 @@ type GetItemValue<T> = {
   getItemValue: (item: T) => UniqueIdentifier;
 }
 
+// `getItemValue` is required outright rather than gated behind a
+// `T extends object` conditional: every consumer passes it, and the conditional
+// stayed unresolved while `T` was still generic, which forced callers that are
+// themselves generic (`SortableRows`) to cast their way past it.
 type SortableProps<T> = DndContextProps &
-  (T extends object ? GetItemValue<T> : Partial<GetItemValue<T>>) & {
+  GetItemValue<T> & {
     value: T[];
     onValueChange?: (items: T[]) => void;
     onMove?: (

@@ -157,12 +157,9 @@ export function AdditionsEditor({
         <h3 className="text-lg font-medium">Additions</h3>
         <CatalogAddPopover
           catalog={additiveCatalog}
-          getId={(additive) => additive.id}
           excludeIds={addedIds}
           getGroup={(additive) => additive.type}
           groupLabels={TYPE_LABELS}
-          getSearchValue={(additive) => additive.name}
-          getLabel={(additive) => additive.name}
           getDetail={(additive) =>
             additive.description && (
               <span className="text-xs text-muted-foreground line-clamp-1">
