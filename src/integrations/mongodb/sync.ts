@@ -822,6 +822,39 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     (await selectIdName(admin, "brands")).map((b) => [b.name, b.id])
   );
 
+  // Fallback chains for batches without a direct beer link (2026-08-12: 166
+  // lines failed brand resolution on the direct chain alone):
+  //   Mongo: batch → recipe → recipe.beer → brand name
+  //   PG:    batch → batches.recipe_id → recipes.brand_id (recipes got
+  //          brand_id during phase 2, so this also covers name-adopted rows)
+  const mongoBatchIdToRecipe = new Map(
+    mongoBatches.filter((b) => b.recipe).map((b) => [b._id.toString(), b.recipe!.toString()])
+  );
+  const mongoRecipeIdToBeer = new Map(
+    (await db.collection<MongoRecipe>("recipes").find().toArray())
+      .filter((r) => r.beer)
+      .map((r) => [r._id.toString(), r.beer!.toString()])
+  );
+  const [pgBatchesResult, pgRecipesResult] = await Promise.all([
+    dynamicFrom(admin, "batches").select("id, recipe_id"),
+    dynamicFrom(admin, "recipes").select("id, brand_id"),
+  ]);
+  if (pgBatchesResult.error || pgRecipesResult.error) {
+    throw new Error(
+      `Failed to read batch/recipe brand fallback data: ${pgBatchesResult.error?.message ?? pgRecipesResult.error?.message}`
+    );
+  }
+  const pgRecipeIdToBrandId = new Map(
+    ((pgRecipesResult.data ?? []) as Array<{ id: string; brand_id: string | null }>)
+      .filter((r) => r.brand_id)
+      .map((r) => [r.id, r.brand_id as string])
+  );
+  const pgBatchIdToBrandId = new Map<string, string>();
+  for (const b of (pgBatchesResult.data ?? []) as Array<{ id: string; recipe_id: string | null }>) {
+    const brandId = b.recipe_id ? pgRecipeIdToBrandId.get(b.recipe_id) : undefined;
+    if (brandId) pgBatchIdToBrandId.set(b.id, brandId);
+  }
+
   // Format lookup: MongoDB formats → PG selling_formats
   // MongoDB "formats" collection has flat names (e.g. "16oz Cans - Case of 24")
   // PG has a two-level model: containers ("16oz Can") + selling_formats ("Case of 24")
@@ -875,6 +908,19 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     const container = formatByContainerName.get(lower);
     if (container) return container;
 
+    // Strategy 3b: keg-size aliases. Mongo formats are named "<owner> <size>"
+    // ("Microstar Half", "Lolev Sixtel", "Kegfleet Half"); the size word maps
+    // onto a PG keg container. The owner prefix is keg-fleet bookkeeping the
+    // PG model tracks elsewhere (keg_owners), not a distinct selling format.
+    if (/\bhalf\b/.test(lower)) {
+      const half = formatByContainerName.get("1/2 barrel");
+      if (half) return half;
+    }
+    if (/\b(sixtel|sixth)\b/.test(lower)) {
+      const sixtel = formatByContainerName.get("1/6 barrel");
+      if (sixtel) return sixtel;
+    }
+
     // Strategy 4: containment — find the longest composite key that overlaps
     let bestMatch: string | null = null;
     let bestLen = 0;
@@ -917,15 +963,21 @@ async function syncPackagingSessions(): Promise<SyncResult> {
 
       const pgBatchId = product.batch ? objectIdToUuid(product.batch.toString()) : null;
 
-      // Resolve brand_id via batch → beer → brand chain (NOT NULL)
+      // Resolve brand_id (NOT NULL): batch → beer → brand, falling back to
+      // batch → recipe → beer → brand, then the PG batch → recipe → brand map.
       let pgBrandId: string | null = null;
       if (product.batch) {
-        const beerId = mongoBatchIdToBeer.get(product.batch.toString());
+        const mongoBatchId = product.batch.toString();
+        const beerId = mongoBatchIdToBeer.get(mongoBatchId)
+          ?? mongoRecipeIdToBeer.get(mongoBatchIdToRecipe.get(mongoBatchId) ?? "");
         if (beerId) {
           const beerName = mongoBeerIdToName.get(beerId);
           if (beerName) {
             pgBrandId = brandNameToId.get(beerName) ?? null;
           }
+        }
+        if (!pgBrandId && pgBatchId) {
+          pgBrandId = pgBatchIdToBrandId.get(pgBatchId) ?? null;
         }
       }
 
