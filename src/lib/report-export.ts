@@ -9,12 +9,12 @@ import { formatBbl } from "@/lib/format";
 import {
   getTaxClassLabel,
   getTotalScopeCaveat,
-  getInProcessSnapshotCaveat,
+  getInProcessBalanceNote,
   getReportExemptionDisclosure,
   totalForColumn,
   totalScopedLineLabel,
   TOTAL_COLUMN_LABEL,
-  IN_PROCESS_SNAPSHOT_LABEL,
+  IN_PROCESS_LABEL,
   type TTBReportRow,
   type TTBVolumeField,
 } from "@/domain/ttb-utils";
@@ -138,7 +138,7 @@ export type TTBBatchData = {
  *
  * Those NOTE rows are load-bearing, not decoration: a CSV is the copy most
  * likely to be attached to an actual Form 5130.9 filing, so it carries the same
- * in-process snapshot caveat, "not accounting-identity checked" disclosure
+ * in-process balance note, "not accounting-identity checked" disclosure
  * (issue #618) and Total-column scope note (issue #670) the screen and the print
  * view show. They are trailing rows in the "Line Item" column, matching how every
  * other label and section header in this CSV is carried.
@@ -179,10 +179,10 @@ export function buildTTBReportCSV(
     labelRow("ENDING BALANCE"),
     createDataRow("Ending Inventory", reportData, "ending_inventory_bbl"),
     labelRow(""),
-    // In-process volumes are a live snapshot of batches currently
-    // fermenting/conditioning/packaging, not a month-end balance (issue #618).
-    labelRow("BEER IN PROCESS (CURRENT SNAPSHOT)"),
-    createDataRow(IN_PROCESS_SNAPSHOT_LABEL, reportData, "in_process_ending_bbl"),
+    // In-process volumes are period-end balances reconstructed from the batch
+    // audit trail (migration 00286, issue #618).
+    labelRow("BEER IN PROCESS (END OF PERIOD)"),
+    createDataRow(IN_PROCESS_LABEL, reportData, "in_process_ending_bbl"),
   ];
 
   // Trailing note rows. Only the "Line Item" key is set: toCSV takes its columns
@@ -191,7 +191,7 @@ export function buildTTBReportCSV(
   const totalScopeCaveat = getTotalScopeCaveat(reportData);
   const noteRows: CSVRow[] = [
     { "Line Item": "" },
-    { "Line Item": `NOTE: ${getInProcessSnapshotCaveat(periodLabel)}` },
+    { "Line Item": `NOTE: ${getInProcessBalanceNote(periodLabel)}` },
     ...(exemptionDisclosure ? [{ "Line Item": `NOTE: ${exemptionDisclosure}` }] : []),
     ...(totalScopeCaveat ? [{ "Line Item": `NOTE: ${totalScopeCaveat}` }] : []),
   ];
@@ -296,8 +296,9 @@ export function generateTTBPrintHTML(
 ): string {
   const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
   const taxClasses = reportData.map((r) => r.ttb_tax_class);
-  // Same snapshot caveat and "not checked" disclosure the screen and the CSV
-  // carry — a printed copy must not be more confident than the screen (#618).
+  // Same in-process balance note and "not checked" disclosure the screen and
+  // the CSV carry — a printed copy must not be more confident than the screen
+  // (#618).
   const exemptionDisclosure = getReportExemptionDisclosure(reportData);
   const totalScopeCaveat = getTotalScopeCaveat(reportData);
 
@@ -373,8 +374,8 @@ export function generateTTBPrintHTML(
       ${createSectionHeader("Ending Balance")}
       ${createRow("Ending Inventory", "ending_inventory_bbl")}
 
-      ${createSectionHeader("Beer in Process (Cellar) — current snapshot")}
-      ${createRow(IN_PROCESS_SNAPSHOT_LABEL, "in_process_ending_bbl")}
+      ${createSectionHeader("Beer in Process (Cellar) — end of period")}
+      ${createRow(IN_PROCESS_LABEL, "in_process_ending_bbl")}
     </tbody>
   </table>
 
@@ -384,7 +385,7 @@ export function generateTTBPrintHTML(
   </p>
 
   <p style="font-size: 10px; color: #666;">
-    <strong>Cellar/In-Process:</strong> ${escapeHTML(getInProcessSnapshotCaveat(`${monthName} ${year}`))}
+    <strong>Cellar/In-Process:</strong> ${escapeHTML(getInProcessBalanceNote(`${monthName} ${year}`))}
   </p>
 
   ${

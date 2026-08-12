@@ -16,7 +16,7 @@ import {
   validateRowBalance,
   validateEndingInventory,
   EMPTY_TOTALS,
-  IN_PROCESS_SNAPSHOT_LABEL,
+  IN_PROCESS_LABEL,
   PACKAGED_TOTAL_MARKER,
   TOTAL_COLUMN_LABEL,
   totalScopeFor,
@@ -418,20 +418,24 @@ describe("buildTTBReportCSV", () => {
     }),
   ];
 
-  it("labels the in-process line as a current snapshot", () => {
+  it("labels the in-process line as an end-of-period balance", () => {
+    // Period-keyed since migration 00286 (issue #618): the CSV comes from
+    // get_ttb_report, whose in-process terms are reconstructed at the period
+    // boundaries from the batch audit trail — not a live snapshot.
     const csv = buildTTBReportCSV(rows, 2026, 6);
-    expect(csv).toContain("BEER IN PROCESS (CURRENT SNAPSHOT)");
-    expect(csv).toContain("In Process (Current Snapshot)");
+    expect(csv).toContain("BEER IN PROCESS (END OF PERIOD)");
+    expect(csv).toContain("In Process (End of Period)");
+    expect(csv).not.toContain("CURRENT SNAPSHOT");
   });
 
-  it("carries the snapshot caveat as a trailing note row, naming the period", () => {
+  it("carries the balance note as a trailing note row, naming the period", () => {
     const csv = buildTTBReportCSV(rows, 2026, 6);
     const noteLine = csv
       .split("\n")
-      .find((line) => line.includes("snapshot of batches that are fermenting"));
+      .find((line) => line.includes("period-end balances reconstructed from the batch audit trail"));
     expect(noteLine).toBeDefined();
     expect(noteLine).toContain("NOTE:");
-    expect(noteLine).toContain("not a balance as of the end of June 2026");
+    expect(noteLine).toContain("the end of June 2026");
     // Trailing rows keep the report's column shape: note in "Line Item", rest empty.
     expect(noteLine?.endsWith(",,,")).toBe(true);
   });
@@ -445,8 +449,9 @@ describe("buildTTBReportCSV", () => {
   it("omits the exemption note when every class in the report was checked", () => {
     const csv = buildTTBReportCSV([rows[1]], 2026, 6);
     expect(csv).not.toContain("Not accounting-identity checked");
-    // The snapshot caveat still applies — the in-process line is always a snapshot.
-    expect(csv).toContain("snapshot of batches that are fermenting");
+    // The in-process balance note still applies — the line always needs its
+    // measurement explained.
+    expect(csv).toContain("period-end balances reconstructed from the batch audit trail");
   });
 
   it("leaks no internal tracker reference into the filed artifact", () => {
@@ -457,7 +462,7 @@ describe("buildTTBReportCSV", () => {
     const csv = buildTTBReportCSV(rows, 2026, 6);
     const html = generateTTBPrintHTML(rows, 2026, 6);
     for (const fragment of [
-      "snapshot of batches that are fermenting",
+      "period-end balances reconstructed from the batch audit trail",
       "Not accounting-identity checked:",
     ]) {
       expect(csv).toContain(fragment);
@@ -549,7 +554,7 @@ describe("Total column parity (issue #670)", () => {
     ["Destroyed", "destroyed", "destroyed_bbl"],
     ["Total Removals", "totalRemovals", "total_removals_bbl"],
     ["Ending Inventory", "endingInventory", "ending_inventory_bbl"],
-    [IN_PROCESS_SNAPSHOT_LABEL, "inProcessEnding", "in_process_ending_bbl"],
+    [IN_PROCESS_LABEL, "inProcessEnding", "in_process_ending_bbl"],
   ];
 
   it("agrees line for line between the screen totals, the CSV and the print view", () => {
@@ -642,7 +647,9 @@ describe("Total column parity (issue #670)", () => {
       "Cellar (In-Process)",
       "Every other line totals all tax classes",
       "left the brewery and no packaged line reports it again",
-      "does not cross-foot",
+      // Issue #698: since checkTotalColumnCrossFoot verifies the column, the
+      // caveat states the checked relationship instead of disclaiming it.
+      "add those removals back and the column cross-foots",
     ]) {
       expect(csv).toContain(fragment);
       expect(html).toContain(fragment);
