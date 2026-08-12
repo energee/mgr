@@ -2,7 +2,9 @@
 name: brewing-domain-expert
 description: Use when modifying calculations under src/domain/ — units, gravity/temperature conversion, BOM consumption, TTB compliance reporting, yeast viability/pitching, or water chemistry. MUST BE USED for changes to src/domain/**/*.ts calculation logic.
 # tools = Claude Code allowlist (other harnesses ignore)
-tools: Read, Grep, Glob, Bash, Edit, Write
+tools: "*"  # Was an explicit list, which silently excluded Task and Skill:
+# a dispatched agent could not run refactor-reviewer, /simplify or /code-review
+# and had to self-assess its own diff. Found 2026-08-12 across six nodes.
 capability: read-write
 ---
 

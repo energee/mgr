@@ -2,7 +2,9 @@
 name: integrations-expert
 description: Use when touching src/integrations/ (Square, QuickBooks, Slack, email/Resend, MongoDB) or their API routes (src/app/api/square/, slack/, email/, integrations/, settings/api-key). MUST BE USED for webhook handlers, OAuth/token flows, credential storage, and external sync logic.
 # tools = Claude Code allowlist (other harnesses ignore)
-tools: Read, Grep, Glob, Bash, Edit, Write
+tools: "*"  # Was an explicit list, which silently excluded Task and Skill:
+# a dispatched agent could not run refactor-reviewer, /simplify or /code-review
+# and had to self-assess its own diff. Found 2026-08-12 across six nodes.
 capability: read-write
 ---
 

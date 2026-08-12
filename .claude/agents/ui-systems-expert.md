@@ -2,7 +2,9 @@
 name: ui-systems-expert
 description: Use when creating or modifying anything under src/components/ — the universal/ entity-agnostic engine, domain/ feature-specific UI, ui/ design-system primitives, or data-table/ plumbing. MUST BE USED for new components and component-layer refactors.
 # tools = Claude Code allowlist (other harnesses ignore)
-tools: Read, Grep, Glob, Bash, Edit, Write
+tools: "*"  # Was an explicit list, which silently excluded Task and Skill:
+# a dispatched agent could not run refactor-reviewer, /simplify or /code-review
+# and had to self-assess its own diff. Found 2026-08-12 across six nodes.
 capability: read-write
 ---
 

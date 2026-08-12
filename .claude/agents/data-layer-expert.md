@@ -2,7 +2,9 @@
 name: data-layer-expert
 description: Use when touching src/lib/supabase/, query-keys.ts, supabase/migrations/, RLS policies, or app-side auth boundaries (the src/app/(app)/layout.tsx staff gate, src/app/portal, src/app/update-password, src/app/api/auth/, src/proxy.ts session refresh). MUST BE USED for migration authoring, RLS policy changes, and query-key additions.
 # tools = Claude Code allowlist (other harnesses ignore)
-tools: Read, Grep, Glob, Bash, Edit, Write
+tools: "*"  # Was an explicit list, which silently excluded Task and Skill:
+# a dispatched agent could not run refactor-reviewer, /simplify or /code-review
+# and had to self-assess its own diff. Found 2026-08-12 across six nodes.
 capability: read-write
 ---
 
