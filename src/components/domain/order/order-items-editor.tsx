@@ -7,7 +7,8 @@
  * add, edit, and remove items. Calculates order totals.
  *
  * Features:
- * - Auto-pricing from customer's price tier when brand/format selected
+ * - Auto-pricing from customer's price tier when brand/format selected, via
+ *   @/services/pricing-service (this component holds no pricing rule of its own)
  * - Shows price source (tier name badge when auto-priced)
  * - Manual price override support
  * - Uses unified selling_format_id (containers + selling_formats model)
@@ -25,7 +26,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
-import { dynamicRpc } from "@/services/types";
+import { getPriceForCustomer, type TierPrice } from "@/services/pricing-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -61,7 +62,6 @@ import {
   parseItemFieldEdit,
   type EditableItemField,
 } from "@/domain/sales/order-item-edit-utils";
-import { log } from "@/lib/client-logger";
 import {
   AddLineButton,
   DeleteLineButton,
@@ -102,13 +102,6 @@ type NewItemState = {
   unit_price: number;
   suggestedPrice: number | null;
   tierName: string | null;
-}
-
-type TierPriceResult = {
-  price: number;
-  tier_name: string;
-  is_brand_specific: boolean;
-  is_style_specific: boolean;
 }
 
 const EMPTY_NEW_ITEM: NewItemState = {
@@ -240,35 +233,18 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     },
   });
 
-  // Function to look up tier price for a selling format (works for all format types including kegs)
-  const lookupTierPrice = useCallback(async (
-    brandId: string | null,
-    formatId: string | null
-  ): Promise<TierPriceResult | null> => {
-    if (!effectiveCustomerId || !formatId) return null;
-
-    try {
-      const { data, error } = await dynamicRpc(supabase, "get_price_for_customer", {
-        p_customer_id: effectiveCustomerId,
-        p_format_id: formatId,
-        p_brand_id: brandId || null,
-        p_style_id: null,
-      });
-
-      if (error) {
-        log.error("Price lookup error:", error);
-        return null;
-      }
-
-      if (data && data.length > 0) {
-        return data[0] as TierPriceResult;
-      }
-      return null;
-    } catch (e) {
-      log.error("Price lookup failed:", e);
-      return null;
-    }
-  }, [effectiveCustomerId, supabase]);
+  // Look up the customer's tier price for a selling format (works for all
+  // format types including kegs). The rule — and the "no price resolved" /
+  // "lookup failed" collapse to null — lives in @/services/pricing-service.
+  const lookupTierPrice = useCallback(
+    (brandId: string | null, formatId: string | null): Promise<TierPrice | null> =>
+      getPriceForCustomer(supabase, {
+        customerId: effectiveCustomerId,
+        sellingFormatId: formatId,
+        brandId,
+      }),
+    [effectiveCustomerId, supabase]
+  );
 
   // Fetch catalog data (must be above useEffect that references them)
   const { data: brands } = useBrands();
