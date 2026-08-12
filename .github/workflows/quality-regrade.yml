@@ -104,7 +104,7 @@ jobs:
           claude_args: |
             --max-turns 60
             --model claude-sonnet-5
-            --allowedTools "Task,Read,Grep,Glob,Edit,Write,Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh run list:*),Bash(gh api:*),Bash(gh label list:*),Bash(bun install:*),Bash(bun run test:*),Bash(bunx vitest run:*),Bash(ls:*),Bash(wc:*)"
+            --allowedTools "Task,Read,Grep,Glob,Edit,Write,Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh run list:*),Bash(gh label list:*),Bash(bun install:*),Bash(bun run test:*),Bash(bunx vitest run:*),Bash(ls:*),Bash(wc:*)"
             --disallowedTools "WebFetch,WebSearch"
 
       - name: Require durable outcome
