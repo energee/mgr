@@ -12,6 +12,11 @@ name: Live DB Drift Check
 # feature branch applied to live before merge, or a snapshot update that
 # wasn't committed) only WARN.
 #
+# The script also diffs the committed migration chain against
+# supabase_migrations.schema_migrations on live (#693): a migration that is
+# committed but never applied FAILs (the catalog diff alone cannot see it —
+# snapshot and live are both post-apply artifacts); live-only versions WARN.
+#
 # Deliberately NOT a pull_request gate. PR-time comparison against live forced
 # an apply-before-merge ordering and made concurrent migration PRs fail each
 # other's runs. The PR-time question — "does the migration chain still replay

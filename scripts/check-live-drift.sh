@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 # scripts/check-live-drift.sh
 #
-# Compares the LIVE database catalog against the committed snapshot in
+# Two checks against the live database, over the same $SUPABASE_DB_URL
+# read-only connection:
+#
+# 1. Migration chain vs live (#693): compares the numeric version prefixes of
+#    supabase/migrations/*.sql against supabase_migrations.schema_migrations
+#    on live. A committed-but-unapplied migration FAILs (exit 1); a live-only
+#    version (applied but not in the chain — usually an in-flight feature
+#    branch) WARNs. The catalog diff below cannot catch this class: both the
+#    live catalog and the committed snapshot are post-apply artifacts, so a
+#    migration that was never pushed leaves both sides agreeing. Comparison
+#    logic lives in scripts/compare-migration-versions.sh (unit-testable
+#    without a database).
+#
+# 2. Compares the LIVE database catalog against the committed snapshot in
 # supabase/live-catalog.snapshot.txt and classifies the delta:
 #
 #   FAIL (exit 1)  — a snapshot line is missing on live: an expected object
@@ -112,13 +125,44 @@ if ! LC_ALL=C sort -c "$SNAPSHOT"; then
   exit 2
 fi
 
+# --- Check 1: migration chain vs live schema_migrations (#693) ---------------
+# A committed migration whose version row is absent on live means db push was
+# never run for it: the catalog diff below is blind to that (snapshot and live
+# both predate the apply), so it is checked explicitly here.
+committed_versions="$(mktemp)"
+live_versions="$(mktemp)"
+trap 'rm -f "$current" "$committed_versions" "$live_versions"' EXIT
+
+for f in supabase/migrations/*.sql; do
+  b="${f##*/}"
+  printf '%s\n' "${b%%_*}"
+done > "$committed_versions"
+
+if ! psql "$SUPABASE_DB_URL" -tA --no-psqlrc -v ON_ERROR_STOP=1 \
+    -c 'select version from supabase_migrations.schema_migrations' \
+    > "$live_versions"; then
+  echo "ERROR: could not read supabase_migrations.schema_migrations from live." >&2
+  exit 2
+fi
+
+# 0 = clean/WARN, 1 = committed-but-unapplied migrations exist. The catalog
+# diff still runs either way; a migration failure is folded into the final
+# exit code so both verdicts appear in one run.
+migrations_rc=0
+bash scripts/compare-migration-versions.sh "$committed_versions" "$live_versions" \
+  || migrations_rc=$?
+if (( migrations_rc > 1 )); then
+  exit "$migrations_rc"
+fi
+
+# --- Check 2: live catalog vs committed snapshot ------------------------------
 # Both files are LC_ALL=C sorted, so comm(1) splits the delta cleanly.
 missing="$(LC_ALL=C comm -23 "$SNAPSHOT" "$current")"
 added="$(LC_ALL=C comm -13 "$SNAPSHOT" "$current")"
 
 if [[ -z "$missing" && -z "$added" ]]; then
   echo "OK: live database catalog matches supabase/live-catalog.snapshot.txt."
-  exit 0
+  exit "$migrations_rc"
 fi
 
 if [[ -n "$missing" ]]; then
@@ -191,4 +235,6 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   } >> "$GITHUB_STEP_SUMMARY"
 fi
 
-exit 0
+# Catalog additions alone are WARN, but a committed-but-unapplied migration
+# found by check 1 still fails the run.
+exit "$migrations_rc"
