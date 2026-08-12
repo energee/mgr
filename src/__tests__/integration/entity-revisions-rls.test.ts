@@ -48,6 +48,9 @@ const FIXTURE_ENTITY_TYPES = [
   // Gained the revision trigger in 00282 (#549); its CASE branch mirrors
   // supplier_catalog_select -> purchasing:read.
   "supplier_catalog",
+  // Gained a DELETE-only trigger in 00286 (#694); its CASE branch mirrors
+  // suppliers_select -> purchasing:read.
+  "suppliers",
   "finished_goods",
   "inventory_lots",
   "keg_transactions",
@@ -75,6 +78,7 @@ type FixtureEntityType = (typeof FIXTURE_ENTITY_TYPES)[number];
  *   batches             -> batches:read
  *   purchase_orders     -> purchasing:read
  *   supplier_catalog    -> purchasing:read
+ *   suppliers           -> purchasing:read
  *   finished_goods      -> inventory:read
  *   inventory_lots      -> inventory:read
  *   keg_transactions    -> inventory:read
@@ -102,6 +106,7 @@ const EXPECTED_VISIBLE: Record<string, readonly FixtureEntityType[]> = {
     "batches",
     "purchase_orders",
     "supplier_catalog",
+    "suppliers",
     "finished_goods",
     "inventory_lots",
     "keg_transactions",
@@ -205,6 +210,7 @@ describe("entity_revisions SELECT is gated by the tracked table's permission (#6
     const salesVisible = await visibleFixtureTypes("sales");
     expect(salesVisible).not.toContain("purchase_orders");
     expect(salesVisible).not.toContain("supplier_catalog");
+    expect(salesVisible).not.toContain("suppliers");
     expect(salesVisible).not.toContain("pricing_tier_prices");
     // viewer holds purchasing:read (00266) so purchase-order revisions are
     // legitimately visible, but settings:manage is admin-only.
@@ -238,6 +244,7 @@ describe("entity_revisions SELECT is gated by the tracked table's permission (#6
     // Guards against the query silently matching nothing and passing vacuously.
     expect(trackedTables).toContain("supplier_catalog");
     expect(trackedTables).toContain("enum_values");
+    expect(trackedTables).toContain("suppliers");
 
     const { rows: policies } = await ownerPool.query<{ qual: string }>(
       `SELECT qual FROM pg_policies
