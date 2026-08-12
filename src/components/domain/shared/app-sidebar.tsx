@@ -5,12 +5,14 @@
  *
  * Main navigation sidebar for the application.
  * Uses shadcn Sidebar components for mobile responsiveness.
- * Animated icons on hover.
+ * Animated icons on hover. Sections (Production, Inventory, Purchasing,
+ * Sales) render always-open — no collapse/expand state — per the
+ * 2026-07-12 mobile-UX nav simplification.
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useContext, useRef, useState } from "react";
+import { useContext, useRef } from "react";
 import { usePermissions } from "@/contexts/permissions";
 import { AnimatedKeyboard } from "@/components/icons/animated";
 import { Button } from "@/components/ui/button";
@@ -34,19 +36,14 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   AnimatedSettings,
   AnimatedHelpCircle,
-  AnimatedChevronDown,
 } from "@/components/icons/animated";
 import type { AnimatedIconHandle } from "@/components/icons/animated";
-// Navigation structure is shared with the cmd+K command palette.
-import { navigation } from "@/components/domain/shared/nav-items";
-import type { AnimatedIcon, NavSection } from "@/components/domain/shared/nav-items";
+// Navigation structure is shared with the cmd+K command palette and the
+// mobile bottom tab bar — a NavEntry[] union of direct links and sections.
+import { navigation, isNavSection } from "@/components/domain/shared/nav-items";
+import type { AnimatedIcon } from "@/components/domain/shared/nav-items";
 
 function AnimatedNavLink({
   href,
@@ -78,52 +75,11 @@ function AnimatedNavLink({
   );
 }
 
-function AnimatedSectionHeader({
-  section,
-}: {
-  section: NavSection;
-}) {
-  const iconRef = useRef<AnimatedIconHandle>(null);
-  const chevronRef = useRef<AnimatedIconHandle>(null);
-
-  return (
-    <SidebarGroupLabel asChild>
-      <CollapsibleTrigger
-        className="flex w-full items-center justify-between"
-        onMouseEnter={() => {
-          iconRef.current?.startAnimation();
-          chevronRef.current?.startAnimation();
-        }}
-        onMouseLeave={() => {
-          iconRef.current?.stopAnimation();
-          chevronRef.current?.stopAnimation();
-        }}
-      >
-        <span className="flex items-center gap-2">
-          <section.icon ref={iconRef} className="h-4 w-4" />
-          {section.label}
-        </span>
-        <AnimatedChevronDown
-          ref={chevronRef}
-          className="h-4 w-4 transition-transform -rotate-90 group-data-[state=open]/collapsible:rotate-0"
-        />
-      </CollapsibleTrigger>
-    </SidebarGroupLabel>
-  );
-}
-
 export function AppSidebar() {
   const pathname = usePathname();
   const { can } = usePermissions();
   const { openHelp } = useContext(KeyboardShortcutsContext);
   const keyboardIconRef = useRef<AnimatedIconHandle>(null);
-  const activeSection = navigation.find((s) =>
-    s.items.some((item) => pathname.startsWith(item.href))
-  );
-  // Multiple sections can be open at once; start with the active route's section expanded.
-  const [openSections, setOpenSections] = useState<Set<string>>(
-    () => new Set(activeSection ? [activeSection.label] : [])
-  );
 
   return (
     <Sidebar>
@@ -156,40 +112,40 @@ export function AppSidebar() {
       {/* Navigation */}
       <SidebarContent>
         <nav aria-label="Main navigation">
-        {navigation.map((section) => (
-          <Collapsible
-            key={section.label}
-            open={openSections.has(section.label)}
-            onOpenChange={(open) =>
-              setOpenSections((prev) => {
-                const next = new Set(prev);
-                if (open) next.add(section.label);
-                else next.delete(section.label);
-                return next;
-              })
-            }
-            className="group/collapsible"
-          >
-            <SidebarGroup>
-              <AnimatedSectionHeader section={section} />
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {section.items.map((item) => (
-                      <AnimatedNavLink
-                        key={item.href}
-                        href={item.href}
-                        icon={item.icon}
-                        label={item.label}
-                        isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-                      />
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </CollapsibleContent>
+        {navigation.map((entry) =>
+          isNavSection(entry) ? (
+            <SidebarGroup key={entry.label}>
+              <SidebarGroupLabel className="flex items-center gap-2">
+                <entry.icon className="h-4 w-4" />
+                {entry.label}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {entry.items.map((item) => (
+                    <AnimatedNavLink
+                      key={item.href}
+                      href={item.href}
+                      icon={item.icon}
+                      label={item.label}
+                      isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
+                    />
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
             </SidebarGroup>
-          </Collapsible>
-        ))}
+          ) : (
+            <SidebarGroup key={entry.href}>
+              <SidebarMenu>
+                <AnimatedNavLink
+                  href={entry.href}
+                  icon={entry.icon}
+                  label={entry.label}
+                  isActive={pathname === entry.href || pathname.startsWith(entry.href + "/")}
+                />
+              </SidebarMenu>
+            </SidebarGroup>
+          )
+        )}
         </nav>
       </SidebarContent>
 

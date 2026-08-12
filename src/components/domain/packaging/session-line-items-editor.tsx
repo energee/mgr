@@ -13,8 +13,9 @@
  * (useIsMobile) line items render as stacked cards with full-width
  * controls instead of the table; on coarse-pointer devices that keep the
  * table (useIsTouch, e.g. tablets) the quantity inputs and delete button
- * get enlarged hit areas. The quick-add row stays table-based on mobile
- * (it reuses AddLineItemRow) inside the table's horizontal scroll.
+ * get enlarged hit areas. The quick-add row reuses AddLineItemRow on
+ * mobile too, with its cells stacked vertically via CSS so adding never
+ * needs horizontal panning.
  *
  * Uses unified selling_format_id (containers + selling_formats model).
  */
@@ -275,11 +276,13 @@ export function SessionLineItemsEditor({
             </div>
           )}
 
-          {/* Quick-add reuses the table-row component; the Table wrapper
-              provides horizontal scroll on narrow screens. */}
+          {/* Quick-add reuses the table-row component; this branch only
+              renders on phones (<768px), so the row's cells are stacked
+              vertically via CSS — a 680px table forced horizontal panning
+              at 390px (mobile-UX verification pass). */}
           {showAddRow && (
             <div className="rounded-lg border">
-              <Table className="min-w-[680px]">
+              <Table className="[&_thead]:hidden [&_tr]:flex [&_tr]:flex-col [&_tr]:gap-2 [&_tr]:border-0 [&_tbody_tr]:p-3 [&_td]:p-0">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Batch</TableHead>

@@ -2,8 +2,13 @@
  * Navigation Items
  *
  * Single source of truth for the app's main navigation structure.
- * Consumed by both the sidebar (AppSidebar) and the cmd+K command
- * palette (CommandPalette) so the two never drift apart.
+ * Consumed by the sidebar (AppSidebar), the cmd+K command palette
+ * (CommandPalette), and the mobile bottom tab bar (MobileTabBar)
+ * so the three never drift apart.
+ *
+ * Shape (2026-07-12 mobile-UX spec): direct links + always-open sections.
+ * Dashboard and Reports are direct links — their sub-pages are reached via
+ * in-page switchers (DashboardSwitcher pills, /reports index), not the nav.
  */
 
 import {
@@ -17,7 +22,7 @@ import {
   AnimatedTruck,
   AnimatedShoppingCart,
   AnimatedTrendingUp,
-  AnimatedPackage,
+  AnimatedChartColumn,
   AnimatedPackageCheck,
   AnimatedWarehouse,
   AnimatedBuilding2,
@@ -26,10 +31,7 @@ import {
   AnimatedBatches,
   AnimatedUpload,
   AnimatedDownload,
-  AnimatedGauge,
-  AnimatedChartLine,
   AnimatedDroplet,
-  AnimatedLayers,
   AnimatedFileStack,
   AnimatedWaypoints,
   AnimatedDrum,
@@ -37,13 +39,6 @@ import {
   AnimatedShip,
   AnimatedFileCheck,
   AnimatedCheckCheck,
-  AnimatedFolderOpen,
-  AnimatedShieldCheck,
-  AnimatedChartColumn,
-  AnimatedHandCoins,
-  AnimatedCircleDollarSign,
-  AnimatedTelescope,
-  AnimatedCog,
   AnimatedBoxes,
 } from "@/components/icons/animated";
 import type { AnimatedIconProps } from "@/components/icons/animated";
@@ -62,16 +57,15 @@ export type NavSection = {
   items: NavItem[];
 }
 
-export const navigation: NavSection[] = [
-  {
-    label: "Dashboards",
-    icon: AnimatedLayoutDashboard,
-    items: [
-      { label: "Production", href: "/dashboard", icon: AnimatedGauge },
-      { label: "Inventory", href: "/dashboard/inventory", icon: AnimatedPackage },
-      { label: "Sales", href: "/dashboard/sales", icon: AnimatedChartLine },
-    ],
-  },
+/** A top-level nav entry: either a direct link or a section of links. */
+export type NavEntry = NavItem | NavSection;
+
+export function isNavSection(entry: NavEntry): entry is NavSection {
+  return "items" in entry;
+}
+
+export const navigation: NavEntry[] = [
+  { label: "Dashboard", href: "/dashboard", icon: AnimatedLayoutDashboard },
   {
     label: "Production",
     icon: AnimatedFlask,
@@ -83,13 +77,7 @@ export const navigation: NavSection[] = [
       { label: "Vessel Transfers", href: "/production/vessel-transfers", icon: AnimatedArrowRightLeft },
       { label: "Brew Logs", href: "/production/brew-logs", icon: AnimatedClipboardList },
       { label: "Yeast Pitches", href: "/production/yeast-pitches", icon: AnimatedDroplet },
-    ],
-  },
-  {
-    label: "Packaging",
-    icon: AnimatedPackageCheck,
-    items: [
-      { label: "Sessions", href: "/production/packaging", icon: AnimatedLayers },
+      { label: "Packaging", href: "/production/packaging", icon: AnimatedPackageCheck },
     ],
   },
   {
@@ -99,20 +87,20 @@ export const navigation: NavSection[] = [
       { label: "Raw Materials", href: "/inventory/items", icon: AnimatedUpload },
       { label: "Finished Goods", href: "/inventory/finished-goods", icon: AnimatedDownload },
       { label: "Lots", href: "/inventory/lots", icon: AnimatedFileStack },
-      { label: "Allocations", href: "/inventory/allocations", icon: AnimatedWaypoints },
       { label: "Kegs", href: "/inventory/kegs", icon: AnimatedDrum },
       { label: "Bins", href: "/inventory/bins", icon: AnimatedBoxes },
       { label: "Transfers", href: "/inventory/transfers", icon: AnimatedRoute },
+      { label: "Allocations", href: "/inventory/allocations", icon: AnimatedWaypoints },
     ],
   },
   {
     label: "Purchasing",
     icon: AnimatedTruck,
     items: [
+      { label: "Purchase Orders", href: "/purchasing/pos", icon: AnimatedShoppingCart },
+      { label: "Suppliers", href: "/purchasing/suppliers", icon: AnimatedBuilding2 },
       { label: "Material Planning", href: "/purchasing/material-planning", icon: AnimatedChartColumn },
       { label: "Ingredient Demand", href: "/purchasing/demand", icon: AnimatedTrendingUp },
-      { label: "Suppliers", href: "/purchasing/suppliers", icon: AnimatedBuilding2 },
-      { label: "Purchase Orders", href: "/purchasing/pos", icon: AnimatedShoppingCart },
     ],
   },
   {
@@ -125,18 +113,5 @@ export const navigation: NavSection[] = [
       { label: "Customers", href: "/sales/customers", icon: AnimatedUsers },
     ],
   },
-  {
-    label: "Reports",
-    icon: AnimatedBarChart3,
-    items: [
-      { label: "All Reports", href: "/reports", icon: AnimatedFolderOpen },
-      { label: "TTB Report", href: "/reports/ttb", icon: AnimatedShieldCheck },
-      { label: "Production Summary", href: "/reports/production-summary", icon: AnimatedChartColumn },
-      { label: "Inventory Valuation", href: "/reports/inventory-valuation", icon: AnimatedHandCoins },
-      { label: "Batch Cost", href: "/reports/batch-cost", icon: AnimatedCircleDollarSign },
-      { label: "Projections", href: "/reports/projections", icon: AnimatedTelescope },
-      { label: "COGS", href: "/reports/cogs", icon: AnimatedCog },
-      { label: "Batch Trace", href: "/reports/trace", icon: AnimatedRoute },
-    ],
-  },
+  { label: "Reports", href: "/reports", icon: AnimatedBarChart3 },
 ];

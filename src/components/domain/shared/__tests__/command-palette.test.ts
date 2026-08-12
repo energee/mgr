@@ -27,10 +27,13 @@ import { escapePostgrestOrValue } from "@/components/data-table/adapter";
 import { customerEntity } from "@/entities/customer";
 import { orderEntity } from "@/entities/order";
 import { batchEntity } from "@/entities/batch";
+import { navigation, isNavSection } from "../nav-items";
 import {
   SEARCH_ENTITIES,
   QUICK_ACTIONS,
   MIN_SEARCH_CHARS,
+  DASHBOARD_PAGES,
+  REPORT_PAGES,
   buildRecordSearchSpec,
 } from "../command-palette";
 
@@ -141,6 +144,47 @@ describe("buildRecordSearchSpec", () => {
       "abc"
     );
     expect(spec).toBeNull();
+  });
+});
+
+describe("DASHBOARD_PAGES / REPORT_PAGES", () => {
+  const navHrefs = navigation.flatMap((e) => (isNavSection(e) ? e.items : [e])).map((i) => i.href);
+
+  it("covers every sub-page the 2026-07-12 nav simplification cut from nav-items.ts", () => {
+    const hrefs = [...DASHBOARD_PAGES, ...REPORT_PAGES].map((p) => p.href);
+    for (const cut of [
+      "/dashboard/inventory",
+      "/dashboard/sales",
+      "/reports/ttb",
+      "/reports/production-summary",
+      "/reports/inventory-valuation",
+      "/reports/batch-cost",
+      "/reports/projections",
+      "/reports/cogs",
+      "/reports/trace",
+    ]) {
+      expect(hrefs).toContain(cut);
+    }
+  });
+
+  it("stays independent of nav-items.ts (none of these hrefs are in the nav)", () => {
+    for (const page of [...DASHBOARD_PAGES, ...REPORT_PAGES]) {
+      expect(navHrefs).not.toContain(page.href);
+    }
+  });
+
+  it("every page points at an existing route", () => {
+    for (const page of [...DASHBOARD_PAGES, ...REPORT_PAGES]) {
+      const file = join(APP_DIR, page.href.slice(1), "page.tsx");
+      expect(existsSync(file), `${page.label}: expected page at ${file}`).toBe(true);
+    }
+  });
+
+  it("every page has a label and an icon", () => {
+    for (const page of [...DASHBOARD_PAGES, ...REPORT_PAGES]) {
+      expect(page.label).toBeTruthy();
+      expect(page.icon).toBeTruthy();
+    }
   });
 });
 

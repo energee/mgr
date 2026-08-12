@@ -271,11 +271,13 @@ export function EntityMobileCardList({
           "create" without scrolling back to the toolbar (audit F-098).
           Hidden when create is suppressed (e.g. calculated views); the
           zero-row case never reaches this branch (the empty state above
-          already surfaces its own Create button). Offset by
+          already surfaces its own Create button). Offset by 3.5rem (the
+          MobileTabBar's height) plus a 1rem gap, plus
           env(safe-area-inset-bottom) to clear the iOS home indicator.
-          z-30 keeps it under the bottom filter sheet (z-50) when open. */}
+          z-30 keeps it under the bottom filter sheet (z-50) and the
+          MobileTabBar (z-40) when open. */}
       {showCreate && (
-        <div className="fixed right-6 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-30 md:hidden">
+        <div className="fixed right-6 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 md:hidden">
           <Button
             size="lg"
             className="rounded-full size-14 shadow-lg"

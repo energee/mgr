@@ -3,7 +3,9 @@
 /**
  * App Header
  *
- * Top header bar with brewery name and user menu.
+ * Top header bar with brewery name and user menu. No mobile nav trigger
+ * here — on phones (<md) the bottom MobileTabBar's "More" button opens the
+ * sidebar's mobile sheet instead (2026-07-12 mobile-UX spec).
  */
 
 import { useRouter } from "next/navigation";
@@ -11,7 +13,6 @@ import type { User } from "@supabase/supabase-js";
 import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,9 +57,8 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
 
   return (
     <header className="h-12 border-b flex items-center justify-between px-4">
-      {/* Left side: menu trigger + brewery logo + name */}
+      {/* Left side: brewery logo + name */}
       <div className="flex items-center gap-2">
-        <SidebarTrigger className="md:hidden" />
         {breweryLogoSvg && (
           <SafeSvg
             svg={breweryLogoSvg}
