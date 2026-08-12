@@ -106,23 +106,55 @@ export type ValidationResult = {
 }
 
 /**
+ * Convert a value to the canonical unit that a reading type's min/max/
+ * warningRanges are defined in (Plato for gravity, °F for temperature).
+ * Types with a single unit, or a unit not recognized as convertible
+ * (e.g. clarity's "ntu", which is a different measurement, not a unit
+ * conversion of "scale"), pass through unchanged.
+ */
+function toCanonicalRangeValue(
+  type: ReadingType,
+  value: number,
+  unit: string | undefined
+): number {
+  if (!unit) return value;
+  if (type === "gravity" && (unit === "sg" || unit === "plato")) {
+    return convertGravity(value, unit, "plato");
+  }
+  if (type === "temperature" && (unit === "f" || unit === "c")) {
+    return convertTemperature(value, unit, "f");
+  }
+  return value;
+}
+
+/**
  * Validate a reading value against its type's constraints
  *
  * @param type - The type of reading being validated
  * @param value - The value to validate (numeric or string for option-based readings)
+ * @param unit - The unit `value` is expressed in. Required to range-check
+ *   types with more than one convertible unit (gravity, temperature) — their
+ *   min/max are defined in the canonical unit (Plato, °F), so a raw
+ *   Celsius or SG value must be converted before comparison. Omit only when
+ *   `value` is already in the canonical unit.
  * @returns ValidationResult with valid flag and optional warning message
  * @example
  * ```ts
- * validateReading("gravity", 12.5)
+ * validateReading("gravity", 12.5, "plato")
  * // Returns: { valid: true }
  *
- * validateReading("temperature", 100)
+ * validateReading("temperature", 100, "f")
  * // Returns: { valid: true, warning: "Value outside typical range (55-85)" }
+ *
+ * validateReading("temperature", 60, "c")
+ * // Returns: { valid: false, warning: "Value must be at most 100" } — 60°C is 140°F,
+ * // converted before the °F-denominated bounds are checked
  * ```
  */
 export function validateReading(
   type: ReadingType,
-  value: number | string
+  value: number | string,
+  unit?: string
 ): ValidationResult {
   const config = READING_TYPES[type];
   if (!config) {
@@ -145,14 +177,16 @@ export function validateReading(
     return { valid: false, warning: "Value must be a number" };
   }
 
-  if (config.min !== undefined && numValue < config.min) {
+  const canonicalValue = toCanonicalRangeValue(type, numValue, unit);
+
+  if (config.min !== undefined && canonicalValue < config.min) {
     return {
       valid: false,
       warning: `Value must be at least ${config.min}`,
     };
   }
 
-  if (config.max !== undefined && numValue > config.max) {
+  if (config.max !== undefined && canonicalValue > config.max) {
     return {
       valid: false,
       warning: `Value must be at most ${config.max}`,
@@ -161,7 +195,7 @@ export function validateReading(
 
   // Check warning ranges (valid but unusual)
   if (config.warningRanges) {
-    if (numValue < config.warningRanges.low || numValue > config.warningRanges.high) {
+    if (canonicalValue < config.warningRanges.low || canonicalValue > config.warningRanges.high) {
       return {
         valid: true,
         warning: `Value outside typical range (${config.warningRanges.low}-${config.warningRanges.high})`,
