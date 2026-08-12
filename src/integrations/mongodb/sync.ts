@@ -966,6 +966,7 @@ async function syncPackagingSessions(): Promise<SyncResult> {
       // Resolve brand_id (NOT NULL): batch → beer → brand, falling back to
       // batch → recipe → beer → brand, then the PG batch → recipe → brand map.
       let pgBrandId: string | null = null;
+      let brandFailure = "product has no batch reference";
       if (product.batch) {
         const mongoBatchId = product.batch.toString();
         const beerId = mongoBatchIdToBeer.get(mongoBatchId)
@@ -974,7 +975,12 @@ async function syncPackagingSessions(): Promise<SyncResult> {
           const beerName = mongoBeerIdToName.get(beerId);
           if (beerName) {
             pgBrandId = brandNameToId.get(beerName) ?? null;
+            brandFailure = `beer "${beerName}" has no matching PG brand`;
+          } else {
+            brandFailure = `beer ${beerId} not found in beers collection`;
           }
+        } else {
+          brandFailure = `batch ${mongoBatchId} has no beer or recipe→beer link`;
         }
         if (!pgBrandId && pgBatchId) {
           pgBrandId = pgBatchIdToBrandId.get(pgBatchId) ?? null;
@@ -984,7 +990,7 @@ async function syncPackagingSessions(): Promise<SyncResult> {
       if (!pgBrandId) {
         lineErrors.push({
           mongoId: doc._id.toString(),
-          error: `product[${i}]: could not resolve brand_id (NOT NULL constraint)`,
+          error: `product[${i}]: could not resolve brand_id — ${brandFailure}`,
         });
         continue;
       }
