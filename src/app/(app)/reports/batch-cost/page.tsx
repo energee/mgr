@@ -20,7 +20,7 @@
  * - recipes -> brands for brand name resolution
  */
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { createClient } from "@/lib/supabase/client";
@@ -28,37 +28,19 @@ import { dynamicFrom } from "@/services/types";
 import { reportKeys } from "@/lib/query-keys";
 import { formatCurrency, formatBbl } from "@/lib/format";
 import { fetchBatchIngredientDetail } from "@/domain/report-utils";
+import { DollarSign, Hash, TrendingUp } from "lucide-react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AlertCircle,
-  ArrowLeft,
-  ChevronDown,
-  ChevronRight,
-  DollarSign,
-  Hash,
-  TrendingUp,
-} from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { DatePicker } from "@/components/ui/date-picker";
-import { Label } from "@/components/ui/label";
-import { ExportMenu } from "@/components/reports/export-menu";
-import Link from "next/link";
+  ExpandChevron,
+  ExpandedDetailRow,
+  ReportDateRangeFilter,
+  ReportPage,
+  ReportSummaryCards,
+  ReportTable,
+  ReportTableCard,
+  StatValue,
+} from "@/components/reports/report-page";
+import { IngredientDetailTable } from "@/components/reports/ingredient-detail-table";
+import { computeBatchCostSummary } from "@/lib/reports/summaries";
 
 // =============================================================================
 // Types
@@ -228,40 +210,10 @@ export default function BatchCostAnalysisPage() {
   // -------------------------------------------------------------------------
   // Summary calculations
   // -------------------------------------------------------------------------
-  const summary = useMemo(() => {
-    if (!batchCostData || batchCostData.length === 0) {
-      return {
-        avgCostPerBatch: 0,
-        avgCostPerBbl: 0,
-        totalProductionCost: 0,
-        batchCount: 0,
-      };
-    }
-
-    const totalProductionCost = batchCostData.reduce(
-      (sum, b) => sum + b.ingredient_cost,
-      0
-    );
-
-    const avgCostPerBatch = totalProductionCost / batchCostData.length;
-
-    const batchesWithVolume = batchCostData.filter(
-      (b) => b.volume_bbl && b.volume_bbl > 0
-    );
-    const totalVolume = batchesWithVolume.reduce(
-      (sum, b) => sum + (b.volume_bbl ?? 0),
-      0
-    );
-    const avgCostPerBbl =
-      totalVolume > 0 ? totalProductionCost / totalVolume : 0;
-
-    return {
-      avgCostPerBatch,
-      avgCostPerBbl,
-      totalProductionCost,
-      batchCount: batchCostData.length,
-    };
-  }, [batchCostData]);
+  const summary = useMemo(
+    () => computeBatchCostSummary(batchCostData),
+    [batchCostData]
+  );
 
   // -------------------------------------------------------------------------
   // CSV export rows (mirrors the visible cost breakdown table)
@@ -294,324 +246,149 @@ export default function BatchCostAnalysisPage() {
   // Render
   // -------------------------------------------------------------------------
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/reports">
-          <Button variant="ghost" size="icon" aria-label="Back to reports">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">
-            Batch Cost Analysis
-          </h1>
-          <p className="text-muted-foreground">
-            Ingredient cost breakdown per production batch
-          </p>
-        </div>
-        <ExportMenu
-          filename={`batch-cost-${fromDate}-to-${toDate}.csv`}
-          rows={exportRows}
-          disabled={isLoading}
+    <ReportPage
+      title="Batch Cost Analysis"
+      description="Ingredient cost breakdown per production batch"
+      exportConfig={{
+        filename: `batch-cost-${fromDate}-to-${toDate}.csv`,
+        rows: exportRows,
+        disabled: isLoading,
+      }}
+      filter={
+        <ReportDateRangeFilter
+          description="Filter batches by creation date"
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDateChange={setFromDate}
+          onToDateChange={setToDate}
         />
-      </div>
+      }
+      error={error}
+      errorFallback="Failed to load batch cost data"
+      note={
+        <>
+          Costs are primarily derived from allocation records linking inventory
+          lots to batches. When no allocations exist, ingredient costs are
+          estimated from the recipe&apos;s catalog prices (marked with *). Only
+          allocations with status &quot;completed&quot; or &quot;planned&quot;
+          are included.
+        </>
+      }
+    >
+      <ReportSummaryCards
+        loading={isLoading}
+        columns={4}
+        cards={[
+          {
+            icon: DollarSign,
+            label: "Avg Cost per Batch",
+            value: <StatValue>{formatCurrency(summary.avgCostPerBatch)}</StatValue>,
+          },
+          {
+            icon: TrendingUp,
+            label: "Avg Cost per BBL",
+            value: <StatValue>{formatCurrency(summary.avgCostPerBbl)}</StatValue>,
+          },
+          {
+            icon: DollarSign,
+            label: "Total Production Cost",
+            value: (
+              <StatValue>{formatCurrency(summary.totalProductionCost)}</StatValue>
+            ),
+          },
+          {
+            icon: Hash,
+            label: "Batches Analyzed",
+            value: <StatValue>{summary.batchCount}</StatValue>,
+          },
+        ]}
+      />
 
-      {/* Date Range */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Date Range</CardTitle>
-          <CardDescription>
-            Filter batches by creation date
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-4 flex-wrap">
-            <div className="space-y-2">
-              <Label>From</Label>
-              <DatePicker
-                value={fromDate}
-                onChange={(v) => v && setFromDate(v)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>To</Label>
-              <DatePicker
-                value={toDate}
-                onChange={(v) => v && setToDate(v)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Error */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Report</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error
-              ? error.message
-              : "Failed to load batch cost data"}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <DollarSign className="h-4 w-4" />
-              Avg Cost per Batch
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {formatCurrency(summary.avgCostPerBatch)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="h-4 w-4" />
-              Avg Cost per BBL
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {formatCurrency(summary.avgCostPerBbl)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <DollarSign className="h-4 w-4" />
-              Total Production Cost
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {formatCurrency(summary.totalProductionCost)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <Hash className="h-4 w-4" />
-              Batches Analyzed
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {summary.batchCount}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Batch Cost Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cost Breakdown by Batch</CardTitle>
-          <CardDescription>
-            Click a row to expand ingredient-level detail
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : !batchCostData || batchCostData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No batches found in the selected date range
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8" />
-                  <TableHead>Batch Code</TableHead>
-                  <TableHead>Recipe</TableHead>
-                  <TableHead>Brand</TableHead>
-                  <TableHead className="text-right">Volume (BBL)</TableHead>
-                  <TableHead className="text-right">
-                    Ingredient Cost
-                  </TableHead>
-                  <TableHead className="text-right">Cost / BBL</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {batchCostData.map((batch) => (
-                  <React.Fragment key={batch.id}>
-                    <TableRow
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => toggleExpand(batch.id)}
-                    >
-                      <TableCell className="w-8">
-                        {expandedBatchId === batch.id ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono">
-                        {batch.batch_code}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {batch.recipe_name ?? "--"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {batch.brand_name ?? "--"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatBbl(batch.volume_bbl)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        <span
-                          title={
-                            batch.has_allocation_costs
-                              ? "From allocation records"
-                              : "Estimated from recipe COGS"
-                          }
-                        >
-                          {formatCurrency(batch.ingredient_cost)}
-                          {!batch.has_allocation_costs &&
-                            batch.ingredient_cost > 0 && (
-                              <span className="text-xs text-muted-foreground ml-1">
-                                *
-                              </span>
-                            )}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(batch.cost_per_bbl)}
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Expanded ingredient detail */}
-                    {expandedBatchId === batch.id && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="bg-muted/30 p-0">
-                          <div className="px-8 py-4">
-                            <h4 className="text-sm font-semibold mb-3">
-                              Ingredient Cost Detail
-                            </h4>
-                            {!batch.has_allocation_costs ? (
-                              <p className="text-sm text-muted-foreground">
-                                No allocation records for this batch. Cost
-                                shown is an estimate from the recipe&apos;s
-                                ingredient catalog prices.
-                              </p>
-                            ) : detailLoading ? (
-                              <div className="space-y-2">
-                                {[...Array(3)].map((_, i) => (
-                                  <Skeleton key={i} className="h-8 w-full" />
-                                ))}
-                              </div>
-                            ) : !ingredientDetail ||
-                              ingredientDetail.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">
-                                No ingredient allocations found for this batch
-                              </p>
-                            ) : (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Ingredient</TableHead>
-                                    <TableHead>Lot #</TableHead>
-                                    <TableHead className="text-right">
-                                      Quantity
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                      Unit Cost
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                      Total Cost
-                                    </TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {ingredientDetail.map((row) => (
-                                    <TableRow key={row.allocation_id}>
-                                      <TableCell>
-                                        {row.ingredient_name}
-                                      </TableCell>
-                                      <TableCell className="text-muted-foreground font-mono text-sm">
-                                        {row.lot_number ?? "--"}
-                                      </TableCell>
-                                      <TableCell className="text-right font-mono">
-                                        {row.quantity.toFixed(2)}
-                                      </TableCell>
-                                      <TableCell className="text-right font-mono">
-                                        {formatCurrency(row.unit_cost)}
-                                      </TableCell>
-                                      <TableCell className="text-right font-mono font-medium">
-                                        {formatCurrency(row.total_cost)}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                  <TableRow className="font-bold border-t-2">
-                                    <TableCell colSpan={4}>Total</TableCell>
-                                    <TableCell className="text-right font-mono">
-                                      {formatCurrency(
-                                        ingredientDetail.reduce(
-                                          (sum, r) => sum + r.total_cost,
-                                          0
-                                        )
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
-                                </TableBody>
-                              </Table>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Disclaimer */}
-      <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Costs are primarily derived from allocation
-            records linking inventory lots to batches. When no allocations
-            exist, ingredient costs are estimated from the recipe&apos;s
-            catalog prices (marked with *). Only allocations with status
-            &quot;completed&quot; or &quot;planned&quot; are included.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+      <ReportTableCard
+        title="Cost Breakdown by Batch"
+        description="Click a row to expand ingredient-level detail"
+        loading={isLoading}
+        isEmpty={!batchCostData || batchCostData.length === 0}
+        emptyMessage="No batches found in the selected date range"
+      >
+        <ReportTable
+          rows={batchCostData ?? []}
+          rowKey={(b) => b.id}
+          rowClassName="cursor-pointer hover:bg-muted/50"
+          onRowClick={(b) => toggleExpand(b.id)}
+          columns={[
+            {
+              header: "",
+              headClassName: "w-8",
+              cellClassName: "w-8",
+              cell: (b) => <ExpandChevron expanded={expandedBatchId === b.id} />,
+            },
+            {
+              header: "Batch Code",
+              cellClassName: "font-mono",
+              cell: (b) => b.batch_code,
+            },
+            {
+              header: "Recipe",
+              cellClassName: "text-muted-foreground",
+              cell: (b) => b.recipe_name ?? "--",
+            },
+            {
+              header: "Brand",
+              cellClassName: "text-muted-foreground",
+              cell: (b) => b.brand_name ?? "--",
+            },
+            {
+              header: "Volume (BBL)",
+              headClassName: "text-right",
+              cellClassName: "text-right font-mono",
+              cell: (b) => formatBbl(b.volume_bbl),
+            },
+            {
+              header: "Ingredient Cost",
+              headClassName: "text-right",
+              cellClassName: "text-right font-mono",
+              cell: (b) => (
+                <span
+                  title={
+                    b.has_allocation_costs
+                      ? "From allocation records"
+                      : "Estimated from recipe COGS"
+                  }
+                >
+                  {formatCurrency(b.ingredient_cost)}
+                  {!b.has_allocation_costs && b.ingredient_cost > 0 && (
+                    <span className="text-xs text-muted-foreground ml-1">*</span>
+                  )}
+                </span>
+              ),
+            },
+            {
+              header: "Cost / BBL",
+              headClassName: "text-right",
+              cellClassName: "text-right font-mono",
+              cell: (b) => formatCurrency(b.cost_per_bbl),
+            },
+          ]}
+          renderAfterRow={(b) =>
+            expandedBatchId === b.id && (
+              <ExpandedDetailRow colSpan={7} title="Ingredient Cost Detail">
+                {!b.has_allocation_costs ? (
+                  <p className="text-sm text-muted-foreground">
+                    No allocation records for this batch. Cost shown is an
+                    estimate from the recipe&apos;s ingredient catalog prices.
+                  </p>
+                ) : (
+                  <IngredientDetailTable
+                    loading={detailLoading}
+                    rows={ingredientDetail}
+                  />
+                )}
+              </ExpandedDetailRow>
+            )
+          }
+        />
+      </ReportTableCard>
+    </ReportPage>
   );
 }

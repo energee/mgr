@@ -21,7 +21,7 @@
  * The header ExportMenu downloads a CSV of whichever tab's table is active.
  */
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
@@ -45,24 +45,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -70,22 +55,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
-  ArrowLeft,
-  AlertCircle,
   DollarSign,
-  ChevronDown,
-  ChevronRight,
   TrendingUp,
   Package,
   Hash,
   BarChart3,
 } from "lucide-react";
-import Link from "next/link";
-import { ExportMenu } from "@/components/reports/export-menu";
-// Chart is lazy-loaded so recharts stays out of the initial bundle — it only
-// renders in the By Period tab.
+import {
+  ExpandChevron,
+  ExpandedDetailRow,
+  ReportDateRangeFilter,
+  ReportField,
+  ReportPage,
+  ReportSummaryCards,
+  ReportTable,
+  ReportTableCard,
+  StatValue,
+} from "@/components/reports/report-page";
+import { IngredientDetailTable } from "@/components/reports/ingredient-detail-table";
+import {
+  computeCogsBatchSummary,
+  computeCogsPeriodSummary,
+  computeCogsSkuSummary,
+} from "@/lib/reports/summaries";
 import { CogsPeriodChartLazy } from "@/components/domain/reports/cogs-period-chart-lazy";
 
 // =============================================================================
@@ -381,121 +374,19 @@ export default function CogsReportPage() {
   // ---------------------------------------------------------------------------
 
   /** Tab 1 summary: batch-level metrics */
-  const batchSummary = useMemo(() => {
-    if (!batchCostData || batchCostData.length === 0) {
-      return {
-        avgCostPerBbl: 0,
-        totalMaterialCost: 0,
-        batchCount: 0,
-        totalUnitsPackaged: 0,
-      };
-    }
-
-    const totalMaterialCost = batchCostData.reduce(
-      (sum, b) => sum + b.total_ingredient_cost,
-      0
-    );
-    const batchesWithVolume = batchCostData.filter(
-      (b) => b.volume_bbl && b.volume_bbl > 0
-    );
-    const totalVolume = batchesWithVolume.reduce(
-      (sum, b) => sum + (b.volume_bbl ?? 0),
-      0
-    );
-    const totalUnitsPackaged = batchCostData.reduce(
-      (sum, b) => sum + b.units_packaged,
-      0
-    );
-
-    return {
-      avgCostPerBbl: totalVolume > 0 ? totalMaterialCost / totalVolume : 0,
-      totalMaterialCost,
-      batchCount: batchCostData.length,
-      totalUnitsPackaged,
-    };
-  }, [batchCostData]);
+  const batchSummary = useMemo(
+    () => computeCogsBatchSummary(batchCostData),
+    [batchCostData]
+  );
 
   /** Tab 2 summary: SKU-level metrics */
-  const skuSummary = useMemo(() => {
-    if (!skuData || skuData.length === 0) {
-      return {
-        highestCostSku: null as CogsSkuRow | null,
-        lowestCostSku: null as CogsSkuRow | null,
-        weightedAvgCostPerUnit: 0,
-      };
-    }
-
-    const withUnits = skuData.filter((s) => s.total_units > 0);
-    const sorted = [...withUnits].sort(
-      (a, b) => (b.avg_cost_per_unit ?? 0) - (a.avg_cost_per_unit ?? 0)
-    );
-
-    const totalCost = withUnits.reduce((sum, s) => sum + s.total_cost, 0);
-    const totalUnits = withUnits.reduce((sum, s) => sum + s.total_units, 0);
-
-    return {
-      highestCostSku: sorted[0] ?? null,
-      lowestCostSku: sorted[sorted.length - 1] ?? null,
-      weightedAvgCostPerUnit: totalUnits > 0 ? totalCost / totalUnits : 0,
-    };
-  }, [skuData]);
+  const skuSummary = useMemo(() => computeCogsSkuSummary(skuData), [skuData]);
 
   /** Tab 3 summary: period-level metrics including category totals for the footer row */
-  const periodSummary = useMemo(() => {
-    if (!periodData || periodData.length === 0) {
-      return {
-        totalCogs: 0,
-        periodChange: null as number | null,
-        avgCogsPerBatch: 0,
-        totalMalt: 0,
-        totalHop: 0,
-        totalYeast: 0,
-        totalAdjunct: 0,
-        totalOther: 0,
-        totalBatches: 0,
-      };
-    }
-
-    // Single-pass aggregation across all period rows
-    let totalCogs = 0;
-    let totalBatches = 0;
-    let totalMalt = 0;
-    let totalHop = 0;
-    let totalYeast = 0;
-    let totalAdjunct = 0;
-    let totalOther = 0;
-    for (const p of periodData) {
-      totalCogs += p.total_cogs;
-      totalBatches += p.batch_count;
-      totalMalt += p.malt_cost;
-      totalHop += p.hop_cost;
-      totalYeast += p.yeast_cost;
-      totalAdjunct += p.adjunct_cost;
-      totalOther += p.other_cost;
-    }
-
-    // Period-over-period change (compare last 2 periods)
-    let periodChange: number | null = null;
-    if (periodData.length >= 2) {
-      const last = periodData[periodData.length - 1].total_cogs;
-      const prev = periodData[periodData.length - 2].total_cogs;
-      if (prev > 0) {
-        periodChange = ((last - prev) / prev) * 100;
-      }
-    }
-
-    return {
-      totalCogs,
-      periodChange,
-      avgCogsPerBatch: totalBatches > 0 ? totalCogs / totalBatches : 0,
-      totalMalt,
-      totalHop,
-      totalYeast,
-      totalAdjunct,
-      totalOther,
-      totalBatches,
-    };
-  }, [periodData]);
+  const periodSummary = useMemo(
+    () => computeCogsPeriodSummary(periodData),
+    [periodData]
+  );
 
   // ---------------------------------------------------------------------------
   // CSV export: mirrors whichever tab's table is currently visible
@@ -595,71 +486,35 @@ export default function CogsReportPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/reports">
-          <Button variant="ghost" size="icon" aria-label="Back to reports">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">
-            Cost of Goods Sold
-          </h1>
-          <p className="text-muted-foreground">
-            Analyze production costs by batch, SKU, or time period
-          </p>
-        </div>
-        <ExportMenu
-          filename={exportConfig.filename}
-          rows={exportConfig.rows}
-          disabled={exportConfig.loading}
+    <ReportPage
+      title="Cost of Goods Sold"
+      description="Analyze production costs by batch, SKU, or time period"
+      exportConfig={{
+        filename: exportConfig.filename,
+        rows: exportConfig.rows,
+        disabled: exportConfig.loading,
+      }}
+      filter={
+        <ReportDateRangeFilter
+          description="Filter data by batch creation date"
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDateChange={setFromDate}
+          onToDateChange={setToDate}
         />
-      </div>
-
-      {/* Date Range */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Date Range</CardTitle>
-          <CardDescription>
-            Filter data by batch creation date
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-4 flex-wrap">
-            <div className="space-y-2">
-              <Label>From</Label>
-              <DatePicker
-                value={fromDate}
-                onChange={(v) => v && setFromDate(v)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>To</Label>
-              <DatePicker
-                value={toDate}
-                onChange={(v) => v && setToDate(v)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Error */}
-      {currentError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Report</AlertTitle>
-          <AlertDescription>
-            {currentError instanceof Error
-              ? currentError.message
-              : "Failed to load COGS data"}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Tabs */}
+      }
+      error={currentError}
+      errorFallback="Failed to load COGS data"
+      note={
+        <>
+          COGS are derived from allocation records linking inventory lots to
+          batches and finished goods packaging records. Only allocations with
+          status &quot;completed&quot; or &quot;planned&quot; are included. Cost
+          per unit uses proportional allocation based on units packaged from
+          each batch.
+        </>
+      }
+    >
       <Tabs
         value={activeTab}
         onValueChange={(v) =>
@@ -676,466 +531,260 @@ export default function CogsReportPage() {
         {/* Tab 1: By Batch                                                    */}
         {/* ================================================================= */}
         <TabsContent value="by-batch" className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="h-4 w-4" />
-                  Avg Cost / BBL
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {sharedLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold font-mono">
+          <ReportSummaryCards
+            loading={sharedLoading}
+            columns={4}
+            cards={[
+              {
+                icon: TrendingUp,
+                label: "Avg Cost / BBL",
+                value: (
+                  <StatValue>
                     {formatCurrency(batchSummary.avgCostPerBbl)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <DollarSign className="h-4 w-4" />
-                  Total Material Costs
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {sharedLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold font-mono">
+                  </StatValue>
+                ),
+              },
+              {
+                icon: DollarSign,
+                label: "Total Material Costs",
+                value: (
+                  <StatValue>
                     {formatCurrency(batchSummary.totalMaterialCost)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Hash className="h-4 w-4" />
-                  Batches
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {sharedLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold font-mono">
-                    {batchSummary.batchCount}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Package className="h-4 w-4" />
-                  Units Packaged
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {sharedLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold font-mono">
+                  </StatValue>
+                ),
+              },
+              {
+                icon: Hash,
+                label: "Batches",
+                value: <StatValue>{batchSummary.batchCount}</StatValue>,
+              },
+              {
+                icon: Package,
+                label: "Units Packaged",
+                value: (
+                  <StatValue>
                     {batchSummary.totalUnitsPackaged.toLocaleString()}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  </StatValue>
+                ),
+              },
+            ]}
+          />
 
-          {/* Batch Cost Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>COGS by Batch</CardTitle>
-              <CardDescription>
-                Click a row to expand ingredient-level detail
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {sharedLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : !batchCostData || batchCostData.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No batches found in the selected date range
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8" />
-                      <TableHead>Batch Code</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Recipe</TableHead>
-                      <TableHead className="text-right">Vol (BBL)</TableHead>
-                      <TableHead className="text-right">
-                        Ingredient Cost
-                      </TableHead>
-                      <TableHead className="text-right">
-                        Units Packaged
-                      </TableHead>
-                      <TableHead className="text-right">COGS/Unit</TableHead>
-                      <TableHead className="text-right">COGS/BBL</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {batchCostData.map((batch) => (
-                      <React.Fragment key={batch.id}>
-                        <TableRow
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => toggleBatchExpand(batch.id)}
-                        >
-                          <TableCell className="w-8">
-                            {expandedBatchId === batch.id ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono">
-                            {batch.batch_code}
-                          </TableCell>
-                          <TableCell>{batch.name}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {batch.recipe_name ?? "--"}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatBbl(batch.volume_bbl)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium">
-                            {formatCurrency(batch.total_ingredient_cost)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {batch.units_packaged.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatCurrency(batch.cogs_per_unit)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatCurrency(batch.cost_per_bbl)}
-                          </TableCell>
-                        </TableRow>
-
-                        {/* Expanded ingredient detail */}
-                        {expandedBatchId === batch.id && (
-                          <TableRow>
-                            <TableCell colSpan={9} className="bg-muted/30 p-0">
-                              <div className="px-8 py-4">
-                                <h4 className="text-sm font-semibold mb-3">
-                                  Ingredient Cost Detail
-                                </h4>
-                                {detailLoading ? (
-                                  <div className="space-y-2">
-                                    {[...Array(3)].map((_, i) => (
-                                      <Skeleton
-                                        key={i}
-                                        className="h-8 w-full"
-                                      />
-                                    ))}
-                                  </div>
-                                ) : !ingredientDetail ||
-                                  ingredientDetail.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">
-                                    No ingredient allocations found for this
-                                    batch
-                                  </p>
-                                ) : (
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead>Ingredient</TableHead>
-                                        <TableHead>Lot #</TableHead>
-                                        <TableHead className="text-right">
-                                          Quantity
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                          Unit Cost
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                          Total Cost
-                                        </TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {ingredientDetail.map((row) => (
-                                        <TableRow key={row.allocation_id}>
-                                          <TableCell>
-                                            {row.ingredient_name}
-                                          </TableCell>
-                                          <TableCell className="text-muted-foreground font-mono text-sm">
-                                            {row.lot_number ?? "--"}
-                                          </TableCell>
-                                          <TableCell className="text-right font-mono">
-                                            {row.quantity.toFixed(2)}
-                                          </TableCell>
-                                          <TableCell className="text-right font-mono">
-                                            {formatCurrency(row.unit_cost)}
-                                          </TableCell>
-                                          <TableCell className="text-right font-mono font-medium">
-                                            {formatCurrency(row.total_cost)}
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                      <TableRow className="font-bold border-t-2">
-                                        <TableCell colSpan={4}>Total</TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(
-                                            ingredientDetail.reduce(
-                                              (sum, r) => sum + r.total_cost,
-                                              0
-                                            )
-                                          )}
-                                        </TableCell>
-                                      </TableRow>
-                                    </TableBody>
-                                  </Table>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <ReportTableCard
+            title="COGS by Batch"
+            description="Click a row to expand ingredient-level detail"
+            loading={sharedLoading}
+            isEmpty={!batchCostData || batchCostData.length === 0}
+            emptyMessage="No batches found in the selected date range"
+          >
+            <ReportTable
+              rows={batchCostData ?? []}
+              rowKey={(b) => b.id}
+              rowClassName="cursor-pointer hover:bg-muted/50"
+              onRowClick={(b) => toggleBatchExpand(b.id)}
+              columns={[
+                {
+                  header: "",
+                  headClassName: "w-8",
+                  cellClassName: "w-8",
+                  cell: (b) => (
+                    <ExpandChevron expanded={expandedBatchId === b.id} />
+                  ),
+                },
+                {
+                  header: "Batch Code",
+                  cellClassName: "font-mono",
+                  cell: (b) => b.batch_code,
+                },
+                { header: "Name", cell: (b) => b.name },
+                {
+                  header: "Recipe",
+                  cellClassName: "text-muted-foreground",
+                  cell: (b) => b.recipe_name ?? "--",
+                },
+                {
+                  header: "Vol (BBL)",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (b) => formatBbl(b.volume_bbl),
+                },
+                {
+                  header: "Ingredient Cost",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono font-medium",
+                  cell: (b) => formatCurrency(b.total_ingredient_cost),
+                },
+                {
+                  header: "Units Packaged",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (b) => b.units_packaged.toLocaleString(),
+                },
+                {
+                  header: "COGS/Unit",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (b) => formatCurrency(b.cogs_per_unit),
+                },
+                {
+                  header: "COGS/BBL",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (b) => formatCurrency(b.cost_per_bbl),
+                },
+              ]}
+              renderAfterRow={(b) =>
+                expandedBatchId === b.id && (
+                  <ExpandedDetailRow colSpan={9} title="Ingredient Cost Detail">
+                    <IngredientDetailTable
+                      loading={detailLoading}
+                      rows={ingredientDetail}
+                    />
+                  </ExpandedDetailRow>
+                )
+              }
+            />
+          </ReportTableCard>
         </TabsContent>
 
         {/* ================================================================= */}
         {/* Tab 2: By SKU                                                      */}
         {/* ================================================================= */}
         <TabsContent value="by-sku" className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="h-4 w-4" />
-                  Highest Cost SKU
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {skuLoading ? (
-                  <Skeleton className="h-8 w-32" />
-                ) : skuSummary.highestCostSku ? (
-                  <div>
-                    <div className="text-lg font-bold font-mono">
-                      {formatCurrency(
-                        skuSummary.highestCostSku.avg_cost_per_unit
-                      )}
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {" "}
-                        /unit
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {skuSummary.highestCostSku.sku_name}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-2xl font-bold font-mono">--</div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Package className="h-4 w-4" />
-                  Lowest Cost SKU
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {skuLoading ? (
-                  <Skeleton className="h-8 w-32" />
-                ) : skuSummary.lowestCostSku ? (
-                  <div>
-                    <div className="text-lg font-bold font-mono">
-                      {formatCurrency(
-                        skuSummary.lowestCostSku.avg_cost_per_unit
-                      )}
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {" "}
-                        /unit
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {skuSummary.lowestCostSku.sku_name}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-2xl font-bold font-mono">--</div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <DollarSign className="h-4 w-4" />
-                  Weighted Avg Cost/Unit
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {skuLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold font-mono">
+          <ReportSummaryCards
+            loading={skuLoading}
+            cards={[
+              {
+                icon: TrendingUp,
+                label: "Highest Cost SKU",
+                value: <SkuStat sku={skuSummary.highestCostSku} />,
+                skeletonClassName: "w-32",
+              },
+              {
+                icon: Package,
+                label: "Lowest Cost SKU",
+                value: <SkuStat sku={skuSummary.lowestCostSku} />,
+                skeletonClassName: "w-32",
+              },
+              {
+                icon: DollarSign,
+                label: "Weighted Avg Cost/Unit",
+                value: (
+                  <StatValue>
                     {formatCurrency(skuSummary.weightedAvgCostPerUnit)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  </StatValue>
+                ),
+              },
+            ]}
+          />
 
-          {/* SKU Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>COGS by SKU</CardTitle>
-              <CardDescription>
-                Click a row to see batch breakdown
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {skuLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : !skuData || skuData.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No finished goods found in the selected date range
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8" />
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Brand</TableHead>
-                      <TableHead>Format</TableHead>
-                      <TableHead className="text-right">Batches</TableHead>
-                      <TableHead className="text-right">Total Units</TableHead>
-                      <TableHead className="text-right">Total Cost</TableHead>
-                      <TableHead className="text-right">
-                        Avg Cost/Unit
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {skuData.map((sku) => (
-                      <React.Fragment key={sku.sku_name}>
-                        <TableRow
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => toggleSkuExpand(sku.sku_name)}
-                        >
-                          <TableCell className="w-8">
-                            {expandedSku === sku.sku_name ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {sku.sku_name}
-                          </TableCell>
-                          <TableCell>{sku.brand_name}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {sku.format_name}
-                            {sku.container_name
-                              ? ` (${sku.container_name})`
-                              : ""}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {sku.batch_count}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {sku.total_units.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium">
-                            {formatCurrency(sku.total_cost)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatCurrency(sku.avg_cost_per_unit)}
-                          </TableCell>
-                        </TableRow>
-
-                        {/* Expanded batch breakdown */}
-                        {expandedSku === sku.sku_name && (
-                          <TableRow>
-                            <TableCell colSpan={8} className="bg-muted/30 p-0">
-                              <div className="px-8 py-4">
-                                <h4 className="text-sm font-semibold mb-3">
-                                  Batch Breakdown
-                                </h4>
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>Batch Code</TableHead>
-                                      <TableHead className="text-right">
-                                        Units
-                                      </TableHead>
-                                      <TableHead className="text-right">
-                                        Cost
-                                      </TableHead>
-                                      <TableHead className="text-right">
-                                        Cost/Unit
-                                      </TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {sku.batches.map((b) => (
-                                      <TableRow key={b.id}>
-                                        <TableCell className="font-mono">
-                                          {b.batch_code}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {b.units.toLocaleString()}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(b.cost)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {formatCurrency(
-                                            b.units > 0
-                                              ? b.cost / b.units
-                                              : null
-                                          )}
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <ReportTableCard
+            title="COGS by SKU"
+            description="Click a row to see batch breakdown"
+            loading={skuLoading}
+            isEmpty={!skuData || skuData.length === 0}
+            emptyMessage="No finished goods found in the selected date range"
+          >
+            <ReportTable
+              rows={skuData ?? []}
+              rowKey={(s) => s.sku_name}
+              rowClassName="cursor-pointer hover:bg-muted/50"
+              onRowClick={(s) => toggleSkuExpand(s.sku_name)}
+              columns={[
+                {
+                  header: "",
+                  headClassName: "w-8",
+                  cellClassName: "w-8",
+                  cell: (s) => (
+                    <ExpandChevron expanded={expandedSku === s.sku_name} />
+                  ),
+                },
+                {
+                  header: "SKU",
+                  cellClassName: "font-medium",
+                  cell: (s) => s.sku_name,
+                },
+                { header: "Brand", cell: (s) => s.brand_name },
+                {
+                  header: "Format",
+                  cellClassName: "text-muted-foreground",
+                  cell: (s) =>
+                    s.container_name
+                      ? `${s.format_name} (${s.container_name})`
+                      : s.format_name,
+                },
+                {
+                  header: "Batches",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (s) => s.batch_count,
+                },
+                {
+                  header: "Total Units",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (s) => s.total_units.toLocaleString(),
+                },
+                {
+                  header: "Total Cost",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono font-medium",
+                  cell: (s) => formatCurrency(s.total_cost),
+                },
+                {
+                  header: "Avg Cost/Unit",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (s) => formatCurrency(s.avg_cost_per_unit),
+                },
+              ]}
+              renderAfterRow={(sku) =>
+                expandedSku === sku.sku_name && (
+                  <ExpandedDetailRow colSpan={8} title="Batch Breakdown">
+                    <ReportTable
+                      rows={sku.batches}
+                      rowKey={(b) => b.id}
+                      columns={[
+                        {
+                          header: "Batch Code",
+                          cellClassName: "font-mono",
+                          cell: (b) => b.batch_code,
+                        },
+                        {
+                          header: "Units",
+                          headClassName: "text-right",
+                          cellClassName: "text-right font-mono",
+                          cell: (b) => b.units.toLocaleString(),
+                        },
+                        {
+                          header: "Cost",
+                          headClassName: "text-right",
+                          cellClassName: "text-right font-mono",
+                          cell: (b) => formatCurrency(b.cost),
+                        },
+                        {
+                          header: "Cost/Unit",
+                          headClassName: "text-right",
+                          cellClassName: "text-right font-mono",
+                          cell: (b) =>
+                            formatCurrency(b.units > 0 ? b.cost / b.units : null),
+                        },
+                      ]}
+                    />
+                  </ExpandedDetailRow>
+                )
+              }
+            />
+          </ReportTableCard>
         </TabsContent>
 
         {/* ================================================================= */}
-        {/* Tab 3: By Period                                                    */}
+        {/* Tab 3: By Period                                                   */}
         {/* ================================================================= */}
         <TabsContent value="by-period" className="space-y-6">
           {/* Granularity selector */}
           <div className="flex items-end gap-4">
-            <div className="space-y-2">
-              <Label>Granularity</Label>
+            <ReportField label="Granularity">
               <Select
                 value={granularity}
                 onValueChange={(v) =>
@@ -1150,68 +799,47 @@ export default function CogsReportPage() {
                   <SelectItem value="quarterly">Quarterly</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </ReportField>
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <DollarSign className="h-4 w-4" />
-                  Total COGS
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {periodLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold font-mono">
+          <ReportSummaryCards
+            loading={periodLoading}
+            cards={[
+              {
+                icon: DollarSign,
+                label: "Total COGS",
+                value: (
+                  <StatValue>
                     {formatCurrency(periodSummary.totalCogs)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="h-4 w-4" />
-                  Period-over-Period
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {periodLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : periodSummary.periodChange !== null ? (
-                  <div
-                    className={`text-2xl font-bold font-mono ${periodSummary.periodChange > 0 ? "text-red-600" : "text-green-600"}`}
-                  >
-                    {periodSummary.periodChange > 0 ? "+" : ""}
-                    {periodSummary.periodChange.toFixed(1)}%
-                  </div>
-                ) : (
-                  <div className="text-2xl font-bold font-mono">--</div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <BarChart3 className="h-4 w-4" />
-                  Avg COGS / Batch
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {periodLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold font-mono">
+                  </StatValue>
+                ),
+              },
+              {
+                icon: TrendingUp,
+                label: "Period-over-Period",
+                value:
+                  periodSummary.periodChange !== null ? (
+                    <div
+                      className={`text-2xl font-bold font-mono ${periodSummary.periodChange > 0 ? "text-red-600" : "text-green-600"}`}
+                    >
+                      {periodSummary.periodChange > 0 ? "+" : ""}
+                      {periodSummary.periodChange.toFixed(1)}%
+                    </div>
+                  ) : (
+                    <StatValue>--</StatValue>
+                  ),
+              },
+              {
+                icon: BarChart3,
+                label: "Avg COGS / Batch",
+                value: (
+                  <StatValue>
                     {formatCurrency(periodSummary.avgCogsPerBatch)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  </StatValue>
+                ),
+              },
+            ]}
+          />
 
           {/* Stacked Bar Chart */}
           <Card>
@@ -1234,111 +862,114 @@ export default function CogsReportPage() {
             </CardContent>
           </Card>
 
-          {/* Period Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Period Detail</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {periodLoading ? (
-                <div className="space-y-2">
-                  {[...Array(4)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : !periodData || periodData.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No data for the selected date range
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Period</TableHead>
-                      <TableHead className="text-right">Total COGS</TableHead>
-                      <TableHead className="text-right">Malts</TableHead>
-                      <TableHead className="text-right">Hops</TableHead>
-                      <TableHead className="text-right">Yeast</TableHead>
-                      <TableHead className="text-right">Adjuncts</TableHead>
-                      <TableHead className="text-right">Other</TableHead>
-                      <TableHead className="text-right">Batches</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {periodData.map((row) => (
-                      <TableRow key={row.period}>
-                        <TableCell className="font-medium">
-                          {row.period}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {formatCurrency(row.total_cogs)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(row.malt_cost)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(row.hop_cost)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(row.yeast_cost)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(row.adjunct_cost)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(row.other_cost)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {row.batch_count}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {periodData.length > 1 && (
-                      <TableRow className="font-bold border-t-2">
-                        <TableCell>Total</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(periodSummary.totalCogs)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(periodSummary.totalMalt)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(periodSummary.totalHop)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(periodSummary.totalYeast)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(periodSummary.totalAdjunct)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(periodSummary.totalOther)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {periodSummary.totalBatches}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <ReportTableCard
+            title="Period Detail"
+            loading={periodLoading}
+            skeletonRows={4}
+            isEmpty={!periodData || periodData.length === 0}
+            emptyMessage="No data for the selected date range"
+          >
+            <ReportTable
+              rows={periodData ?? []}
+              rowKey={(p) => p.period}
+              columns={[
+                {
+                  header: "Period",
+                  cellClassName: "font-medium",
+                  cell: (p) => p.period,
+                },
+                {
+                  header: "Total COGS",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono font-medium",
+                  cell: (p) => formatCurrency(p.total_cogs),
+                },
+                {
+                  header: "Malts",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (p) => formatCurrency(p.malt_cost),
+                },
+                {
+                  header: "Hops",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (p) => formatCurrency(p.hop_cost),
+                },
+                {
+                  header: "Yeast",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (p) => formatCurrency(p.yeast_cost),
+                },
+                {
+                  header: "Adjuncts",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (p) => formatCurrency(p.adjunct_cost),
+                },
+                {
+                  header: "Other",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (p) => formatCurrency(p.other_cost),
+                },
+                {
+                  header: "Batches",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (p) => p.batch_count,
+                },
+              ]}
+              footer={
+                (periodData?.length ?? 0) > 1 && (
+                  <TableRow className="font-bold border-t-2">
+                    <TableCell>Total</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(periodSummary.totalCogs)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(periodSummary.totalMalt)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(periodSummary.totalHop)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(periodSummary.totalYeast)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(periodSummary.totalAdjunct)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(periodSummary.totalOther)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {periodSummary.totalBatches}
+                    </TableCell>
+                  </TableRow>
+                )
+              }
+            />
+          </ReportTableCard>
         </TabsContent>
       </Tabs>
+    </ReportPage>
+  );
+}
 
-      {/* Disclaimer */}
-      <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> COGS are derived from allocation records
-            linking inventory lots to batches and finished goods packaging
-            records. Only allocations with status &quot;completed&quot; or
-            &quot;planned&quot; are included. Cost per unit uses proportional
-            allocation based on units packaged from each batch.
-          </p>
-        </CardContent>
-      </Card>
+/**
+ * Highest/lowest-cost SKU stat: cost per unit over the SKU name, or "--" when
+ * no SKU qualifies.
+ */
+function SkuStat({ sku }: { sku: CogsSkuRow | null }) {
+  if (!sku) return <StatValue>--</StatValue>;
+  return (
+    <div>
+      <div className="text-lg font-bold font-mono">
+        {formatCurrency(sku.avg_cost_per_unit)}
+        <span className="text-xs font-normal text-muted-foreground"> /unit</span>
+      </div>
+      <p className="text-sm text-muted-foreground truncate">{sku.sku_name}</p>
     </div>
   );
 }

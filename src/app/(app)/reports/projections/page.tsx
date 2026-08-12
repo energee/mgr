@@ -21,34 +21,22 @@ import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
 import { formatDecimal } from "@/lib/format";
 import { format, addDays } from "date-fns";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Package, ShoppingCart, AlertTriangle } from "lucide-react";
 import {
-  ArrowLeft,
-  AlertCircle,
-  Package,
-  ShoppingCart,
-  AlertTriangle,
-} from "lucide-react";
-import { ExportMenu } from "@/components/reports/export-menu";
-import Link from "next/link";
+  ReportFilterCard,
+  ReportPage,
+  ReportSummaryCards,
+  ReportTable,
+  ReportTableState,
+  StatValue,
+} from "@/components/reports/report-page";
+import {
+  groupIngredientsBySource,
+  type GroupedIngredientRow,
+} from "@/lib/reports/summaries";
 
 // =============================================================================
 // Types
@@ -98,44 +86,6 @@ type ProjectionData = {
 
 /** Format a numeric quantity to two decimal places, or "--" if null */
 const formatQty = formatDecimal;
-
-/** Ingredient row from the grouping helper */
-type GroupedIngredientRow = {
-  name: string;
-  category: string;
-  qty: number;
-  unit: string;
-}
-
-/**
- * Group projection ingredients by a source type ("batch" or "order").
- * Returns entries pairing each entity with its ingredient rows, filtered
- * to only entities that have at least one ingredient source.
- */
-function groupIngredientsBySource<T extends { id: string }>(
-  data: ProjectionData | undefined,
-  sourceType: "batch" | "order",
-  entities: T[],
-): { entity: T; ingredients: GroupedIngredientRow[] }[] {
-  if (!data) return [];
-  const map = new Map<string, { entity: T; ingredients: GroupedIngredientRow[] }>();
-  for (const entity of entities) {
-    map.set(entity.id, { entity, ingredients: [] });
-  }
-  for (const ing of data.ingredients) {
-    for (const src of ing.sources) {
-      if (src.type === sourceType && map.has(src.id)) {
-        map.get(src.id)!.ingredients.push({
-          name: ing.name,
-          category: ing.category,
-          qty: src.qty,
-          unit: ing.unit,
-        });
-      }
-    }
-  }
-  return Array.from(map.values()).filter((entry) => entry.ingredients.length > 0);
-}
 
 // =============================================================================
 // Component
@@ -439,12 +389,20 @@ export default function IngredientProjectionsPage() {
   // Group ingredients by batch / order for the breakdown tabs
   // ---------------------------------------------------------------------------
   const ingredientsByBatch = useMemo(
-    () => groupIngredientsBySource(projectionData, "batch", projectionData?.batches ?? []),
+    () => groupIngredientsBySource(
+        projectionData?.ingredients,
+        "batch",
+        projectionData?.batches ?? []
+      ),
     [projectionData],
   );
 
   const ingredientsByOrder = useMemo(
-    () => groupIngredientsBySource(projectionData, "order", projectionData?.orders ?? []),
+    () => groupIngredientsBySource(
+        projectionData?.ingredients,
+        "order",
+        projectionData?.orders ?? []
+      ),
     [projectionData],
   );
 
@@ -468,38 +426,19 @@ export default function IngredientProjectionsPage() {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/reports">
-          <Button variant="ghost" size="icon" aria-label="Back to reports">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">
-            Ingredient Projections
-          </h1>
-          <p className="text-muted-foreground">
-            Forward-looking ingredient needs from planned batches and confirmed orders
-          </p>
-        </div>
-        <ExportMenu
-          filename={`ingredient-projections-${horizonDays}d.csv`}
-          rows={exportRows}
-          disabled={isLoading}
-        />
-      </div>
-
-      {/* Horizon Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Projection Horizon</CardTitle>
-          <CardDescription>
-            Select the number of days to look ahead
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <ReportPage
+      title="Ingredient Projections"
+      description="Forward-looking ingredient needs from planned batches and confirmed orders"
+      exportConfig={{
+        filename: `ingredient-projections-${horizonDays}d.csv`,
+        rows: exportRows,
+        disabled: isLoading,
+      }}
+      filter={
+        <ReportFilterCard
+          title="Projection Horizon"
+          description="Select the number of days to look ahead"
+        >
           <div className="flex items-center gap-2">
             {[30, 60, 90].map((days) => (
               <Button
@@ -511,259 +450,186 @@ export default function IngredientProjectionsPage() {
               </Button>
             ))}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Error */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Report</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error
-              ? error.message
-              : "Failed to load projection data"}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <Package className="h-4 w-4" />
-              Total Ingredients Needed
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {summary.totalIngredients}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <AlertTriangle className="h-4 w-4" />
-              At Risk (Shortfall)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {summary.atRisk}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <ShoppingCart className="h-4 w-4" />
-              Batches + Orders in Window
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {summary.batchCount + summary.orderCount}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        </ReportFilterCard>
+      }
+      error={error}
+      errorFallback="Failed to load projection data"
+      note="Projections are based on recipe ingredient lists for planned and in-progress batches, and confirmed/scheduled orders. On-hand quantities come from inventory lots with remaining stock. Yeast is counted as 1 package per batch. Actual usage may vary based on batch volume scaling and recipe adjustments."
+    >
+      <ReportSummaryCards
+        loading={isLoading}
+        cards={[
+          {
+            icon: Package,
+            label: "Total Ingredients Needed",
+            value: <StatValue>{summary.totalIngredients}</StatValue>,
+          },
+          {
+            icon: AlertTriangle,
+            label: "At Risk (Shortfall)",
+            value: <StatValue>{summary.atRisk}</StatValue>,
+          },
+          {
+            icon: ShoppingCart,
+            label: "Batches + Orders in Window",
+            value: (
+              <StatValue>{summary.batchCount + summary.orderCount}</StatValue>
+            ),
+          },
+        ]}
+      />
 
       {/* Tabs */}
       <Card>
         <CardContent className="pt-6">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+          >
             <TabsList>
               <TabsTrigger value="combined">Combined</TabsTrigger>
               <TabsTrigger value="by-batch">By Batch</TabsTrigger>
               <TabsTrigger value="by-order">By Order</TabsTrigger>
             </TabsList>
 
-            {/* Combined Tab */}
             <TabsContent value="combined">
-              {isLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : !projectionData || projectionData.ingredients.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No ingredient projections found for the selected horizon
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Ingredient</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Needed</TableHead>
-                      <TableHead className="text-right">On Hand</TableHead>
-                      <TableHead className="text-right">Shortfall</TableHead>
-                      <TableHead>Unit</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {projectionData.ingredients.map((ing) => (
-                      <TableRow key={`${ing.category}::${ing.name}`}>
-                        <TableCell className="font-medium">{ing.name}</TableCell>
-                        <TableCell className="capitalize text-muted-foreground">
-                          {ing.category}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatQty(ing.neededQty)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatQty(ing.onHandQty)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right font-mono font-medium ${
-                            ing.shortfall < 0 ? "text-destructive" : ""
-                          }`}
-                        >
-                          {formatQty(ing.shortfall)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {ing.unit}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              <ReportTableState
+                loading={isLoading}
+                isEmpty={
+                  !projectionData || projectionData.ingredients.length === 0
+                }
+                emptyMessage="No ingredient projections found for the selected horizon"
+              >
+                <ReportTable
+                  rows={projectionData?.ingredients ?? []}
+                  rowKey={(ing) => `${ing.category}::${ing.name}`}
+                  columns={[
+                    {
+                      header: "Ingredient",
+                      cellClassName: "font-medium",
+                      cell: (ing) => ing.name,
+                    },
+                    {
+                      header: "Category",
+                      cellClassName: "capitalize text-muted-foreground",
+                      cell: (ing) => ing.category,
+                    },
+                    {
+                      header: "Needed",
+                      headClassName: "text-right",
+                      cellClassName: "text-right font-mono",
+                      cell: (ing) => formatQty(ing.neededQty),
+                    },
+                    {
+                      header: "On Hand",
+                      headClassName: "text-right",
+                      cellClassName: "text-right font-mono",
+                      cell: (ing) => formatQty(ing.onHandQty),
+                    },
+                    {
+                      header: "Shortfall",
+                      headClassName: "text-right",
+                      cellClassName: (ing) =>
+                        `text-right font-mono font-medium ${
+                          ing.shortfall < 0 ? "text-destructive" : ""
+                        }`,
+                      cell: (ing) => formatQty(ing.shortfall),
+                    },
+                    {
+                      header: "Unit",
+                      cellClassName: "text-muted-foreground",
+                      cell: (ing) => ing.unit,
+                    },
+                  ]}
+                />
+              </ReportTableState>
             </TabsContent>
 
-            {/* By Batch Tab */}
             <TabsContent value="by-batch">
-              {isLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : ingredientsByBatch.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No batch ingredient projections found
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {ingredientsByBatch.map(({ entity: batch, ingredients }) => (
-                    <div key={batch.id}>
-                      <h3 className="text-sm font-semibold mb-2">
-                        {batch.batch_code} - {batch.name}
-                      </h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Ingredient</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead className="text-right">Quantity</TableHead>
-                            <TableHead>Unit</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {ingredients.map((ing, idx) => (
-                            <TableRow key={`${batch.id}-${ing.name}-${idx}`}>
-                              <TableCell className="font-medium">{ing.name}</TableCell>
-                              <TableCell className="capitalize text-muted-foreground">
-                                {ing.category}
-                              </TableCell>
-                              <TableCell className="text-right font-mono">
-                                {formatQty(ing.qty)}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {ing.unit}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <SourceBreakdown
+                loading={isLoading}
+                emptyMessage="No batch ingredient projections found"
+                groups={ingredientsByBatch.map(({ entity, ingredients }) => ({
+                  id: entity.id,
+                  heading: `${entity.batch_code} - ${entity.name}`,
+                  ingredients,
+                }))}
+              />
             </TabsContent>
 
-            {/* By Order Tab */}
             <TabsContent value="by-order">
-              {isLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : ingredientsByOrder.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No order ingredient projections found
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {ingredientsByOrder.map(({ entity: order, ingredients }) => (
-                    <div key={order.id}>
-                      <h3 className="text-sm font-semibold mb-2">
-                        {order.order_number}
-                        {order.customer_name ? ` - ${order.customer_name}` : ""}
-                      </h3>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Ingredient</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead className="text-right">Quantity</TableHead>
-                            <TableHead>Unit</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {ingredients.map((ing, idx) => (
-                            <TableRow key={`${order.id}-${ing.name}-${idx}`}>
-                              <TableCell className="font-medium">{ing.name}</TableCell>
-                              <TableCell className="capitalize text-muted-foreground">
-                                {ing.category}
-                              </TableCell>
-                              <TableCell className="text-right font-mono">
-                                {formatQty(ing.qty)}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {ing.unit}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <SourceBreakdown
+                loading={isLoading}
+                emptyMessage="No order ingredient projections found"
+                groups={ingredientsByOrder.map(({ entity, ingredients }) => ({
+                  id: entity.id,
+                  heading: `${entity.order_number}${
+                    entity.customer_name ? ` - ${entity.customer_name}` : ""
+                  }`,
+                  ingredients,
+                }))}
+              />
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
+    </ReportPage>
+  );
+}
 
-      {/* Disclaimer */}
-      <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Projections are based on recipe ingredient
-            lists for planned and in-progress batches, and confirmed/scheduled
-            orders. On-hand quantities come from inventory lots with remaining
-            stock. Yeast is counted as 1 package per batch. Actual usage may vary
-            based on batch volume scaling and recipe adjustments.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+/**
+ * Per-source ingredient breakdown used by the "By Batch" and "By Order" tabs:
+ * a heading per source entity followed by its ingredient quantities.
+ */
+function SourceBreakdown({
+  loading,
+  emptyMessage,
+  groups,
+}: {
+  loading: boolean;
+  emptyMessage: string;
+  groups: { id: string; heading: string; ingredients: GroupedIngredientRow[] }[];
+}) {
+  return (
+    <ReportTableState
+      loading={loading}
+      isEmpty={groups.length === 0}
+      emptyMessage={emptyMessage}
+    >
+      <div className="space-y-6">
+        {groups.map((group) => (
+          <div key={group.id}>
+            <h3 className="text-sm font-semibold mb-2">{group.heading}</h3>
+            <ReportTable
+              rows={group.ingredients}
+              rowKey={(ing, i) => `${group.id}-${ing.name}-${i}`}
+              columns={[
+                {
+                  header: "Ingredient",
+                  cellClassName: "font-medium",
+                  cell: (ing) => ing.name,
+                },
+                {
+                  header: "Category",
+                  cellClassName: "capitalize text-muted-foreground",
+                  cell: (ing) => ing.category,
+                },
+                {
+                  header: "Quantity",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (ing) => formatQty(ing.qty),
+                },
+                {
+                  header: "Unit",
+                  cellClassName: "text-muted-foreground",
+                  cell: (ing) => ing.unit,
+                },
+              ]}
+            />
+          </div>
+        ))}
+      </div>
+    </ReportTableState>
   );
 }
