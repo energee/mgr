@@ -18,11 +18,14 @@
  * needs horizontal panning.
  *
  * Uses unified selling_format_id (containers + selling_formats model).
+ *
+ * Add-row visibility and the heading/Cancel shell come from the shared
+ * line-items editor primitives
+ * (src/components/domain/shared/line-items-editor.tsx).
  */
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -33,7 +36,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useSessionLineItems,
@@ -48,6 +50,13 @@ import { cn } from "@/lib/utils";
 import { useIsMobile, useIsTouch } from "@/hooks/use-mobile";
 import { BatchCell, FormatCell } from "./packaging-shared";
 import { AddLineItemRow } from "./add-line-item-row";
+import {
+  DeleteLineButton,
+  LineItemsEditorShell,
+  LineItemsEmptyRow,
+  LineItemsLoading,
+  useAddRow,
+} from "@/components/domain/shared/line-items-editor";
 
 // =============================================================================
 // Types
@@ -66,7 +75,7 @@ export function SessionLineItemsEditor({
   readOnly = false,
 }: SessionLineItemsEditorProps) {
   const [newItem, setNewItem] = useState<NewItemState>({ ...EMPTY_NEW_ITEM });
-  const [showAddRow, setShowAddRow] = useState(false);
+  const addRow = useAddRow();
   const isMobile = useIsMobile();
   const isTouch = useIsTouch();
 
@@ -168,29 +177,19 @@ export function SessionLineItemsEditor({
     );
 
   const renderDelete = (item: LineItemRow, sizeClass: string) => (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="Remove line item"
-      className={cn("text-destructive", sizeClass)}
+    <DeleteLineButton
+      label="Remove line item"
+      className={sizeClass}
       onClick={() => deleteItem.mutate(item.id)}
       disabled={deleteItem.isPending}
-    >
-      <Trash2 className="h-4 w-4" />
-    </Button>
+    />
   );
 
   // ---------------------------------------------------------------------------
   // Loading state
   // ---------------------------------------------------------------------------
 
-  if (itemsLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (itemsLoading) return <LineItemsLoading />;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -201,22 +200,12 @@ export function SessionLineItemsEditor({
   const tableInputHeight = isTouch ? "h-10" : "h-8";
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Line Items</h3>
-        {!readOnly && !showAddRow && (
-          <Button
-            size="sm"
-            variant="outline"
-            className={cn(isTouch && "min-h-[44px]")}
-            onClick={() => setShowAddRow(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Line Item
-          </Button>
-        )}
-      </div>
-
+    <LineItemsEditorShell
+      addLabel="Add Line Item"
+      canAdd={!readOnly}
+      addRow={addRow}
+      buttonClassName={cn(isTouch && "min-h-[44px]")}
+    >
       {isMobile ? (
         <div className="space-y-3">
           {items?.map((item) => (
@@ -255,7 +244,7 @@ export function SessionLineItemsEditor({
           ))}
 
           {/* Empty state */}
-          {(!items || items.length === 0) && !showAddRow && (
+          {(!items || items.length === 0) && !addRow.showAddRow && (
             <div className="rounded-lg border py-8 text-center text-muted-foreground">
               No line items yet. Click &quot;Add Line Item&quot; to add
               products to this packaging session.
@@ -280,7 +269,7 @@ export function SessionLineItemsEditor({
               renders on phones (<768px), so the row's cells are stacked
               vertically via CSS — a 680px table forced horizontal panning
               at 390px (mobile-UX verification pass). */}
-          {showAddRow && (
+          {addRow.showAddRow && (
             <div className="rounded-lg border">
               <Table className="[&_thead]:hidden [&_tr]:flex [&_tr]:flex-col [&_tr]:gap-2 [&_tr]:border-0 [&_tbody_tr]:p-3 [&_td]:p-0">
                 <TableHeader>
@@ -343,7 +332,7 @@ export function SessionLineItemsEditor({
             ))}
 
             {/* Add new item row */}
-            {showAddRow && (
+            {addRow.showAddRow && (
               <AddLineItemRow
                 newItem={newItem}
                 onChange={setNewItem}
@@ -353,16 +342,11 @@ export function SessionLineItemsEditor({
             )}
 
             {/* Empty state */}
-            {(!items || items.length === 0) && !showAddRow && (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="text-center text-muted-foreground py-8"
-                >
-                  No line items yet. Click &quot;Add Line Item&quot; to add
-                  products to this packaging session.
-                </TableCell>
-              </TableRow>
+            {(!items || items.length === 0) && !addRow.showAddRow && (
+              <LineItemsEmptyRow colSpan={6}>
+                No line items yet. Click &quot;Add Line Item&quot; to add
+                products to this packaging session.
+              </LineItemsEmptyRow>
             )}
           </TableBody>
           {items && items.length > 0 && (
@@ -379,19 +363,6 @@ export function SessionLineItemsEditor({
           )}
         </Table>
       )}
-
-      {showAddRow && (
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(isTouch && "min-h-[44px]")}
-            onClick={() => setShowAddRow(false)}
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
-    </div>
+    </LineItemsEditorShell>
   );
 }

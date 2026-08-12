@@ -19,19 +19,21 @@
  * inventory items/lots) so units survive the accept-into-inventory copy;
  * legacy free-text units on existing rows are still rendered as an extra
  * option so they display and round-trip until deliberately changed.
+ *
+ * Add-row visibility, the buffered-edit map and the heading/Cancel shell come
+ * from the shared line-items editor primitives
+ * (src/components/domain/shared/line-items-editor.tsx).
  */
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom } from "@/services/types";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -47,7 +49,6 @@ import {
   ComboboxField,
   ComboboxItem,
 } from "@/components/ui/combobox";
-import { Plus, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { purchaseOrderKeys, catalogKeys } from "@/lib/query-keys";
 import {
@@ -61,6 +62,17 @@ import {
   parsePoItemFieldEdit,
   type EditableItemField,
 } from "@/domain/sales/order-item-edit-utils";
+import {
+  AddLineButton,
+  DeleteLineButton,
+  LineItemEditInput,
+  LineItemsEditorShell,
+  LineItemsEmptyRow,
+  LineItemsLoading,
+  LineItemsTotalFooter,
+  useAddRow,
+  useLineItemEdits,
+} from "@/components/domain/shared/line-items-editor";
 
 // =============================================================================
 // Types
@@ -124,12 +136,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     unit: "lb",
     unit_price: "",
   });
-  const [showAddRow, setShowAddRow] = useState(false);
-
-  // Local buffer for existing-row qty/price edits, keyed by `${itemId}:${field}`.
-  // Raw strings are held while typing and committed on blur/Enter via
-  // commitItemEdit — mirrors the pendingEdits pattern in order-items-editor.tsx.
-  const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
+  const addRow = useAddRow();
 
   // Fetch PO line items with resolved catalog names
   const { data: items, isLoading: itemsLoading } = useQuery({
@@ -216,7 +223,7 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lineItems(poId) });
       setNewItem({ catalog_type: "", catalog_id: "", quantity: "1", unit: "lb", unit_price: "" });
-      setShowAddRow(false);
+      addRow.close();
       toast.success("Item added");
     },
     onError: () => {
@@ -241,29 +248,13 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     },
   });
 
-  // Buffer a keystroke for an existing row's qty/price input
-  const setPendingEdit = (itemId: string, field: EditableItemField, raw: string) => {
-    setPendingEdits((prev) => ({ ...prev, [`${itemId}:${field}`]: raw }));
-  };
-
-  // Commit a buffered qty/price edit on blur/Enter. Invalid input
-  // (empty/NaN/negative price/non-positive qty) is dropped so the field
-  // reverts to the saved value; unchanged values skip the write entirely.
-  const commitItemEdit = (item: POLineItemRow, field: EditableItemField) => {
-    const key = `${item.id}:${field}`;
-    const raw = pendingEdits[key];
-    if (raw === undefined) return; // nothing typed since last commit
-    setPendingEdits((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    const parsed = parsePoItemFieldEdit(field, raw);
-    if (parsed === null) return; // revert to saved value
-    const current = field === "quantity" ? item.quantity : item.unit_price;
-    if (parsed === current) return; // no-op — avoid the write
-    updateItem.mutate({ id: item.id, field, value: parsed });
-  };
+  // Buffered qty/price edits on existing rows, committed on blur/Enter.
+  // Invalid input (empty/NaN/negative price/non-positive qty) is dropped so
+  // the field reverts to the saved value; unchanged values skip the write.
+  const edits = useLineItemEdits<EditableItemField>({
+    parse: parsePoItemFieldEdit,
+    onCommit: (id, field, value) => updateItem.mutate({ id, field, value }),
+  });
 
   // Delete item mutation
   const deleteItem = useMutation({
@@ -322,26 +313,10 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
     });
   };
 
-  if (itemsLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (itemsLoading) return <LineItemsLoading />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Line Items</h3>
-        {!readOnly && !showAddRow && (
-          <Button size="sm" variant="outline" onClick={() => setShowAddRow(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Item
-          </Button>
-        )}
-      </div>
-
+    <LineItemsEditorShell addLabel="Add Item" canAdd={!readOnly} addRow={addRow}>
       <Table>
         <TableHeader>
           <TableRow>
@@ -365,16 +340,14 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 {readOnly ? (
                   item.quantity
                 ) : (
-                  <Input
+                  <LineItemEditInput
+                    edits={edits}
+                    id={item.id}
+                    field="quantity"
+                    savedValue={item.quantity}
                     type="number"
                     step="0.01"
                     min={0}
-                    value={pendingEdits[`${item.id}:quantity`] ?? item.quantity}
-                    onChange={(e) => setPendingEdit(item.id, "quantity", e.target.value)}
-                    onBlur={() => commitItemEdit(item, "quantity")}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitItemEdit(item, "quantity");
-                    }}
                     className="h-8 w-full"
                   />
                 )}
@@ -399,16 +372,14 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 {readOnly ? (
                   item.unit_price ? `$${item.unit_price.toFixed(2)}` : "—"
                 ) : (
-                  <Input
+                  <LineItemEditInput
+                    edits={edits}
+                    id={item.id}
+                    field="unit_price"
+                    savedValue={item.unit_price}
                     type="number"
                     step="0.01"
                     min={0}
-                    value={pendingEdits[`${item.id}:unit_price`] ?? item.unit_price ?? ""}
-                    onChange={(e) => setPendingEdit(item.id, "unit_price", e.target.value)}
-                    onBlur={() => commitItemEdit(item, "unit_price")}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitItemEdit(item, "unit_price");
-                    }}
                     className="h-8 w-full"
                     placeholder="0.00"
                   />
@@ -419,23 +390,18 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
               </TableCell>
               {!readOnly && (
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Remove line item"
-                    className="h-8 w-8 text-destructive"
+                  <DeleteLineButton
+                    label="Remove line item"
                     onClick={() => deleteItem.mutate(item.id)}
                     disabled={deleteItem.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  />
                 </TableCell>
               )}
             </TableRow>
           ))}
 
           {/* Add new item row */}
-          {showAddRow && (
+          {addRow.showAddRow && (
             <TableRow>
               <TableCell>
                 <Select
@@ -526,55 +492,32 @@ export function POLineItemsEditor({ poId, readOnly = false }: POLineItemsEditorP
                 ${((newQuantity ?? 0) * (newUnitPrice ?? 0)).toFixed(2)}
               </TableCell>
               <TableCell>
-                <Button
-                  size="icon"
-                  aria-label="Add line item"
-                  className="h-8 w-8"
+                <AddLineButton
+                  label="Add line item"
                   onClick={handleAdd}
-                  disabled={addItem.isPending}
-                >
-                  {addItem.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                </Button>
+                  isPending={addItem.isPending}
+                />
               </TableCell>
             </TableRow>
           )}
 
           {/* Empty state */}
-          {(!items || items.length === 0) && !showAddRow && (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                No line items yet. Click &quot;Add Item&quot; to add items to this purchase order.
-              </TableCell>
-            </TableRow>
+          {(!items || items.length === 0) && !addRow.showAddRow && (
+            <LineItemsEmptyRow colSpan={7}>
+              No line items yet. Click &quot;Add Item&quot; to add items to this purchase order.
+            </LineItemsEmptyRow>
           )}
         </TableBody>
         {items && items.length > 0 && (
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={5} className="text-right font-medium">
-                Subtotal
-              </TableCell>
-              <TableCell className="text-right font-bold text-lg">
-                ${total.toFixed(2)}
-              </TableCell>
-              {!readOnly && <TableCell />}
-            </TableRow>
-          </TableFooter>
+          <LineItemsTotalFooter
+            labelColSpan={5}
+            label="Subtotal"
+            amount={total}
+            trailingCell={!readOnly}
+          />
         )}
       </Table>
-
-      {showAddRow && (
-        <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setShowAddRow(false)}>
-            Cancel
-          </Button>
-        </div>
-      )}
-    </div>
+    </LineItemsEditorShell>
   );
 }
 

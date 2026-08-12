@@ -22,6 +22,10 @@
  *   ship_transfer_partial RPC consumes the lines, so the editor turns
  *   read-only and surfaces shipped quantities instead.
  *
+ * Add-row visibility, the buffered quantity edits and the surrounding
+ * heading/Cancel shell come from the shared line-items editor primitives
+ * (src/components/domain/shared/line-items-editor.tsx).
+ *
  * Mutations invalidate transferKeys.lines(transferId) (covers the Ship dialog
  * and this editor's nested linesEdit key) plus the location_transfers entity
  * keys so lines_count refreshes on the header and list views.
@@ -30,7 +34,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,10 +45,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ComboboxField, ComboboxItem } from "@/components/ui/combobox";
-import { Loader2, Lock, Plus, Trash2 } from "lucide-react";
+import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { entityKeys, transferKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
+import {
+  AddLineButton,
+  DeleteLineButton,
+  LineItemEditInput,
+  LineItemsEditorShell,
+  LineItemsEmptyRow,
+  LineItemsLoading,
+  useAddRow,
+  useLineItemEdits,
+} from "@/components/domain/shared/line-items-editor";
 
 // =============================================================================
 // Types
@@ -94,14 +107,16 @@ export function TransferLinesEditor({
 
   const editable = status === "planned";
 
-  // New-line form state
-  const [showAddRow, setShowAddRow] = useState(false);
+  // New-line form state. Closing the add row (Cancel, or after a successful
+  // insert) clears the draft selection.
   const [selectedKey, setSelectedKey] = useState("");
   const [newQuantity, setNewQuantity] = useState(1);
-
-  // Buffered quantity edits for existing rows, keyed by line ID. Committed on
-  // blur/Enter; invalid input reverts to the saved value.
-  const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
+  const addRow = useAddRow({
+    onClose: () => {
+      setSelectedKey("");
+      setNewQuantity(1);
+    },
+  });
 
   // ---------------------------------------------------------------------------
   // Queries
@@ -302,9 +317,7 @@ export function TransferLinesEditor({
     },
     onSuccess: () => {
       invalidateAfterChange();
-      setSelectedKey("");
-      setNewQuantity(1);
-      setShowAddRow(false);
+      addRow.close();
       toast.success("Line added");
     },
     onError: (error) => {
@@ -349,21 +362,16 @@ export function TransferLinesEditor({
     },
   });
 
-  // Commit a buffered quantity edit on blur/Enter. Empty/NaN/non-positive
-  // input is dropped so the field reverts to the saved value.
-  const commitQuantityEdit = (line: TransferLineRow) => {
-    const raw = pendingEdits[line.id];
-    if (raw === undefined) return;
-    setPendingEdits((prev) => {
-      const next = { ...prev };
-      delete next[line.id];
-      return next;
-    });
-    const parsed = parseInt(raw, 10);
-    if (!Number.isFinite(parsed) || parsed < 1) return; // revert
-    if (parsed === line.quantity) return; // no-op
-    updateLine.mutate({ id: line.id, quantity: parsed });
-  };
+  // Buffered quantity edits on existing rows, committed on blur/Enter.
+  // Empty/NaN/non-positive input is dropped so the field reverts to the
+  // saved value.
+  const edits = useLineItemEdits<"quantity">({
+    parse: (_field, raw) => {
+      const parsed = parseInt(raw, 10);
+      return Number.isFinite(parsed) && parsed >= 1 ? parsed : null;
+    },
+    onCommit: (id, _field, quantity) => updateLine.mutate({ id, quantity }),
+  });
 
   const handleAdd = () => {
     if (!selectedItem) {
@@ -381,33 +389,17 @@ export function TransferLinesEditor({
   // Render
   // ---------------------------------------------------------------------------
 
-  if (linesLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (linesLoading) return <LineItemsLoading />;
 
   const showShippedColumn = !editable;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Line Items</h3>
-        {editable && !showAddRow && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowAddRow(true)}
-            disabled={!fromBinId}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Line
-          </Button>
-        )}
-      </div>
-
+    <LineItemsEditorShell
+      addLabel="Add Line"
+      canAdd={editable}
+      addDisabled={!fromBinId}
+      addRow={addRow}
+    >
       {!editable && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Lock className="h-3.5 w-3.5" />
@@ -432,20 +424,13 @@ export function TransferLinesEditor({
               <TableCell className="font-medium">{line.item_name}</TableCell>
               <TableCell className="text-right">
                 {editable ? (
-                  <Input
+                  <LineItemEditInput
+                    edits={edits}
+                    id={line.id}
+                    field="quantity"
+                    savedValue={line.quantity}
                     type="number"
                     min={1}
-                    value={pendingEdits[line.id] ?? line.quantity}
-                    onChange={(e) =>
-                      setPendingEdits((prev) => ({
-                        ...prev,
-                        [line.id]: e.target.value,
-                      }))
-                    }
-                    onBlur={() => commitQuantityEdit(line)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitQuantityEdit(line);
-                    }}
                     className="h-8 w-[100px] ml-auto tabular-nums"
                   />
                 ) : (
@@ -459,23 +444,18 @@ export function TransferLinesEditor({
               )}
               {editable && (
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Remove line"
-                    className="h-8 w-8 text-destructive"
+                  <DeleteLineButton
+                    label="Remove line"
                     onClick={() => deleteLine.mutate(line.id)}
                     disabled={deleteLine.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  />
                 </TableCell>
               )}
             </TableRow>
           ))}
 
           {/* Add new line row */}
-          {editable && showAddRow && (
+          {editable && addRow.showAddRow && (
             <TableRow>
               <TableCell>
                 <ComboboxField
@@ -529,55 +509,27 @@ export function TransferLinesEditor({
                 )}
               </TableCell>
               <TableCell>
-                <Button
-                  size="icon"
-                  aria-label="Add line"
-                  className="h-8 w-8"
+                <AddLineButton
+                  label="Add line"
                   onClick={handleAdd}
+                  isPending={addLine.isPending}
                   disabled={addLine.isPending || !selectedKey}
-                >
-                  {addLine.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                </Button>
+                />
               </TableCell>
             </TableRow>
           )}
 
           {/* Empty state */}
-          {(!lines || lines.length === 0) && !showAddRow && (
-            <TableRow>
-              {/* 3 columns either way: Item + Quantity + (Shipped | actions) */}
-              <TableCell
-                colSpan={3}
-                className="text-center text-muted-foreground py-8"
-              >
-                {editable
-                  ? 'No line items yet. Click "Add Line" to choose items from the source bin.'
-                  : "No line items on this transfer."}
-              </TableCell>
-            </TableRow>
+          {/* 3 columns either way: Item + Quantity + (Shipped | actions) */}
+          {(!lines || lines.length === 0) && !addRow.showAddRow && (
+            <LineItemsEmptyRow colSpan={3}>
+              {editable
+                ? 'No line items yet. Click "Add Line" to choose items from the source bin.'
+                : "No line items on this transfer."}
+            </LineItemsEmptyRow>
           )}
         </TableBody>
       </Table>
-
-      {showAddRow && (
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setShowAddRow(false);
-              setSelectedKey("");
-              setNewQuantity(1);
-            }}
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
-    </div>
+    </LineItemsEditorShell>
   );
 }
