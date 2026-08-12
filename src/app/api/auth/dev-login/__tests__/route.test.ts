@@ -611,6 +611,30 @@ describe("GET /api/auth/dev-login gate", () => {
     expect(response.headers.get("location")).toBe("http://localhost:3000/");
   });
 
+  // WHATWG URL parsing treats `\` as `/` for http(s), and strips tab/newline
+  // characters entirely before parsing, so each of these "paths" is a
+  // protocol-relative reference in disguise:
+  // new URL("/\\evil.example.com", origin) → http://evil.example.com/ (#737).
+  // new URL("/\t/evil.example.com", origin) → http://evil.example.com/ (same class).
+  it.each([
+    "/\\evil.example.com",
+    "/\\\\evil.example.com",
+    "/\t/evil.example.com",
+    "/\n/evil.example.com",
+    "/\r/evil.example.com",
+  ])("rejects a backslash/control-character redirect target (%s)", async (target) => {
+    setupSupabase();
+    vi.stubEnv("E2E_DEV_LOGIN", "1");
+
+    const response = await GET(
+      new NextRequest(
+        `http://localhost:3000/api/auth/dev-login?redirect=${encodeURIComponent(target)}`,
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe("http://localhost:3000/");
+  });
+
   // --- The login page's button must not drift away from this gate. ----------
   // PR #682's first cut tightened the gate and left
   // src/app/(auth)/login/login-form.tsx offering the Dev Login button on
