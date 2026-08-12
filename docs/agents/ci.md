@@ -10,7 +10,7 @@ workflow change, or the unit suite fails.
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `test.yml` | Every PR to main (docs-only included — a check has to report on every PR to be usable as a required one) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-deploy-state` / `check-agent-config`, plus the deterministic codegraph extractor evals (`bun tools/codegraph/eval.ts --ast` / `--sql` — offline, no LLM). Playwright E2E runs on every PR too as of 2026-07-30 (#437) — see [Why E2E runs on pull requests](#why-e2e-runs-on-pull-requests) for the shape and the reasoning, including why it never did before, despite #506 having been written to do it. Only `Production Build` stays nightly / `workflow_dispatch`: it compiles against the **hosted** Supabase credentials that fork PRs cannot read, and it is also the only job that runs `bun audit`, so the **dependency audit is a nightly signal, not a PR-time one**. PRs are not left without build coverage — the E2E job runs its own `bun run build` against its local stack. E2E boots an isolated local Supabase, builds against it (`NEXT_PUBLIC_*` are inlined at build time, so the hosted-credential build artifact cannot serve it), and runs Playwright against `bun start` — the shipped artifact, not a dev server. Because that server is a production build, the job sets `E2E_DEV_LOGIN: "1"` so `/api/auth/dev-login` (how `e2e/auth.setup.ts` gets a session, absent any hosted E2E credentials) answers instead of 404ing; the flag belongs to this job alone and must never be set on a deployed environment. The flag is not sufficient by itself — on that path the route also requires the Supabase project URL to have a **loopback hostname**, which this job satisfies via its own local stack. That narrows a stray `E2E_DEV_LOGIN=1` to databases reachable only on the serving machine (#656); it is not a guarantee that no real data is reachable, since a self-hosted Supabase, a sidecar, a tunnel or a local proxy can all sit behind a loopback name. The URL is resolved through `getSupabaseUrl()` — the same accessor `createAdminClient()` uses — precisely so a build-time-inlined `NEXT_PUBLIC_*` literal cannot make the gate disagree with the database the route actually connects to. The route's separate `NODE_ENV === "development"` path now requires the same loopback hostname by default, with `DEV_LOGIN_ALLOW_REMOTE_DB=1` as an explicit per-developer opt-in for a hosted project (#679); that variable must never be set in a workflow — a contract test asserts it appears in none. Full reasoning, including what is *not* guaranteed, is in the route's docstring (`src/app/api/auth/dev-login/route.ts`). |
-| `db-lint.yml` | PR touching `supabase/migrations/**` or `supabase/config.toml` | Replays the full migration chain from scratch (`ON_ERROR_STOP`) and runs the RLS integration tests against it. |
+| `db-lint.yml` | **Every PR** (the schema path filter moved inside the workflow — see [Required status checks](#required-status-checks)) | A `changes` job diffs the PR against `env.SCHEMA_PATHS`; when it matches, `supabase-reset` + `db-lint` replay the full migration chain from scratch (`ON_ERROR_STOP`) and run the RLS integration tests against it. `db-lint-gate` always runs, carries the required context name `Database Lint and Integration Tests`, and reflects those jobs' results. |
 | `shell-lint.yml` | PR touching `scripts/**` | `bash -n` + shellcheck over every shebang-bearing file under `scripts/` (selection is by shebang, not extension, so extensionless scripts like `scripts/agent-worktree` are covered). No database, no build. |
 | `live-drift.yml` | Daily schedule + dispatch | Watchdog comparing the live database catalog to `supabase/live-catalog.snapshot.txt` — catches out-of-band drift no PR would surface. Missing/changed objects FAIL; additions WARN. Also diffs the migration chain (`supabase/migrations/*.sql` version prefixes) against `supabase_migrations.schema_migrations` on live (#693): a committed-but-unapplied migration FAILs (the catalog diff alone is blind to it — snapshot and live are both post-apply artifacts); versions applied on live but absent from the chain WARN. Comparison core: `scripts/compare-migration-versions.sh` (unit-tested DB-free via `make check-agent-config`). Two tracking issues, deliberately distinct: `live-drift` (real drift) and `watchdog-down` (the check never reached the database — missing secret, billing block, connection error). While `watchdog-down` is open there is **no** drift detection at all. |
 | `nightly-watch.yml` | `workflow_run` completion of scheduled Test runs, or dispatch with a simulated `conclusion` | Opens/updates ONE `nightly-red` tracking issue when the nightly fails; closes it on the next green run. Dispatch exists so the watchdog can be exercised without waiting for a red nightly. |
@@ -495,19 +495,9 @@ longer queues behind `static -> unit-tests` it
 *sets* the PR's critical path rather than extending it: PR latency went **down**
 by ~2m40s even though a five-minute browser suite was added to every PR.
 
-**Still outstanding — the "required" half, so #437's criterion 1 is only half
-met.** The `main` ruleset declares no `required_status_checks` rule at all
-today (`gh api repos/energee/mgr/rulesets/11725742` returns `deletion`,
-`non_fast_forward`, `pull_request`, `required_linear_history` and nothing
-else), and `main` has no legacy branch protection either
-(`gh api repos/energee/mgr/branches/main/protection` -> 404 "Branch not
-protected"). So nothing is literally blocking: not `E2E Tests`, not
-`Static Checks`, not `Unit Tests`. They run and **report** on every PR, and a
-failure is a visible red X, but a merge is not prevented. Read every "gate" in
-this section as *reporting*, not *blocking*. Making those three contexts
-required is a repository-settings change (ruleset `main`, id `11725742`), not
-a workflow change, and it is a deliberate owner call — `Production Build` must
-**not** be added, since it does not run on PRs.
+**The "required" half is #713, and it is a repository-settings change** — see
+[Required status checks](#required-status-checks) below for the final list and
+the shim that makes `Database Lint and Integration Tests` eligible.
 
 **Side effect of the missing rule: `progress.yml`'s auto-merge intermittently
 fails outright (found 2026-08-02).** `progress.yml`'s `gh pr merge --auto`
@@ -526,6 +516,107 @@ lands, not a new bug to chase. **Watch for:** this note going stale once #713
 adds the required-checks rule — the failure should stop recurring, and if a
 future harvest still finds it after that rule lands, the fix didn't address
 this side effect and needs its own look.
+
+## Required status checks
+
+Four contexts, and only four, are required on `main` (ruleset `11725742`,
+rule type `required_status_checks`). The strings are the **job `name:` values**
+— GitHub matches required contexts by exact job name, not by workflow name:
+
+| Context | Workflow / job | Why it can be required |
+|---|---|---|
+| `Static Checks` | `test.yml` / `static` | Runs on every PR; no `if:`, no path filter. |
+| `Unit Tests` | `test.yml` / `unit-tests` | Same. |
+| `E2E Tests` | `test.yml` / `e2e` | Same. Verified 2026-08-12: the job carries **no** `if:` guard and no `needs:` edge, so it genuinely runs per-PR (it did not before #437 — see [Why E2E runs on pull requests](#why-e2e-runs-on-pull-requests)). |
+| `Database Lint and Integration Tests` | `db-lint.yml` / `db-lint-gate` | Made eligible by the shim below. |
+
+**Deliberately advisory — never require these:**
+
+- `Production Build` (`test.yml` / `build`) carries
+  `if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'`
+  because it compiles against hosted Supabase credentials a fork PR cannot
+  read. It does not run on pull requests, so requiring it would leave **every**
+  PR permanently pending. This one is load-bearing: it is the single most
+  likely mistake when editing the ruleset.
+- `Fresh Supabase Migration Replay` and `Database Lint Heavy Lane`
+  (`db-lint.yml`) are the path-gated heavy jobs. They are *supposed* to skip,
+  and their results reach the required check through `db-lint-gate` instead.
+- `Shell Syntax and ShellCheck` (`shell-lint.yml`) is still path-filtered at
+  `on:` (`scripts/**`) and therefore still ineligible. It was left that way on
+  purpose: it lints one directory, its findings are cheap to notice as a red X,
+  and giving it the same shim would add a second always-running job for a lane
+  that has never blocked anything. If it is ever to be required, it needs the
+  db-lint treatment first — requiring it as-is would hang every PR that does
+  not touch `scripts/`.
+- Everything cron-driven (`live-drift.yml`, `prod-health.yml`,
+  `nightly-watch.yml`, the agentic loops) reports nothing on a PR at all.
+
+### The always-reporting shim (#713)
+
+**The problem.** A required context must report a conclusion on *every* PR. A
+`paths:` filter on `on:` does not produce a skipped check — GitHub never
+queues the workflow at all, so the context is simply **absent**, and the PR
+sits pending forever with no way to clear it. That is why the "just require
+it" version of #713 would have made every docs-only PR unmergeable.
+
+**The mechanism.** `db-lint.yml` now triggers on every `pull_request` and does
+the filtering one level down, in four jobs:
+
+1. `changes` — always runs. Computes the merge base and runs
+   `git diff --name-only <base> <head> -- $SCHEMA_PATHS` (the former `on:
+   paths:` list, **translated** to git pathspecs). Outputs `schema=true|false`.
+   It **fails open**: a non-`pull_request` event, or a merge base it cannot
+   compute, sets `schema=true`. An unknown diff runs the full checks; it never
+   resolves to a skip.
+2. `supabase-reset` and `db-lint` — the heavy jobs, gated on
+   `if: needs.changes.outputs.schema == 'true'`. They skip on unrelated PRs.
+3. `db-lint-gate` — `name: Database Lint and Integration Tests`, the required
+   context. `needs: [changes, supabase-reset, db-lint]` with `if: always()`,
+   so it reports even when its dependencies skipped (without `always()`, a
+   skipped dependency skips the dependent, which is the stuck-pending failure
+   again).
+
+**Why it cannot report a failure as green.** The gate does not consume
+`success()`; it reads each dependency's `result` and exits 1 on anything
+unexpected:
+
+- `changes` not `success` → exit 1 (nothing can vouch for the diff).
+- `schema == 'true'` and either heavy job is not `success` → exit 1. That
+  covers `failure`, `cancelled` **and** `skipped` — a skip in this branch means
+  the job that should have run did not.
+- `schema != 'true'` and either heavy job is not `skipped` → exit 1. A heavy
+  job that ran anyway and failed cannot be laundered into a pass by the filter.
+
+The only two passing shapes are "heavy lane ran and succeeded" and "heavy lane
+was correctly skipped". `.github/scripts/ci-workflows.test.ts` pins all of it —
+the absent `paths:` filter, the uniqueness of the required job name, the
+`always()`, the `needs:` set, the fail-open detection, and each `!=` comparison
+individually (pinning the `::error::` message alone would be satisfied by a
+gate that always exits 0).
+
+**The trap this shim sets, and how it is defused.** `on: paths:` globs and git
+pathspecs are *different dialects*, so the list cannot be copied across —
+it has to be translated. In a git pathspec `*` matches `/`, but `**/` still
+requires at least one directory. So the original `supabase/migrations/**/*.sql`
+matched `supabase/migrations/sub/deep.sql` and **not**
+`supabase/migrations/00250_x.sql` — and every migration in this repo is
+top-level, so the pattern matched nothing real. Left in, it would have skipped
+the heavy lane on every migration PR and reported the required check green:
+the precise failure this gate exists to prevent, introduced by the gate.
+Caught by executing the patterns, not by reading them. `supabase/migrations/*.sql`
+is the correct form.
+
+The lesson generalises: `ci-workflows.test.ts` no longer pins the *spelling* of
+these patterns. It runs `git ls-files -- $SCHEMA_PATHS` against the real tree
+and asserts that **every** file in `supabase/migrations/` is selected, that the
+other single-gate lanes are selected, and that ordinary files
+(`package.json`, `AGENTS.md`) are not. A string assertion is structurally
+incapable of catching a pattern that is spelled exactly as intended and matches
+nothing.
+
+**Cost.** Two extra ~20-second runner jobs on every PR (`changes` needs a full
+clone for the diff; the gate needs no checkout at all). Actions minutes are
+free on this public repo.
 
 ## Rules when changing workflows
 
@@ -568,11 +659,14 @@ this side effect and needs its own look.
    that passes when it is unconfigured is worse than no check — fail loudly
    with an `::error::` instead.
 
-   This applies to the always-report set only: `test.yml`'s `static`,
-   `unit-tests` and `e2e`. `db-lint.yml` (`supabase/migrations/**`) and
-   `shell-lint.yml` (`scripts/**`) are **deliberately** path-filtered, and both
-   filters are pinned in `.github/scripts/ci-workflows.test.ts` (removing
-   either `paths:` list reds the suite) — they are opt-in lanes for the diffs
-   that need them, they report nothing on unrelated PRs, and for that reason
-   they must never be made required. Adding a job to the always-report set means giving
-   it a trigger that fires on every PR, not adding a path filter and hoping.
+   This applies to the always-report set: `test.yml`'s `static`, `unit-tests`
+   and `e2e`, plus `db-lint.yml`'s `db-lint-gate`. The heavy db-lint jobs are
+   the sanctioned exception — they *are* filtered, but a filtered job may only
+   be skipped behind a gate job that translates the skip into a conclusion (see
+   [the shim](#the-always-reporting-shim-713)); a filtered job whose own
+   context is required is the bug. `shell-lint.yml` (`scripts/**`) is still
+   path-filtered at `on:` and is **deliberately not required** for that reason.
+   Both path lists are pinned in `.github/scripts/ci-workflows.test.ts`
+   (dropping either reds the suite). Adding a job to the always-report set
+   means giving it a trigger that fires on every PR, not adding a path filter
+   and hoping.

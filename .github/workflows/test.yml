@@ -219,6 +219,14 @@ jobs:
   #     with the edge, run 30559728366 started e2e 2m54s late (16:04:07Z ->
   #     16:07:01Z) for a 7m55s PR; without it, run 30569164797 started e2e and
   #     static in the same second (18:09:29Z) and the whole PR took 5m14s.
+  #
+  # Those three rules bind any job whose OWN context is required, which is the
+  # case for all three jobs here. db-lint.yml (#713) is the one sanctioned
+  # variation and not a counter-example: its heavy jobs do carry a filter, a
+  # `needs:` edge and a deliberate skip, but their context is NOT the required
+  # one — a separate always-running gate job holds that name and converts their
+  # skip into an explicit conclusion. The invariant is unchanged; only the job
+  # that carries the required name may never skip.
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest

@@ -173,3 +173,77 @@ command with the sandbox disabled rather than debugging the script.
 allow-list argument list exceeds `ARG_MAX` and every sandboxed command fails
 with E2BIG. Prune with `make worktree-doctor` / `scripts/agent-worktree`;
 bypass per-command in the meantime.
+
+**The pre-PR review gate cannot be satisfied in the same command it guards
+(#786).** The gate is a `PreToolUse` hook on `Bash` in `.claude/settings.json`.
+`PreToolUse` sees the *whole* command string before any of it runs, and the
+matcher is `grep -qE '(^|[;&|] *)gh +pr +create'` — the `&` of `&&` matches
+`[;&|]`. So the form AGENTS.md's "Landing the Plane" step 2 reads like:
+
+```bash
+touch $(git rev-parse --git-dir)/pr-review-ok && gh pr create ...   # ALWAYS DENIED
+```
+
+…always fails: at hook time the marker does not exist yet. Issue **two
+separate tool calls** — `touch` first, then `gh pr create` on its own. There
+is no chaining operator that evades this, and none should be looked for.
+
+**The marker is per-worktree, and that is correct.** The hook runs
+`git rev-parse --git-dir` in its own cwd, so from
+`.agents/worktrees/mgr/<name>` it resolves to
+`<main>/.git/worktrees/<name>/pr-review-ok`, not `<main>/.git/pr-review-ok`.
+Verified 2026-08-12 from a live worktree: touching the *main* checkout's
+`.git/pr-review-ok` does **not** unlock the gate there. Issue #786's original
+text claims the opposite; it is wrong. Do not "fix" this to point at the main
+checkout — the marker is consumed per PR by a paired `PostToolUse` hook, so a
+shared one would let one worktree spend another's.
+
+**The matcher has no shell-quoting awareness, and it is not limited to `gh`.**
+`grep` is line-oriented and `^` anchors at every line start, so the phrase
+appearing inside a quoted string, a heredoc body, or a PR body draft trips the
+gate even though nothing would execute. Observed 2026-08-12: a **`git commit
+-F -`** whose heredoc message *described* this very footgun was denied, because
+the message body contained the phrase on its own line. The hook matches on the
+`Bash` tool, not on the program being run — any command whose text contains the
+phrase is denied, `git commit` included. Pass PR bodies with `--body-file`,
+never inline, and keep the phrase out of commit messages (describe it, e.g.
+"the PR-create gate", rather than quoting it). Conversely it
+under-matches — `$(gh pr create ...)`, `xargs gh pr create`, `gh --repo x pr
+create` all slip past — so treat it as a reminder, not an enforcement boundary.
+A quoting-aware version would have to strip quoted spans and heredoc bodies
+before matching, e.g.
+
+```sh
+jq -r '.tool_input.command // ""' \
+  | perl -0777 -pe "s/<<-?['\"]?(\w+)['\"]?.*?^\1\$//gms; s/'[^']*'//g; s/\"(\\\\.|[^\"\\\\])*\"//g" \
+  | grep -qE '(^|[;&|] *)gh +pr +create'
+```
+
+…but `.claude/settings.json` is harness configuration: agents must not edit
+their own hooks or permissions, and the sandbox denies writes there. Applying
+that change is an owner action.
+
+**`/code-review` and `/simplify` have no repo-side definition, so nothing in
+this repo can scope them to your worktree (#785).** Verified 2026-08-12: they
+exist in neither `.claude/skills/`, `.agents/skills/`, `~/.claude/skills/`,
+nor any plugin cache — they are built-in CLI skills, and they resolve their
+diff against the **session's** cwd/checkout. A subagent working in
+`.agents/worktrees/mgr/<name>` still has the session rooted at the main
+checkout, which is how `--fix` silently edited the wrong tree three times in
+the 2.0 streamlining waves. There is no configuration fix. Mitigations, in
+order of preference:
+
+1. Run them from a session whose cwd *is* the worktree (`EnterWorktree`), not
+   from a subagent whose cwd was only ever set per-Bash-call.
+2. Never pass `--fix` from a subagent. Review the findings and apply the edits
+   yourself with absolute paths into your worktree.
+3. Before committing, run `git status` in the **main** checkout as well — a
+   stray modification there is the signature of this bug.
+
+**`[skip ci]` in a commit message strands a required check pending.** GitHub
+suppresses the whole workflow run, so `Static Checks`, `Unit Tests`,
+`E2E Tests` and `Database Lint and Integration Tests` never report — and a
+required context that never reports cannot be cleared. No workflow-side design
+can close this (the shim in `db-lint.yml` covers path filtering, not run
+suppression). Never put `[skip ci]` in a commit that will become a PR;
+`progress.yml` already avoids it deliberately for this reason.

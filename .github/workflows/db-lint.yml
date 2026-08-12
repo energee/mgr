@@ -5,17 +5,25 @@ name: Database Security Lint
 # from the trigger paths — dependency bumps were replaying the full migration
 # chain for no schema signal. The daily live-drift watchdog covers
 # out-of-band schema changes.
+#
+# #713: `Database Lint and Integration Tests` is a REQUIRED status check on
+# `main`, so it has to report a conclusion on EVERY pull request — and a
+# `paths:` filter on `on:` cannot, because GitHub never queues the workflow for
+# a filtered-out PR and the context then stays pending forever. The filter
+# therefore moved one level down, into the `changes` job, and `db-lint-gate`
+# carries the required name and reflects the heavy jobs' results.
+#
+# Full rationale, including why the gate treats an unexpected `skipped` as a
+# failure: docs/agents/ci.md, "The always-reporting shim".
+#
+# Why keep filtering at all, now that Actions minutes are free on this public
+# repo: the heavy lane is Docker-backed and the slowest thing here, and it is
+# the job most likely to grow. Keeping it off unrelated PRs keeps db-lint off
+# the PR critical path as the migration chain lengthens. If it ever stops
+# being worth the two extra runner jobs, delete the filter — the gate job can
+# stay exactly as it is.
 on:
   pull_request:
-    paths:
-      - "supabase/migrations/**/*.sql"
-      - "supabase/config.toml"
-      - "supabase/functions/**"
-      - "src/__tests__/integration/**"
-      - "scripts/migration-dry-run.sh"
-      - "scripts/live-catalog.sql"
-      - "vitest.integration.config.ts"
-      - ".github/workflows/db-lint.yml"
   workflow_dispatch:
 
 concurrency:
@@ -25,9 +33,99 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The former `on: pull_request: paths:` list, TRANSLATED to git pathspecs —
+  # not copied. The two glob dialects differ in a way that silently breaks the
+  # gate: in a git pathspec `*` matches `/`, but `**/` still requires at least
+  # one directory, so the original `supabase/migrations/**/*.sql` matched
+  # `supabase/migrations/sub/deep.sql` and NOT `supabase/migrations/00250_x.sql`
+  # — i.e. it matched no migration this repo actually has, and every migration
+  # PR would have skipped the heavy lane and reported the required check green.
+  # `supabase/migrations/*.sql` matches both. `ci-workflows.test.ts` now runs
+  # these patterns through `git ls-files` against the real tree rather than
+  # pinning their spelling, because a string pin cannot catch this.
+  SCHEMA_PATHS: |
+    supabase/migrations/*.sql
+    supabase/config.toml
+    supabase/functions/**
+    src/__tests__/integration/**
+    scripts/migration-dry-run.sh
+    scripts/live-catalog.sql
+    vitest.integration.config.ts
+    .github/workflows/db-lint.yml
+
 jobs:
+  changes:
+    name: Detect Schema-Relevant Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      schema: ${{ steps.filter.outputs.schema }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # Read-only job; don't leave GITHUB_TOKEN in .git/config.
+          persist-credentials: false
+          # Needed to reach the PR's base commit for the diff.
+          fetch-depth: 0
+
+      - name: Decide whether the heavy database lane must run
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # Fail OPEN into the heavy lane, never into a skip: anything this
+          # step cannot determine must run the full checks, because the gate
+          # job turns a skip into a passing required check.
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "Not a pull_request event — running the full lane."
+            echo "schema=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! merge_base=$(git merge-base "$BASE_SHA" "$HEAD_SHA"); then
+            echo "::warning::Could not compute a merge base for $BASE_SHA..$HEAD_SHA — running the full lane."
+            echo "schema=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A plain read loop, not `mapfile`: that is bash 4+, so it cannot be
+          # exercised on a macOS bash 3.2 before it reaches a runner.
+          patterns=()
+          while IFS= read -r pattern; do
+            [ -n "${pattern// /}" ] || continue
+            # A `#` line would otherwise become a pathspec that matches
+            # nothing — silently narrowing the filter.
+            case "$pattern" in \#*) continue ;; esac
+            patterns+=("$pattern")
+          done <<< "$SCHEMA_PATHS"
+
+          if [ "${#patterns[@]}" -eq 0 ]; then
+            echo "::error::SCHEMA_PATHS is empty — the filter is broken, not the diff."
+            exit 1
+          fi
+
+          echo "Diffing $merge_base..$HEAD_SHA against ${#patterns[@]} pattern(s)."
+          matched=$(git diff --name-only "$merge_base" "$HEAD_SHA" -- "${patterns[@]}")
+
+          if [ -n "$matched" ]; then
+            printf 'Schema-relevant files changed:\n%s\n' "$matched"
+            echo "schema=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No schema-relevant files changed; the heavy lane will be skipped."
+            echo "schema=false" >> "$GITHUB_OUTPUT"
+          fi
+
   supabase-reset:
     name: Fresh Supabase Migration Replay
+    needs: changes
+    if: needs.changes.outputs.schema == 'true'
     runs-on: ubuntu-latest
     # Docker-backed; a wedged `supabase start` would otherwise hold a PR check
     # open for the 6-hour job default.
@@ -49,7 +147,12 @@ jobs:
         run: make db-dry-run
 
   db-lint:
-    name: Database Lint and Integration Tests
+    # Deliberately NOT named "Database Lint and Integration Tests": that string
+    # is the required context and belongs to the always-reporting gate below.
+    # This job is allowed to be skipped; the gate is not.
+    name: Database Lint Heavy Lane
+    needs: changes
+    if: needs.changes.outputs.schema == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -162,3 +265,63 @@ jobs:
           echo "::error::Database security lint failed. See the report above."
           echo "See docs/spec/architecture.md for security guidelines."
           exit 1
+
+  db-lint-gate:
+    # THE REQUIRED CONTEXT (#713). It runs on every pull request, has no
+    # services and no checkout, and does exactly one thing: turn the heavy
+    # lane's outcome into this check's conclusion.
+    name: Database Lint and Integration Tests
+    needs: [changes, supabase-reset, db-lint]
+    # `always()` is what makes the context report even when its dependencies
+    # skipped. Without it a skipped dependency would skip this job too, and a
+    # skipped required check never reports — the exact stuck-pending failure
+    # this shim exists to prevent.
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Reflect the heavy database lane's result
+        env:
+          SCHEMA_CHANGED: ${{ needs.changes.outputs.schema }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          REPLAY_RESULT: ${{ needs.supabase-reset.result }}
+          LINT_RESULT: ${{ needs.db-lint.result }}
+        run: |
+          set -euo pipefail
+          echo "changes=$CHANGES_RESULT (schema=$SCHEMA_CHANGED) replay=$REPLAY_RESULT lint=$LINT_RESULT"
+
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::Change detection reported \"$CHANGES_RESULT\"; nothing here can vouch for the diff."
+            exit 1
+          fi
+
+          if [ "$SCHEMA_CHANGED" = "true" ]; then
+            # Only `success` is acceptable. failure/cancelled/skipped all mean
+            # the schema checks did not pass, and must not report green.
+            if [ "$REPLAY_RESULT" != "success" ] || [ "$LINT_RESULT" != "success" ]; then
+              echo "::error::Schema-relevant paths changed but the heavy lane reported replay=$REPLAY_RESULT lint=$LINT_RESULT."
+              exit 1
+            fi
+            echo "Heavy database lane passed."
+            exit 0
+          fi
+
+          # The only other verdict the detection job may produce. Anything
+          # else (notably an empty output, if it ever succeeded without
+          # writing one) would otherwise fall into the skip branch below and
+          # exit 0 — the single input that could reach a green check without
+          # a decision behind it.
+          if [ "$SCHEMA_CHANGED" != "false" ]; then
+            echo "::error::Change detection produced no usable verdict (schema=\"$SCHEMA_CHANGED\")."
+            exit 1
+          fi
+
+          # No schema-relevant change. The heavy jobs must have SKIPPED; any
+          # other conclusion means they ran and something went wrong, and a
+          # failure must never be laundered into a pass by the filter.
+          if [ "$REPLAY_RESULT" != "skipped" ] || [ "$LINT_RESULT" != "skipped" ]; then
+            echo "::error::No schema-relevant change was detected, but the heavy lane reported replay=$REPLAY_RESULT lint=$LINT_RESULT instead of skipped."
+            exit 1
+          fi
+          echo "No schema-relevant paths changed — the heavy database lane was correctly skipped."
