@@ -1,0 +1,129 @@
+{
+  "_readme": [
+    "Hand-written gold sets, one per extractor, so an F1 drop points at which pass regressed.",
+    "Entities are matched on name+type. Relations on source+predicate+target.",
+    "Edit these freely - they are the specification the extractors are scored against."
+  ],
+  "cases": [
+    {
+      "file": "src/domain/yeast-lineage.ts",
+      "extractor": "ast",
+      "why": "One small module exercising four AST edge kinds: a resolved path-alias import, an exported function, a dynamicRpc-wrapped invoke, and a read-only supabase chain.",
+      "entities": [
+        {
+          "name": "src/domain/yeast-lineage.ts",
+          "type": "MODULE"
+        },
+        {
+          "name": "src/domain/yeast-lineage.ts#resolveYeastLineageRoot",
+          "type": "FUNCTION"
+        }
+      ],
+      "relations": [
+        {
+          "source": "src/domain/yeast-lineage.ts",
+          "predicate": "imports",
+          "target": "src/services/types.ts"
+        },
+        {
+          "source": "src/domain/yeast-lineage.ts",
+          "predicate": "defines",
+          "target": "src/domain/yeast-lineage.ts#resolveYeastLineageRoot"
+        },
+        {
+          "source": "src/domain/yeast-lineage.ts",
+          "predicate": "invokes",
+          "target": "get_yeast_lineage_root"
+        },
+        {
+          "source": "src/domain/yeast-lineage.ts",
+          "predicate": "reads_from",
+          "target": "yeast_pitches_with_remaining"
+        }
+      ],
+      "notes": [
+        "Scored by provenance: only facts whose file_path is this file.",
+        "The imports edge asserts module RESOLUTION: '@/services/types' must land on src/services/types.ts. The external '@supabase/supabase-js' import must produce nothing.",
+        "invokes comes from the dynamicRpc(client, \"get_yeast_lineage_root\", args) wrapper - argument index 1, not 0. A regression to plain .rpc() matching loses this edge.",
+        "reads_from, not writes_to: the fluent chain is .select().eq().single(), no write method. A chain-walk regression flips this.",
+        "Deliberately absent: a calls edge to src/services/types.ts#dynamicRpc. Direct calls to imported identifiers resolve to the local import specifier (alias not dereferenced), so the AST pass emits none; the invokes edge carries the semantic fact. If alias dereferencing is ever added, add the calls edge here in the same commit."
+      ]
+    },
+    {
+      "file": "supabase/migrations/00064_ai_api_key_settings.sql",
+      "extractor": "sql",
+      "why": "Three RLS policies with no user_has_permission() call, plus an ALTER TABLE that must NOT produce a creates edge.",
+      "entities": [
+        {
+          "name": "00064_ai_api_key_settings.sql",
+          "type": "MIGRATION"
+        }
+      ],
+      "relations": [
+        {
+          "source": "00064_ai_api_key_settings.sql",
+          "predicate": "creates",
+          "target": "system_settings.system_settings_select"
+        },
+        {
+          "source": "00064_ai_api_key_settings.sql",
+          "predicate": "creates",
+          "target": "system_settings.system_settings_update"
+        },
+        {
+          "source": "00064_ai_api_key_settings.sql",
+          "predicate": "creates",
+          "target": "system_settings.system_settings_insert"
+        }
+      ],
+      "notes": [
+        "Scored by provenance: this lists only what the SQL pass attributes to THIS file.",
+        "The three RLS_POLICY nodes and their `protects` edges are attributed to supabase/live-catalog.snapshot.txt, which is authoritative for policy->table. They are real, just not this file's contribution.",
+        "No PERMISSION entity: these policies gate on auth.uid() and a key NOT LIKE filter, not user_has_permission().",
+        "No creates edge to system_settings or user_preferences - the migration only INSERTs into and ALTERs them. That absence is the assertion this case exists to make."
+      ]
+    },
+    {
+      "file": "src/app/api/square/webhook/route.ts",
+      "extractor": "llm",
+      "why": "The webhook case. Under the tightened LLM schema this file yields exactly one boundary fact; everything else in it belongs to the AST pass.",
+      "entities": [
+        {
+          "name": "POST /api/square/webhook",
+          "type": "WEBHOOK"
+        },
+        {
+          "name": "Square",
+          "type": "EXTERNAL_SYSTEM"
+        }
+      ],
+      "relations": [
+        {
+          "source": "POST /api/square/webhook",
+          "predicate": "triggered_by",
+          "target": "Square"
+        }
+      ],
+      "notes": [
+        "Deliberately excluded: verifyWebhookSignature, checkReplayWindow, the ingest RPCs, square_sync_log.",
+        "Those are FUNCTION/DB_FUNCTION/TABLE facts the AST and SQL passes already own exactly."
+      ]
+    },
+    {
+      "file": "docs/agents/db-security.md",
+      "extractor": "llm",
+      "why": "A rules document. It describes conventions rather than naming a specific system entity, so the correct answer is nearly empty - which is the point.",
+      "entities": [
+        {
+          "name": "docs/agents/db-security.md",
+          "type": "DOC"
+        }
+      ],
+      "relations": [],
+      "notes": [
+        "This case exists to catch over-extraction. A pass that invents entities here is hallucinating structure from prose.",
+        "docs/spec/architecture.md is referenced by this file, but a doc-to-doc citation is not a documented_in edge - open question, see the report."
+      ]
+    }
+  ]
+}

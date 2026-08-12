@@ -262,6 +262,7 @@ If the user says **"I want to implement a new feature: …"**, follow the two-ph
 
 1. **File issues for remaining work** — anything that needs follow-up.
 2. **Run quality gates** (if code changed) — `make check`, or `make check-all` if cross-component.
+   - Before opening a PR, also run `/simplify` first, then `/code-review` (review last, so it sees the post-simplification diff), and apply/triage the findings. A PreToolUse hook blocks `gh pr create` until you confirm this with `touch $(git rev-parse --git-dir)/pr-review-ok` (one-shot, consumed per PR).
 3. **Push to remote** — MANDATORY:
    ```bash
    git pull --rebase

@@ -12,6 +12,11 @@
  * 3. **RPC tools** — Wrappers around Supabase RPC calls to PostgreSQL functions.
  * 4. **Navigation tools** — Return NavigationIntent objects that the client
  *    renders as action cards for the user to review and submit.
+ * 5. **Confirm-gated write tools** — Return ConfirmWriteIntent objects
+ *    (`action: "confirm_write"`). Nothing is written here: the client renders
+ *    a Confirm/Cancel card and, on confirm, POSTs the payload to
+ *    `/api/chat/write`, which re-validates and executes under the caller's
+ *    session client (RLS-enforced). See `src/lib/schemas/chat-write.ts`.
  */
 
 import { tool } from "ai";
@@ -22,6 +27,16 @@ import type { Database } from "@/types/supabase";
 import { formatStateLabel } from "@/types/entity";
 import { getHelpContentForSystemPrompt } from "@/lib/help-content";
 import { batchTransitions } from "@/lib/schemas/batch";
+import {
+  READING_TYPES,
+  validateReading,
+  formatReadingValue,
+  type ReadingType,
+} from "@/domain/batch-readings";
+import {
+  READING_ELIGIBLE_STATES,
+  type ConfirmWriteIntent,
+} from "@/lib/schemas/chat-write";
 import { entityService } from "@/services/entity-service";
 import { inventoryService } from "@/services/inventory-service";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
@@ -1196,6 +1211,101 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           url: "/production/packaging/new",
           prefillData,
           description: `Create a packaging session for ${sessionDate}`,
+        };
+      },
+    }),
+
+    // =========================================================================
+    // Confirm-Gated Write Tools (return ConfirmWriteIntent; the client
+    // confirms, then POSTs to /api/chat/write — no write happens here)
+    // =========================================================================
+
+    recordBatchReading: tool({
+      description:
+        "Record a fermentation reading (gravity, temperature, pH, pressure, dissolved oxygen, diacetyl, clarity) directly on a batch. Use when the user states the measured value in chat. Returns a pending write the user must confirm before it is saved. To open the readings form instead, use addBatchReading.",
+      inputSchema: z.object({
+        batchId: z.string().uuid().optional().describe("The batch UUID"),
+        batchNumber: z
+          .string()
+          .optional()
+          .describe("The batch number to search for"),
+        readingType: z.enum([
+          "gravity",
+          "temperature",
+          "ph",
+          "pressure",
+          "dissolved_oxygen",
+          "diacetyl",
+          "clarity",
+        ]),
+        value: z
+          .union([z.number(), z.string()])
+          .describe(
+            "The measured value. Numeric for most types; for diacetyl one of: absent, trace, present"
+          ),
+        unit: z
+          .string()
+          .optional()
+          .describe(
+            "Unit the value was measured in (gravity: sg|plato, temperature: f|c, clarity: scale|ntu). Defaults to the reading type's default unit."
+          ),
+        notes: z.string().optional().describe("Optional reading notes"),
+      }),
+      execute: async ({
+        batchId,
+        batchNumber,
+        readingType,
+        value,
+        unit,
+        notes,
+      }): Promise<ConfirmWriteIntent> => {
+        const batch = await resolveBatch(supabase, batchId, batchNumber);
+
+        if (
+          !READING_ELIGIBLE_STATES.includes(
+            batch.status as (typeof READING_ELIGIBLE_STATES)[number]
+          )
+        ) {
+          throw new Error(
+            `Batch #${batch.batch_code} is "${batch.status}" — readings can only be added to batches that are ${READING_ELIGIBLE_STATES.join(", ")}.`
+          );
+        }
+
+        const type = readingType as ReadingType;
+        const config = READING_TYPES[type];
+        const resolvedUnit = unit ?? config.defaultUnit;
+        if (!config.units.includes(resolvedUnit)) {
+          throw new Error(
+            `Invalid unit "${resolvedUnit}" for ${config.label}. Valid units: ${config.units.join(", ")}`
+          );
+        }
+
+        const validation = validateReading(type, value);
+        if (!validation.valid) {
+          throw new Error(
+            `Invalid ${config.label} value: ${validation.warning ?? String(value)}`
+          );
+        }
+
+        const formatted = formatReadingValue(type, value, resolvedUnit);
+        const warningNote = validation.warning
+          ? ` (note: ${validation.warning})`
+          : "";
+
+        return {
+          action: "confirm_write" as const,
+          writeAction: "add_batch_reading" as const,
+          params: {
+            batchId: batch.id,
+            reading: {
+              reading_type: type,
+              value,
+              unit: resolvedUnit,
+              timestamp: new Date().toISOString(),
+              ...(notes ? { notes } : {}),
+            },
+          },
+          description: `Record ${config.label} reading of ${formatted} for batch #${batch.batch_code}${warningNote}`,
         };
       },
     }),
