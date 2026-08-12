@@ -11,9 +11,10 @@
  *   number (orders.order_number is UNIQUE), customer + notes carried over;
  *   delivery dates and fulfillment fields deliberately do NOT carry over
  * - line items: brand/format/keg owner/style/quantity copied, unit prices
- *   re-resolved through the get_price_for_customer RPC so the copy reflects
- *   current tier pricing (falls back to the source price when no tier price
- *   resolves); allocation fields (batch_id, package_id) never carry over
+ *   re-resolved through the shared pricing service
+ *   (@/services/pricing-service) so the copy reflects current tier pricing
+ *   (falls back to the source price when no tier price resolves); allocation
+ *   fields (batch_id, package_id) never carry over
  *
  * Surfaced as the "Duplicate Order" action on order detail / list rows
  * (src/entities/order.tsx) and the "Reorder last" button on the customer
@@ -29,7 +30,7 @@ import { createClient } from "@/lib/supabase/client";
 import { orderKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
 import { localDateString } from "@/lib/format";
-import { log } from "@/lib/client-logger";
+import { getPriceForCustomer } from "@/services/pricing-service";
 
 type Client = SupabaseClient<Database>;
 
@@ -89,30 +90,25 @@ export function nextDuplicateOrderNumber(
 
 
 /**
- * Re-resolve a copied line item's unit price at current tier pricing via the
- * get_price_for_customer RPC (same lookup the order items editor uses).
- * Falls back to the source item's price when the order has no customer, the
- * item has no selling format, or no tier price resolves.
+ * Re-resolve a copied line item's unit price at current tier pricing through
+ * the shared pricing service (the same lookup the order items editor uses).
+ * Falls back to the source item's price whenever no price resolves — the order
+ * has no customer, the item has no selling format, the customer has no tier
+ * price for that format, or the lookup errored (a pricing outage must not
+ * block the reorder; the service logs it and reports null).
  */
 async function resolveUnitPrice(
   supabase: Client,
   customerId: string | null,
   item: SourceItem
 ): Promise<number | null> {
-  if (!customerId || !item.selling_format_id) return item.unit_price;
-  const { data, error } = await supabase.rpc("get_price_for_customer", {
-    p_customer_id: customerId,
-    p_format_id: item.selling_format_id,
-    p_brand_id: item.brand_id ?? undefined,
-    p_style_id: item.style_id ?? undefined,
+  const tierPrice = await getPriceForCustomer(supabase, {
+    customerId,
+    sellingFormatId: item.selling_format_id,
+    brandId: item.brand_id,
+    styleId: item.style_id,
   });
-  if (error) {
-    // Pricing lookup failure shouldn't block the reorder — keep the old price.
-    log.error("Reorder price lookup failed:", error);
-    return item.unit_price;
-  }
-  if (!data || data.length === 0) return item.unit_price;
-  return data[0].price;
+  return tierPrice?.price ?? item.unit_price;
 }
 
 /**

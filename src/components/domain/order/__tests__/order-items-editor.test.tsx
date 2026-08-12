@@ -17,9 +17,15 @@
  *   - Rows are asserted through the readOnly branch, which renders plain
  *     text/spans and avoids the Combobox/Input editing chrome (orthogonal to
  *     the loading/empty/rows layout logic under test).
+ *
+ * The "Apply tier price" block additionally pins the customer-tier pricing
+ * lookup that reaches the get_price_for_customer RPC — written against the
+ * pre-extraction inline implementation so the move to
+ * @/services/pricing-service is provably behavior-preserving.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { act } from "react";
 import { setupRenderHarness } from "@/test/react-harness";
 
 // Mutable fixture the react-query mock reads. Hoisted so the (hoisted)
@@ -40,9 +46,30 @@ const h = vi.hoisted(() => ({
     volume_bbl: number | null;
   }>,
   owners: [] as Array<{ id: string; name: string }>,
+  // Pricing-lookup recorder + programmable RPC response.
+  rpcCalls: [] as Array<{ fn: string; args: Record<string, unknown> }>,
+  rpcResult: { data: [] as unknown[] | null, error: null as unknown },
+  // Every useMutation().mutate(vars) in the component lands here; the vars
+  // shape identifies which mutation fired.
+  mutateCalls: [] as unknown[],
+  toasts: [] as Array<{ kind: "success" | "error"; message: string }>,
 }));
 
-vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      h.rpcCalls.push({ fn, args });
+      return Promise.resolve(h.rpcResult);
+    },
+  }),
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: (message: string) => h.toasts.push({ kind: "success", message }),
+    error: (message: string) => h.toasts.push({ kind: "error", message }),
+  },
+}));
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: { queryKey: unknown[] }) => {
@@ -55,7 +82,11 @@ vi.mock("@tanstack/react-query", () => ({
     // Order detail, brand availability, per-item availability: irrelevant here.
     return { data: undefined, isLoading: false, isPending: false };
   },
-  useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+  useMutation: () => ({
+    mutate: (vars: unknown) => h.mutateCalls.push(vars),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
@@ -100,6 +131,10 @@ beforeEach(() => {
   h.brands = [];
   h.formats = [];
   h.owners = [];
+  h.rpcCalls = [];
+  h.rpcResult = { data: [], error: null };
+  h.mutateCalls = [];
+  h.toasts = [];
 });
 
 describe("OrderItemsEditor", () => {
@@ -186,5 +221,106 @@ describe("OrderItemsEditor", () => {
     expect(displayedValues).toEqual(
       expect.arrayContaining(["Rubico II", "Per Keg", "Microstar"]),
     );
+  });
+});
+
+// ===========================================================================
+// Customer-tier pricing lookup
+// ===========================================================================
+
+describe("OrderItemsEditor — apply tier price", () => {
+  // A priced row: brand + format set so the "Apply tier price" button renders
+  // (it is gated on customer + brand + format all being present).
+  const pricedRow = () =>
+    makeRow({
+      id: "i1",
+      brand_id: "brand-1",
+      selling_format_id: "format-1",
+      quantity: 4,
+      unit_price: 8,
+    });
+
+  const clickApply = async (c: HTMLElement) => {
+    const button = c.querySelector<HTMLButtonElement>('[aria-label="Apply tier price"]');
+    expect(button).not.toBeNull();
+    await act(async () => {
+      button!.click();
+    });
+  };
+
+  const renderPriced = () => {
+    h.itemsState = { data: [pricedRow()], isLoading: false };
+    h.brands = [{ id: "brand-1", name: "Rubico II" }];
+    h.formats = [{
+      id: "format-1",
+      name: "Per Case",
+      container_type: "case",
+      container_name: "12oz Can",
+      unit_count: 24,
+      volume_oz: 12,
+      volume_bbl: null,
+    }];
+    return render(<OrderItemsEditor orderId="o1" customerId="cust-1" />);
+  };
+
+  it("looks up the tier price for the row's customer/brand/format and applies it", async () => {
+    h.rpcResult = {
+      data: [{ price: 12.5, tier_name: "Wholesale", is_brand_specific: false, is_style_specific: false }],
+      error: null,
+    };
+    const c = renderPriced();
+    await clickApply(c);
+
+    expect(h.rpcCalls).toHaveLength(1);
+    expect(h.rpcCalls[0].fn).toBe("get_price_for_customer");
+    const args = h.rpcCalls[0].args;
+    expect(args.p_customer_id).toBe("cust-1");
+    expect(args.p_format_id).toBe("format-1");
+    expect(args.p_brand_id).toBe("brand-1");
+    // No style on an order line. The RPC declares p_style_id DEFAULT NULL, so
+    // an explicit null and an omitted key are the same call — assert the
+    // meaning, not which of the two encodings the caller happens to use.
+    expect(args.p_style_id ?? null).toBeNull();
+
+    // The resolved price is written back to the row's unit_price…
+    expect(h.mutateCalls).toContainEqual({ id: "i1", field: "unit_price", value: 12.5 });
+    // …and the tier name is surfaced in the confirmation toast.
+    expect(h.toasts).toContainEqual({
+      kind: "success",
+      message: "Applied Wholesale price: $12.50",
+    });
+  });
+
+  it("reports no tier price when the lookup returns no rows (and writes nothing)", async () => {
+    h.rpcResult = { data: [], error: null };
+    const c = renderPriced();
+    await clickApply(c);
+
+    expect(h.rpcCalls).toHaveLength(1);
+    expect(h.mutateCalls).toHaveLength(0);
+    expect(h.toasts).toContainEqual({
+      kind: "error",
+      message: "No tier price found for this combination",
+    });
+  });
+
+  it("treats an RPC error as 'no tier price' rather than surfacing it (and writes nothing)", async () => {
+    h.rpcResult = { data: null, error: { message: "boom" } };
+    const c = renderPriced();
+    await clickApply(c);
+
+    expect(h.mutateCalls).toHaveLength(0);
+    expect(h.toasts).toContainEqual({
+      kind: "error",
+      message: "No tier price found for this combination",
+    });
+  });
+
+  it("does not offer the lookup when the order has no customer", () => {
+    h.itemsState = { data: [pricedRow()], isLoading: false };
+    h.brands = [{ id: "brand-1", name: "Rubico II" }];
+    const c = render(<OrderItemsEditor orderId="o1" />);
+    expect(c.querySelector('[aria-label="Apply tier price"]')).toBeNull();
+    expect(h.rpcCalls).toHaveLength(0);
   });
 });
