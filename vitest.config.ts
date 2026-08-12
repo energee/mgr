@@ -9,6 +9,20 @@ import path from "path";
 const TEST_TZ = "America/New_York";
 process.env.TZ = TEST_TZ;
 
+// #699: Sentry-harness repro tests are quarantined from CI on the unreviewed
+// fix PR itself. The harness's agent must name its reproducing test
+// `src/**/<name>.sentry.test.ts(x)` — the lander rejects any other test-file
+// path (`.github/scripts/sentry-harness/outbox.ts`, SENTRY_TEST_FILE_RE) — and
+// this exclude keeps those files from executing under test.yml before a human
+// has reviewed the PR. GITHUB_HEAD_REF is set only on pull_request-event runs,
+// so the tests still execute everywhere that matters: in the agent's own
+// schedule/dispatch job (where it proves red-then-green), in local runs, and
+// on every CI run after the PR is reviewed and merged. Pinned by a contract in
+// .github/scripts/ci-workflows.test.ts. Side effect, accepted: on a
+// sentry-fix PR the new fix code has no executing test, so coverage reads
+// slightly lower there.
+const isSentryFixPr = (process.env.GITHUB_HEAD_REF ?? "").startsWith("sentry-fix/");
+
 // Shared exclude list for both projects (see `projects` below).
 const sharedExclude = [
   // Spread the defaults: a bare `exclude` REPLACES them, un-ignoring
@@ -17,6 +31,7 @@ const sharedExclude = [
   // Integration tests require a live Postgres instance; they run under
   // bun run test:integration (vitest.integration.config.ts), not here.
   "src/__tests__/integration/**",
+  ...(isSentryFixPr ? ["**/*.sentry.test.{ts,tsx}"] : []),
 ];
 
 // Directories whose tests are pure logic (no DOM): they run in the `node`

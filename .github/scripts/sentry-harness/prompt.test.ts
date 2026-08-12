@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { auditFeatureDeployment } from "../../../scripts/check-feature-deployment";
-import { BODY_FILES, parsePlan } from "./outbox";
+import { BODY_FILES, parsePlan, SENTRY_TEST_FILE_RE } from "./outbox";
 import { buildFixPrompt } from "./prompt";
 import type { SentryIssue } from "./types";
 
@@ -249,6 +249,21 @@ describe("buildFixPrompt", () => {
 
     it("warns that a comment target must be an issue this harness filed", () => {
       expect(buildFixPrompt(issue)).toContain("labelled `sentry-fix`");
+    });
+
+    // #699: the lander rejects any test file outside the quarantine name, so
+    // step 5 has to dictate that name — a prompt that still says "write a
+    // Vitest test" with no shape sends every (A) fix into a rejection.
+    it("dictates the quarantined test filename the lander requires", () => {
+      const prompt = buildFixPrompt(issue);
+
+      expect(prompt).toContain("`<name>.sentry.test.ts`");
+      expect(prompt).toContain("src/lib/foo.sentry.test.ts");
+      expect(prompt).toContain("no edits to existing tests");
+      // The shape the prompt teaches is one the validator accepts…
+      expect("src/lib/foo.sentry.test.ts").toMatch(SENTRY_TEST_FILE_RE);
+      // …and the plain name it used to teach is not.
+      expect("src/lib/foo.test.ts").not.toMatch(SENTRY_TEST_FILE_RE);
     });
   });
 });

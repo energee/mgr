@@ -7,6 +7,7 @@ import {
   auditWorkflowEgress,
   readOnlyMintContradictions,
 } from "./workflow-egress";
+import { fixBranch, SENTRY_TEST_FILE_RE } from "./sentry-harness/outbox";
 
 function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
@@ -1199,6 +1200,54 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).not.toContain("pull-requests:");
     expect(workflow).not.toContain("actions/checkout");
     expect(workflow).toContain("timeout-minutes:");
+  });
+
+  // #699 (the #668 residual): prompt step 5 makes the Sentry agent add a
+  // Vitest test, and that file used to execute under test.yml on the
+  // unreviewed fix PR — agent-authored code reaching an executor one hop after
+  // the credential split. The fix is a quarantine, not a workflow step: the
+  // lander only accepts agent tests named `src/**/*.sentry.test.ts(x)`
+  // (outbox.ts, covered by outbox.test.ts), and vitest.config.ts excludes that
+  // pattern exactly when the CI run's head ref is a `sentry-fix/*` branch.
+  // This contract pins the config half so it cannot be dropped without the
+  // suite going red.
+  describe("sentry-fix PR test quarantine (#699)", () => {
+    // `uncommented()` strips YAML comments, not TS ones, so filter `//` lines
+    // here: a comment restating the guard must not satisfy the contract.
+    const config = read("vitest.config.ts")
+      .split("\n")
+      .filter((line) => !/^\s*\/\//.test(line))
+      .join("\n");
+
+    it("keys the exclusion off the branch prefix the lander actually pushes", () => {
+      // fixBranch() is what names the fix PR's head ref; if it ever changes,
+      // the config's prefix check must move with it.
+      expect(fixBranch("12345").startsWith("sentry-fix/")).toBe(true);
+      expect(config).toContain("GITHUB_HEAD_REF");
+      expect(config).toContain('startsWith("sentry-fix/")');
+    });
+
+    it("excludes the quarantine glob only on sentry-fix PR runs", () => {
+      // The glob must exist, and must be spread conditionally — an
+      // unconditional exclude would silence the repro tests everywhere,
+      // including after review and merge.
+      const conditional = config
+        .split("\n")
+        .find((line) => line.includes("**/*.sentry.test.{ts,tsx}"));
+      expect(conditional, "vitest.config.ts no longer excludes **/*.sentry.test.{ts,tsx}").toBeDefined();
+      expect(conditional).toMatch(/\?\s*\[/);
+      expect(conditional).toContain(": []");
+    });
+
+    it("quarantine-named files are ones the exclusion glob and the lander agree on", () => {
+      // The lander's shape (asserted against its exported regex) sits under
+      // src/, inside the vitest include roots, where the glob above reaches.
+      expect("src/lib/foo.sentry.test.ts").toMatch(SENTRY_TEST_FILE_RE);
+      expect("src/components/bar.sentry.test.tsx").toMatch(SENTRY_TEST_FILE_RE);
+      // Playwright's tree is not covered by a vitest exclude, so the lander
+      // must never quarantine-bless a path there.
+      expect("e2e/foo.sentry.test.ts").not.toMatch(SENTRY_TEST_FILE_RE);
+    });
   });
 
   // Routing freshness: docs/agents/ci.md's workflow table went stale in the

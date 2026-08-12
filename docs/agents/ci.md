@@ -243,10 +243,23 @@ comment rather than describing the job as "cannot write".
 
 The patch denylist is the same kind of claim and deserves the same honesty. It
 refuses the build and automation surface — the files that get *executed* rather
-than reviewed. It is **not** a general defense against a hostile patch: a test
-file the agent adds runs in CI on the resulting PR like any other file (prompt
-step 5 requires one), which is #699's residual, not something this list closes.
-Do not describe it as closing "the one path".
+than reviewed. It is **not** a general defense against a hostile patch, and the
+test file prompt step 5 requires used to be the disclosed gap: it ran in CI on
+the resulting PR like any other file (#699). That path is now closed by a
+quarantine, not by this list: the lander only accepts agent tests as NEW files
+named `src/**/<name>.sentry.test.ts(x)` (`outbox.ts`, `SENTRY_TEST_FILE_RE` —
+every other test path CI selects is rejected, including edits to existing
+tests, `e2e/`, and the integration suite `db-lint.yml` runs), and
+`vitest.config.ts` excludes `**/*.sentry.test.{ts,tsx}` exactly when
+`GITHUB_HEAD_REF` is a `sentry-fix/*` branch. The repro test therefore runs in
+the agent's own job (schedule/dispatch has no head ref), locally, and on every
+CI run after review and merge — but never in CI on the unreviewed fix PR. Both
+halves are pinned: the config guard by `ci-workflows.test.ts` ("sentry-fix PR
+test quarantine"), the lander rule by `outbox.test.ts`. What this does **not**
+close: the patch's *source* changes still execute on the fix PR under the
+pre-existing tests that import them — that is code a reviewer reads as the
+diff, not a file executing sight-unseen, and closing it entirely would take
+the sandboxed-CI option #699 priced and declined.
 
 Every other agent job still holds a push-capable token: `bug-patrol`,
 `feedback-distill` and `quality-regrade` legitimately push from inside the
