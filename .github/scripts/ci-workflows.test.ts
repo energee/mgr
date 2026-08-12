@@ -7,7 +7,7 @@ import {
   auditWorkflowEgress,
   readOnlyMintContradictions,
 } from "./workflow-egress";
-import { fixBranch, SENTRY_TEST_FILE_RE } from "./sentry-harness/outbox";
+import { EXECUTED_TEST_DIRS, fixBranch, SENTRY_TEST_FILE_RE } from "./sentry-harness/outbox";
 
 function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), "utf8");
@@ -68,10 +68,11 @@ function jobBlocks(workflow: string): Map<string, string> {
  * deletion of the code it describes. That is the same defect this file's E2E
  * contracts exist to catch, one level up.
  */
-function uncommented(block: string): string {
+function uncommented(block: string, marker: "#" | "//" = "#"): string {
+  const commentStart = marker === "#" ? /^\s*#/ : /^\s*\/\//;
   return block
     .split("\n")
-    .filter((line) => !/^\s*#/.test(line))
+    .filter((line) => !commentStart.test(line))
     .join("\n");
 }
 
@@ -1212,12 +1213,9 @@ describe("GitHub Actions performance contracts", () => {
   // This contract pins the config half so it cannot be dropped without the
   // suite going red.
   describe("sentry-fix PR test quarantine (#699)", () => {
-    // `uncommented()` strips YAML comments, not TS ones, so filter `//` lines
-    // here: a comment restating the guard must not satisfy the contract.
-    const config = read("vitest.config.ts")
-      .split("\n")
-      .filter((line) => !/^\s*\/\//.test(line))
-      .join("\n");
+    // A comment restating the guard must not satisfy the contract, so strip
+    // TS `//` comments before matching (uncommented() defaults to YAML `#`).
+    const config = uncommented(read("vitest.config.ts"), "//");
 
     it("keys the exclusion off the branch prefix the lander actually pushes", () => {
       // fixBranch() is what names the fix PR's head ref; if it ever changes,
@@ -1247,6 +1245,20 @@ describe("GitHub Actions performance contracts", () => {
       // Playwright's tree is not covered by a vitest exclude, so the lander
       // must never quarantine-bless a path there.
       expect("e2e/foo.sentry.test.ts").not.toMatch(SENTRY_TEST_FILE_RE);
+    });
+
+    // EXECUTED_TEST_DIRS is a hardcoded allowlist of "CI executes this as a
+    // test regardless of filename" directories. Nothing else ties it back to
+    // the configs it's describing, so a rename here would silently open a
+    // hole. Pin both halves directly against the config values.
+    it("stays in sync with the configs it describes", () => {
+      expect(EXECUTED_TEST_DIRS).toContain("e2e/");
+      expect(read("playwright.config.ts")).toContain('testDir: "./e2e"');
+
+      expect(EXECUTED_TEST_DIRS).toContain("src/__tests__/integration/");
+      expect(read("vitest.integration.config.ts")).toContain(
+        'include: ["src/__tests__/integration/**/*.test.ts"]',
+      );
     });
   });
 

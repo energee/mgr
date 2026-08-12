@@ -111,22 +111,23 @@ export const FORBIDDEN_PATCH_PREFIXES = [
  */
 export const SENTRY_TEST_FILE_RE = /^src\/.+\.sentry\.test\.tsx?$/;
 
-/** Paths CI executes as tests without the quarantine name being enough. */
-const EXECUTED_TEST_DIRS = ["e2e/", "src/__tests__/integration/"] as const;
+/**
+ * Paths CI executes as tests without the quarantine name being enough:
+ * Playwright's `testDir` (`playwright.config.ts`) and the integration suite's
+ * `include` root (`vitest.integration.config.ts`). Pinned against both by
+ * ci-workflows.test.ts so a config change can't silently drift this list.
+ */
+export const EXECUTED_TEST_DIRS = ["e2e/", "src/__tests__/integration/"] as const;
 
 /** Anything vitest or Playwright would select as a test file. */
 const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/;
 
-/** True when a patch path is a test file CI would execute on the fix PR. */
-function isExecutedTestPath(path: string): boolean {
-  return TEST_FILE_RE.test(path) || EXECUTED_TEST_DIRS.some((dir) => path.startsWith(dir));
-}
-
-/** True when the path carries the quarantine name in a quarantined location. */
-function isQuarantinedTestPath(path: string): boolean {
-  return (
-    SENTRY_TEST_FILE_RE.test(path) && !EXECUTED_TEST_DIRS.some((dir) => path.startsWith(dir))
-  );
+/** True when a patch path is a test file CI would execute unreviewed, and isn't quarantine-shaped. */
+function isUnquarantinedTestPath(path: string): boolean {
+  const inExecutedDir = EXECUTED_TEST_DIRS.some((dir) => path.startsWith(dir));
+  const isExecuted = TEST_FILE_RE.test(path) || inExecutedDir;
+  const isQuarantined = SENTRY_TEST_FILE_RE.test(path) && !inExecutedDir;
+  return isExecuted && !isQuarantined;
 }
 
 /** Refuse absurd patches outright rather than pushing them. */
@@ -349,9 +350,7 @@ export function validatePatch(plan: OutboxPlan, patch: string): string[] {
     );
   }
 
-  const unquarantined = paths.filter(
-    (path) => isExecutedTestPath(path) && !isQuarantinedTestPath(path),
-  );
+  const unquarantined = paths.filter(isUnquarantinedTestPath);
   if (unquarantined.length > 0) {
     fail(
       `patch touches test files CI would execute on the unreviewed fix PR (${unquarantined.join(", ")}); agent-authored tests must be NEW files named src/**/<name>.sentry.test.ts, and existing tests must be left alone (#699)`,

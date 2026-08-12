@@ -277,6 +277,9 @@ describe("validatePatch", () => {
     // does not help there, and spec helpers are imported by specs that run
     "e2e/foo.spec.ts",
     "e2e/bar.sentry.test.ts",
+    // the "setup" project matches *.setup.ts, not *.test.*/*.spec.* — only
+    // the directory check (not TEST_FILE_RE) catches this one
+    "e2e/auth.setup.ts",
     // db-lint.yml executes the integration suite when the patch also carries a
     // migration (which the prefix list allows)
     "src/__tests__/integration/foo.test.ts",
