@@ -1,55 +1,49 @@
 "use client";
 
 /**
- * RecipeAdditionsDisplay - Water chemistry and recipe additions display
+ * RecipeAdditionsDisplay - Water chemistry and recipe additions container
  *
- * Sections:
- * 1. Water Chemistry -- calculates salt additions from source/target water profiles,
- *    shows ion concentration comparison, and provides "Apply to Recipe" button
- * 2. Applied Water Treatment -- shows water_salt/acid recipe_additions already saved
- * 3. Other Additions -- non-water additions (clarifiers, nutrients, etc.)
+ * Owns data fetching (recipe additions, water profiles, additive catalog),
+ * the salt-calculation memos, and the "Apply to Recipe" mutation. Rendering
+ * is delegated to three feature components:
+ * 1. Water Chemistry -- water-chemistry-summary.tsx (ion comparison table +
+ *    calculated salt additions with "Apply to Recipe")
+ * 2. Applied Water Treatment -- additions-table.tsx over the saved
+ *    water_salt/acid recipe_additions
+ * 3. Other Additions -- other-additions-section.tsx (clarifiers, nutrients,
+ *    etc., grouped by timing)
+ *
+ * Salt math lives in src/domain/water-chemistry.ts; label/color lookups in
+ * addition-labels.ts.
  */
 
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { entityKeys, recipeKeys, catalogKeys } from "@/lib/query-keys";
-import { cn } from "@/lib/utils";
 import {
   calculateAdditions,
   calculateResultingProfile,
-  calculateSulfateChlorideRatio,
-  formatRatio,
-  getRatioDescription,
   mapSaltAdditionsToItems,
   toWaterProfile,
-  SALT_ADDITIVE_MAP,
-  WATER_IONS,
   type WaterProfile,
   type SaltAdditions,
 } from "@/domain/water-chemistry";
 import { useCatalog } from "@/hooks/use-catalog";
 import Link from "next/link";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
-import { convertVolume, formatVolume } from "@/domain/units";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FlaskConical, Pencil, Loader2, Check } from "lucide-react";
+import { FlaskConical, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { replaceRecipeAdditions } from "@/services/recipe-additions-service";
-
-/** Water chemistry additive types */
-const WATER_CHEMISTRY_TYPES = ["water_salt", "acid"];
+import {
+  WaterChemistrySummary,
+  CalculatedAdditionsSection,
+} from "./water-chemistry-summary";
+import { AdditionsTable } from "./additions-table";
+import { OtherAdditionsSection } from "./other-additions-section";
+import { WATER_CHEMISTRY_TYPES, type AdditionRow } from "./addition-labels";
 
 /** Shared Supabase select fragment for recipe_additions with nested additive */
 const ADDITIONS_SELECT = `
@@ -67,59 +61,6 @@ const ADDITIONS_SELECT = `
     description
   )
 ` as const;
-
-/** Domain constants: brewing process timing labels (not entity status -- no stateMachine applies). */
-const TIMING_LABELS: Record<string, string> = {
-  mash: "Mash",
-  sparge: "Sparge",
-  boil: "Boil",
-  whirlpool: "Whirlpool",
-  fermentation: "Fermentation",
-  packaging: "Packaging",
-};
-
-/** Domain constants: water chemistry target labels (not entity status). */
-const TARGET_LABELS: Record<string, string> = {
-  mash: "Mash Water",
-  sparge: "Sparge Water",
-  kettle: "Kettle",
-};
-
-/** Domain constants: additive type labels (not entity status -- no stateMachine applies). */
-const TYPE_LABELS: Record<string, string> = {
-  water_salt: "Water Salt",
-  acid: "Acid",
-  clarifier: "Clarifier",
-  nutrient: "Nutrient",
-  antifoam: "Antifoam",
-  other: "Other",
-};
-
-/** Domain constants: additive type badge colors (not entity status). */
-const TYPE_COLORS: Record<string, string> = {
-  water_salt: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  acid: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  clarifier: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  nutrient: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  antifoam: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  other: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
-};
-
-type AdditionRow = {
-  id: string;
-  additive_id: string;
-  amount: number;
-  unit: string;
-  timing: string;
-  target: string | null;
-  position: number | null;
-  additive: {
-    id: string;
-    name: string;
-    type: string;
-    description: string | null;
-  } | null;
-}
 
 type CatalogItem = {
   id: string;
@@ -343,7 +284,6 @@ export function RecipeAdditionsDisplay({
   }
 
   const hasWaterProfiles = !!sourceWaterProfile && !!targetWaterProfile;
-  const hasCalculatedAdditions = !!calculatedAdditions;
   const hasWaterAdditions = waterAdditions.length > 0;
   const hasOtherAdditions = otherAdditions.length > 0;
   const hasNothing = !hasWaterProfiles && !hasWaterAdditions && !hasOtherAdditions;
@@ -378,9 +318,9 @@ export function RecipeAdditionsDisplay({
   return (
     <div className="space-y-6">
       {/* Water Chemistry Section */}
-      {hasWaterProfiles && resultingProfile && targetProfile && (
+      {sourceProfile && targetProfile && resultingProfile && (
         <WaterChemistrySummary
-          source={sourceProfile!}
+          source={sourceProfile}
           target={targetProfile}
           targetName={targetWaterProfile?.name ?? undefined}
           resulting={resultingProfile}
@@ -388,9 +328,9 @@ export function RecipeAdditionsDisplay({
       )}
 
       {/* Calculated Salt Additions */}
-      {hasCalculatedAdditions && (
+      {calculatedAdditions && (
         <CalculatedAdditionsSection
-          additions={calculatedAdditions!}
+          additions={calculatedAdditions}
           onApply={() => applyMutation.mutate()}
           isApplying={applyMutation.isPending}
           applySuccess={applySuccess}
@@ -442,285 +382,5 @@ export function RecipeAdditionsDisplay({
         </Button>
       </div>
     </div>
-  );
-}
-
-/**
- * WaterChemistrySummary -- read-only table comparing source, target, and resulting
- * ion concentrations (ppm) plus the sulfate:chloride ratio.
- */
-export function WaterChemistrySummary({
-  source,
-  target,
-  targetName,
-  resulting,
-}: {
-  source: WaterProfile & { name?: string };
-  target: WaterProfile;
-  targetName?: string;
-  resulting: WaterProfile;
-}) {
-  const ratio = calculateSulfateChlorideRatio(
-    resulting.sulfate_ppm,
-    resulting.chloride_ppm
-  );
-  const ratioDesc = getRatioDescription(ratio);
-
-  return (
-    <div className="space-y-2">
-      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-        Water Chemistry
-      </h4>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-20" />
-            {WATER_IONS.map((ion) => (
-              <TableHead key={ion.key} className="text-center w-16">
-                {ion.label}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow>
-            <TableCell className="text-xs text-muted-foreground font-medium">
-              Source
-              {source.name && (
-                <div className="text-[10px] font-normal truncate max-w-20">
-                  {source.name}
-                </div>
-              )}
-            </TableCell>
-            {WATER_IONS.map((ion) => (
-              <TableCell
-                key={ion.key}
-                className="text-center font-mono text-sm"
-              >
-                {Math.round(source[ion.key] ?? 0)}
-              </TableCell>
-            ))}
-          </TableRow>
-          <TableRow>
-            <TableCell className="text-xs text-muted-foreground font-medium">
-              Target
-              {targetName && (
-                <div className="text-[10px] font-normal truncate max-w-20">
-                  {targetName}
-                </div>
-              )}
-            </TableCell>
-            {WATER_IONS.map((ion) => (
-              <TableCell
-                key={ion.key}
-                className="text-center font-mono text-sm"
-              >
-                {Math.round(target[ion.key] ?? 0)}
-              </TableCell>
-            ))}
-          </TableRow>
-          <TableRow>
-            <TableCell className="text-xs text-muted-foreground font-medium">
-              Result
-            </TableCell>
-            {WATER_IONS.map((ion) => {
-              const result = Math.round(resulting[ion.key]);
-              const tgt = target[ion.key];
-              const withinRange =
-                tgt != null &&
-                tgt > 0 &&
-                Math.abs(result - tgt) / tgt <= 0.1;
-              return (
-                <TableCell
-                  key={ion.key}
-                  className={cn(
-                    "text-center font-mono text-sm font-medium",
-                    tgt != null &&
-                      (withinRange
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-amber-600 dark:text-amber-400")
-                  )}
-                >
-                  {result}
-                </TableCell>
-              );
-            })}
-          </TableRow>
-        </TableBody>
-      </Table>
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">SO&#x2084;:Cl Ratio:</span>
-        <span className="font-mono font-medium">{formatRatio(ratio)}</span>
-        <Badge variant="outline">{ratioDesc.label}</Badge>
-      </div>
-    </div>
-  );
-}
-
-/** Calculated salt additions with "Apply to Recipe" button (exported for characterization tests) */
-export function CalculatedAdditionsSection({
-  additions,
-  onApply,
-  isApplying,
-  applySuccess,
-  totalVolumeGal,
-}: {
-  additions: SaltAdditions;
-  onApply: () => void;
-  isApplying: boolean;
-  applySuccess: boolean;
-  totalVolumeGal: number;
-}) {
-  const nonZeroSalts = Object.entries(SALT_ADDITIVE_MAP).filter(
-    ([key]) => additions[key as keyof SaltAdditions] > 0
-  );
-
-  const volumeUnit = useResolvedUnitPreferences().volume_unit;
-
-  if (nonZeroSalts.length === 0) return null;
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-          Calculated Salt Additions
-          <span className="text-xs font-normal normal-case ml-2">
-            ({formatVolume(convertVolume(totalVolumeGal, "gal", "bbl"), volumeUnit, 1)} total water)
-          </span>
-        </h4>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onApply}
-          disabled={isApplying}
-          className="gap-1"
-        >
-          {isApplying ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : applySuccess ? (
-            <Check className="h-3 w-3" />
-          ) : null}
-          {applySuccess ? "Applied" : "Apply to Recipe"}
-        </Button>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Salt</TableHead>
-            <TableHead className="w-28 text-right">Amount</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {nonZeroSalts.map(([key, name]) => (
-            <TableRow key={key}>
-              <TableCell className="font-medium">{name}</TableCell>
-              <TableCell className="text-right font-mono">
-                {additions[key as keyof SaltAdditions].toFixed(1)} g
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-/** Other additions section -- clarifiers, nutrients, etc. (exported for characterization tests) */
-export function OtherAdditionsSection({
-  additions,
-}: {
-  additions: AdditionRow[];
-}) {
-  const groupedByTiming = additions.reduce(
-    (acc, addition) => {
-      const timing = addition.timing;
-      if (!acc[timing]) acc[timing] = [];
-      acc[timing].push(addition);
-      return acc;
-    },
-    {} as Record<string, AdditionRow[]>
-  );
-
-  return (
-    <div>
-      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-        Other Additions
-      </h4>
-      {Object.entries(groupedByTiming).map(([timing, items]) => (
-        <div key={timing} className="mb-3">
-          <div className="text-sm font-medium mb-1 flex items-center gap-2">
-            <Badge variant="outline">{TIMING_LABELS[timing] || timing}</Badge>
-            <span className="text-muted-foreground text-xs">
-              ({items.length} {items.length === 1 ? "addition" : "additions"})
-            </span>
-          </div>
-          <AdditionsTable additions={items} showTarget={timing === "mash" || timing === "sparge"} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Shared table for displaying addition rows (exported for characterization tests) */
-export function AdditionsTable({
-  additions,
-  showTarget,
-}: {
-  additions: AdditionRow[];
-  showTarget?: boolean;
-}) {
-  const hasTargets =
-    showTarget ??
-    additions.some((a) =>
-      WATER_CHEMISTRY_TYPES.includes(a.additive?.type || "")
-    );
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Additive</TableHead>
-          <TableHead className="w-24">Type</TableHead>
-          <TableHead className="w-28 text-right">Amount</TableHead>
-          {hasTargets && <TableHead className="w-28">Target</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {additions.map((addition) => (
-          <TableRow key={addition.id}>
-            <TableCell>
-              <div>
-                <span className="font-medium">
-                  {addition.additive?.name || "Unknown"}
-                </span>
-                {addition.additive?.description && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {addition.additive.description}
-                  </p>
-                )}
-              </div>
-            </TableCell>
-            <TableCell>
-              <Badge
-                variant="secondary"
-                className={TYPE_COLORS[addition.additive?.type || "other"]}
-              >
-                {TYPE_LABELS[addition.additive?.type || "other"]}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-right font-mono">
-              {addition.amount} {addition.unit}
-            </TableCell>
-            {hasTargets && (
-              <TableCell>
-                {addition.target
-                  ? TARGET_LABELS[addition.target] || addition.target
-                  : "\u2014"}
-              </TableCell>
-            )}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
   );
 }

@@ -11,6 +11,43 @@
  */
 
 /**
+ * One unaccepted po_receive row as returned by the
+ * `get_unaccepted_po_receives` RPC, with its catalog name resolved
+ * client-side. Lives here rather than in a component file so the dialog,
+ * the receive grid and the accept-mutation hook all import the RPC row
+ * contract from the same React-free leaf.
+ */
+export type UnacceptedReceive = {
+  receive_id: string;
+  po_line_item_id: string;
+  catalog_type: string;
+  catalog_id: string;
+  catalog_name: string; // resolved client-side
+  quantity: number;
+  unit: string;
+  unit_price: number | null;
+  lot_number: string | null;
+  expiration_date: string | null;
+  received_date: string | null;
+};
+
+/**
+ * Per-row acceptance state: whether the row is selected, which
+ * inventory_item it maps to, and the storage bin it goes into (`bin_id`
+ * writes a bin_inventory_items row on accept; empty means no placement).
+ *
+ * This is view state, not domain data — nothing in this module consumes it
+ * (`buildBinPlacements` deliberately takes a structural map instead). It is
+ * parked here only so the dialog, the grid and the accept hook share one
+ * declaration; if it grows more UI concerns, move it to the component layer.
+ */
+export type RowState = {
+  selected: boolean;
+  inventory_item_id: string;
+  bin_id: string;
+};
+
+/**
  * Shape of a prior accepted-lot row returned by the dialog's
  * prior-mapping query (inventory_lots with embedded po_receive →
  * po_line_item and bin_inventory_items placements).
