@@ -11,7 +11,7 @@
  * - Dry hop timing notes
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,32 +23,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  Sortable,
-  SortableContent,
-  SortableItem,
-  SortableItemHandle,
-  SortableOverlay,
-} from "@/components/ui/sortable";
-import {
+  SortableRows,
+  SortableRowHandle,
+  RemoveRowButton,
   SortableDragPreview,
-  reorderWithPositions,
-} from "@/components/ui/sortable-drag-preview";
+  useSortableRows,
+} from "@/components/ui/sortable-rows";
+import { SchedulePresetsMenu } from "@/components/ui/schedule-presets-menu";
 import { UnitInput } from "@/components/ui/unit-input";
 import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatTemperature } from "@/domain/units";
-import { Plus, Trash2, GripVertical, ChevronDown, FlaskConical, ChevronRight } from "lucide-react";
+import { Plus, FlaskConical, ChevronRight } from "lucide-react";
 
 // Types for fermentation stages
 export type FermentationStage = {
@@ -155,76 +145,33 @@ export function FermentationScheduleEditor({
   disabled = false,
 }: FermentationScheduleEditorProps) {
   const tempUnit = useResolvedUnitPreferences().temperature_unit;
-  // Backfill IDs once if legacy data lacks them — required for stable drag-and-drop.
-  // One-shot guard prevents re-running on parent re-renders (which can happen when
-  // onChange has an unstable identity).
-  const backfilledRef = useRef(false);
-  useEffect(() => {
-    if (backfilledRef.current) return;
-    backfilledRef.current = true;
-    if (stages.some((s) => !s.id)) {
-      onChange(stages.map((s) => (s.id ? s : { ...s, id: generateId() })));
-    }
-  }, [stages, onChange]);
-
-  const handleAddStage = useCallback(() => {
-    const newStage: FermentationStage = {
-      id: generateId(),
-      stage: "primary",
-      name: "New Stage",
-      temp_f: 68,
-      duration_days: 7,
-      position: stages.length,
-    };
-    onChange([...stages, newStage]);
-  }, [stages, onChange]);
+  const rows = useSortableRows({ items: stages, onChange, generateId });
 
   const handleApplyPreset = useCallback(
     (presetKey: keyof typeof FERMENTATION_PRESETS) => {
-      const preset = FERMENTATION_PRESETS[presetKey];
-      const newStages: FermentationStage[] = preset.stages.map((stage, index) => ({
-        id: generateId(),
-        ...stage,
-        position: index,
-      }));
-      onChange(newStages);
+      onChange(
+        FERMENTATION_PRESETS[presetKey].stages.map((stage, index) => ({
+          id: generateId(),
+          ...stage,
+          position: index,
+        }))
+      );
     },
     [onChange]
   );
 
-  const handleUpdateStage = useCallback(
-    (index: number, field: keyof FermentationStage, value: string | number) => {
-      const updated = [...stages];
-      updated[index] = { ...updated[index], [field]: value };
-      onChange(updated);
-    },
-    [stages, onChange]
-  );
-
+  /** Switching type renames the stage only while it still carries the placeholder name. */
   const handleStageTypeChange = useCallback(
     (index: number, stageType: FermentationStage["stage"]) => {
       const typeConfig = STAGE_TYPES.find((t) => t.value === stageType);
-      const updated = [...stages];
-      updated[index] = {
-        ...updated[index],
+      rows.update(index, {
         stage: stageType,
-        name: updated[index].name === "New Stage" ? (typeConfig?.label || stageType) : updated[index].name,
-      };
-      onChange(updated);
+        ...(stages[index].name === "New Stage"
+          ? { name: typeConfig?.label || stageType }
+          : {}),
+      });
     },
-    [stages, onChange]
-  );
-
-  const handleRemove = useCallback(
-    (index: number) => {
-      onChange(reorderWithPositions(stages.filter((_, i) => i !== index)));
-    },
-    [stages, onChange]
-  );
-
-  const handleReorder = useCallback(
-    (reordered: FermentationStage[]) => onChange(reorderWithPositions(reordered)),
-    [onChange]
+    [stages, rows]
   );
 
   const totalDays = stages.reduce((sum, stage) => sum + (stage.duration_days || 0), 0);
@@ -234,40 +181,25 @@ export function FermentationScheduleEditor({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Fermentation Schedule</h3>
         <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={disabled}>
-                Presets
-                <ChevronDown className="ml-1 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              {Object.entries(FERMENTATION_PRESETS).map(([key, preset]) => (
-                <DropdownMenuItem
-                  key={key}
-                  onClick={() => handleApplyPreset(key as keyof typeof FERMENTATION_PRESETS)}
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">{preset.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {preset.description}
-                    </span>
-                  </div>
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onChange([])}
-                className="text-destructive"
-              >
-                Clear All Stages
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <SchedulePresetsMenu
+            presets={FERMENTATION_PRESETS}
+            onApply={handleApplyPreset}
+            onClear={() => onChange([])}
+            clearLabel="Clear All Stages"
+            disabled={disabled}
+          />
           <Button
             variant="outline"
             size="sm"
-            onClick={handleAddStage}
+            onClick={() =>
+              rows.append({
+                id: generateId(),
+                stage: "primary",
+                name: "New Stage",
+                temp_f: 68,
+                duration_days: 7,
+              })
+            }
             disabled={disabled}
           >
             <Plus className="mr-1 h-4 w-4" />
@@ -276,127 +208,31 @@ export function FermentationScheduleEditor({
         </div>
       </div>
 
-      {stages.length === 0 ? (
-        <div className="border rounded-md p-8 text-center text-muted-foreground">
-          <FlaskConical className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No fermentation stages defined yet.</p>
-          <p className="text-sm mt-1">
-            Select a preset or click &quot;Add Stage&quot; to build your fermentation schedule.
-          </p>
-        </div>
-      ) : (
-        <Sortable
-          value={stages}
-          onValueChange={handleReorder}
-          getItemValue={(item) => item.id!}
-        >
-          <SortableContent asChild>
-          <div className="space-y-2">
-          {stages.map((stage, index) => (
-            <SortableItem key={stage.id} value={stage.id!} asChild disabled={disabled}>
-            <Collapsible>
-              <div className="border rounded-lg">
-                <div className="flex items-center gap-2 p-3">
-                  <SortableItemHandle className="p-1 hover:bg-muted rounded touch-none">
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                  </SortableItemHandle>
-
-                  {/* Stage Type */}
-                  <Select
-                    value={stage.stage}
-                    onValueChange={(value) =>
-                      handleStageTypeChange(index, value as FermentationStage["stage"])
-                    }
-                    disabled={disabled}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STAGE_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Stage Name */}
-                  <Input
-                    value={stage.name}
-                    onChange={(e) => handleUpdateStage(index, "name", e.target.value)}
-                    disabled={disabled}
-                    className="flex-1 min-w-[120px]"
-                    placeholder="Stage name"
-                  />
-
-                  {/* Temperature */}
-                  <UnitInput
-                    value={stage.temp_f}
-                    onChange={(value) =>
-                      handleUpdateStage(index, "temp_f", value ?? 0)
-                    }
-                    unitType="temperature"
-                    decimals={0}
-                    disabled={disabled}
-                    wrapperClassName="w-28"
-                  />
-
-                  {/* Duration */}
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      step="1"
-                      min="0"
-                      value={stage.duration_days || ""}
-                      onChange={(e) =>
-                        handleUpdateStage(index, "duration_days", parseInt(e.target.value) || 0)
-                      }
-                      disabled={disabled}
-                      className="w-14 text-right"
-                    />
-                    <span className="text-sm text-muted-foreground">days</span>
-                  </div>
-
-                  {/* Expand/Notes toggle */}
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 [&[data-state=open]>svg]:rotate-90">
-                      <ChevronRight className="h-4 w-4 transition-transform" />
-                    </Button>
-                  </CollapsibleTrigger>
-
-                  {/* Remove */}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemove(index)}
-                    disabled={disabled}
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Notes Section */}
-                <CollapsibleContent>
-                  <div className="px-3 pb-3 pt-1 border-t">
-                    <Textarea
-                      placeholder="Notes (dry hop timing, temperature ramp instructions, etc.)"
-                      value={stage.notes || ""}
-                      onChange={(e) => handleUpdateStage(index, "notes", e.target.value)}
-                      disabled={disabled}
-                      className="min-h-[60px] text-sm"
-                    />
-                  </div>
-                </CollapsibleContent>
-              </div>
-            </Collapsible>
-            </SortableItem>
-          ))}
+      <SortableRows
+        as="stack"
+        items={stages}
+        onReorder={rows.reorder}
+        disabled={disabled}
+        empty={
+          <div className="border rounded-md p-8 text-center text-muted-foreground">
+            <FlaskConical className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No fermentation stages defined yet.</p>
+            <p className="text-sm mt-1">
+              Select a preset or click &quot;Add Stage&quot; to build your fermentation schedule.
+            </p>
           </div>
-          </SortableContent>
-
+        }
+        overlay={(stage) => (
+          <SortableDragPreview
+            title={stage?.name || "Stage"}
+            subtitle={
+              stage
+                ? `${formatTemperature(stage.temp_f, tempUnit, 0)} · ${stage.duration_days}d`
+                : undefined
+            }
+          />
+        )}
+        footer={
           <div className="flex justify-between items-center border-t pt-3 text-sm mt-2">
             <span className="text-muted-foreground">
               {stages.length} stage{stages.length !== 1 ? "s" : ""}
@@ -405,20 +241,99 @@ export function FermentationScheduleEditor({
               Total: {totalDays} days ({Math.round(totalDays / 7)} weeks)
             </span>
           </div>
+        }
+      >
+        {(stage, index) => (
+          <Collapsible>
+            <div className="border rounded-lg">
+              <div className="flex items-center gap-2 p-3">
+                <SortableRowHandle />
 
-          <SortableOverlay>
-            {({ value }) => {
-              const stage = stages.find((s) => s.id === value);
-              return (
-                <SortableDragPreview
-                  title={stage?.name || "Stage"}
-                  subtitle={stage ? `${formatTemperature(stage.temp_f, tempUnit, 0)} · ${stage.duration_days}d` : undefined}
+                {/* Stage Type */}
+                <Select
+                  value={stage.stage}
+                  onValueChange={(value) =>
+                    handleStageTypeChange(index, value as FermentationStage["stage"])
+                  }
+                  disabled={disabled}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGE_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Stage Name */}
+                <Input
+                  value={stage.name}
+                  onChange={(e) => rows.updateField(index, "name", e.target.value)}
+                  disabled={disabled}
+                  className="flex-1 min-w-[120px]"
+                  placeholder="Stage name"
                 />
-              );
-            }}
-          </SortableOverlay>
-        </Sortable>
-      )}
+
+                {/* Temperature */}
+                <UnitInput
+                  value={stage.temp_f}
+                  onChange={(value) => rows.updateField(index, "temp_f", value ?? 0)}
+                  unitType="temperature"
+                  decimals={0}
+                  disabled={disabled}
+                  wrapperClassName="w-28"
+                />
+
+                {/* Duration */}
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={stage.duration_days || ""}
+                    onChange={(e) =>
+                      rows.updateField(index, "duration_days", parseInt(e.target.value) || 0)
+                    }
+                    disabled={disabled}
+                    className="w-14 text-right"
+                  />
+                  <span className="text-sm text-muted-foreground">days</span>
+                </div>
+
+                {/* Expand/Notes toggle */}
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 [&[data-state=open]>svg]:rotate-90"
+                  >
+                    <ChevronRight className="h-4 w-4 transition-transform" />
+                  </Button>
+                </CollapsibleTrigger>
+
+                <RemoveRowButton onClick={() => rows.remove(index)} disabled={disabled} />
+              </div>
+
+              {/* Notes Section */}
+              <CollapsibleContent>
+                <div className="px-3 pb-3 pt-1 border-t">
+                  <Textarea
+                    placeholder="Notes (dry hop timing, temperature ramp instructions, etc.)"
+                    value={stage.notes || ""}
+                    onChange={(e) => rows.updateField(index, "notes", e.target.value)}
+                    disabled={disabled}
+                    className="min-h-[60px] text-sm"
+                  />
+                </div>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
+        )}
+      </SortableRows>
     </div>
   );
 }

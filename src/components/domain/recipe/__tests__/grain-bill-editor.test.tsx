@@ -17,25 +17,72 @@
  * logic.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act } from "react";
 import { setupRenderHarness } from "@/test/react-harness";
+import { click, setInputValue } from "@/test/dom-events";
 import type { GrainBillItem } from "../grain-bill-editor";
+
+// Captures the Sortable's reorder callback and the mocked catalog data so
+// interaction tests can drive reordering and the add-from-catalog popover.
+const captured = vi.hoisted(() => ({
+  reorder: undefined as ((items: unknown[]) => void) | undefined,
+  catalog: [] as unknown[],
+}));
 
 vi.mock("@/hooks/use-unit-preferences", () => ({
   useResolvedUnitPreferences: () => ({ weight_unit: "lbs" }),
 }));
 vi.mock("@/hooks/use-catalog", () => ({
-  useCatalog: () => ({ data: [], isLoading: false }),
+  useCatalog: () => ({ data: captured.catalog, isLoading: false }),
 }));
 vi.mock("@/components/ui/sortable", () => ({
-  Sortable: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  Sortable: ({
+    children,
+    onValueChange,
+  }: {
+    children: React.ReactNode;
+    onValueChange?: (items: unknown[]) => void;
+  }) => {
+    captured.reorder = onValueChange;
+    return <>{children}</>;
+  },
   SortableContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SortableItem: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SortableItemHandle: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SortableOverlay: () => null,
 }));
+// Radix popover + cmdk stubs: render inline so the add-from-catalog list is
+// reachable without portal/pointer plumbing; CommandItem becomes a button.
+vi.mock("@/components/ui/popover", () => ({
+  Popover: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PopoverContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+vi.mock("@/components/ui/command", () => ({
+  Command: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CommandInput: () => null,
+  CommandList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CommandEmpty: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CommandGroup: ({ children, heading }: { children: React.ReactNode; heading?: React.ReactNode }) => (
+    <div>
+      <span>{heading}</span>
+      {children}
+    </div>
+  ),
+  CommandItem: ({ children, onSelect }: { children: React.ReactNode; onSelect?: () => void }) => (
+    <button type="button" data-testid="cmd-item" onClick={() => onSelect?.()}>
+      {children}
+    </button>
+  ),
+}));
 
 import { GrainBillEditor } from "../grain-bill-editor";
+
+beforeEach(() => {
+  captured.reorder = undefined;
+  captured.catalog = [];
+});
 
 const { render } = setupRenderHarness();
 
@@ -125,5 +172,75 @@ describe("GrainBillEditor", () => {
     const c = render(<GrainBillEditor items={items} onChange={noop} />);
     expect(c.textContent).not.toContain("Base malt is only");
     expect(c.textContent).not.toContain("no weight specified");
+  });
+
+  describe("interactions", () => {
+    const twoItems = (): GrainBillItem[] => [
+      { id: "i1", malt_id: "m1", weight_lbs: 8, position: 0, malt: baseMalt },
+      { id: "i2", malt_id: "m2", weight_lbs: 2, position: 1, malt: specialtyMalt },
+    ];
+
+    it("adds a catalog malt as a new zero-weight item at the end", () => {
+      captured.catalog = [baseMalt];
+      const onChange = vi.fn();
+      const c = render(<GrainBillEditor items={[]} onChange={onChange} />);
+      click(c.querySelector('[data-testid="cmd-item"]'));
+      expect(onChange).toHaveBeenCalledTimes(1);
+      const added = onChange.mock.calls[0][0] as GrainBillItem[];
+      expect(added).toHaveLength(1);
+      expect(added[0]).toMatchObject({
+        malt_id: "m1",
+        weight_lbs: 0,
+        position: 0,
+        malt: baseMalt,
+      });
+      expect(added[0].id).toBeTruthy();
+    });
+
+    it("hides already-added malts from the add selector", () => {
+      captured.catalog = [baseMalt, specialtyMalt];
+      const c = render(
+        <GrainBillEditor
+          items={[{ id: "i1", malt_id: "m1", weight_lbs: 8, position: 0, malt: baseMalt }]}
+          onChange={vi.fn()}
+        />,
+      );
+      const options = Array.from(c.querySelectorAll('[data-testid="cmd-item"]'));
+      expect(options).toHaveLength(1);
+      expect(options[0].textContent).toContain("Crystal 60");
+    });
+
+    it("removes a row and renumbers remaining positions", () => {
+      const onChange = vi.fn();
+      const c = render(<GrainBillEditor items={twoItems()} onChange={onChange} />);
+      const firstRowButtons = c.querySelectorAll("tbody tr")[0].querySelectorAll("button");
+      click(firstRowButtons[firstRowButtons.length - 1]);
+      expect(onChange).toHaveBeenCalledWith([
+        expect.objectContaining({ id: "i2", position: 0 }),
+      ]);
+    });
+
+    it("propagates a weight edit for the right row", () => {
+      const onChange = vi.fn();
+      const c = render(<GrainBillEditor items={twoItems()} onChange={onChange} />);
+      const weightInput = c
+        .querySelectorAll("tbody tr")[1]
+        .querySelector('input[type="number"]') as HTMLInputElement;
+      setInputValue(weightInput, "3.5");
+      const updated = onChange.mock.calls[0][0] as GrainBillItem[];
+      expect(updated[1]).toMatchObject({ id: "i2", weight_lbs: 3.5 });
+      expect(updated[0]).toMatchObject({ id: "i1", weight_lbs: 8 });
+    });
+
+    it("persists a reorder with renumbered positions", () => {
+      const onChange = vi.fn();
+      const items = twoItems();
+      render(<GrainBillEditor items={items} onChange={onChange} />);
+      act(() => captured.reorder!([items[1], items[0]]));
+      expect(onChange).toHaveBeenCalledWith([
+        expect.objectContaining({ id: "i2", position: 0 }),
+        expect.objectContaining({ id: "i1", position: 1 }),
+      ]);
+    });
   });
 });

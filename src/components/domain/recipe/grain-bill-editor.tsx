@@ -7,43 +7,26 @@
  * inline weight editing, automatic percentage calculation, and drag-to-reorder.
  */
 
-import { useState, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { useCatalog } from "@/hooks/use-catalog";
 import {
-  Table,
-  TableBody,
   TableCell,
-  TableHead,
-  TableHeader,
   TableRow,
   TableFooter,
 } from "@/components/ui/table";
 import {
-  Sortable,
-  SortableContent,
-  SortableItem,
-  SortableItemHandle,
-  SortableOverlay,
-} from "@/components/ui/sortable";
-import { Button } from "@/components/ui/button";
+  SortableRows,
+  SortableHandleCell,
+  RemoveRowCell,
+  SortableDragPreview,
+  useSortableRows,
+} from "@/components/ui/sortable-rows";
+import { CatalogAddPopover } from "@/components/ui/catalog-add-popover";
 import { Input } from "@/components/ui/input";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatWeight } from "@/domain/units";
-import { Plus, Trash2, GripVertical, ChevronsUpDown, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { catalogKeys } from "@/lib/query-keys";
 
@@ -96,8 +79,7 @@ export function GrainBillEditor({
   disabled = false,
 }: GrainBillEditorProps) {
   const weightUnit = useResolvedUnitPreferences().weight_unit;
-  const [addOpen, setAddOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
+  const rows = useSortableRows({ items, onChange });
 
   const { data: maltCatalog = [], isLoading: loadingMalts } = useCatalog<MaltCatalogItem>(
     catalogKeys.malts(),
@@ -116,255 +98,137 @@ export function GrainBillEditor({
     return (weight / totalWeight) * 100;
   }
 
-  const handleAddMalt = useCallback(
-    (malt: MaltCatalogItem) => {
-      if (items.some((item) => item.malt_id === malt.id)) {
-        setAddOpen(false);
-        return;
-      }
+  /** Adding a malt already in the bill is a no-op (the popover still closes). */
+  function handleAddMalt(malt: MaltCatalogItem) {
+    if (items.some((item) => item.malt_id === malt.id)) return;
+    rows.append({ id: crypto.randomUUID(), malt_id: malt.id, weight_lbs: 0, malt });
+  }
 
-      const newItem: GrainBillItem = {
-        id: crypto.randomUUID(),
-        malt_id: malt.id,
-        weight_lbs: 0,
-        position: items.length,
-        malt,
-      };
-
-      onChange([...items, newItem]);
-      setAddOpen(false);
-      setSearchValue("");
-    },
-    [items, onChange]
+  const addedMaltIds = useMemo(
+    () => new Set(items.map((item) => item.malt_id)),
+    [items]
   );
-
-  const handleWeightChange = useCallback(
-    (index: number, weight: number) => {
-      const updated = [...items];
-      updated[index] = { ...updated[index], weight_lbs: weight };
-      onChange(updated);
-    },
-    [items, onChange]
-  );
-
-  const handleRemove = useCallback(
-    (index: number) => {
-      const updated = items
-        .filter((_, i) => i !== index)
-        .map((item, i) => ({ ...item, position: i }));
-      onChange(updated);
-    },
-    [items, onChange]
-  );
-
-  const handleReorder = useCallback(
-    (reordered: GrainBillItem[]) => {
-      const updated = reordered.map((item, i) => ({
-        ...item,
-        position: i,
-      }));
-      onChange(updated);
-    },
-    [onChange]
-  );
-
-  /** Available (not-yet-added) malts grouped by type for the selector */
-  const availableMaltsByType = useMemo(() => {
-    const addedIds = new Set(items.map((item) => item.malt_id));
-    const groups: Record<string, MaltCatalogItem[]> = {};
-    for (const malt of maltCatalog) {
-      if (addedIds.has(malt.id)) continue;
-      const type = malt.type || "other";
-      if (!groups[type]) groups[type] = [];
-      groups[type].push(malt);
-    }
-    return groups;
-  }, [maltCatalog, items]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
-        <Popover open={addOpen} onOpenChange={setAddOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={disabled || loadingMalts}
-              className="gap-1"
-            >
-              <Plus className="h-4 w-4" />
-              Add Malt
-              <ChevronsUpDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[400px] p-0" align="end">
-            <Command>
-              <CommandInput
-                placeholder="Search malts..."
-                value={searchValue}
-                onValueChange={setSearchValue}
-              />
-              <CommandList>
-                <CommandEmpty>No malts found.</CommandEmpty>
-                {Object.entries(availableMaltsByType).map(([type, malts]) => (
-                    <CommandGroup key={type} heading={MALT_TYPE_LABELS[type] || type}>
-                      {malts.map((malt) => (
-                        <CommandItem
-                          key={malt.id}
-                          value={`${malt.name} ${malt.maltster || ""}`}
-                          onSelect={() => handleAddMalt(malt)}
-                          className="flex items-center justify-between"
-                        >
-                          <div className="flex flex-col">
-                            <span>{malt.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {malt.maltster}
-                              {malt.color_lovibond && ` • ${malt.color_lovibond}°L`}
-                              {malt.potential_ppg && ` • ${malt.potential_ppg} PPG`}
-                            </span>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                ))}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+        <CatalogAddPopover
+          catalog={maltCatalog}
+          getId={(malt) => malt.id}
+          excludeIds={addedMaltIds}
+          getGroup={(malt) => malt.type}
+          groupLabels={MALT_TYPE_LABELS}
+          getSearchValue={(malt) => `${malt.name} ${malt.maltster || ""}`}
+          getLabel={(malt) => malt.name}
+          getDetail={(malt) => (
+            <span className="text-xs text-muted-foreground">
+              {malt.maltster}
+              {malt.color_lovibond && ` • ${malt.color_lovibond}°L`}
+              {malt.potential_ppg && ` • ${malt.potential_ppg} PPG`}
+            </span>
+          )}
+          onSelect={handleAddMalt}
+          triggerLabel="Add Malt"
+          searchPlaceholder="Search malts..."
+          emptyMessage="No malts found."
+          disabled={disabled || loadingMalts}
+        />
       </div>
 
-      {items.length === 0 ? (
-        <div className="border rounded-md p-8 text-center text-muted-foreground">
-          <p>No malts added yet.</p>
-          <p className="text-sm mt-1">Click &quot;Add Malt&quot; to build your grain bill.</p>
-        </div>
-      ) : (
-        <Sortable
-          value={items}
-          onValueChange={handleReorder}
-          getItemValue={(item) => item.id!}
-        >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8"></TableHead>
-                <TableHead>Malt</TableHead>
-                <TableHead className="w-24 text-right">Weight (lbs)</TableHead>
-                <TableHead className="w-16 text-right">Bags</TableHead>
-                <TableHead className="w-20 text-right">%</TableHead>
-                <TableHead className="w-20 text-right">°L</TableHead>
-                <TableHead className="w-16"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <SortableContent asChild>
-              <TableBody>
-                {items.map((item, index) => {
-                  const malt = item.malt || maltCatalog.find((m) => m.id === item.malt_id);
-                  const percentage = getPercentage(item.weight_lbs);
+      <SortableRows
+        items={items}
+        onReorder={rows.reorder}
+        disabled={disabled}
+        columns={[
+          { className: "w-8" },
+          { label: "Malt" },
+          { label: "Weight (lbs)", className: "w-24 text-right" },
+          { label: "Bags", className: "w-16 text-right" },
+          { label: "%", className: "w-20 text-right" },
+          { label: "°L", className: "w-20 text-right" },
+          { className: "w-16" },
+        ]}
+        empty={
+          <div className="border rounded-md p-8 text-center text-muted-foreground">
+            <p>No malts added yet.</p>
+            <p className="text-sm mt-1">Click &quot;Add Malt&quot; to build your grain bill.</p>
+          </div>
+        }
+        overlay={(item) => (
+          <SortableDragPreview
+            title={
+              (item?.malt || maltCatalog.find((m) => m.id === item?.malt_id))?.name || "Unknown"
+            }
+            subtitle={item?.weight_lbs ? `${item.weight_lbs} lbs` : undefined}
+          />
+        )}
+        footer={
+          <TableFooter>
+            <TableRow>
+              <TableCell colSpan={2} className="font-medium">
+                Total
+              </TableCell>
+              <TableCell className="text-right font-medium">
+                {formatWeight(totalWeight, weightUnit)}
+              </TableCell>
+              <TableCell></TableCell>
+              <TableCell className="text-right font-medium">100%</TableCell>
+              <TableCell colSpan={2}></TableCell>
+            </TableRow>
+          </TableFooter>
+        }
+      >
+        {(item, index) => {
+          const malt = item.malt || maltCatalog.find((m) => m.id === item.malt_id);
+          const percentage = getPercentage(item.weight_lbs);
 
-                  return (
-                    <SortableItem key={item.id} value={item.id!} asChild disabled={disabled}>
-                      <TableRow>
-                        <TableCell>
-                          <SortableItemHandle className="p-1 hover:bg-muted rounded touch-none">
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
-                          </SortableItemHandle>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <div className="font-medium">{malt?.name || "Unknown"}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {malt?.maltster}
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              {malt?.type}
-                            </Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            step="0.25"
-                            min="0"
-                            value={item.weight_lbs || ""}
-                            onChange={(e) =>
-                              handleWeightChange(index, parseFloat(e.target.value) || 0)
-                            }
-                            disabled={disabled}
-                            className="w-20 text-right ml-auto"
-                          />
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground tabular-nums">
-                          {malt?.bag_weight_lbs
-                            ? (item.weight_lbs / malt.bag_weight_lbs).toFixed(1)
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span
-                            className={cn(
-                              "tabular-nums",
-                              percentage >= 70 && "font-semibold text-primary"
-                            )}
-                          >
-                            {percentage.toFixed(1)}%
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {malt?.color_lovibond?.toFixed(1) || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemove(index)}
-                            disabled={disabled}
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    </SortableItem>
-                  );
-                })}
-              </TableBody>
-            </SortableContent>
-            <TableFooter>
-              <TableRow>
-                <TableCell colSpan={2} className="font-medium">
-                  Total
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatWeight(totalWeight, weightUnit)}
-                </TableCell>
-                <TableCell></TableCell>
-                <TableCell className="text-right font-medium">100%</TableCell>
-                <TableCell colSpan={2}></TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-          <SortableOverlay>
-            {({ value }) => {
-              const item = items.find((i) => i.id === value);
-              const malt = item?.malt || maltCatalog.find((m) => m.id === item?.malt_id);
-              return (
-                <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 shadow-sm">
-                  <GripVertical className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{malt?.name || "Unknown"}</span>
-                  {item && (
-                    <span className="text-sm text-muted-foreground">
-                      {item.weight_lbs ? `${item.weight_lbs} lbs` : ""}
-                    </span>
-                  )}
+          return (
+            <TableRow>
+              <SortableHandleCell />
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <div className="font-medium">{malt?.name || "Unknown"}</div>
+                    <div className="text-xs text-muted-foreground">{malt?.maltster}</div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {malt?.type}
+                  </Badge>
                 </div>
-              );
-            }}
-          </SortableOverlay>
-        </Sortable>
-      )}
+              </TableCell>
+              <TableCell className="text-right">
+                <Input
+                  type="number"
+                  step="0.25"
+                  min="0"
+                  value={item.weight_lbs || ""}
+                  onChange={(e) =>
+                    rows.updateField(index, "weight_lbs", parseFloat(e.target.value) || 0)
+                  }
+                  disabled={disabled}
+                  className="w-20 text-right ml-auto"
+                />
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground tabular-nums">
+                {malt?.bag_weight_lbs
+                  ? (item.weight_lbs / malt.bag_weight_lbs).toFixed(1)
+                  : "—"}
+              </TableCell>
+              <TableCell className="text-right">
+                <span
+                  className={cn("tabular-nums", percentage >= 70 && "font-semibold text-primary")}
+                >
+                  {percentage.toFixed(1)}%
+                </span>
+              </TableCell>
+              <TableCell className="text-right text-muted-foreground">
+                {malt?.color_lovibond?.toFixed(1) || "—"}
+              </TableCell>
+              <RemoveRowCell onClick={() => rows.remove(index)} disabled={disabled} />
+            </TableRow>
+          );
+        }}
+      </SortableRows>
 
       {items.length > 0 && (
         <GrainBillWarnings items={items} totalWeight={totalWeight} />
