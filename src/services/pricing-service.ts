@@ -11,7 +11,14 @@
  * editor and once in the reorder/duplicate path — so "how do I price a line for
  * this customer?" was answerable only by reading component code. Both callers
  * now go through here; this file is React-free and callable from a route
- * handler, a script, or an AI tool.
+ * handler or an AI tool.
+ *
+ * Not fully framework-free, though: the error path logs through
+ * `@/lib/client-logger`, which pulls in `@sentry/nextjs`. That makes this the
+ * only module in `src/services/` carrying a Next-flavoured dependency. Fine
+ * for anything running inside the app; a plain Node script would need that
+ * logger swapped for `@/lib/logger` or injected. Noted so the next caller does
+ * not discover it the hard way.
  *
  * Semantics deliberately preserved from those two call sites:
  * - No customer or no selling format => `null`, with **no RPC round trip**.
