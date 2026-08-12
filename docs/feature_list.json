@@ -546,9 +546,9 @@
       "verification": "manual",
       "state": "passing",
       "migrations": ["00285_capture_channel_formats.sql"],
-      "deployment": { "state": "pending", "pending_since": "2026-07-31", "tracking_issue": 724 },
+      "deployment": { "state": "live", "observed_live_on": "2026-08-12", "verified_by": ["supabase/live-catalog.snapshot.txt", "#724"] },
       "evidence": "docs/plans/2026-02-19-per-channel-format-visibility-design.md",
-      "notes": "Anchored by the 00285 capture migration (#724), which brings the live-only channel_formats table — a #217 renumbering casualty the shipped UI reads and writes — into the chain. deployment is \"pending\", not \"live\", because 00285 itself has not been pushed: the tables it declares are already present on live (which is why the feature works in production and why the snapshot lists both), but section 4 of the migration also restores 00125's RLS tightening on the superseded pricing_channel_formats table, and that part has never applied to live. Flip to \"live\" once an operator runs scripts/db-push.sh."
+      "notes": "Anchored by the 00285 capture migration (#724), which brings the live-only channel_formats table — a #217 renumbering casualty the shipped UI reads and writes — into the chain. Flipped from \"pending\" to \"live\" on 2026-08-12: scripts/db-push.sh was run, 00285 is recorded in supabase_migrations.schema_migrations on live, and both channel_formats and pricing_channel_formats appear in the regenerated snapshot. Section 4's RLS tightening on the superseded pricing_channel_formats table is applied — the snapshot's former permissive \"Authenticated users can …\" policies were replaced by pricing_channel_formats_select/_write in the same refresh."
     },
     {
       "id": "F125",
