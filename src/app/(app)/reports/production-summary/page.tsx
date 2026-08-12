@@ -18,14 +18,7 @@ import { MONTHS } from "@/domain/ttb-utils";
 import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
 import { formatBbl } from "@/lib/format";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -33,31 +26,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar } from "lucide-react";
 import {
-  ArrowLeft,
-  Calendar,
-  AlertCircle,
-} from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ExportMenu } from "@/components/reports/export-menu";
-import Link from "next/link";
+  ReportField,
+  ReportFilterCard,
+  ReportPage,
+  ReportSummaryCards,
+  ReportTable,
+  ReportTableCard,
+  StatValue,
+} from "@/components/reports/report-page";
+import {
+  aggregateProduction,
+  computeAvgDaysInTank,
+  type ProductionAggregate,
+} from "@/lib/reports/summaries";
 import {
   startOfMonth,
   endOfMonth,
   subMonths,
   format,
-  differenceInDays,
   parseISO,
+  differenceInDays,
 } from "date-fns";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 
@@ -87,10 +79,6 @@ type ProductionBatchRow = {
 }
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-// =============================================================================
 // Helper Functions
 // =============================================================================
 
@@ -101,54 +89,11 @@ function getYearOptions(): number[] {
 }
 
 /**
- * Calculate the number of days a batch has been in tank.
- * Uses planned_start_date as start and the current date as end.
- * Returns null if the start date is missing.
+ * Days a batch has been in tank: planned_start_date to now.
+ * Passed to {@link computeAvgDaysInTank}, which handles the null/negative cases.
  */
-function daysInTank(
-  plannedStart: string | null,
-): number | null {
-  if (!plannedStart) return null;
+function daysSincePlannedStart(plannedStart: string): number {
   return differenceInDays(new Date(), parseISO(plannedStart));
-}
-
-/** Shared aggregation shape used by both brand and style summaries. */
-type ProductionAggregate = {
-  key: string;
-  label: string;
-  batchCount: number;
-  totalBbl: number;
-  avgBblPerBatch: number;
-}
-
-/**
- * Aggregate batches into production summaries by a key extractor.
- * Returns rows sorted descending by totalBbl.
- */
-function aggregateProduction(
-  batches: ProductionBatchRow[],
-  getKey: (b: ProductionBatchRow) => string,
-  getLabel: (b: ProductionBatchRow) => string,
-): ProductionAggregate[] {
-  const map = new Map<string, { label: string; batchCount: number; totalBbl: number }>();
-
-  for (const b of batches) {
-    const key = getKey(b);
-    const existing = map.get(key) ?? { label: getLabel(b), batchCount: 0, totalBbl: 0 };
-    existing.batchCount += 1;
-    existing.totalBbl += b.volume_bbl ?? 0;
-    map.set(key, existing);
-  }
-
-  return Array.from(map.entries())
-    .map(([key, v]) => ({
-      key,
-      label: v.label,
-      batchCount: v.batchCount,
-      totalBbl: v.totalBbl,
-      avgBblPerBatch: v.batchCount > 0 ? v.totalBbl / v.batchCount : 0,
-    }))
-    .sort((a, b) => b.totalBbl - a.totalBbl);
 }
 
 // =============================================================================
@@ -279,14 +224,10 @@ export default function ProductionSummaryPage() {
     [batches]
   );
 
-  const avgDaysInTank = useMemo(() => {
-    if (!batches || batches.length === 0) return null;
-    const days = batches
-      .map((b) => daysInTank(b.planned_start_date))
-      .filter((d): d is number => d !== null && d >= 0);
-    if (days.length === 0) return null;
-    return days.reduce((sum, d) => sum + d, 0) / days.length;
-  }, [batches]);
+  const avgDaysInTank = useMemo(
+    () => computeAvgDaysInTank(batches, daysSincePlannedStart),
+    [batches]
+  );
 
   /** Production aggregated by brand. */
   const brandProduction = useMemo(
@@ -336,152 +277,99 @@ export default function ProductionSummaryPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/reports">
-          <Button variant="ghost" size="icon" aria-label="Back to reports">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">
-            Production Summary
-          </h1>
-          <p className="text-muted-foreground">
-            Monthly production volumes by brand and style
-          </p>
-        </div>
-        <ExportMenu
-          filename={`production-summary-${year}-${String(month).padStart(2, "0")}.csv`}
-          rows={exportRows}
-          disabled={isLoading}
-        />
-      </div>
-
-      {/* Period Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Calendar className="h-5 w-5" />
-            Reporting Period
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-4">
-            <div className="space-y-2">
-              <Label>Year</Label>
-              <Select
-                value={year.toString()}
-                onValueChange={(v) => setYear(parseInt(v))}
-              >
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {getYearOptions().map((y) => (
-                    <SelectItem key={y} value={y.toString()}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Month</Label>
-              <Select
-                value={month.toString()}
-                onValueChange={(v) => setMonth(parseInt(v))}
-              >
-                <SelectTrigger className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((m, i) => (
-                    <SelectItem key={i} value={(i + 1).toString()}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="pb-2 text-muted-foreground font-medium">
-              {monthName} {year}
-            </div>
+    <ReportPage
+      title="Production Summary"
+      description="Monthly production volumes by brand and style"
+      exportConfig={{
+        filename: `production-summary-${year}-${String(month).padStart(2, "0")}.csv`,
+        rows: exportRows,
+        disabled: isLoading,
+      }}
+      filter={
+        <ReportFilterCard
+          title={
+            <span className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Reporting Period
+            </span>
+          }
+        >
+          <ReportField label="Year">
+            <Select
+              value={year.toString()}
+              onValueChange={(v) => setYear(parseInt(v))}
+            >
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {getYearOptions().map((y) => (
+                  <SelectItem key={y} value={y.toString()}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </ReportField>
+          <ReportField label="Month">
+            <Select
+              value={month.toString()}
+              onValueChange={(v) => setMonth(parseInt(v))}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={i} value={(i + 1).toString()}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </ReportField>
+          <div className="pb-2 text-muted-foreground font-medium">
+            {monthName} {year}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Report</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error
-              ? error.message
-              : "Failed to load production summary data"}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Batches
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {totalBatches}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Produced
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
+        </ReportFilterCard>
+      }
+      error={error}
+      errorFallback="Failed to load production summary data"
+    >
+      <ReportSummaryCards
+        loading={isLoading}
+        cards={[
+          {
+            label: "Total Batches",
+            value: <StatValue>{totalBatches}</StatValue>,
+            skeletonClassName: "w-20",
+          },
+          {
+            label: "Total Produced",
+            value: (
+              <StatValue>
                 {formatBbl(totalBbl)}{" "}
                 <span className="text-sm font-normal text-muted-foreground">
                   BBL
                 </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Avg Days in Tank
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
+              </StatValue>
+            ),
+            skeletonClassName: "w-20",
+          },
+          {
+            label: "Avg Days in Tank",
+            value: (
+              <StatValue>
                 {avgDaysInTank !== null ? avgDaysInTank.toFixed(1) : "--"}{" "}
                 <span className="text-sm font-normal text-muted-foreground">
                   days
                 </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              </StatValue>
+            ),
+            skeletonClassName: "w-20",
+          },
+        ]}
+      />
 
       {/* Monthly Production Trend (12 months) */}
       <Card>
@@ -496,9 +384,7 @@ export default function ProductionSummaryPage() {
             <TrendChart
               data={trendData}
               xKey="date"
-              series={[
-                { key: "volume_bbl", label: "Volume (BBL)" },
-              ]}
+              series={[{ key: "volume_bbl", label: "Volume (BBL)" }]}
               type="bar"
               height={280}
               formatValue={(v) => `${v.toFixed(1)} BBL`}
@@ -509,145 +395,105 @@ export default function ProductionSummaryPage() {
         </CardContent>
       </Card>
 
-      {/* Production by Brand */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Production by Brand</CardTitle>
-          <CardDescription>
-            Aggregate volumes per brand for {monthName} {year}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : brandProduction.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              No completed batches in this period
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Brand</TableHead>
-                  <TableHead className="text-right"># Batches</TableHead>
-                  <TableHead className="text-right">Total BBL</TableHead>
-                  <TableHead className="text-right">
-                    Avg BBL / Batch
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {brandProduction.map((row) => (
-                  <TableRow key={row.key}>
-                    <TableCell className="font-medium">
-                      {row.label}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {row.batchCount}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatBbl(row.totalBbl)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatBbl(row.avgBblPerBatch)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {brandProduction.length > 1 && (
-                  <TableRow className="font-bold border-t-2">
-                    <TableCell>Total</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {totalBatches}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatBbl(totalBbl)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {totalBatches > 0
-                        ? formatBbl(totalBbl / totalBatches)
-                        : "0.00"}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <ProductionBreakdownCard
+        title="Production by Brand"
+        description={`Aggregate volumes per brand for ${monthName} ${year}`}
+        groupHeader="Brand"
+        rows={brandProduction}
+        loading={isLoading}
+        totalBatches={totalBatches}
+        totalBbl={totalBbl}
+      />
 
-      {/* Production by Style */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Production by Style</CardTitle>
-          <CardDescription>
-            Aggregate volumes per beer style for {monthName} {year}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : styleProduction.length === 0 ? (
-            <div className="text-center py-6 text-muted-foreground">
-              No completed batches in this period
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Style</TableHead>
-                  <TableHead className="text-right"># Batches</TableHead>
-                  <TableHead className="text-right">Total BBL</TableHead>
-                  <TableHead className="text-right">
-                    Avg BBL / Batch
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {styleProduction.map((row) => (
-                  <TableRow key={row.key}>
-                    <TableCell className="font-medium">
-                      {row.label}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {row.batchCount}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatBbl(row.totalBbl)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatBbl(row.avgBblPerBatch)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {styleProduction.length > 1 && (
-                  <TableRow className="font-bold border-t-2">
-                    <TableCell>Total</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {totalBatches}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatBbl(totalBbl)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {totalBatches > 0
-                        ? formatBbl(totalBbl / totalBatches)
-                        : "0.00"}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+      <ProductionBreakdownCard
+        title="Production by Style"
+        description={`Aggregate volumes per beer style for ${monthName} ${year}`}
+        groupHeader="Style"
+        rows={styleProduction}
+        loading={isLoading}
+        totalBatches={totalBatches}
+        totalBbl={totalBbl}
+      />
+    </ReportPage>
+  );
+}
+
+/**
+ * One production breakdown table (by brand or by style): the group column plus
+ * batch count / total BBL / average BBL, with a totals row when there is more
+ * than one group.
+ */
+function ProductionBreakdownCard({
+  title,
+  description,
+  groupHeader,
+  rows,
+  loading,
+  totalBatches,
+  totalBbl,
+}: {
+  title: string;
+  description: string;
+  groupHeader: string;
+  rows: ProductionAggregate[];
+  loading: boolean;
+  totalBatches: number;
+  totalBbl: number;
+}) {
+  return (
+    <ReportTableCard
+      title={title}
+      description={description}
+      loading={loading}
+      skeletonRows={4}
+      isEmpty={rows.length === 0}
+      emptyMessage="No completed batches in this period"
+    >
+      <ReportTable
+        rows={rows}
+        rowKey={(r) => r.key}
+        columns={[
+          {
+            header: groupHeader,
+            cellClassName: "font-medium",
+            cell: (r) => r.label,
+          },
+          {
+            header: "# Batches",
+            headClassName: "text-right",
+            cellClassName: "text-right font-mono",
+            cell: (r) => r.batchCount,
+          },
+          {
+            header: "Total BBL",
+            headClassName: "text-right",
+            cellClassName: "text-right font-mono",
+            cell: (r) => formatBbl(r.totalBbl),
+          },
+          {
+            header: "Avg BBL / Batch",
+            headClassName: "text-right",
+            cellClassName: "text-right font-mono",
+            cell: (r) => formatBbl(r.avgBblPerBatch),
+          },
+        ]}
+        footer={
+          rows.length > 1 && (
+            <TableRow className="font-bold border-t-2">
+              <TableCell>Total</TableCell>
+              <TableCell className="text-right font-mono">
+                {totalBatches}
+              </TableCell>
+              <TableCell className="text-right font-mono">
+                {formatBbl(totalBbl)}
+              </TableCell>
+              <TableCell className="text-right font-mono">
+                {totalBatches > 0 ? formatBbl(totalBbl / totalBatches) : "0.00"}
+              </TableCell>
+            </TableRow>
+          )
+        }
+      />
+    </ReportTableCard>
   );
 }

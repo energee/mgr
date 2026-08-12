@@ -22,36 +22,27 @@ import { createClient } from "@/lib/supabase/client";
 import { reportKeys } from "@/lib/query-keys";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { formatCurrency } from "@/lib/format";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DollarSign, Package, Warehouse } from "lucide-react";
 import {
-  ArrowLeft,
-  DollarSign,
-  AlertCircle,
-  Package,
-  Warehouse,
-} from "lucide-react";
-import { ExportMenu } from "@/components/reports/export-menu";
-import Link from "next/link";
+  ReportField,
+  ReportFilterCard,
+  ReportPage,
+  ReportSummaryCards,
+  ReportTable,
+  ReportTableCard,
+  StatValue,
+} from "@/components/reports/report-page";
+import {
+  aggregateFinishedGoodsValuation,
+  aggregateRawMaterials,
+  buildBatchCostMap,
+  type FinishedGoodDisplayRow,
+  type RawMaterialRow,
+} from "@/lib/reports/summaries";
 
 // =============================================================================
 // Types
@@ -70,16 +61,6 @@ type RawMaterialLot = {
   } | null;
 }
 
-/** Aggregated raw material row for display */
-type RawMaterialRow = {
-  itemName: string;
-  category: string;
-  totalQuantity: number;
-  unit: string;
-  avgUnitCost: number;
-  totalValue: number;
-}
-
 /** Finished good row from finished_goods_with_availability */
 type FinishedGoodRow = {
   id: string | null;
@@ -88,16 +69,6 @@ type FinishedGoodRow = {
   selling_format_name: string | null;
   available_quantity: number | null;
   quantity: number | null;
-}
-
-/** Aggregated finished good row for display */
-type FinishedGoodDisplayRow = {
-  brandName: string;
-  packageType: string;
-  quantity: number;
-  /** Estimated unit cost derived from batch ingredient costs */
-  unitCostEstimate: number;
-  totalValue: number;
 }
 
 // =============================================================================
@@ -212,30 +183,7 @@ export default function InventoryValuationPage() {
           .in("batch_id", batchIds),
       ]);
 
-      // Sum costs per batch
-      const costMap = new Map<string, number>();
-      for (const a of allocations ?? []) {
-        if (!a.destination_id) continue;
-        const lineCost = (a.quantity ?? 0) * (a.unit_cost ?? 0);
-        costMap.set(a.destination_id, (costMap.get(a.destination_id) ?? 0) + lineCost);
-      }
-
-      // Sum total FG units per batch
-      const unitsMap = new Map<string, number>();
-      for (const fg of fgRows ?? []) {
-        if (!fg.batch_id) continue;
-        unitsMap.set(fg.batch_id, (unitsMap.get(fg.batch_id) ?? 0) + (fg.quantity ?? 0));
-      }
-
-      // Combine into cost-per-unit map
-      const result = new Map<string, { totalCost: number; totalUnits: number }>();
-      for (const batchId of batchIds) {
-        result.set(batchId, {
-          totalCost: costMap.get(batchId) ?? 0,
-          totalUnits: unitsMap.get(batchId) ?? 0,
-        });
-      }
-      return result;
+      return buildBatchCostMap(batchIds, allocations ?? [], fgRows ?? []);
     },
     enabled: !!finishedGoods && finishedGoods.length > 0,
   });
@@ -243,108 +191,18 @@ export default function InventoryValuationPage() {
   // ---------------------------------------------------------------------------
   // Aggregate raw materials by item
   // ---------------------------------------------------------------------------
-  const rawMaterialRows = useMemo<RawMaterialRow[]>(() => {
-    if (!rawMaterialLots) return [];
-
-    const grouped = new Map<
-      string,
-      {
-        itemName: string;
-        category: string;
-        totalQuantity: number;
-        unit: string;
-        totalCost: number;
-        lotCount: number;
-      }
-    >();
-
-    for (const lot of rawMaterialLots) {
-      const itemId = lot.inventory_item_id ?? "unknown";
-      const remaining = lot.remaining_quantity ?? 0;
-      const cost = lot.unit_cost ?? 0;
-      const existing = grouped.get(itemId);
-
-      if (existing) {
-        existing.totalQuantity += remaining;
-        existing.totalCost += remaining * cost;
-        existing.lotCount += 1;
-      } else {
-        grouped.set(itemId, {
-          itemName: lot.inventory_items?.name ?? "Unknown Item",
-          category: lot.inventory_items?.category ?? "other",
-          totalQuantity: remaining,
-          unit: lot.unit ?? "",
-          totalCost: remaining * cost,
-          lotCount: 1,
-        });
-      }
-    }
-
-    return Array.from(grouped.values())
-      .map((item) => ({
-        itemName: item.itemName,
-        category: item.category,
-        totalQuantity: item.totalQuantity,
-        unit: item.unit,
-        avgUnitCost:
-          item.totalQuantity > 0
-            ? item.totalCost / item.totalQuantity
-            : 0,
-        totalValue: item.totalCost,
-      }))
-      .sort((a, b) => a.category.localeCompare(b.category) || a.itemName.localeCompare(b.itemName));
-  }, [rawMaterialLots]);
+  const rawMaterialRows = useMemo<RawMaterialRow[]>(
+    () => aggregateRawMaterials(rawMaterialLots),
+    [rawMaterialLots]
+  );
 
   // ---------------------------------------------------------------------------
   // Aggregate finished goods by brand + package type
   // ---------------------------------------------------------------------------
-  const finishedGoodRows = useMemo<FinishedGoodDisplayRow[]>(() => {
-    if (!finishedGoods) return [];
-
-    const grouped = new Map<
-      string,
-      { brandName: string; packageType: string; quantity: number; totalValue: number }
-    >();
-
-    for (const fg of finishedGoods) {
-      const key = `${fg.brand_name ?? "Unknown"}::${fg.selling_format_name ?? "Unknown"}`;
-      const available = fg.available_quantity ?? 0;
-
-      // Calculate per-unit cost from batch ingredient costs
-      let unitCost = 0;
-      if (fg.batch_id && batchCosts) {
-        const batchInfo = batchCosts.get(fg.batch_id);
-        if (batchInfo && batchInfo.totalUnits > 0) {
-          unitCost = batchInfo.totalCost / batchInfo.totalUnits;
-        }
-      }
-
-      const existing = grouped.get(key);
-      if (existing) {
-        existing.quantity += available;
-        existing.totalValue += available * unitCost;
-      } else {
-        grouped.set(key, {
-          brandName: fg.brand_name ?? "Unknown",
-          packageType: fg.selling_format_name ?? "Unknown",
-          quantity: available,
-          totalValue: available * unitCost,
-        });
-      }
-    }
-
-    // Unit cost is derived from batch ingredient costs allocated proportionally
-    // across all finished goods produced from that batch.
-    return Array.from(grouped.values())
-      .map((item) => ({
-        brandName: item.brandName,
-        packageType: item.packageType,
-        quantity: item.quantity,
-        unitCostEstimate: item.quantity > 0 ? item.totalValue / item.quantity : 0,
-        totalValue: item.totalValue,
-      }))
-      .sort((a, b) => a.brandName.localeCompare(b.brandName) || a.packageType.localeCompare(b.packageType));
-  }, [finishedGoods, batchCosts]);
+  const finishedGoodRows = useMemo<FinishedGoodDisplayRow[]>(
+    () => aggregateFinishedGoodsValuation(finishedGoods, batchCosts),
+    [finishedGoods, batchCosts]
+  );
 
   // ---------------------------------------------------------------------------
   // Totals
@@ -408,137 +266,74 @@ export default function InventoryValuationPage() {
   }, [activeTab, asOfDate, fgLoading, finishedGoodRows, rawLoading, rawMaterialRows]);
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/reports">
-          <Button variant="ghost" size="icon" aria-label="Back to reports">
-            <ArrowLeft className="h-4 w-4" />
+    <ReportPage
+      title="Inventory Valuation"
+      description="Current inventory value by category"
+      exportConfig={{
+        filename: exportConfig.filename,
+        rows: exportConfig.rows,
+        disabled: exportConfig.loading,
+      }}
+      filter={
+        <ReportFilterCard
+          title="Report Date"
+          description="Select the as-of date for the valuation snapshot"
+        >
+          <ReportField label="As of" htmlFor="as-of-date">
+            <Input
+              id="as-of-date"
+              type="date"
+              value={asOfDate}
+              onChange={(e) => setAsOfDate(e.target.value)}
+              className="w-48"
+            />
+          </ReportField>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAsOfDate(getTodayString())}
+          >
+            Today
           </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">
-            Inventory Valuation
-          </h1>
-          <p className="text-muted-foreground">
-            Current inventory value by category
-          </p>
-        </div>
-        <ExportMenu
-          filename={exportConfig.filename}
-          rows={exportConfig.rows}
-          disabled={exportConfig.loading}
-        />
-      </div>
-
-      {/* As-of Date Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Report Date</CardTitle>
-          <CardDescription>
-            Select the as-of date for the valuation snapshot
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="as-of-date">As of</Label>
-              <Input
-                id="as-of-date"
-                type="date"
-                value={asOfDate}
-                onChange={(e) => setAsOfDate(e.target.value)}
-                className="w-48"
-              />
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAsOfDate(getTodayString())}
-            >
-              Today
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Report</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error
-              ? error.message
-              : "Failed to load inventory valuation data"}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-              <Warehouse className="h-4 w-4" />
-              Raw Materials
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-28" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {formatCurrency(rawMaterialsTotal)}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-              <Package className="h-4 w-4" />
-              Finished Goods
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-28" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {formatCurrency(finishedGoodsTotal)}
-              </div>
-            )}
-            {!isLoading && finishedGoodsTotal === 0 && finishedGoodRows.length > 0 && (
+        </ReportFilterCard>
+      }
+      error={error}
+      errorFallback="Failed to load inventory valuation data"
+      note="Raw material values are calculated using the weighted average unit cost from purchase receipts. Finished goods values are estimated from batch ingredient costs divided by total units packaged. All quantities reflect the remaining balance after allocations (planned and completed)."
+    >
+      <ReportSummaryCards
+        loading={isLoading}
+        cards={[
+          {
+            icon: Warehouse,
+            label: "Raw Materials",
+            value: <StatValue>{formatCurrency(rawMaterialsTotal)}</StatValue>,
+            skeletonClassName: "w-28",
+          },
+          {
+            icon: Package,
+            label: "Finished Goods",
+            value: <StatValue>{formatCurrency(finishedGoodsTotal)}</StatValue>,
+            sub: finishedGoodsTotal === 0 && finishedGoodRows.length > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 Unit costs not yet tracked
               </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-              <DollarSign className="h-4 w-4" />
-              Grand Total
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-28" />
-            ) : (
-              <div className="text-2xl font-bold font-mono">
-                {formatCurrency(grandTotal)}
-              </div>
-            )}
-            {!isLoading && finishedGoodRows.length > 0 && (
+            ),
+            skeletonClassName: "w-28",
+          },
+          {
+            icon: DollarSign,
+            label: "Grand Total",
+            value: <StatValue>{formatCurrency(grandTotal)}</StatValue>,
+            sub: finishedGoodRows.length > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 Finished goods valued at estimated ingredient cost per unit
               </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            ),
+            skeletonClassName: "w-28",
+          },
+        ]}
+      />
 
       {/* Tabbed Detail Tables */}
       <Tabs
@@ -554,224 +349,143 @@ export default function InventoryValuationPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Raw Materials Tab */}
         <TabsContent value="raw-materials">
-          <Card>
-            <CardHeader>
-              <CardTitle>Raw Materials Valuation</CardTitle>
-              <CardDescription>
-                Inventory lots with remaining quantity as of {asOfDate},
-                grouped by item
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {rawLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : rawMaterialRows.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No raw material inventory found for this date
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Qty on Hand</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead className="text-right">
-                        Avg Unit Cost
-                      </TableHead>
-                      <TableHead className="text-right">Total Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rawMaterialRows.map((row, i) => {
-                      // Insert category subtotal row when category changes
-                      const prevCategory =
-                        i > 0 ? rawMaterialRows[i - 1].category : null;
-                      const showCategoryHeader =
-                        row.category !== prevCategory;
-                      const isLastInCategory =
-                        i === rawMaterialRows.length - 1 ||
-                        rawMaterialRows[i + 1].category !== row.category;
-
-                      return (
-                        <CategoryRowGroup
-                          key={`${row.itemName}-${row.unit}`}
-                          row={row}
-                          showCategoryHeader={showCategoryHeader}
-                          isLastInCategory={isLastInCategory}
-                          categoryTotal={categoryTotals.get(row.category) ?? 0}
-                        />
-                      );
-                    })}
-                    {/* Grand total */}
-                    <TableRow className="font-bold border-t-2">
-                      <TableCell colSpan={5}>Total Raw Materials</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(rawMaterialsTotal)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <ReportTableCard
+            title="Raw Materials Valuation"
+            description={`Inventory lots with remaining quantity as of ${asOfDate}, grouped by item`}
+            loading={rawLoading}
+            isEmpty={rawMaterialRows.length === 0}
+            emptyMessage="No raw material inventory found for this date"
+          >
+            <ReportTable
+              rows={rawMaterialRows}
+              rowKey={(r) => `${r.itemName}-${r.unit}`}
+              columns={[
+                { header: "Item", cellClassName: "pl-6", cell: (r) => r.itemName },
+                {
+                  header: "Category",
+                  cellClassName: "text-muted-foreground text-sm",
+                  cell: (r) => capitalize(r.category),
+                },
+                {
+                  header: "Qty on Hand",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (r) => formatQuantity(r.totalQuantity),
+                },
+                { header: "Unit", cell: (r) => r.unit },
+                {
+                  header: "Avg Unit Cost",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (r) =>
+                    r.avgUnitCost > 0 ? formatCurrency(r.avgUnitCost) : "--",
+                },
+                {
+                  header: "Total Value",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (r) =>
+                    r.totalValue > 0 ? formatCurrency(r.totalValue) : "--",
+                },
+              ]}
+              // Category header before the first row of each category, and a
+              // category subtotal after the last one.
+              renderBeforeRow={(row, i) =>
+                (i === 0 || rawMaterialRows[i - 1].category !== row.category) && (
+                  <TableRow className="bg-muted/50">
+                    <TableCell colSpan={6} className="font-semibold text-sm">
+                      {capitalize(row.category)}
+                    </TableCell>
+                  </TableRow>
+                )
+              }
+              renderAfterRow={(row, i) =>
+                (i === rawMaterialRows.length - 1 ||
+                  rawMaterialRows[i + 1].category !== row.category) && (
+                  <TableRow className="border-t">
+                    <TableCell colSpan={5} className="font-medium text-sm pl-6">
+                      Subtotal: {capitalize(row.category)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-medium">
+                      {formatCurrency(categoryTotals.get(row.category) ?? 0)}
+                    </TableCell>
+                  </TableRow>
+                )
+              }
+              footer={
+                <TableRow className="font-bold border-t-2">
+                  <TableCell colSpan={5}>Total Raw Materials</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatCurrency(rawMaterialsTotal)}
+                  </TableCell>
+                </TableRow>
+              }
+            />
+          </ReportTableCard>
         </TabsContent>
 
-        {/* Finished Goods Tab */}
         <TabsContent value="finished-goods">
-          <Card>
-            <CardHeader>
-              <CardTitle>Finished Goods Valuation</CardTitle>
-              <CardDescription>
-                Packaged products with available quantity as of {asOfDate},
-                grouped by brand and package type
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {fgLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full" />
-                  ))}
-                </div>
-              ) : finishedGoodRows.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No finished goods inventory found for this date
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Brand</TableHead>
-                      <TableHead>Package Type</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead className="text-right">
-                        Unit Cost Est.
-                      </TableHead>
-                      <TableHead className="text-right">Total Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {finishedGoodRows.map((row) => (
-                      <TableRow key={`${row.brandName}-${row.packageType}`}>
-                        <TableCell>{row.brandName}</TableCell>
-                        <TableCell>{row.packageType}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatQuantity(row.quantity, 0)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">
-                          {row.unitCostEstimate > 0
-                            ? formatCurrency(row.unitCostEstimate)
-                            : "--"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {row.totalValue > 0
-                            ? formatCurrency(row.totalValue)
-                            : "--"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {/* Total */}
-                    <TableRow className="font-bold border-t-2">
-                      <TableCell colSpan={4}>Total Finished Goods</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {finishedGoodsTotal > 0
-                          ? formatCurrency(finishedGoodsTotal)
-                          : "--"}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              )}
-              {finishedGoodRows.length > 0 && finishedGoodsTotal === 0 && (
+          <ReportTableCard
+            title="Finished Goods Valuation"
+            description={`Packaged products with available quantity as of ${asOfDate}, grouped by brand and package type`}
+            loading={fgLoading}
+            isEmpty={finishedGoodRows.length === 0}
+            emptyMessage="No finished goods inventory found for this date"
+            footer={
+              finishedGoodRows.length > 0 &&
+              finishedGoodsTotal === 0 && (
                 <p className="text-sm text-muted-foreground mt-4">
                   No ingredient cost data is available for these finished goods.
-                  Ensure batches have ingredient allocations recorded to see
-                  cost estimates here.
+                  Ensure batches have ingredient allocations recorded to see cost
+                  estimates here.
                 </p>
-              )}
-            </CardContent>
-          </Card>
+              )
+            }
+          >
+            <ReportTable
+              rows={finishedGoodRows}
+              rowKey={(r) => `${r.brandName}-${r.packageType}`}
+              columns={[
+                { header: "Brand", cell: (r) => r.brandName },
+                { header: "Package Type", cell: (r) => r.packageType },
+                {
+                  header: "Quantity",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (r) => formatQuantity(r.quantity, 0),
+                },
+                {
+                  header: "Unit Cost Est.",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono text-muted-foreground",
+                  cell: (r) =>
+                    r.unitCostEstimate > 0
+                      ? formatCurrency(r.unitCostEstimate)
+                      : "--",
+                },
+                {
+                  header: "Total Value",
+                  headClassName: "text-right",
+                  cellClassName: "text-right font-mono",
+                  cell: (r) =>
+                    r.totalValue > 0 ? formatCurrency(r.totalValue) : "--",
+                },
+              ]}
+              footer={
+                <TableRow className="font-bold border-t-2">
+                  <TableCell colSpan={4}>Total Finished Goods</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {finishedGoodsTotal > 0
+                      ? formatCurrency(finishedGoodsTotal)
+                      : "--"}
+                  </TableCell>
+                </TableRow>
+              }
+            />
+          </ReportTableCard>
         </TabsContent>
       </Tabs>
-
-      {/* Disclaimer */}
-      <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Raw material values are calculated using the
-            weighted average unit cost from purchase receipts. Finished goods
-            values are estimated from batch ingredient costs divided by total
-            units packaged. All quantities reflect the remaining balance after
-            allocations (planned and completed).
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// =============================================================================
-// Category Row Group Sub-component
-// =============================================================================
-
-/**
- * Renders a raw material row, optionally preceded by a category header
- * and followed by a category subtotal.
- */
-function CategoryRowGroup({
-  row,
-  showCategoryHeader,
-  isLastInCategory,
-  categoryTotal,
-}: {
-  row: RawMaterialRow;
-  showCategoryHeader: boolean;
-  isLastInCategory: boolean;
-  categoryTotal: number;
-}) {
-  return (
-    <>
-      {showCategoryHeader && (
-        <TableRow className="bg-muted/50">
-          <TableCell colSpan={6} className="font-semibold text-sm">
-            {capitalize(row.category)}
-          </TableCell>
-        </TableRow>
-      )}
-      <TableRow>
-        <TableCell className="pl-6">{row.itemName}</TableCell>
-        <TableCell className="text-muted-foreground text-sm">
-          {capitalize(row.category)}
-        </TableCell>
-        <TableCell className="text-right font-mono">
-          {formatQuantity(row.totalQuantity)}
-        </TableCell>
-        <TableCell>{row.unit}</TableCell>
-        <TableCell className="text-right font-mono">
-          {row.avgUnitCost > 0 ? formatCurrency(row.avgUnitCost) : "--"}
-        </TableCell>
-        <TableCell className="text-right font-mono">
-          {row.totalValue > 0 ? formatCurrency(row.totalValue) : "--"}
-        </TableCell>
-      </TableRow>
-      {isLastInCategory && (
-        <TableRow className="border-t">
-          <TableCell colSpan={5} className="font-medium text-sm pl-6">
-            Subtotal: {capitalize(row.category)}
-          </TableCell>
-          <TableCell className="text-right font-mono font-medium">
-            {formatCurrency(categoryTotal)}
-          </TableCell>
-        </TableRow>
-      )}
-    </>
+    </ReportPage>
   );
 }
