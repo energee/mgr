@@ -13,7 +13,7 @@
 import { withPermission } from "@/lib/api/auth";
 import { successResponse, errorResponse } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/errors";
-import { validateReading } from "@/domain/batch-readings";
+import { READING_TYPES, validateReading } from "@/domain/batch-readings";
 import {
   chatWriteRequestSchema,
   READING_ELIGIBLE_STATES,
@@ -34,6 +34,15 @@ export const POST = withPermission(
 
     // Single writeAction today; add cases here as more writes are gated.
     const { batchId, reading } = parsed.data.params;
+
+    if (!READING_TYPES[reading.reading_type].units.includes(reading.unit)) {
+      return errorResponse(
+        "VALIDATION_ERROR",
+        `Invalid unit "${reading.unit}" for ${READING_TYPES[reading.reading_type].label}`,
+        undefined,
+        422,
+      );
+    }
 
     const validation = validateReading(reading.reading_type, reading.value);
     if (!validation.valid) {

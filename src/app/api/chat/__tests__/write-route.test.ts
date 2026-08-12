@@ -113,6 +113,16 @@ describe("POST /api/chat/write", () => {
     expect(sb.fromSpy).not.toHaveBeenCalled();
   });
 
+  it("rejects a reading whose unit is invalid for its reading type", async () => {
+    const sb = makeSupabase({});
+    fixture.supabase = sb.supabase;
+
+    const response = await POST(request(readingBody({ unit: "fahrenheit" })));
+
+    expect(response.status).toBe(422);
+    expect(sb.fromSpy).not.toHaveBeenCalled();
+  });
+
   it("refuses batches that are not in a reading-eligible state", async () => {
     const sb = makeSupabase({
       batches: [
