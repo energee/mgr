@@ -1,0 +1,1 @@
+- **2026-08-11 (pre-PR review gate).** PreToolUse hook in `.claude/settings.json` now denies `gh pr create` until `/simplify` and `/code-review` have been run and confirmed via a one-shot `touch $(git rev-parse --git-dir)/pr-review-ok` marker; step documented in AGENTS.md "Landing the Plane".
