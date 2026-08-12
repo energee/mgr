@@ -31,7 +31,9 @@ the warning becomes noise; and it reports "fresh" for uncommitted working-tree e
 which is the most common way a graph goes wrong mid-session. The fingerprint takes
 tracked blob SHAs straight from git's index (no file reads) and overlays anything git
 reports as modified, so it survives 50 unrelated commits and goes stale the moment you
-edit a source file.
+edit a source file. The digest also folds in an `EXTRACTOR_VERSION` constant
+(`store.ts`), bumped whenever the extractor code itself changes what it emits — so a
+parser change invalidates old graphs even though `tools/codegraph/` is not an input.
 
 Auto-refresh runs the deterministic passes only (~7s, offline). LLM edges are carried
 over from the existing graph rather than re-run, since those need a subscription --

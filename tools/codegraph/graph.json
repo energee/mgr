@@ -1,9 +1,9 @@
 {
- "commit": "b484fd6e77602242ee859a50a0bdd9301eedfd11",
- "built_at": "2026-08-11T23:27:11.970Z",
+ "commit": "6fb413696b312b412d973ffeca1138fff7ba5d04",
+ "built_at": "2026-08-12T00:25:13.304Z",
  "inputs": {
   "count": 1377,
-  "digest": "fed01c42056e8c15"
+  "digest": "bd75fbf5677b8e3a"
  },
  "nodes": [
   {
@@ -7278,6 +7278,15 @@
    "extractor": "sql"
   },
   {
+   "name": "user_preferences.System can insert preferences",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'user_preferences.System can insert preferences' on user_preferences, defined in 00009_user_preferences_and_units.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00009_user_preferences_and_units.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
    "name": "00010_unified_allocations.sql",
    "type": "MIGRATION",
    "description": "Migration 00010_unified_allocations.sql.",
@@ -8551,6 +8560,42 @@
    "extractor": "sql"
   },
   {
+   "name": "batch_blends.Authenticated users can view batch blends",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'batch_blends.Authenticated users can view batch blends' on batch_blends, defined in 00055_batch_blending.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "batch_blends.Authenticated users can insert batch blends",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'batch_blends.Authenticated users can insert batch blends' on batch_blends, defined in 00055_batch_blending.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "batch_blends.Authenticated users can update batch blends",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'batch_blends.Authenticated users can update batch blends' on batch_blends, defined in 00055_batch_blending.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "batch_blends.Authenticated users can delete batch blends",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'batch_blends.Authenticated users can delete batch blends' on batch_blends, defined in 00055_batch_blending.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
    "name": "batch_blend_details",
    "type": "VIEW",
    "description": "Postgres view 'batch_blend_details', last defined in 00055_batch_blending.sql. Views are absent from the live snapshot, so this is chain-only.",
@@ -8574,6 +8619,78 @@
    "file_path": "supabase/migrations/00057_pick_list_tables.sql",
    "aliases": [],
    "extractor": "sql"
+  },
+  {
+   "name": "pick_lists.Users can view pick lists",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pick_lists.Users can view pick lists' on pick_lists, defined in 00057_pick_list_tables.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pick_lists.Users can insert pick lists",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pick_lists.Users can insert pick lists' on pick_lists, defined in 00057_pick_list_tables.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pick_lists.Users can update pick lists",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pick_lists.Users can update pick lists' on pick_lists, defined in 00057_pick_list_tables.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pick_lists.Users can delete pick lists",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pick_lists.Users can delete pick lists' on pick_lists, defined in 00057_pick_list_tables.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pick_list_items.Users can view pick list items",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pick_list_items.Users can view pick list items' on pick_list_items, defined in 00057_pick_list_tables.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pick_list_items.Users can insert pick list items",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pick_list_items.Users can insert pick list items' on pick_list_items, defined in 00057_pick_list_tables.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pick_list_items.Users can update pick list items",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pick_list_items.Users can update pick list items' on pick_list_items, defined in 00057_pick_list_tables.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pick_list_items.Users can delete pick list items",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pick_list_items.Users can delete pick list items' on pick_list_items, defined in 00057_pick_list_tables.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
   },
   {
    "name": "pick_list_details",
@@ -8926,6 +9043,78 @@
    "extractor": "sql"
   },
   {
+   "name": "keg_owners.Authenticated users can view keg owners",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'keg_owners.Authenticated users can view keg owners' on keg_owners, defined in 00079_keg_owners.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "keg_owners.Authenticated users can insert keg owners",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'keg_owners.Authenticated users can insert keg owners' on keg_owners, defined in 00079_keg_owners.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "keg_owners.Authenticated users can update keg owners",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'keg_owners.Authenticated users can update keg owners' on keg_owners, defined in 00079_keg_owners.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "keg_owners.Authenticated users can delete keg owners",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'keg_owners.Authenticated users can delete keg owners' on keg_owners, defined in 00079_keg_owners.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "keg_owner_deposits.Authenticated users can view keg owner deposits",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'keg_owner_deposits.Authenticated users can view keg owner deposits' on keg_owner_deposits, defined in 00079_keg_owners.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "keg_owner_deposits.Authenticated users can insert keg owner deposits",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'keg_owner_deposits.Authenticated users can insert keg owner deposits' on keg_owner_deposits, defined in 00079_keg_owners.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "keg_owner_deposits.Authenticated users can update keg owner deposits",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'keg_owner_deposits.Authenticated users can update keg owner deposits' on keg_owner_deposits, defined in 00079_keg_owners.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "keg_owner_deposits.Authenticated users can delete keg owner deposits",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'keg_owner_deposits.Authenticated users can delete keg owner deposits' on keg_owner_deposits, defined in 00079_keg_owners.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
    "name": "keg_inventory_with_details",
    "type": "VIEW",
    "description": "Postgres view 'keg_inventory_with_details', last defined in 00228_keg_netting_and_transfer_integrity.sql. Views are absent from the live snapshot, so this is chain-only.",
@@ -9012,12 +9201,66 @@
    "extractor": "sql"
   },
   {
+   "name": "recipe_variants.Authenticated users can manage recipe_variants",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'recipe_variants.Authenticated users can manage recipe_variants' on recipe_variants, defined in 00083_recipe_variants.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "recipe_variant_hops.Authenticated users can manage recipe_variant_hops",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'recipe_variant_hops.Authenticated users can manage recipe_variant_hops' on recipe_variant_hops, defined in 00083_recipe_variants.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "recipe_variant_adjuncts.Authenticated users can manage recipe_variant_adjuncts",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'recipe_variant_adjuncts.Authenticated users can manage recipe_variant_adjuncts' on recipe_variant_adjuncts, defined in 00083_recipe_variants.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "recipe_variant_fruits.Authenticated users can manage recipe_variant_fruits",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'recipe_variant_fruits.Authenticated users can manage recipe_variant_fruits' on recipe_variant_fruits, defined in 00083_recipe_variants.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "recipe_variant_spices.Authenticated users can manage recipe_variant_spices",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'recipe_variant_spices.Authenticated users can manage recipe_variant_spices' on recipe_variant_spices, defined in 00083_recipe_variants.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
    "name": "00084_batch_additions.sql",
    "type": "MIGRATION",
    "description": "Migration 00084_batch_additions.sql.",
    "file_path": "supabase/migrations/00084_batch_additions.sql",
    "aliases": [],
    "extractor": "sql"
+  },
+  {
+   "name": "batch_additions.Authenticated users can manage batch_additions",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'batch_additions.Authenticated users can manage batch_additions' on batch_additions, defined in 00084_batch_additions.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00084_batch_additions.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
   },
   {
    "name": "00085_variant_cost_views.sql",
@@ -9108,6 +9351,51 @@
    "extractor": "sql"
   },
   {
+   "name": "slack_settings.Authenticated users can read slack settings",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'slack_settings.Authenticated users can read slack settings' on slack_settings, defined in 00090_slack_integration.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "slack_settings.Authenticated users can update slack settings",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'slack_settings.Authenticated users can update slack settings' on slack_settings, defined in 00090_slack_integration.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "slack_notification_log.Authenticated users can read slack log",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'slack_notification_log.Authenticated users can read slack log' on slack_notification_log, defined in 00090_slack_integration.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "slack_notification_log.Anyone can insert slack log",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'slack_notification_log.Anyone can insert slack log' on slack_notification_log, defined in 00090_slack_integration.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "slack_notification_log.Anyone can update slack log",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'slack_notification_log.Anyone can update slack log' on slack_notification_log, defined in 00090_slack_integration.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
    "name": "00091_square_integration.sql",
    "type": "MIGRATION",
    "description": "Migration 00091_square_integration.sql.",
@@ -9116,9 +9404,45 @@
    "extractor": "sql"
   },
   {
+   "name": "square_settings.Authenticated users can manage square_settings",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'square_settings.Authenticated users can manage square_settings' on square_settings, defined in 00091_square_integration.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
    "name": "square_settings_safe",
    "type": "VIEW",
    "description": "Postgres view 'square_settings_safe', last defined in 00091_square_integration.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "square_catalog_map.Authenticated users can manage square_catalog_map",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'square_catalog_map.Authenticated users can manage square_catalog_map' on square_catalog_map, defined in 00091_square_integration.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "square_sync_log.Authenticated users can manage square_sync_log",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'square_sync_log.Authenticated users can manage square_sync_log' on square_sync_log, defined in 00091_square_integration.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "square_draft_sales.Authenticated users can manage square_draft_sales",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'square_draft_sales.Authenticated users can manage square_draft_sales' on square_draft_sales, defined in 00091_square_integration.sql. Not present in the live snapshot.",
    "file_path": "supabase/migrations/00091_square_integration.sql",
    "aliases": [],
    "extractor": "sql",
@@ -9220,6 +9544,24 @@
    "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
    "aliases": [],
    "extractor": "sql"
+  },
+  {
+   "name": "slack_notification_log.Authenticated users can insert slack log",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'slack_notification_log.Authenticated users can insert slack log' on slack_notification_log, defined in 00093_fix_slack_rls_policies.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "slack_notification_log.Authenticated users can update slack log",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'slack_notification_log.Authenticated users can update slack log' on slack_notification_log, defined in 00093_fix_slack_rls_policies.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
   },
   {
    "name": "00094_apply_change_request_function.sql",
@@ -9898,6 +10240,42 @@
    "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
    "aliases": [],
    "extractor": "sql"
+  },
+  {
+   "name": "brewery_shipping_defaults.Authenticated users can manage brewery_shipping_defaults",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'brewery_shipping_defaults.Authenticated users can manage brewery_shipping_defaults' on brewery_shipping_defaults, defined in 00162_order_shipping_materials.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "customer_shipping_materials.Authenticated users can manage customer_shipping_materials",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'customer_shipping_materials.Authenticated users can manage customer_shipping_materials' on customer_shipping_materials, defined in 00162_order_shipping_materials.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "customer_pallet_configs.Authenticated users can manage customer_pallet_configs",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'customer_pallet_configs.Authenticated users can manage customer_pallet_configs' on customer_pallet_configs, defined in 00162_order_shipping_materials.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "order_materials.Authenticated users can manage order_materials",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'order_materials.Authenticated users can manage order_materials' on order_materials, defined in 00162_order_shipping_materials.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
   },
   {
    "name": "00163_calculate_material_shortfalls.sql",
@@ -39398,6 +39776,34 @@
    "extractor": "sql"
   },
   {
+   "source": "00009_user_preferences_and_units.sql",
+   "predicate": "creates",
+   "target": "user_preferences.Users can view own preferences",
+   "file_path": "supabase/migrations/00009_user_preferences_and_units.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00009_user_preferences_and_units.sql",
+   "predicate": "creates",
+   "target": "user_preferences.Users can update own preferences",
+   "file_path": "supabase/migrations/00009_user_preferences_and_units.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00009_user_preferences_and_units.sql",
+   "predicate": "creates",
+   "target": "user_preferences.System can insert preferences",
+   "file_path": "supabase/migrations/00009_user_preferences_and_units.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "user_preferences.System can insert preferences",
+   "predicate": "protects",
+   "target": "user_preferences",
+   "file_path": "supabase/migrations/00009_user_preferences_and_units.sql",
+   "extractor": "sql"
+  },
+  {
    "source": "00010_unified_allocations.sql",
    "predicate": "creates",
    "target": "suppliers",
@@ -40618,6 +41024,20 @@
   {
    "source": "00013_rls_performance_fix.sql",
    "predicate": "creates",
+   "target": "user_preferences.Users can view own preferences",
+   "file_path": "supabase/migrations/00013_rls_performance_fix.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00013_rls_performance_fix.sql",
+   "predicate": "creates",
+   "target": "user_preferences.Users can update own preferences",
+   "file_path": "supabase/migrations/00013_rls_performance_fix.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00013_rls_performance_fix.sql",
+   "predicate": "creates",
    "target": "suppliers.suppliers_access",
    "file_path": "supabase/migrations/00013_rls_performance_fix.sql",
    "extractor": "sql"
@@ -41151,6 +41571,13 @@
    "source": "00014_security_fixes.sql",
    "predicate": "creates",
    "target": "get_ai_schema_context",
+   "file_path": "supabase/migrations/00014_security_fixes.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00014_security_fixes.sql",
+   "predicate": "creates",
+   "target": "user_preferences.Users can insert own preferences",
    "file_path": "supabase/migrations/00014_security_fixes.sql",
    "extractor": "sql"
   },
@@ -43166,6 +43593,62 @@
   {
    "source": "00055_batch_blending.sql",
    "predicate": "creates",
+   "target": "batch_blends.Authenticated users can view batch blends",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_blends.Authenticated users can view batch blends",
+   "predicate": "protects",
+   "target": "batch_blends",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00055_batch_blending.sql",
+   "predicate": "creates",
+   "target": "batch_blends.Authenticated users can insert batch blends",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_blends.Authenticated users can insert batch blends",
+   "predicate": "protects",
+   "target": "batch_blends",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00055_batch_blending.sql",
+   "predicate": "creates",
+   "target": "batch_blends.Authenticated users can update batch blends",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_blends.Authenticated users can update batch blends",
+   "predicate": "protects",
+   "target": "batch_blends",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00055_batch_blending.sql",
+   "predicate": "creates",
+   "target": "batch_blends.Authenticated users can delete batch blends",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_blends.Authenticated users can delete batch blends",
+   "predicate": "protects",
+   "target": "batch_blends",
+   "file_path": "supabase/migrations/00055_batch_blending.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00055_batch_blending.sql",
+   "predicate": "creates",
    "target": "batch_blend_details",
    "file_path": "supabase/migrations/00055_batch_blending.sql",
    "extractor": "sql"
@@ -43208,6 +43691,118 @@
   {
    "source": "00057_pick_list_tables.sql",
    "predicate": "creates",
+   "target": "pick_list_items",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00057_pick_list_tables.sql",
+   "predicate": "creates",
+   "target": "pick_lists.Users can view pick lists",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pick_lists.Users can view pick lists",
+   "predicate": "protects",
+   "target": "pick_lists",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00057_pick_list_tables.sql",
+   "predicate": "creates",
+   "target": "pick_lists.Users can insert pick lists",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pick_lists.Users can insert pick lists",
+   "predicate": "protects",
+   "target": "pick_lists",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00057_pick_list_tables.sql",
+   "predicate": "creates",
+   "target": "pick_lists.Users can update pick lists",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pick_lists.Users can update pick lists",
+   "predicate": "protects",
+   "target": "pick_lists",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00057_pick_list_tables.sql",
+   "predicate": "creates",
+   "target": "pick_lists.Users can delete pick lists",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pick_lists.Users can delete pick lists",
+   "predicate": "protects",
+   "target": "pick_lists",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00057_pick_list_tables.sql",
+   "predicate": "creates",
+   "target": "pick_list_items.Users can view pick list items",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pick_list_items.Users can view pick list items",
+   "predicate": "protects",
+   "target": "pick_list_items",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00057_pick_list_tables.sql",
+   "predicate": "creates",
+   "target": "pick_list_items.Users can insert pick list items",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pick_list_items.Users can insert pick list items",
+   "predicate": "protects",
+   "target": "pick_list_items",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00057_pick_list_tables.sql",
+   "predicate": "creates",
+   "target": "pick_list_items.Users can update pick list items",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pick_list_items.Users can update pick list items",
+   "predicate": "protects",
+   "target": "pick_list_items",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00057_pick_list_tables.sql",
+   "predicate": "creates",
+   "target": "pick_list_items.Users can delete pick list items",
+   "file_path": "supabase/migrations/00057_pick_list_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pick_list_items.Users can delete pick list items",
+   "predicate": "protects",
    "target": "pick_list_items",
    "file_path": "supabase/migrations/00057_pick_list_tables.sql",
    "extractor": "sql"
@@ -43413,6 +44008,90 @@
    "predicate": "protects",
    "target": "enum_values",
    "file_path": "supabase/migrations/00059_rls_initplan_and_duplicate_indexes.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "batch_blends.Authenticated users can view batch blends",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "batch_blends.Authenticated users can insert batch blends",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "batch_blends.Authenticated users can update batch blends",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "batch_blends.Authenticated users can delete batch blends",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "pick_lists.Users can view pick lists",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "pick_lists.Users can insert pick lists",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "pick_lists.Users can update pick lists",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "pick_lists.Users can delete pick lists",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "pick_list_items.Users can view pick list items",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "pick_list_items.Users can insert pick list items",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "pick_list_items.Users can update pick list items",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00062_fix_rls_initplan_batch_blends_pick_lists.sql",
+   "predicate": "creates",
+   "target": "pick_list_items.Users can delete pick list items",
+   "file_path": "supabase/migrations/00062_fix_rls_initplan_batch_blends_pick_lists.sql",
    "extractor": "sql"
   },
   {
@@ -44181,6 +44860,62 @@
   {
    "source": "00079_keg_owners.sql",
    "predicate": "creates",
+   "target": "keg_owners.Authenticated users can view keg owners",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "keg_owners.Authenticated users can view keg owners",
+   "predicate": "protects",
+   "target": "keg_owners",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00079_keg_owners.sql",
+   "predicate": "creates",
+   "target": "keg_owners.Authenticated users can insert keg owners",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "keg_owners.Authenticated users can insert keg owners",
+   "predicate": "protects",
+   "target": "keg_owners",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00079_keg_owners.sql",
+   "predicate": "creates",
+   "target": "keg_owners.Authenticated users can update keg owners",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "keg_owners.Authenticated users can update keg owners",
+   "predicate": "protects",
+   "target": "keg_owners",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00079_keg_owners.sql",
+   "predicate": "creates",
+   "target": "keg_owners.Authenticated users can delete keg owners",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "keg_owners.Authenticated users can delete keg owners",
+   "predicate": "protects",
+   "target": "keg_owners",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00079_keg_owners.sql",
+   "predicate": "creates",
    "target": "keg_owners.set_updated_at",
    "file_path": "supabase/migrations/00079_keg_owners.sql",
    "extractor": "sql"
@@ -44195,6 +44930,62 @@
   {
    "source": "00079_keg_owners.sql",
    "predicate": "creates",
+   "target": "keg_owner_deposits",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00079_keg_owners.sql",
+   "predicate": "creates",
+   "target": "keg_owner_deposits.Authenticated users can view keg owner deposits",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "keg_owner_deposits.Authenticated users can view keg owner deposits",
+   "predicate": "protects",
+   "target": "keg_owner_deposits",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00079_keg_owners.sql",
+   "predicate": "creates",
+   "target": "keg_owner_deposits.Authenticated users can insert keg owner deposits",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "keg_owner_deposits.Authenticated users can insert keg owner deposits",
+   "predicate": "protects",
+   "target": "keg_owner_deposits",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00079_keg_owners.sql",
+   "predicate": "creates",
+   "target": "keg_owner_deposits.Authenticated users can update keg owner deposits",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "keg_owner_deposits.Authenticated users can update keg owner deposits",
+   "predicate": "protects",
+   "target": "keg_owner_deposits",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00079_keg_owners.sql",
+   "predicate": "creates",
+   "target": "keg_owner_deposits.Authenticated users can delete keg owner deposits",
+   "file_path": "supabase/migrations/00079_keg_owners.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "keg_owner_deposits.Authenticated users can delete keg owner deposits",
+   "predicate": "protects",
    "target": "keg_owner_deposits",
    "file_path": "supabase/migrations/00079_keg_owners.sql",
    "extractor": "sql"
@@ -44860,6 +45651,34 @@
   {
    "source": "00083_recipe_variants.sql",
    "predicate": "creates",
+   "target": "recipe_variants.Authenticated users can manage recipe_variants",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipe_variants.Authenticated users can manage recipe_variants",
+   "predicate": "protects",
+   "target": "recipe_variants",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00083_recipe_variants.sql",
+   "predicate": "creates",
+   "target": "recipe_variant_hops",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00083_recipe_variants.sql",
+   "predicate": "creates",
+   "target": "recipe_variant_hops.Authenticated users can manage recipe_variant_hops",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipe_variant_hops.Authenticated users can manage recipe_variant_hops",
+   "predicate": "protects",
    "target": "recipe_variant_hops",
    "file_path": "supabase/migrations/00083_recipe_variants.sql",
    "extractor": "sql"
@@ -44874,6 +45693,34 @@
   {
    "source": "00083_recipe_variants.sql",
    "predicate": "creates",
+   "target": "recipe_variant_adjuncts.Authenticated users can manage recipe_variant_adjuncts",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipe_variant_adjuncts.Authenticated users can manage recipe_variant_adjuncts",
+   "predicate": "protects",
+   "target": "recipe_variant_adjuncts",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00083_recipe_variants.sql",
+   "predicate": "creates",
+   "target": "recipe_variant_fruits",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00083_recipe_variants.sql",
+   "predicate": "creates",
+   "target": "recipe_variant_fruits.Authenticated users can manage recipe_variant_fruits",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipe_variant_fruits.Authenticated users can manage recipe_variant_fruits",
+   "predicate": "protects",
    "target": "recipe_variant_fruits",
    "file_path": "supabase/migrations/00083_recipe_variants.sql",
    "extractor": "sql"
@@ -44886,8 +45733,36 @@
    "extractor": "sql"
   },
   {
+   "source": "00083_recipe_variants.sql",
+   "predicate": "creates",
+   "target": "recipe_variant_spices.Authenticated users can manage recipe_variant_spices",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipe_variant_spices.Authenticated users can manage recipe_variant_spices",
+   "predicate": "protects",
+   "target": "recipe_variant_spices",
+   "file_path": "supabase/migrations/00083_recipe_variants.sql",
+   "extractor": "sql"
+  },
+  {
    "source": "00084_batch_additions.sql",
    "predicate": "creates",
+   "target": "batch_additions",
+   "file_path": "supabase/migrations/00084_batch_additions.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00084_batch_additions.sql",
+   "predicate": "creates",
+   "target": "batch_additions.Authenticated users can manage batch_additions",
+   "file_path": "supabase/migrations/00084_batch_additions.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_additions.Authenticated users can manage batch_additions",
+   "predicate": "protects",
    "target": "batch_additions",
    "file_path": "supabase/migrations/00084_batch_additions.sql",
    "extractor": "sql"
@@ -45308,6 +46183,76 @@
   {
    "source": "00090_slack_integration.sql",
    "predicate": "creates",
+   "target": "slack_settings.Authenticated users can read slack settings",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "slack_settings.Authenticated users can read slack settings",
+   "predicate": "protects",
+   "target": "slack_settings",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00090_slack_integration.sql",
+   "predicate": "creates",
+   "target": "slack_settings.Authenticated users can update slack settings",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "slack_settings.Authenticated users can update slack settings",
+   "predicate": "protects",
+   "target": "slack_settings",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00090_slack_integration.sql",
+   "predicate": "creates",
+   "target": "slack_notification_log",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00090_slack_integration.sql",
+   "predicate": "creates",
+   "target": "slack_notification_log.Authenticated users can read slack log",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "slack_notification_log.Authenticated users can read slack log",
+   "predicate": "protects",
+   "target": "slack_notification_log",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00090_slack_integration.sql",
+   "predicate": "creates",
+   "target": "slack_notification_log.Anyone can insert slack log",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "slack_notification_log.Anyone can insert slack log",
+   "predicate": "protects",
+   "target": "slack_notification_log",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00090_slack_integration.sql",
+   "predicate": "creates",
+   "target": "slack_notification_log.Anyone can update slack log",
+   "file_path": "supabase/migrations/00090_slack_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "slack_notification_log.Anyone can update slack log",
+   "predicate": "protects",
    "target": "slack_notification_log",
    "file_path": "supabase/migrations/00090_slack_integration.sql",
    "extractor": "sql"
@@ -45322,6 +46267,20 @@
   {
    "source": "00091_square_integration.sql",
    "predicate": "creates",
+   "target": "square_settings",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00091_square_integration.sql",
+   "predicate": "creates",
+   "target": "square_settings.Authenticated users can manage square_settings",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "square_settings.Authenticated users can manage square_settings",
+   "predicate": "protects",
    "target": "square_settings",
    "file_path": "supabase/migrations/00091_square_integration.sql",
    "extractor": "sql"
@@ -45364,6 +46323,20 @@
   {
    "source": "00091_square_integration.sql",
    "predicate": "creates",
+   "target": "square_catalog_map.Authenticated users can manage square_catalog_map",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "square_catalog_map.Authenticated users can manage square_catalog_map",
+   "predicate": "protects",
+   "target": "square_catalog_map",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00091_square_integration.sql",
+   "predicate": "creates",
    "target": "square_catalog_map.set_square_catalog_map_updated_at",
    "file_path": "supabase/migrations/00091_square_integration.sql",
    "extractor": "sql"
@@ -45385,6 +46358,34 @@
   {
    "source": "00091_square_integration.sql",
    "predicate": "creates",
+   "target": "square_sync_log.Authenticated users can manage square_sync_log",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "square_sync_log.Authenticated users can manage square_sync_log",
+   "predicate": "protects",
+   "target": "square_sync_log",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00091_square_integration.sql",
+   "predicate": "creates",
+   "target": "square_draft_sales",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00091_square_integration.sql",
+   "predicate": "creates",
+   "target": "square_draft_sales.Authenticated users can manage square_draft_sales",
+   "file_path": "supabase/migrations/00091_square_integration.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "square_draft_sales.Authenticated users can manage square_draft_sales",
+   "predicate": "protects",
    "target": "square_draft_sales",
    "file_path": "supabase/migrations/00091_square_integration.sql",
    "extractor": "sql"
@@ -45569,6 +46570,48 @@
    "predicate": "protects",
    "target": "order_items",
    "file_path": "supabase/migrations/00092_change_request_tables.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00093_fix_slack_rls_policies.sql",
+   "predicate": "creates",
+   "target": "slack_settings.Authenticated users can read slack settings",
+   "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00093_fix_slack_rls_policies.sql",
+   "predicate": "creates",
+   "target": "slack_settings.Authenticated users can update slack settings",
+   "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00093_fix_slack_rls_policies.sql",
+   "predicate": "creates",
+   "target": "slack_notification_log.Authenticated users can insert slack log",
+   "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "slack_notification_log.Authenticated users can insert slack log",
+   "predicate": "protects",
+   "target": "slack_notification_log",
+   "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00093_fix_slack_rls_policies.sql",
+   "predicate": "creates",
+   "target": "slack_notification_log.Authenticated users can update slack log",
+   "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "slack_notification_log.Authenticated users can update slack log",
+   "predicate": "protects",
+   "target": "slack_notification_log",
+   "file_path": "supabase/migrations/00093_fix_slack_rls_policies.sql",
    "extractor": "sql"
   },
   {
@@ -47681,6 +48724,20 @@
   {
    "source": "00162_order_shipping_materials.sql",
    "predicate": "creates",
+   "target": "brewery_shipping_defaults.Authenticated users can manage brewery_shipping_defaults",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "brewery_shipping_defaults.Authenticated users can manage brewery_shipping_defaults",
+   "predicate": "protects",
+   "target": "brewery_shipping_defaults",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00162_order_shipping_materials.sql",
+   "predicate": "creates",
    "target": "brewery_shipping_defaults.trg_brewery_shipping_defaults_updated_at",
    "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
    "extractor": "sql"
@@ -47695,6 +48752,20 @@
   {
    "source": "00162_order_shipping_materials.sql",
    "predicate": "creates",
+   "target": "customer_shipping_materials",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00162_order_shipping_materials.sql",
+   "predicate": "creates",
+   "target": "customer_shipping_materials.Authenticated users can manage customer_shipping_materials",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "customer_shipping_materials.Authenticated users can manage customer_shipping_materials",
+   "predicate": "protects",
    "target": "customer_shipping_materials",
    "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
    "extractor": "sql"
@@ -47723,6 +48794,20 @@
   {
    "source": "00162_order_shipping_materials.sql",
    "predicate": "creates",
+   "target": "customer_pallet_configs.Authenticated users can manage customer_pallet_configs",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "customer_pallet_configs.Authenticated users can manage customer_pallet_configs",
+   "predicate": "protects",
+   "target": "customer_pallet_configs",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00162_order_shipping_materials.sql",
+   "predicate": "creates",
    "target": "customer_pallet_configs.trg_customer_pallet_configs_updated_at",
    "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
    "extractor": "sql"
@@ -47737,6 +48822,20 @@
   {
    "source": "00162_order_shipping_materials.sql",
    "predicate": "creates",
+   "target": "order_materials",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00162_order_shipping_materials.sql",
+   "predicate": "creates",
+   "target": "order_materials.Authenticated users can manage order_materials",
+   "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "order_materials.Authenticated users can manage order_materials",
+   "predicate": "protects",
    "target": "order_materials",
    "file_path": "supabase/migrations/00162_order_shipping_materials.sql",
    "extractor": "sql"

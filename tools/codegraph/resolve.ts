@@ -24,6 +24,8 @@
  * Both failure modes the cookbook names are still reported: entities that no
  * rule touched, and merges that look suspicious enough to eyeball.
  */
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import type { StoredEntity, StoredRelation } from "./schema";
 import { edgeKey, type Graph } from "./store";
 
@@ -59,12 +61,15 @@ function canonicalNameFor(
   entity: StoredEntity,
   docPathsInRepo: Set<string>,
   externalCanon: Map<string, string>,
+  isRootFile: (name: string) => boolean,
 ): string | undefined {
   if (entity.type === "DOC") {
     const stripped = normalizeDocPath(entity.name);
     if (stripped !== entity.name && docPathsInRepo.has(stripped)) return stripped;
-    // A bare filename that matches exactly one real doc path resolves to it.
-    if (!stripped.includes("/")) {
+    // A bare filename that matches exactly one real doc path resolves to it —
+    // unless the bare name is itself a real repo-root file (README.md,
+    // AGENTS.md), which would wrongly fold into a nested doc's path.
+    if (!stripped.includes("/") && !isRootFile(stripped)) {
       const matches = [...docPathsInRepo].filter((p) => p.endsWith(`/${stripped}`));
       if (matches.length === 1) return matches[0];
     }
@@ -77,10 +82,27 @@ function canonicalNameFor(
   return undefined;
 }
 
-export function resolveGraph(graph: GraphBody): {
+export function resolveGraph(
+  graph: GraphBody,
+  repoRoot?: string,
+): {
   graph: GraphBody;
   report: ResolutionReport;
 } {
+  // Repo-root files are checked lazily and memoized; without a repoRoot
+  // (unit-test callers) nothing is treated as a root file.
+  const rootFileCache = new Map<string, boolean>();
+  const isRootFile = (name: string): boolean => {
+    if (!repoRoot) return false;
+    let hit = rootFileCache.get(name);
+    if (hit === undefined) {
+      const p = join(repoRoot, name);
+      hit = existsSync(p) && statSync(p).isFile();
+      rootFileCache.set(name, hit);
+    }
+    return hit;
+  };
+
   const docPathsInRepo = new Set(
     graph.nodes
       .filter((e) => e.type === "DOC" && e.name.includes("/"))
@@ -99,7 +121,7 @@ export function resolveGraph(graph: GraphBody): {
 
   const rename = new Map<string, string>();
   for (const e of graph.nodes) {
-    const canon = canonicalNameFor(e, docPathsInRepo, externalCanon);
+    const canon = canonicalNameFor(e, docPathsInRepo, externalCanon, isRootFile);
     if (canon && canon !== e.name) rename.set(e.name, canon);
   }
 

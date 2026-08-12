@@ -159,9 +159,11 @@ export function runSqlPass(repoRoot: string): SqlPassResult {
       const stmt = decomment(stmtRaw);
 
       // CREATE POLICY <name> ON <table> ... user_has_permission('perm')
-      const pol = /create\s+policy\s+"?([a-z0-9_]+)"?\s+on\s+"?(?:public\.)?([a-z0-9_]+)"?/i.exec(stmt);
+      // Quoted names may contain spaces ("Users can view own preferences").
+      const pol = /create\s+policy\s+(?:"([^"]+)"|([a-z0-9_]+))\s+on\s+"?(?:public\.)?([a-z0-9_]+)"?/i.exec(stmt);
       if (pol) {
-        const [, policyRaw, table] = pol;
+        const [, quoted, bare, table] = pol;
+        const policyRaw = quoted ?? bare;
         const policy = `${table}.${policyRaw}`;
         addRel({ source: mig, predicate: "creates", target: policy, file_path: rel, extractor: "sql" });
         // policy may predate the snapshot node (dropped later) — only edge if known

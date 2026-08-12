@@ -14,7 +14,7 @@
  */
 import { execSync, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import type { StoredEntity, StoredRelation } from "./schema";
 import { runAstPass } from "./ast";
@@ -32,12 +32,22 @@ export type Graph = {
    * determines staleness. Comparing commits is both too noisy (it fires on
    * commits touching docs/progress or CI config, which the graph never reads)
    * and too weak (it reports "fresh" for uncommitted working-tree edits, the
-   * most common way a graph goes wrong mid-session).
+   * most common way a graph goes wrong mid-session). The digest also folds in
+   * EXTRACTOR_VERSION so extractor code changes invalidate old graphs.
    */
   inputs?: { count: number; digest: string };
   nodes: StoredEntity[];
   links: StoredRelation[];
 };
+
+/**
+ * Version of the extractor code itself, folded into the staleness digest.
+ * INPUT_GLOBS only covers extraction *inputs*, so a parser change merged
+ * without a manual rebuild would otherwise be invisible to auto-refresh
+ * forever. Bump this whenever a change under tools/codegraph/ alters what the
+ * deterministic passes emit (same idiom as PROMPT_VERSION in extract.ts).
+ */
+const EXTRACTOR_VERSION = 2;
 
 /**
  * Glob patterns for every file the extraction passes read. Keep in sync with
@@ -102,7 +112,10 @@ export function inputFingerprint(repoRoot: string): { count: number; digest: str
   entries.sort();
   return {
     count: entries.length,
-    digest: createHash("sha256").update(entries.join("\n")).digest("hex").slice(0, 16),
+    digest: createHash("sha256")
+      .update(`extractor:v${EXTRACTOR_VERSION}\n${entries.join("\n")}`)
+      .digest("hex")
+      .slice(0, 16),
   };
 }
 
@@ -197,7 +210,13 @@ export function save(
     inputs: inputs ?? inputFingerprint(repoRoot),
     ...graph,
   };
-  writeFileSync(join(repoRoot, GRAPH_PATH), JSON.stringify(out, null, 1));
+  // Write-then-rename so a concurrent reader (query.ts auto-refresh in another
+  // session) never parses a torn graph.json — same pattern as extract.ts cache
+  // entries.
+  const dest = join(repoRoot, GRAPH_PATH);
+  const tmp = `${dest}.tmp`;
+  writeFileSync(tmp, JSON.stringify(out, null, 1));
+  renameSync(tmp, dest);
   return out;
 }
 
@@ -272,7 +291,7 @@ export async function rebuild(
   parts.push(llmPart(prev, reExtracted));
 
   const { graph: merged, report } = merge(parts);
-  const { graph: resolved, report: resolution } = resolveGraph(merged);
+  const { graph: resolved, report: resolution } = resolveGraph(merged, repoRoot);
   carryProfiles(prev, resolved);
   return { graph: save(repoRoot, resolved, commit), merge: report, resolution };
 }
