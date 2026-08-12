@@ -125,11 +125,13 @@ source table's — see *Access control* below.
 | pricing_tier_prices | `00213` | Tier price changes |
 | supplier_catalog | `00282`† | Price / SKU / lead time edits and preferred-supplier changes |
 | enum_values | `00282`† | Status-option edits: label, color, sort_order, `is_default` |
+| suppliers | `00286`† | **DELETE only** — full `old_data` image per deleted row. INSERT/UPDATE deliberately untracked: the MongoDB sync upserts every supplier on every run (#694) |
 
-† `00282` is committed but **not yet applied to the live database** (#693), so
-those two rows describe the migration chain, not production. The ten rows above
-them are live — `supabase/live-catalog.snapshot.txt` lists exactly ten
-`tr_*_revision` triggers.
+† `00282` and `00286` are committed but **not yet applied to the live
+database** (#693), so those three rows describe the migration chain, not
+production. The ten rows above them are live —
+`supabase/live-catalog.snapshot.txt` lists exactly ten `tr_*_revision`
+triggers.
 
 No other table carries the trigger. In particular `brew_logs`, `vessels` and
 `inventory_items` do **not**, despite the brew-log detail page rendering a
@@ -138,10 +140,11 @@ Revision History section that is therefore permanently empty (#695).
 ### Access control
 
 Reads are gated by migration `00275` (re-stated by `00282` to add
-`supplier_catalog` and `enum_values`): `entity_revisions_select` maps
-`entity_type` to the permission the tracked table's own SELECT policy requires
-(`orders` → `orders:read`, `purchase_orders` and `supplier_catalog` →
-`purchasing:read`, and so on). Any `entity_type` not enumerated falls back to
+`supplier_catalog` and `enum_values`, then by `00286` to add `suppliers`):
+`entity_revisions_select` maps `entity_type` to the permission the tracked
+table's own SELECT policy requires (`orders` → `orders:read`,
+`purchase_orders`, `supplier_catalog` and `suppliers` → `purchasing:read`, and
+so on). Any `entity_type` not enumerated falls back to
 `settings:manage`, so a table that gains the trigger without a matching CASE
 branch is **admin-only until the branch is added** — the failure mode is
 closed, never open.

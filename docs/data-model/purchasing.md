@@ -19,6 +19,17 @@ Ingredient and material suppliers.
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
 
+**Deletion audit — migration `00286`, committed but NOT YET APPLIED LIVE
+(sequenced behind `00282`, #693).** Once pushed, every row deletion writes an
+[`entity_revisions`](system.md#entity_revisions) row
+(`entity_type = 'suppliers'`, `operation = 'DELETE'`, full `old_data` image).
+The trigger is deliberately DELETE-only: the MongoDB sync upserts every
+supplier document on every run, so an INSERT/UPDATE trigger would append one
+no-change ledger row per supplier per sync (#694). Deletion is the loss mode —
+`00252_merge_duplicate_suppliers.sql` hard-deleted supplier rows with no trail.
+Reading those revisions requires `purchasing:read`, the same permission
+`suppliers_select` requires.
+
 ---
 
 ## `supplier_catalog`
