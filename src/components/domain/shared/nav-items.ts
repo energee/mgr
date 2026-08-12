@@ -9,6 +9,22 @@
  * Shape (2026-07-12 mobile-UX spec): direct links + always-open sections.
  * Dashboard and Reports are direct links — their sub-pages are reached via
  * in-page switchers (DashboardSwitcher pills, /reports index), not the nav.
+ *
+ * Frozen-out surfaces (2.0 streamlining, node D3). These features keep their
+ * code, routes and migrations — they are simply not advertised in the primary
+ * nav, and must not be re-added here without an explicit product decision:
+ *
+ * - QuickBooks Online     — reachable via /settings/integrations
+ * - Slack notifications   — reachable via /settings/integrations
+ * - Beer-orders XLSX      — reachable via /settings/integrations/beer-orders
+ * - Keg owner/deposits    — reachable via the /inventory/kegs page links
+ *   (keg FILL identity — `keg_filled_contents` netting in packaging and
+ *   fulfilment — is a separate, live concern and is unaffected)
+ * - Inventory/Sales dashboards — reachable via the DashboardSwitcher pills
+ *
+ * Square POS is deliberately NOT frozen. Pick lists are deliberately NOT
+ * frozen (their completion transitions allocations) and stay under Sales.
+ * `nav-items.test.ts` pins this list so a regression fails the suite.
  */
 
 import {

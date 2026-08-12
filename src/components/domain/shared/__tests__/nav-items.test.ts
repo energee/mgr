@@ -1,7 +1,8 @@
 /**
  * Structural tests for the simplified navigation (spec 2026-07-12).
  * Pins: 2 direct links + 4 sections, unique rooted hrefs, the cut links
- * stay cut, and the floor destinations the mobile tab bar targets exist.
+ * stay cut, the 2.0 D3 freeze-list stays frozen out, and the floor
+ * destinations the mobile tab bar targets exist.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -44,6 +45,34 @@ describe("navigation structure", () => {
     ]) {
       expect(hrefs).not.toContain(gone);
     }
+  });
+
+  // 2.0 streamlining node D3: these features keep their code, routes and
+  // migrations but are deliberately not advertised in the primary nav. None
+  // was ever present here, so this pins the status quo against re-addition
+  // rather than recording a removal. Prefix-matched so a sub-route can't
+  // sneak back in under a frozen root.
+  it("keeps the D3 freeze-list out of the nav", () => {
+    for (const frozen of [
+      "/settings/integrations", // QuickBooks, Slack, beer-orders XLSX, MongoDB
+      "/inventory/kegs/owners", // keg owner records
+      "/inventory/kegs/reports", // deposits-outstanding money math
+    ]) {
+      for (const href of hrefs) {
+        expect(
+          href === frozen || href.startsWith(frozen + "/"),
+          `${href} must stay out of the nav (frozen root ${frozen})`
+        ).toBe(false);
+      }
+    }
+  });
+
+  // Square POS and pick lists are explicitly NOT part of the freeze: Square is
+  // a retained integration, and pick-list completion transitions allocations.
+  // Keg FILL identity lives under /inventory/kegs/transactions and is live, so
+  // only the owner/deposit routes above are frozen.
+  it("keeps keg transactions reachable via the Kegs nav entry", () => {
+    expect(hrefs).toContain("/inventory/kegs");
   });
 
   it("keeps the floor destinations the mobile tab bar targets", () => {
