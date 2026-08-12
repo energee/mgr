@@ -82,7 +82,7 @@ export const POST = withPermission(
       data: reading,
     });
     if (insertError) {
-      // Maps RLS denials (42501) to a friendly FORBIDDEN via PG_ERROR_MAP.
+      // Maps RLS denials (42501) to a friendly FORBIDDEN via PG_ERROR_TABLE.
       const apiError = handleApiError(insertError);
       return errorResponse(
         apiError.code,

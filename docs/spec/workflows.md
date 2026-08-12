@@ -542,7 +542,7 @@ async function updateWithOptimisticLock<T>(
     .single();
 
   if (count === 0) {
-    throw new ConcurrentModificationError(
+    throw new Error(
       'This record was modified by another user. Please refresh and try again.'
     );
   }

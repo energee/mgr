@@ -119,45 +119,13 @@ export function useUpdateUnitPreferences() {
   });
 }
 
-// =============================================================================
-// Utility Hooks
-// =============================================================================
-
 /**
- * Get a specific unit preference with a fallback.
+ * Unit preferences, falling back to the defaults while loading or when
+ * unauthenticated — for components that only need the resolved units (not
+ * loading state). Callers destructure the fields they use, e.g.
+ * `const { volume_unit } = useResolvedUnitPreferences()`.
  */
-export function useVolumeUnit(): VolumeUnit {
+export function useResolvedUnitPreferences(): UnitPreferences {
   const { data } = useUnitPreferences();
-  return data?.volume_unit ?? "bbl";
-}
-
-export function useWeightUnit(): WeightUnit {
-  const { data } = useUnitPreferences();
-  return data?.weight_unit ?? "lbs";
-}
-
-export function useTemperatureUnit(): TemperatureUnit {
-  const { data } = useUnitPreferences();
-  return data?.temperature_unit ?? "f";
-}
-
-export function useGravityUnit(): GravityUnit {
-  const { data } = useUnitPreferences();
-  return data?.gravity_unit ?? "plato";
-}
-
-/**
- * Composite preferences for `extractBrewMeasurements` and other helpers
- * that highlight a brew day's mash temp / gravity / volume in one go.
- */
-export function useBrewMeasurementUnits(): {
-  temperature: TemperatureUnit;
-  gravity: GravityUnit;
-  volume: VolumeUnit;
-} {
-  return {
-    temperature: useTemperatureUnit(),
-    gravity: useGravityUnit(),
-    volume: useVolumeUnit(),
-  };
+  return data ?? DEFAULT_UNIT_PREFERENCES;
 }

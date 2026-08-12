@@ -165,7 +165,7 @@ All tools are defined in `src/app/api/chat/tools.ts` and bound to the authentica
 
 ### Navigation Tools (Write via Form Pre-fill)
 
-Navigation tools validate inputs server-side, then return a `NavigationIntent` object. The chat panel renders this as an action card with an "Open Form" button. Clicking stores prefill data in a zustand store and navigates to the target form/dialog.
+Navigation tools validate inputs server-side, then return a `NavigationIntent` object. The chat panel renders this as an action card with an "Open Form" button. Clicking stores prefill data in the sessionStorage-backed prefill store (`setPrefill`) and navigates to the target form/dialog.
 
 | Tool | Description | Input |
 |------|-------------|-------|
@@ -639,7 +639,7 @@ SRM = 1.4922 * MCU^0.6859
 - `src/app/api/chat/tools.ts` — Tool definitions (32 read tools + 3 navigation tools)
 
 ### Prefill Store
-- `src/contexts/prefill-store.ts` — Zustand store for NavigationIntent data (prefill + dialog auto-open)
+- `src/contexts/prefill-store.ts` — sessionStorage-backed prefill handoff (`setPrefill` / `consumePrefill`) for NavigationIntent data (prefill + dialog auto-open)
 
 ### AI Library
 - `src/domain/ai/index.ts` — Public exports

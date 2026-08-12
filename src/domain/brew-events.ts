@@ -32,6 +32,22 @@ const DEFAULT_UNITS: BrewMeasurementUnits = {
   volume: "bbl",
 };
 
+/**
+ * Adapt snake_case unit preferences (see `useUnitPreferences`) to the
+ * `BrewMeasurementUnits` shape `extractBrewMeasurements` consumes.
+ */
+export function toBrewMeasurementUnits(prefs: {
+  temperature_unit: TemperatureUnit;
+  gravity_unit: GravityUnit;
+  volume_unit: VolumeUnit;
+}): BrewMeasurementUnits {
+  return {
+    temperature: prefs.temperature_unit,
+    gravity: prefs.gravity_unit,
+    volume: prefs.volume_unit,
+  };
+}
+
 function findMeasurement(
   events: BrewEvent[],
   phases: string[],

@@ -1,9 +1,9 @@
 {
- "commit": "6fb413696b312b412d973ffeca1138fff7ba5d04",
- "built_at": "2026-08-12T00:25:13.304Z",
+ "commit": "3998475d02ef21eab8805dc55be26e4d3b7e6e40",
+ "built_at": "2026-08-12T17:58:32.628Z",
  "inputs": {
-  "count": 1377,
-  "digest": "bd75fbf5677b8e3a"
+  "count": 1389,
+  "digest": "9267b7a1144ecf7e"
  },
  "nodes": [
   {
@@ -11402,6 +11402,48 @@
    "extractor": "sql"
   },
   {
+   "name": "00285_capture_channel_formats.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00285_capture_channel_formats.sql.",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "pricing_channel_formats.pricing_channel_formats_select",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pricing_channel_formats.pricing_channel_formats_select' on pricing_channel_formats, defined in 00285_capture_channel_formats.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pricing_channel_formats.pricing_channel_formats_write",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pricing_channel_formats.pricing_channel_formats_write' on pricing_channel_formats, defined in 00285_capture_channel_formats.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "00286_suppliers_delete_revision_trail.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00286_suppliers_delete_revision_trail.sql.",
+   "file_path": "supabase/migrations/00286_suppliers_delete_revision_trail.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "00287_ttb_period_keyed_in_process.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00287_ttb_period_keyed_in_process.sql.",
+   "file_path": "supabase/migrations/00287_ttb_period_keyed_in_process.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
    "name": "20260416162155_remote_applied.sql",
    "type": "MIGRATION",
    "description": "Migration 20260416162155_remote_applied.sql.",
@@ -11922,6 +11964,22 @@
    "extractor": "ast"
   },
   {
+   "name": "src/__tests__/integration/suppliers-revisions.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/suppliers-revisions.test.ts.",
+   "file_path": "src/__tests__/integration/suppliers-revisions.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/ttb-in-process-period-keyed.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/ttb-in-process-period-keyed.test.ts.",
+   "file_path": "src/__tests__/integration/ttb-in-process-period-keyed.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
    "name": "src/__tests__/integration/ttb-loss-reconciliation.test.ts",
    "type": "TEST",
    "description": "TEST at src/__tests__/integration/ttb-loss-reconciliation.test.ts.",
@@ -12118,6 +12176,52 @@
    "extractor": "ast"
   },
   {
+   "name": "src/lib/api/errors.ts",
+   "type": "MODULE",
+   "description": "Source module at src/lib/api/errors.ts.",
+   "file_path": "src/lib/api/errors.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/api/errors.ts#handleApiError",
+   "type": "FUNCTION",
+   "description": "Exported function 'handleApiError' in src/lib/api/errors.ts.",
+   "file_path": "src/lib/api/errors.ts",
+   "aliases": [
+    "handleApiError"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/pg-error-codes.ts",
+   "type": "MODULE",
+   "description": "Source module at src/lib/pg-error-codes.ts.",
+   "file_path": "src/lib/pg-error-codes.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/pg-error-codes.ts#PG_ERROR_CODES",
+   "type": "FUNCTION",
+   "description": "Exported function 'PG_ERROR_CODES' in src/lib/pg-error-codes.ts.",
+   "file_path": "src/lib/pg-error-codes.ts",
+   "aliases": [
+    "PG_ERROR_CODES"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/pg-error-codes.ts#PG_ERROR_TABLE",
+   "type": "FUNCTION",
+   "description": "Exported function 'PG_ERROR_TABLE' in src/lib/pg-error-codes.ts.",
+   "file_path": "src/lib/pg-error-codes.ts",
+   "aliases": [
+    "PG_ERROR_TABLE"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/services/types.ts",
    "type": "SERVICE",
    "description": "SERVICE at src/services/types.ts.",
@@ -12215,52 +12319,6 @@
    "extractor": "ast"
   },
   {
-   "name": "src/lib/pg-error-codes.ts",
-   "type": "MODULE",
-   "description": "Source module at src/lib/pg-error-codes.ts.",
-   "file_path": "src/lib/pg-error-codes.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/pg-error-codes.ts#PG_ERROR_CODES",
-   "type": "FUNCTION",
-   "description": "Exported function 'PG_ERROR_CODES' in src/lib/pg-error-codes.ts.",
-   "file_path": "src/lib/pg-error-codes.ts",
-   "aliases": [
-    "PG_ERROR_CODES"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/pg-error-codes.ts#PG_ERROR_MESSAGES",
-   "type": "FUNCTION",
-   "description": "Exported function 'PG_ERROR_MESSAGES' in src/lib/pg-error-codes.ts.",
-   "file_path": "src/lib/pg-error-codes.ts",
-   "aliases": [
-    "PG_ERROR_MESSAGES"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/api/errors.ts",
-   "type": "MODULE",
-   "description": "Source module at src/lib/api/errors.ts.",
-   "file_path": "src/lib/api/errors.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/api/errors.ts#handleApiError",
-   "type": "FUNCTION",
-   "description": "Exported function 'handleApiError' in src/lib/api/errors.ts.",
-   "file_path": "src/lib/api/errors.ts",
-   "aliases": [
-    "handleApiError"
-   ],
-   "extractor": "ast"
-  },
-  {
    "name": "src/lib/api/auth.ts",
    "type": "MODULE",
    "description": "Source module at src/lib/api/auth.ts.",
@@ -12327,16 +12385,6 @@
    "extractor": "ast"
   },
   {
-   "name": "src/lib/api/validation.ts#validateParams",
-   "type": "FUNCTION",
-   "description": "Exported function 'validateParams' in src/lib/api/validation.ts.",
-   "file_path": "src/lib/api/validation.ts",
-   "aliases": [
-    "validateParams"
-   ],
-   "extractor": "ast"
-  },
-  {
    "name": "src/lib/api/validation.ts#validateSearchParams",
    "type": "FUNCTION",
    "description": "Exported function 'validateSearchParams' in src/lib/api/validation.ts.",
@@ -12344,42 +12392,6 @@
    "aliases": [
     "validateSearchParams"
    ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/api/rate-limit.ts",
-   "type": "MODULE",
-   "description": "Source module at src/lib/api/rate-limit.ts.",
-   "file_path": "src/lib/api/rate-limit.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/api/rate-limit.ts#rateLimit",
-   "type": "FUNCTION",
-   "description": "Exported function 'rateLimit' in src/lib/api/rate-limit.ts.",
-   "file_path": "src/lib/api/rate-limit.ts",
-   "aliases": [
-    "rateLimit"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/api/rate-limit.ts#getClientIp",
-   "type": "FUNCTION",
-   "description": "Exported function 'getClientIp' in src/lib/api/rate-limit.ts.",
-   "file_path": "src/lib/api/rate-limit.ts",
-   "aliases": [
-    "getClientIp"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/api/index.ts",
-   "type": "MODULE",
-   "description": "Source module at src/lib/api/index.ts.",
-   "file_path": "src/lib/api/index.ts",
-   "aliases": [],
    "extractor": "ast"
   },
   {
@@ -13137,16 +13149,6 @@
    "extractor": "ast"
   },
   {
-   "name": "src/lib/query-keys.ts#customerKeys",
-   "type": "FUNCTION",
-   "description": "Exported function 'customerKeys' in src/lib/query-keys.ts.",
-   "file_path": "src/lib/query-keys.ts",
-   "aliases": [
-    "customerKeys"
-   ],
-   "extractor": "ast"
-  },
-  {
    "name": "src/lib/query-keys.ts#userKeys",
    "type": "FUNCTION",
    "description": "Exported function 'userKeys' in src/lib/query-keys.ts.",
@@ -13610,6 +13612,420 @@
    "file_path": "src/lib/help-content.ts",
    "aliases": [
     "getHelpContentForSystemPrompt"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts",
+   "type": "MODULE",
+   "description": "Source module at src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#VOLUME_CONVERSIONS",
+   "type": "FUNCTION",
+   "description": "Exported function 'VOLUME_CONVERSIONS' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "VOLUME_CONVERSIONS"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#RETAIL_VOLUME_CONVERSIONS",
+   "type": "FUNCTION",
+   "description": "Exported function 'RETAIL_VOLUME_CONVERSIONS' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "RETAIL_VOLUME_CONVERSIONS"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#WEIGHT_CONVERSIONS",
+   "type": "FUNCTION",
+   "description": "Exported function 'WEIGHT_CONVERSIONS' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "WEIGHT_CONVERSIONS"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#UNIT_LABELS",
+   "type": "FUNCTION",
+   "description": "Exported function 'UNIT_LABELS' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "UNIT_LABELS"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#convertVolume",
+   "type": "FUNCTION",
+   "description": "Exported function 'convertVolume' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "convertVolume"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#formatVolume",
+   "type": "FUNCTION",
+   "description": "Exported function 'formatVolume' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "formatVolume"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#parseVolumeInput",
+   "type": "FUNCTION",
+   "description": "Exported function 'parseVolumeInput' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "parseVolumeInput"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#volumeToDisplay",
+   "type": "FUNCTION",
+   "description": "Exported function 'volumeToDisplay' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "volumeToDisplay"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#convertRetailVolume",
+   "type": "FUNCTION",
+   "description": "Exported function 'convertRetailVolume' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "convertRetailVolume"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#formatRetailVolume",
+   "type": "FUNCTION",
+   "description": "Exported function 'formatRetailVolume' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "formatRetailVolume"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#parseRetailVolumeInput",
+   "type": "FUNCTION",
+   "description": "Exported function 'parseRetailVolumeInput' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "parseRetailVolumeInput"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#convertWeight",
+   "type": "FUNCTION",
+   "description": "Exported function 'convertWeight' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "convertWeight"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#formatWeight",
+   "type": "FUNCTION",
+   "description": "Exported function 'formatWeight' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "formatWeight"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#parseWeightInput",
+   "type": "FUNCTION",
+   "description": "Exported function 'parseWeightInput' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "parseWeightInput"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#weightToDisplay",
+   "type": "FUNCTION",
+   "description": "Exported function 'weightToDisplay' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "weightToDisplay"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#convertIngredientQuantity",
+   "type": "FUNCTION",
+   "description": "Exported function 'convertIngredientQuantity' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "convertIngredientQuantity"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#convertTemperature",
+   "type": "FUNCTION",
+   "description": "Exported function 'convertTemperature' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "convertTemperature"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#formatTemperature",
+   "type": "FUNCTION",
+   "description": "Exported function 'formatTemperature' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "formatTemperature"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#parseTemperatureInput",
+   "type": "FUNCTION",
+   "description": "Exported function 'parseTemperatureInput' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "parseTemperatureInput"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#formatTemperatureRange",
+   "type": "FUNCTION",
+   "description": "Exported function 'formatTemperatureRange' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "formatTemperatureRange"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#platoToSg",
+   "type": "FUNCTION",
+   "description": "Exported function 'platoToSg' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "platoToSg"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#sgToPlato",
+   "type": "FUNCTION",
+   "description": "Exported function 'sgToPlato' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "sgToPlato"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#convertGravity",
+   "type": "FUNCTION",
+   "description": "Exported function 'convertGravity' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "convertGravity"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#formatGravity",
+   "type": "FUNCTION",
+   "description": "Exported function 'formatGravity' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "formatGravity"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#formatGravityFromSg",
+   "type": "FUNCTION",
+   "description": "Exported function 'formatGravityFromSg' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "formatGravityFromSg"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#parseGravityInput",
+   "type": "FUNCTION",
+   "description": "Exported function 'parseGravityInput' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "parseGravityInput"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#getUnitOptions",
+   "type": "FUNCTION",
+   "description": "Exported function 'getUnitOptions' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "getUnitOptions"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#getUnitLabel",
+   "type": "FUNCTION",
+   "description": "Exported function 'getUnitLabel' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "getUnitLabel"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#getNextUnit",
+   "type": "FUNCTION",
+   "description": "Exported function 'getNextUnit' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "getNextUnit"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#toDisplayValue",
+   "type": "FUNCTION",
+   "description": "Exported function 'toDisplayValue' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "toDisplayValue"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/units.ts#toCanonicalValue",
+   "type": "FUNCTION",
+   "description": "Exported function 'toCanonicalValue' in src/domain/units.ts.",
+   "file_path": "src/domain/units.ts",
+   "aliases": [
+    "toCanonicalValue"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/batch-readings.ts",
+   "type": "MODULE",
+   "description": "Source module at src/domain/batch-readings.ts.",
+   "file_path": "src/domain/batch-readings.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/batch-readings.ts#READING_TYPES",
+   "type": "FUNCTION",
+   "description": "Exported function 'READING_TYPES' in src/domain/batch-readings.ts.",
+   "file_path": "src/domain/batch-readings.ts",
+   "aliases": [
+    "READING_TYPES"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/batch-readings.ts#validateReading",
+   "type": "FUNCTION",
+   "description": "Exported function 'validateReading' in src/domain/batch-readings.ts.",
+   "file_path": "src/domain/batch-readings.ts",
+   "aliases": [
+    "validateReading"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/batch-readings.ts#convertGravity",
+   "type": "FUNCTION",
+   "description": "Exported function 'convertGravity' in src/domain/batch-readings.ts.",
+   "file_path": "src/domain/batch-readings.ts",
+   "aliases": [
+    "convertGravity"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/batch-readings.ts#formatReadingValue",
+   "type": "FUNCTION",
+   "description": "Exported function 'formatReadingValue' in src/domain/batch-readings.ts.",
+   "file_path": "src/domain/batch-readings.ts",
+   "aliases": [
+    "formatReadingValue"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/batch-readings.ts#getUnitLabel",
+   "type": "FUNCTION",
+   "description": "Exported function 'getUnitLabel' in src/domain/batch-readings.ts.",
+   "file_path": "src/domain/batch-readings.ts",
+   "aliases": [
+    "getUnitLabel"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/schemas/chat-write.ts",
+   "type": "MODULE",
+   "description": "Source module at src/lib/schemas/chat-write.ts.",
+   "file_path": "src/lib/schemas/chat-write.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/schemas/chat-write.ts#READING_ELIGIBLE_STATES",
+   "type": "FUNCTION",
+   "description": "Exported function 'READING_ELIGIBLE_STATES' in src/lib/schemas/chat-write.ts.",
+   "file_path": "src/lib/schemas/chat-write.ts",
+   "aliases": [
+    "READING_ELIGIBLE_STATES"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/schemas/chat-write.ts#batchReadingSchema",
+   "type": "FUNCTION",
+   "description": "Exported function 'batchReadingSchema' in src/lib/schemas/chat-write.ts.",
+   "file_path": "src/lib/schemas/chat-write.ts",
+   "aliases": [
+    "batchReadingSchema"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/schemas/chat-write.ts#chatWriteRequestSchema",
+   "type": "FUNCTION",
+   "description": "Exported function 'chatWriteRequestSchema' in src/lib/schemas/chat-write.ts.",
+   "file_path": "src/lib/schemas/chat-write.ts",
+   "aliases": [
+    "chatWriteRequestSchema"
    ],
    "extractor": "ast"
   },
@@ -15456,11 +15872,111 @@
    "extractor": "ast"
   },
   {
+   "name": "src/test/supabase-mock.ts",
+   "type": "MODULE",
+   "description": "Source module at src/test/supabase-mock.ts.",
+   "file_path": "src/test/supabase-mock.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/test/supabase-mock.ts#makeQueryBuilder",
+   "type": "FUNCTION",
+   "description": "Exported function 'makeQueryBuilder' in src/test/supabase-mock.ts.",
+   "file_path": "src/test/supabase-mock.ts",
+   "aliases": [
+    "makeQueryBuilder"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/test/supabase-mock.ts#makeSupabase",
+   "type": "FUNCTION",
+   "description": "Exported function 'makeSupabase' in src/test/supabase-mock.ts.",
+   "file_path": "src/test/supabase-mock.ts",
+   "aliases": [
+    "makeSupabase"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/test/supabase-mock.ts#throwingSupabase",
+   "type": "FUNCTION",
+   "description": "Exported function 'throwingSupabase' in src/test/supabase-mock.ts.",
+   "file_path": "src/test/supabase-mock.ts",
+   "aliases": [
+    "throwingSupabase"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/app/api/chat/__tests__/record-reading-tool.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/app/api/chat/__tests__/record-reading-tool.test.ts.",
+   "file_path": "src/app/api/chat/__tests__/record-reading-tool.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
    "name": "src/app/api/chat/__tests__/route-authorization.test.ts",
    "type": "TEST",
    "description": "TEST at src/app/api/chat/__tests__/route-authorization.test.ts.",
    "file_path": "src/app/api/chat/__tests__/route-authorization.test.ts",
    "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/app/api/chat/write/route.ts",
+   "type": "MODULE",
+   "description": "Source module at src/app/api/chat/write/route.ts.",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "POST /api/chat/write",
+   "type": "API_ENDPOINT",
+   "description": "HTTP POST handler for /api/chat/write.",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "aliases": [
+    "POST"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/app/api/chat/__tests__/write-route.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/app/api/chat/__tests__/write-route.test.ts.",
+   "file_path": "src/app/api/chat/__tests__/write-route.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/api/rate-limit.ts",
+   "type": "MODULE",
+   "description": "Source module at src/lib/api/rate-limit.ts.",
+   "file_path": "src/lib/api/rate-limit.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/api/rate-limit.ts#rateLimit",
+   "type": "FUNCTION",
+   "description": "Exported function 'rateLimit' in src/lib/api/rate-limit.ts.",
+   "file_path": "src/lib/api/rate-limit.ts",
+   "aliases": [
+    "rateLimit"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/api/rate-limit.ts#getClientIp",
+   "type": "FUNCTION",
+   "description": "Exported function 'getClientIp' in src/lib/api/rate-limit.ts.",
+   "file_path": "src/lib/api/rate-limit.ts",
+   "aliases": [
+    "getClientIp"
+   ],
    "extractor": "ast"
   },
   {
@@ -16634,44 +17150,6 @@
    "extractor": "ast"
   },
   {
-   "name": "src/test/supabase-mock.ts",
-   "type": "MODULE",
-   "description": "Source module at src/test/supabase-mock.ts.",
-   "file_path": "src/test/supabase-mock.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/test/supabase-mock.ts#makeQueryBuilder",
-   "type": "FUNCTION",
-   "description": "Exported function 'makeQueryBuilder' in src/test/supabase-mock.ts.",
-   "file_path": "src/test/supabase-mock.ts",
-   "aliases": [
-    "makeQueryBuilder"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/test/supabase-mock.ts#makeSupabase",
-   "type": "FUNCTION",
-   "description": "Exported function 'makeSupabase' in src/test/supabase-mock.ts.",
-   "file_path": "src/test/supabase-mock.ts",
-   "aliases": [
-    "makeSupabase"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/test/supabase-mock.ts#throwingSupabase",
-   "type": "FUNCTION",
-   "description": "Exported function 'throwingSupabase' in src/test/supabase-mock.ts.",
-   "file_path": "src/test/supabase-mock.ts",
-   "aliases": [
-    "throwingSupabase"
-   ],
-   "extractor": "ast"
-  },
-  {
    "name": "src/app/api/orders/[id]/change-requests/[requestId]/reject/__tests__/route.test.ts",
    "type": "TEST",
    "description": "TEST at src/app/api/orders/[id]/change-requests/[requestId]/reject/__tests__/route.test.ts.",
@@ -17040,324 +17518,6 @@
    "file_path": "src/domain/inventory-units.ts",
    "aliases": [
     "ratioFromDecimal"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts",
-   "type": "MODULE",
-   "description": "Source module at src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#VOLUME_CONVERSIONS",
-   "type": "FUNCTION",
-   "description": "Exported function 'VOLUME_CONVERSIONS' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "VOLUME_CONVERSIONS"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#RETAIL_VOLUME_CONVERSIONS",
-   "type": "FUNCTION",
-   "description": "Exported function 'RETAIL_VOLUME_CONVERSIONS' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "RETAIL_VOLUME_CONVERSIONS"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#WEIGHT_CONVERSIONS",
-   "type": "FUNCTION",
-   "description": "Exported function 'WEIGHT_CONVERSIONS' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "WEIGHT_CONVERSIONS"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#UNIT_LABELS",
-   "type": "FUNCTION",
-   "description": "Exported function 'UNIT_LABELS' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "UNIT_LABELS"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#convertVolume",
-   "type": "FUNCTION",
-   "description": "Exported function 'convertVolume' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "convertVolume"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#formatVolume",
-   "type": "FUNCTION",
-   "description": "Exported function 'formatVolume' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "formatVolume"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#parseVolumeInput",
-   "type": "FUNCTION",
-   "description": "Exported function 'parseVolumeInput' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "parseVolumeInput"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#volumeToDisplay",
-   "type": "FUNCTION",
-   "description": "Exported function 'volumeToDisplay' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "volumeToDisplay"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#convertRetailVolume",
-   "type": "FUNCTION",
-   "description": "Exported function 'convertRetailVolume' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "convertRetailVolume"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#formatRetailVolume",
-   "type": "FUNCTION",
-   "description": "Exported function 'formatRetailVolume' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "formatRetailVolume"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#parseRetailVolumeInput",
-   "type": "FUNCTION",
-   "description": "Exported function 'parseRetailVolumeInput' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "parseRetailVolumeInput"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#convertWeight",
-   "type": "FUNCTION",
-   "description": "Exported function 'convertWeight' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "convertWeight"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#formatWeight",
-   "type": "FUNCTION",
-   "description": "Exported function 'formatWeight' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "formatWeight"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#parseWeightInput",
-   "type": "FUNCTION",
-   "description": "Exported function 'parseWeightInput' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "parseWeightInput"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#weightToDisplay",
-   "type": "FUNCTION",
-   "description": "Exported function 'weightToDisplay' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "weightToDisplay"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#convertIngredientQuantity",
-   "type": "FUNCTION",
-   "description": "Exported function 'convertIngredientQuantity' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "convertIngredientQuantity"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#convertTemperature",
-   "type": "FUNCTION",
-   "description": "Exported function 'convertTemperature' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "convertTemperature"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#formatTemperature",
-   "type": "FUNCTION",
-   "description": "Exported function 'formatTemperature' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "formatTemperature"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#parseTemperatureInput",
-   "type": "FUNCTION",
-   "description": "Exported function 'parseTemperatureInput' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "parseTemperatureInput"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#formatTemperatureRange",
-   "type": "FUNCTION",
-   "description": "Exported function 'formatTemperatureRange' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "formatTemperatureRange"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#platoToSg",
-   "type": "FUNCTION",
-   "description": "Exported function 'platoToSg' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "platoToSg"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#sgToPlato",
-   "type": "FUNCTION",
-   "description": "Exported function 'sgToPlato' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "sgToPlato"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#convertGravity",
-   "type": "FUNCTION",
-   "description": "Exported function 'convertGravity' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "convertGravity"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#formatGravity",
-   "type": "FUNCTION",
-   "description": "Exported function 'formatGravity' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "formatGravity"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#formatGravityFromSg",
-   "type": "FUNCTION",
-   "description": "Exported function 'formatGravityFromSg' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "formatGravityFromSg"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#parseGravityInput",
-   "type": "FUNCTION",
-   "description": "Exported function 'parseGravityInput' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "parseGravityInput"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#getUnitOptions",
-   "type": "FUNCTION",
-   "description": "Exported function 'getUnitOptions' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "getUnitOptions"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#getUnitLabel",
-   "type": "FUNCTION",
-   "description": "Exported function 'getUnitLabel' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "getUnitLabel"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#getNextUnit",
-   "type": "FUNCTION",
-   "description": "Exported function 'getNextUnit' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "getNextUnit"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#toDisplayValue",
-   "type": "FUNCTION",
-   "description": "Exported function 'toDisplayValue' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "toDisplayValue"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/units.ts#toCanonicalValue",
-   "type": "FUNCTION",
-   "description": "Exported function 'toCanonicalValue' in src/domain/units.ts.",
-   "file_path": "src/domain/units.ts",
-   "aliases": [
-    "toCanonicalValue"
    ],
    "extractor": "ast"
   },
@@ -18416,6 +18576,32 @@
    "type": "TEST",
    "description": "TEST at src/components/domain/__tests__/vessel-transfer-dedup.test.ts.",
    "file_path": "src/components/domain/__tests__/vessel-transfer-dedup.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/inventory/keg-owner-deposits-plan.ts",
+   "type": "MODULE",
+   "description": "Source module at src/components/domain/inventory/keg-owner-deposits-plan.ts.",
+   "file_path": "src/components/domain/inventory/keg-owner-deposits-plan.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/inventory/keg-owner-deposits-plan.ts#planDepositSave",
+   "type": "FUNCTION",
+   "description": "Exported function 'planDepositSave' in src/components/domain/inventory/keg-owner-deposits-plan.ts.",
+   "file_path": "src/components/domain/inventory/keg-owner-deposits-plan.ts",
+   "aliases": [
+    "planDepositSave"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/inventory/__tests__/keg-owner-deposits-plan.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/components/domain/inventory/__tests__/keg-owner-deposits-plan.test.ts.",
+   "file_path": "src/components/domain/inventory/__tests__/keg-owner-deposits-plan.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -20416,6 +20602,16 @@
    "extractor": "ast"
   },
   {
+   "name": "src/components/domain/shared/nav-items.ts#isNavSection",
+   "type": "FUNCTION",
+   "description": "Exported function 'isNavSection' in src/components/domain/shared/nav-items.ts.",
+   "file_path": "src/components/domain/shared/nav-items.ts",
+   "aliases": [
+    "isNavSection"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/components/domain/shared/nav-items.ts#navigation",
    "type": "FUNCTION",
    "description": "Exported function 'navigation' in src/components/domain/shared/nav-items.ts.",
@@ -20622,52 +20818,12 @@
    "extractor": "ast"
   },
   {
-   "name": "src/hooks/use-unit-preferences.ts#useVolumeUnit",
+   "name": "src/hooks/use-unit-preferences.ts#useResolvedUnitPreferences",
    "type": "FUNCTION",
-   "description": "Exported function 'useVolumeUnit' in src/hooks/use-unit-preferences.ts.",
+   "description": "Exported function 'useResolvedUnitPreferences' in src/hooks/use-unit-preferences.ts.",
    "file_path": "src/hooks/use-unit-preferences.ts",
    "aliases": [
-    "useVolumeUnit"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/hooks/use-unit-preferences.ts#useWeightUnit",
-   "type": "FUNCTION",
-   "description": "Exported function 'useWeightUnit' in src/hooks/use-unit-preferences.ts.",
-   "file_path": "src/hooks/use-unit-preferences.ts",
-   "aliases": [
-    "useWeightUnit"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/hooks/use-unit-preferences.ts#useTemperatureUnit",
-   "type": "FUNCTION",
-   "description": "Exported function 'useTemperatureUnit' in src/hooks/use-unit-preferences.ts.",
-   "file_path": "src/hooks/use-unit-preferences.ts",
-   "aliases": [
-    "useTemperatureUnit"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/hooks/use-unit-preferences.ts#useGravityUnit",
-   "type": "FUNCTION",
-   "description": "Exported function 'useGravityUnit' in src/hooks/use-unit-preferences.ts.",
-   "file_path": "src/hooks/use-unit-preferences.ts",
-   "aliases": [
-    "useGravityUnit"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/hooks/use-unit-preferences.ts#useBrewMeasurementUnits",
-   "type": "FUNCTION",
-   "description": "Exported function 'useBrewMeasurementUnits' in src/hooks/use-unit-preferences.ts.",
-   "file_path": "src/hooks/use-unit-preferences.ts",
-   "aliases": [
-    "useBrewMeasurementUnits"
+    "useResolvedUnitPreferences"
    ],
    "extractor": "ast"
   },
@@ -20830,64 +20986,6 @@
    "extractor": "ast"
   },
   {
-   "name": "src/domain/batch-readings.ts",
-   "type": "MODULE",
-   "description": "Source module at src/domain/batch-readings.ts.",
-   "file_path": "src/domain/batch-readings.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/batch-readings.ts#READING_TYPES",
-   "type": "FUNCTION",
-   "description": "Exported function 'READING_TYPES' in src/domain/batch-readings.ts.",
-   "file_path": "src/domain/batch-readings.ts",
-   "aliases": [
-    "READING_TYPES"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/batch-readings.ts#validateReading",
-   "type": "FUNCTION",
-   "description": "Exported function 'validateReading' in src/domain/batch-readings.ts.",
-   "file_path": "src/domain/batch-readings.ts",
-   "aliases": [
-    "validateReading"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/batch-readings.ts#convertGravity",
-   "type": "FUNCTION",
-   "description": "Exported function 'convertGravity' in src/domain/batch-readings.ts.",
-   "file_path": "src/domain/batch-readings.ts",
-   "aliases": [
-    "convertGravity"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/batch-readings.ts#formatReadingValue",
-   "type": "FUNCTION",
-   "description": "Exported function 'formatReadingValue' in src/domain/batch-readings.ts.",
-   "file_path": "src/domain/batch-readings.ts",
-   "aliases": [
-    "formatReadingValue"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/domain/batch-readings.ts#getUnitLabel",
-   "type": "FUNCTION",
-   "description": "Exported function 'getUnitLabel' in src/domain/batch-readings.ts.",
-   "file_path": "src/domain/batch-readings.ts",
-   "aliases": [
-    "getUnitLabel"
-   ],
-   "extractor": "ast"
-  },
-  {
    "name": "src/types/domain.ts",
    "type": "MODULE",
    "description": "Source module at src/types/domain.ts.",
@@ -20901,6 +20999,16 @@
    "description": "Source module at src/domain/brew-events.ts.",
    "file_path": "src/domain/brew-events.ts",
    "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/brew-events.ts#toBrewMeasurementUnits",
+   "type": "FUNCTION",
+   "description": "Exported function 'toBrewMeasurementUnits' in src/domain/brew-events.ts.",
+   "file_path": "src/domain/brew-events.ts",
+   "aliases": [
+    "toBrewMeasurementUnits"
+   ],
    "extractor": "ast"
   },
   {
@@ -21774,6 +21882,26 @@
    "extractor": "ast"
   },
   {
+   "name": "src/components/domain/shared/command-palette.tsx#DASHBOARD_PAGES",
+   "type": "FUNCTION",
+   "description": "Exported function 'DASHBOARD_PAGES' in src/components/domain/shared/command-palette.tsx.",
+   "file_path": "src/components/domain/shared/command-palette.tsx",
+   "aliases": [
+    "DASHBOARD_PAGES"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/shared/command-palette.tsx#REPORT_PAGES",
+   "type": "FUNCTION",
+   "description": "Exported function 'REPORT_PAGES' in src/components/domain/shared/command-palette.tsx.",
+   "file_path": "src/components/domain/shared/command-palette.tsx",
+   "aliases": [
+    "REPORT_PAGES"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/components/domain/shared/command-palette.tsx#QUICK_ACTIONS",
    "type": "FUNCTION",
    "description": "Exported function 'QUICK_ACTIONS' in src/components/domain/shared/command-palette.tsx.",
@@ -21806,6 +21934,102 @@
    "type": "TEST",
    "description": "TEST at src/components/domain/shared/__tests__/entity-config-client-boundary.test.ts.",
    "file_path": "src/components/domain/shared/__tests__/entity-config-client-boundary.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/hooks/use-mobile.ts",
+   "type": "MODULE",
+   "description": "Source module at src/hooks/use-mobile.ts.",
+   "file_path": "src/hooks/use-mobile.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/hooks/use-mobile.ts#useIsMobile",
+   "type": "FUNCTION",
+   "description": "Exported function 'useIsMobile' in src/hooks/use-mobile.ts.",
+   "file_path": "src/hooks/use-mobile.ts",
+   "aliases": [
+    "useIsMobile"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/hooks/use-mobile.ts#useIsTouch",
+   "type": "FUNCTION",
+   "description": "Exported function 'useIsTouch' in src/hooks/use-mobile.ts.",
+   "file_path": "src/hooks/use-mobile.ts",
+   "aliases": [
+    "useIsTouch"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/ui/separator.tsx",
+   "type": "MODULE",
+   "description": "Source module at src/components/ui/separator.tsx.",
+   "file_path": "src/components/ui/separator.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/ui/sheet.tsx",
+   "type": "MODULE",
+   "description": "Source module at src/components/ui/sheet.tsx.",
+   "file_path": "src/components/ui/sheet.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/ui/sidebar.tsx",
+   "type": "MODULE",
+   "description": "Source module at src/components/ui/sidebar.tsx.",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "type": "MODULE",
+   "description": "Source module at src/components/domain/shared/mobile-tab-bar.tsx.",
+   "file_path": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/shared/mobile-tab-bar.tsx#isTabActive",
+   "type": "FUNCTION",
+   "description": "Exported function 'isTabActive' in src/components/domain/shared/mobile-tab-bar.tsx.",
+   "file_path": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "aliases": [
+    "isTabActive"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/shared/mobile-tab-bar.tsx#MobileTabBar",
+   "type": "COMPONENT",
+   "description": "React component 'MobileTabBar' in src/components/domain/shared/mobile-tab-bar.tsx.",
+   "file_path": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "aliases": [
+    "MobileTabBar"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/shared/__tests__/mobile-tab-bar.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/components/domain/shared/__tests__/mobile-tab-bar.test.ts.",
+   "file_path": "src/components/domain/shared/__tests__/mobile-tab-bar.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/domain/shared/__tests__/nav-items.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/components/domain/shared/__tests__/nav-items.test.ts.",
+   "file_path": "src/components/domain/shared/__tests__/nav-items.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -22527,34 +22751,6 @@
    "description": "React Query key 'materialPlanningKeys.sessionMaterials' from src/lib/query-keys.ts.",
    "file_path": "src/lib/query-keys.ts",
    "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/hooks/use-mobile.ts",
-   "type": "MODULE",
-   "description": "Source module at src/hooks/use-mobile.ts.",
-   "file_path": "src/hooks/use-mobile.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/hooks/use-mobile.ts#useIsMobile",
-   "type": "FUNCTION",
-   "description": "Exported function 'useIsMobile' in src/hooks/use-mobile.ts.",
-   "file_path": "src/hooks/use-mobile.ts",
-   "aliases": [
-    "useIsMobile"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/hooks/use-mobile.ts#useIsTouch",
-   "type": "FUNCTION",
-   "description": "Exported function 'useIsTouch' in src/hooks/use-mobile.ts.",
-   "file_path": "src/hooks/use-mobile.ts",
-   "aliases": [
-    "useIsTouch"
-   ],
    "extractor": "ast"
   },
   {
@@ -24012,14 +24208,6 @@
    "extractor": "ast"
   },
   {
-   "name": "src/components/ui/sheet.tsx",
-   "type": "MODULE",
-   "description": "Source module at src/components/ui/sheet.tsx.",
-   "file_path": "src/components/ui/sheet.tsx",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
    "name": "src/components/ui/calendar.tsx",
    "type": "MODULE",
    "description": "Source module at src/components/ui/calendar.tsx.",
@@ -24278,12 +24466,22 @@
    "extractor": "ast"
   },
   {
-   "name": "src/contexts/prefill-store.ts#usePrefillStore",
+   "name": "src/contexts/prefill-store.ts#setPrefill",
    "type": "FUNCTION",
-   "description": "Exported function 'usePrefillStore' in src/contexts/prefill-store.ts.",
+   "description": "Exported function 'setPrefill' in src/contexts/prefill-store.ts.",
    "file_path": "src/contexts/prefill-store.ts",
    "aliases": [
-    "usePrefillStore"
+    "setPrefill"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/contexts/prefill-store.ts#consumePrefill",
+   "type": "FUNCTION",
+   "description": "Exported function 'consumePrefill' in src/contexts/prefill-store.ts.",
+   "file_path": "src/contexts/prefill-store.ts",
+   "aliases": [
+    "consumePrefill"
    ],
    "extractor": "ast"
   },
@@ -24604,14 +24802,6 @@
    "extractor": "ast"
   },
   {
-   "name": "src/components/ui/separator.tsx",
-   "type": "MODULE",
-   "description": "Source module at src/components/ui/separator.tsx.",
-   "file_path": "src/components/ui/separator.tsx",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
    "name": "src/components/universal/entity-relation-table.tsx",
    "type": "MODULE",
    "description": "Source module at src/components/universal/entity-relation-table.tsx.",
@@ -24772,14 +24962,6 @@
    "type": "TEST",
    "description": "TEST at src/components/universal/__tests__/reset-form-version-guard.test.ts.",
    "file_path": "src/components/universal/__tests__/reset-form-version-guard.test.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/contexts/__tests__/prefill-store.test.ts",
-   "type": "TEST",
-   "description": "TEST at src/contexts/__tests__/prefill-store.test.ts.",
-   "file_path": "src/contexts/__tests__/prefill-store.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -25114,22 +25296,42 @@
    "extractor": "ast"
   },
   {
-   "name": "src/domain/ttb-utils.ts#IN_PROCESS_SNAPSHOT_LABEL",
+   "name": "src/domain/ttb-utils.ts#IN_PROCESS_LABEL",
    "type": "FUNCTION",
-   "description": "Exported function 'IN_PROCESS_SNAPSHOT_LABEL' in src/domain/ttb-utils.ts.",
+   "description": "Exported function 'IN_PROCESS_LABEL' in src/domain/ttb-utils.ts.",
    "file_path": "src/domain/ttb-utils.ts",
    "aliases": [
-    "IN_PROCESS_SNAPSHOT_LABEL"
+    "IN_PROCESS_LABEL"
    ],
    "extractor": "ast"
   },
   {
-   "name": "src/domain/ttb-utils.ts#getInProcessSnapshotCaveat",
+   "name": "src/domain/ttb-utils.ts#getInProcessBalanceNote",
    "type": "FUNCTION",
-   "description": "Exported function 'getInProcessSnapshotCaveat' in src/domain/ttb-utils.ts.",
+   "description": "Exported function 'getInProcessBalanceNote' in src/domain/ttb-utils.ts.",
    "file_path": "src/domain/ttb-utils.ts",
    "aliases": [
-    "getInProcessSnapshotCaveat"
+    "getInProcessBalanceNote"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/ttb-utils.ts#LEGACY_IN_PROCESS_SNAPSHOT_LABEL",
+   "type": "FUNCTION",
+   "description": "Exported function 'LEGACY_IN_PROCESS_SNAPSHOT_LABEL' in src/domain/ttb-utils.ts.",
+   "file_path": "src/domain/ttb-utils.ts",
+   "aliases": [
+    "LEGACY_IN_PROCESS_SNAPSHOT_LABEL"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/ttb-utils.ts#getLegacyInProcessSnapshotCaveat",
+   "type": "FUNCTION",
+   "description": "Exported function 'getLegacyInProcessSnapshotCaveat' in src/domain/ttb-utils.ts.",
+   "file_path": "src/domain/ttb-utils.ts",
+   "aliases": [
+    "getLegacyInProcessSnapshotCaveat"
    ],
    "extractor": "ast"
   },
@@ -25300,6 +25502,16 @@
    "file_path": "src/domain/ttb-utils.ts",
    "aliases": [
     "totalForColumn"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/domain/ttb-utils.ts#checkTotalColumnCrossFoot",
+   "type": "FUNCTION",
+   "description": "Exported function 'checkTotalColumnCrossFoot' in src/domain/ttb-utils.ts.",
+   "file_path": "src/domain/ttb-utils.ts",
+   "aliases": [
+    "checkTotalColumnCrossFoot"
    ],
    "extractor": "ast"
   },
@@ -26370,6 +26582,14 @@
    "extractor": "ast"
   },
   {
+   "name": "src/lib/__tests__/batch-record-invalidation-keys.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/lib/__tests__/batch-record-invalidation-keys.test.ts.",
+   "file_path": "src/lib/__tests__/batch-record-invalidation-keys.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
    "name": "src/lib/__tests__/brew-events.test.ts",
    "type": "TEST",
    "description": "TEST at src/lib/__tests__/brew-events.test.ts.",
@@ -26574,14 +26794,6 @@
    "type": "TEST",
    "description": "TEST at src/lib/__tests__/query-client.test.ts.",
    "file_path": "src/lib/__tests__/query-client.test.ts",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/lib/__tests__/query-keys.test.ts",
-   "type": "TEST",
-   "description": "TEST at src/lib/__tests__/query-keys.test.ts.",
-   "file_path": "src/lib/__tests__/query-keys.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -27128,14 +27340,6 @@
    "aliases": [
     "KeyboardShortcutsProvider"
    ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/components/ui/sidebar.tsx",
-   "type": "MODULE",
-   "description": "Source module at src/components/ui/sidebar.tsx.",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "aliases": [],
    "extractor": "ast"
   },
   {
@@ -28171,6 +28375,14 @@
    "type": "MODULE",
    "description": "Source module at src/components/domain/shared/chat-panel.tsx.",
    "file_path": "src/components/domain/shared/chat-panel.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "batchKeys.readings",
+   "type": "QUERY_KEY",
+   "description": "React Query key 'batchKeys.readings' from src/lib/query-keys.ts.",
+   "file_path": "src/lib/query-keys.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -30334,14 +30546,6 @@
    "aliases": [
     "BatchReadingsPage"
    ],
-   "extractor": "ast"
-  },
-  {
-   "name": "batchKeys.readings",
-   "type": "QUERY_KEY",
-   "description": "React Query key 'batchKeys.readings' from src/lib/query-keys.ts.",
-   "file_path": "src/lib/query-keys.ts",
-   "aliases": [],
    "extractor": "ast"
   },
   {
@@ -52957,6 +53161,146 @@
    "extractor": "sql"
   },
   {
+   "source": "00285_capture_channel_formats.sql",
+   "predicate": "creates",
+   "target": "channel_formats",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00285_capture_channel_formats.sql",
+   "predicate": "creates",
+   "target": "channel_formats.channel_formats_select",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00285_capture_channel_formats.sql",
+   "predicate": "creates",
+   "target": "channel_formats.channel_formats_write",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "channel_formats.channel_formats_write",
+   "predicate": "requires",
+   "target": "settings:manage",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00285_capture_channel_formats.sql",
+   "predicate": "creates",
+   "target": "pricing_channel_formats",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00285_capture_channel_formats.sql",
+   "predicate": "creates",
+   "target": "pricing_channel_formats.pricing_channel_formats_select",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pricing_channel_formats.pricing_channel_formats_select",
+   "predicate": "protects",
+   "target": "pricing_channel_formats",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00285_capture_channel_formats.sql",
+   "predicate": "creates",
+   "target": "pricing_channel_formats.pricing_channel_formats_write",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pricing_channel_formats.pricing_channel_formats_write",
+   "predicate": "protects",
+   "target": "pricing_channel_formats",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "pricing_channel_formats.pricing_channel_formats_write",
+   "predicate": "requires",
+   "target": "settings:manage",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00285_capture_channel_formats.sql",
+   "predicate": "creates",
+   "target": "channel_formats.current_user_enabled",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00285_capture_channel_formats.sql",
+   "predicate": "creates",
+   "target": "pricing_channel_formats.current_user_enabled",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00286_suppliers_delete_revision_trail.sql",
+   "predicate": "creates",
+   "target": "entity_revisions.entity_revisions_select",
+   "file_path": "supabase/migrations/00286_suppliers_delete_revision_trail.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "entity_revisions.entity_revisions_select",
+   "predicate": "requires",
+   "target": "orders:read",
+   "file_path": "supabase/migrations/00286_suppliers_delete_revision_trail.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "entity_revisions.entity_revisions_select",
+   "predicate": "requires",
+   "target": "recipes:read",
+   "file_path": "supabase/migrations/00286_suppliers_delete_revision_trail.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "entity_revisions.entity_revisions_select",
+   "predicate": "requires",
+   "target": "batches:read",
+   "file_path": "supabase/migrations/00286_suppliers_delete_revision_trail.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "entity_revisions.entity_revisions_select",
+   "predicate": "requires",
+   "target": "purchasing:read",
+   "file_path": "supabase/migrations/00286_suppliers_delete_revision_trail.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "entity_revisions.entity_revisions_select",
+   "predicate": "requires",
+   "target": "inventory:read",
+   "file_path": "supabase/migrations/00286_suppliers_delete_revision_trail.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "entity_revisions.entity_revisions_select",
+   "predicate": "requires",
+   "target": "settings:manage",
+   "file_path": "supabase/migrations/00286_suppliers_delete_revision_trail.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00287_ttb_period_keyed_in_process.sql",
+   "predicate": "creates",
+   "target": "get_ttb_inventory_summary",
+   "file_path": "supabase/migrations/00287_ttb_period_keyed_in_process.sql",
+   "extractor": "sql"
+  },
+  {
    "source": "src/lib/sentry-config.ts",
    "predicate": "defines",
    "target": "src/lib/sentry-config.ts#sentryBaseConfig",
@@ -53272,6 +53616,13 @@
    "extractor": "ast"
   },
   {
+   "source": "src/__tests__/integration/suppliers-revisions.test.ts",
+   "predicate": "imports",
+   "target": "src/__tests__/integration/_helpers/role-client.ts",
+   "file_path": "src/__tests__/integration/suppliers-revisions.test.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/__tests__/integration/ttb-loss-reconciliation.test.ts",
    "predicate": "imports",
    "target": "src/__tests__/integration/_helpers/role-client.ts",
@@ -53398,9 +53749,51 @@
    "extractor": "ast"
   },
   {
+   "source": "src/lib/api/errors.ts",
+   "predicate": "imports",
+   "target": "src/lib/pg-error-codes.ts",
+   "file_path": "src/lib/api/errors.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/api/errors.ts",
+   "predicate": "defines",
+   "target": "src/lib/api/errors.ts#handleApiError",
+   "file_path": "src/lib/api/errors.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/pg-error-codes.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/errors.ts",
+   "file_path": "src/lib/pg-error-codes.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/pg-error-codes.ts",
+   "predicate": "defines",
+   "target": "src/lib/pg-error-codes.ts#PG_ERROR_CODES",
+   "file_path": "src/lib/pg-error-codes.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/pg-error-codes.ts",
+   "predicate": "defines",
+   "target": "src/lib/pg-error-codes.ts#PG_ERROR_TABLE",
+   "file_path": "src/lib/pg-error-codes.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/services/types.ts",
    "predicate": "imports",
    "target": "src/types/supabase.ts",
+   "file_path": "src/services/types.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/services/types.ts",
+   "predicate": "imports",
+   "target": "src/lib/pg-error-codes.ts",
    "file_path": "src/services/types.ts",
    "extractor": "ast"
   },
@@ -53444,34 +53837,6 @@
    "predicate": "defines",
    "target": "src/services/types.ts#formatServiceError",
    "file_path": "src/services/types.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/pg-error-codes.ts",
-   "predicate": "defines",
-   "target": "src/lib/pg-error-codes.ts#PG_ERROR_CODES",
-   "file_path": "src/lib/pg-error-codes.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/pg-error-codes.ts",
-   "predicate": "defines",
-   "target": "src/lib/pg-error-codes.ts#PG_ERROR_MESSAGES",
-   "file_path": "src/lib/pg-error-codes.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/api/errors.ts",
-   "predicate": "imports",
-   "target": "src/lib/pg-error-codes.ts",
-   "file_path": "src/lib/api/errors.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/api/errors.ts",
-   "predicate": "defines",
-   "target": "src/lib/api/errors.ts#handleApiError",
-   "file_path": "src/lib/api/errors.ts",
    "extractor": "ast"
   },
   {
@@ -53561,29 +53926,8 @@
   {
    "source": "src/lib/api/validation.ts",
    "predicate": "defines",
-   "target": "src/lib/api/validation.ts#validateParams",
-   "file_path": "src/lib/api/validation.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/api/validation.ts",
-   "predicate": "defines",
    "target": "src/lib/api/validation.ts#validateSearchParams",
    "file_path": "src/lib/api/validation.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/api/rate-limit.ts",
-   "predicate": "defines",
-   "target": "src/lib/api/rate-limit.ts#rateLimit",
-   "file_path": "src/lib/api/rate-limit.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/api/rate-limit.ts",
-   "predicate": "defines",
-   "target": "src/lib/api/rate-limit.ts#getClientIp",
-   "file_path": "src/lib/api/rate-limit.ts",
    "extractor": "ast"
   },
   {
@@ -53617,7 +53961,21 @@
   {
    "source": "src/app/api/batches/[id]/route.ts",
    "predicate": "imports",
-   "target": "src/lib/api/index.ts",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/batches/[id]/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/batches/[id]/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/batches/[id]/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/batches/[id]/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/validation.ts",
    "file_path": "src/app/api/batches/[id]/route.ts",
    "extractor": "ast"
   },
@@ -53680,7 +54038,21 @@
   {
    "source": "src/app/api/recipes/[id]/route.ts",
    "predicate": "imports",
-   "target": "src/lib/api/index.ts",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/recipes/[id]/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/recipes/[id]/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/recipes/[id]/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/recipes/[id]/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/validation.ts",
    "file_path": "src/app/api/recipes/[id]/route.ts",
    "extractor": "ast"
   },
@@ -54009,7 +54381,21 @@
   {
    "source": "src/app/api/batches/route.ts",
    "predicate": "imports",
-   "target": "src/lib/api/index.ts",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/batches/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/batches/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/batches/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/batches/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/validation.ts",
    "file_path": "src/app/api/batches/route.ts",
    "extractor": "ast"
   },
@@ -54017,13 +54403,6 @@
    "source": "src/app/api/batches/route.ts",
    "predicate": "imports",
    "target": "src/lib/schemas/batch.ts",
-   "file_path": "src/app/api/batches/route.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/app/api/batches/route.ts",
-   "predicate": "imports",
-   "target": "src/lib/api/response.ts",
    "file_path": "src/app/api/batches/route.ts",
    "extractor": "ast"
   },
@@ -54283,13 +54662,6 @@
    "source": "src/lib/query-keys.ts",
    "predicate": "defines",
    "target": "src/lib/query-keys.ts#consumptionKeys",
-   "file_path": "src/lib/query-keys.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/query-keys.ts",
-   "predicate": "defines",
-   "target": "src/lib/query-keys.ts#customerKeys",
    "file_path": "src/lib/query-keys.ts",
    "extractor": "ast"
   },
@@ -54576,7 +54948,28 @@
   {
    "source": "src/app/api/batches/[id]/transfer/route.ts",
    "predicate": "imports",
-   "target": "src/lib/api/index.ts",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/batches/[id]/transfer/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/batches/[id]/transfer/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/batches/[id]/transfer/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/batches/[id]/transfer/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/validation.ts",
+   "file_path": "src/app/api/batches/[id]/transfer/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/batches/[id]/transfer/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/errors.ts",
    "file_path": "src/app/api/batches/[id]/transfer/route.ts",
    "extractor": "ast"
   },
@@ -54662,6 +55055,293 @@
    "predicate": "defines",
    "target": "src/lib/help-content.ts#getHelpContentForSystemPrompt",
    "file_path": "src/lib/help-content.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#VOLUME_CONVERSIONS",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#RETAIL_VOLUME_CONVERSIONS",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#WEIGHT_CONVERSIONS",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#UNIT_LABELS",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#convertVolume",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#formatVolume",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#parseVolumeInput",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#volumeToDisplay",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#convertRetailVolume",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#formatRetailVolume",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#parseRetailVolumeInput",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#convertWeight",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#formatWeight",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#parseWeightInput",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#weightToDisplay",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#convertIngredientQuantity",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#convertTemperature",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#formatTemperature",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#parseTemperatureInput",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#formatTemperatureRange",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#platoToSg",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#sgToPlato",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#convertGravity",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#formatGravity",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#formatGravityFromSg",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#parseGravityInput",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#getUnitOptions",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#getUnitLabel",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#getNextUnit",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#toDisplayValue",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/units.ts",
+   "predicate": "defines",
+   "target": "src/domain/units.ts#toCanonicalValue",
+   "file_path": "src/domain/units.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/batch-readings.ts",
+   "predicate": "imports",
+   "target": "src/domain/units.ts",
+   "file_path": "src/domain/batch-readings.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/batch-readings.ts",
+   "predicate": "defines",
+   "target": "src/domain/batch-readings.ts#READING_TYPES",
+   "file_path": "src/domain/batch-readings.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/batch-readings.ts",
+   "predicate": "defines",
+   "target": "src/domain/batch-readings.ts#validateReading",
+   "file_path": "src/domain/batch-readings.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/batch-readings.ts",
+   "predicate": "defines",
+   "target": "src/domain/batch-readings.ts#convertGravity",
+   "file_path": "src/domain/batch-readings.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/batch-readings.ts",
+   "predicate": "defines",
+   "target": "src/domain/batch-readings.ts#formatReadingValue",
+   "file_path": "src/domain/batch-readings.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/batch-readings.ts",
+   "predicate": "defines",
+   "target": "src/domain/batch-readings.ts#getUnitLabel",
+   "file_path": "src/domain/batch-readings.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/schemas/chat-write.ts",
+   "predicate": "imports",
+   "target": "src/domain/batch-readings.ts",
+   "file_path": "src/lib/schemas/chat-write.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/schemas/chat-write.ts",
+   "predicate": "defines",
+   "target": "src/lib/schemas/chat-write.ts#READING_ELIGIBLE_STATES",
+   "file_path": "src/lib/schemas/chat-write.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/schemas/chat-write.ts",
+   "predicate": "defines",
+   "target": "src/lib/schemas/chat-write.ts#batchReadingSchema",
+   "file_path": "src/lib/schemas/chat-write.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/schemas/chat-write.ts",
+   "predicate": "defines",
+   "target": "src/lib/schemas/chat-write.ts#chatWriteRequestSchema",
+   "file_path": "src/lib/schemas/chat-write.ts",
    "extractor": "ast"
   },
   {
@@ -56515,6 +57195,20 @@
   {
    "source": "src/app/api/chat/tools.ts",
    "predicate": "imports",
+   "target": "src/domain/batch-readings.ts",
+   "file_path": "src/app/api/chat/tools.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/tools.ts",
+   "predicate": "imports",
+   "target": "src/lib/schemas/chat-write.ts",
+   "file_path": "src/app/api/chat/tools.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/tools.ts",
+   "predicate": "imports",
    "target": "src/services/entity-service.ts",
    "file_path": "src/app/api/chat/tools.ts",
    "extractor": "ast"
@@ -56807,10 +57501,136 @@
    "extractor": "ast"
   },
   {
+   "source": "src/test/supabase-mock.ts",
+   "predicate": "imports",
+   "target": "src/types/supabase.ts",
+   "file_path": "src/test/supabase-mock.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/test/supabase-mock.ts",
+   "predicate": "defines",
+   "target": "src/test/supabase-mock.ts#makeQueryBuilder",
+   "file_path": "src/test/supabase-mock.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/test/supabase-mock.ts",
+   "predicate": "defines",
+   "target": "src/test/supabase-mock.ts#makeSupabase",
+   "file_path": "src/test/supabase-mock.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/test/supabase-mock.ts",
+   "predicate": "defines",
+   "target": "src/test/supabase-mock.ts#throwingSupabase",
+   "file_path": "src/test/supabase-mock.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/__tests__/record-reading-tool.test.ts",
+   "predicate": "imports",
+   "target": "src/test/supabase-mock.ts",
+   "file_path": "src/app/api/chat/__tests__/record-reading-tool.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/__tests__/record-reading-tool.test.ts",
+   "predicate": "imports",
+   "target": "src/app/api/chat/tools.ts",
+   "file_path": "src/app/api/chat/__tests__/record-reading-tool.test.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/app/api/chat/__tests__/route-authorization.test.ts",
    "predicate": "imports",
    "target": "src/app/api/chat/route.ts",
    "file_path": "src/app/api/chat/__tests__/route-authorization.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/write/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/write/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/write/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/errors.ts",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/write/route.ts",
+   "predicate": "imports",
+   "target": "src/domain/batch-readings.ts",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/write/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/schemas/chat-write.ts",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/write/route.ts",
+   "predicate": "defines",
+   "target": "POST /api/chat/write",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/write/route.ts",
+   "predicate": "reads_from",
+   "target": "batches",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/write/route.ts",
+   "predicate": "writes_to",
+   "target": "batch_logs",
+   "file_path": "src/app/api/chat/write/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/__tests__/write-route.test.ts",
+   "predicate": "imports",
+   "target": "src/test/supabase-mock.ts",
+   "file_path": "src/app/api/chat/__tests__/write-route.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/chat/__tests__/write-route.test.ts",
+   "predicate": "imports",
+   "target": "src/app/api/chat/write/route.ts",
+   "file_path": "src/app/api/chat/__tests__/write-route.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/api/rate-limit.ts",
+   "predicate": "defines",
+   "target": "src/lib/api/rate-limit.ts#rateLimit",
+   "file_path": "src/lib/api/rate-limit.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/api/rate-limit.ts",
+   "predicate": "defines",
+   "target": "src/lib/api/rate-limit.ts#getClientIp",
+   "file_path": "src/lib/api/rate-limit.ts",
    "extractor": "ast"
   },
   {
@@ -58222,6 +59042,13 @@
   },
   {
    "source": "src/integrations/quickbooks/sync-bill.ts",
+   "predicate": "reads_from",
+   "target": "qbo_account_mappings",
+   "file_path": "src/integrations/quickbooks/sync-bill.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/integrations/quickbooks/sync-bill.ts",
    "predicate": "defines",
    "target": "src/integrations/quickbooks/sync-bill.ts#syncBill",
    "file_path": "src/integrations/quickbooks/sync-bill.ts",
@@ -58231,13 +59058,6 @@
    "source": "src/integrations/quickbooks/sync-bill.ts",
    "predicate": "reads_from",
    "target": "purchase_orders",
-   "file_path": "src/integrations/quickbooks/sync-bill.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/integrations/quickbooks/sync-bill.ts",
-   "predicate": "reads_from",
-   "target": "qbo_account_mappings",
    "file_path": "src/integrations/quickbooks/sync-bill.ts",
    "extractor": "ast"
   },
@@ -58697,34 +59517,6 @@
    "extractor": "ast"
   },
   {
-   "source": "src/test/supabase-mock.ts",
-   "predicate": "imports",
-   "target": "src/types/supabase.ts",
-   "file_path": "src/test/supabase-mock.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/test/supabase-mock.ts",
-   "predicate": "defines",
-   "target": "src/test/supabase-mock.ts#makeQueryBuilder",
-   "file_path": "src/test/supabase-mock.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/test/supabase-mock.ts",
-   "predicate": "defines",
-   "target": "src/test/supabase-mock.ts#makeSupabase",
-   "file_path": "src/test/supabase-mock.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/test/supabase-mock.ts",
-   "predicate": "defines",
-   "target": "src/test/supabase-mock.ts#throwingSupabase",
-   "file_path": "src/test/supabase-mock.ts",
-   "extractor": "ast"
-  },
-  {
    "source": "src/app/api/orders/[id]/change-requests/[requestId]/reject/route.ts",
    "predicate": "tested_by",
    "target": "src/app/api/orders/[id]/change-requests/[requestId]/reject/__tests__/route.test.ts",
@@ -58748,7 +59540,21 @@
   {
    "source": "src/app/api/recipes/route.ts",
    "predicate": "imports",
-   "target": "src/lib/api/index.ts",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/recipes/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/recipes/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/recipes/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/recipes/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/validation.ts",
    "file_path": "src/app/api/recipes/route.ts",
    "extractor": "ast"
   },
@@ -58756,13 +59562,6 @@
    "source": "src/app/api/recipes/route.ts",
    "predicate": "imports",
    "target": "src/lib/schemas/recipe.ts",
-   "file_path": "src/app/api/recipes/route.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/app/api/recipes/route.ts",
-   "predicate": "imports",
-   "target": "src/lib/api/response.ts",
    "file_path": "src/app/api/recipes/route.ts",
    "extractor": "ast"
   },
@@ -59296,223 +60095,6 @@
    "predicate": "defines",
    "target": "src/domain/inventory-units.ts#ratioFromDecimal",
    "file_path": "src/domain/inventory-units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#VOLUME_CONVERSIONS",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#RETAIL_VOLUME_CONVERSIONS",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#WEIGHT_CONVERSIONS",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#UNIT_LABELS",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#convertVolume",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#formatVolume",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#parseVolumeInput",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#volumeToDisplay",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#convertRetailVolume",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#formatRetailVolume",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#parseRetailVolumeInput",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#convertWeight",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#formatWeight",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#parseWeightInput",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#weightToDisplay",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#convertIngredientQuantity",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#convertTemperature",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#formatTemperature",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#parseTemperatureInput",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#formatTemperatureRange",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#platoToSg",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#sgToPlato",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#convertGravity",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#formatGravity",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#formatGravityFromSg",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#parseGravityInput",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#getUnitOptions",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#getUnitLabel",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#getNextUnit",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#toDisplayValue",
-   "file_path": "src/domain/units.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/units.ts",
-   "predicate": "defines",
-   "target": "src/domain/units.ts#toCanonicalValue",
-   "file_path": "src/domain/units.ts",
    "extractor": "ast"
   },
   {
@@ -60393,7 +60975,21 @@
   {
    "source": "src/app/api/users/[id]/route.ts",
    "predicate": "imports",
-   "target": "src/lib/api/index.ts",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/users/[id]/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/users/[id]/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/users/[id]/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/users/[id]/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/errors.ts",
    "file_path": "src/app/api/users/[id]/route.ts",
    "extractor": "ast"
   },
@@ -60484,7 +61080,28 @@
   {
    "source": "src/app/api/users/[id]/status/route.ts",
    "predicate": "imports",
-   "target": "src/lib/api/index.ts",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/users/[id]/status/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/users/[id]/status/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/users/[id]/status/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/users/[id]/status/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/validation.ts",
+   "file_path": "src/app/api/users/[id]/status/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/users/[id]/status/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/errors.ts",
    "file_path": "src/app/api/users/[id]/status/route.ts",
    "extractor": "ast"
   },
@@ -60526,7 +61143,28 @@
   {
    "source": "src/app/api/users/invite/route.ts",
    "predicate": "imports",
-   "target": "src/lib/api/index.ts",
+   "target": "src/lib/api/response.ts",
+   "file_path": "src/app/api/users/invite/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/users/invite/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/auth.ts",
+   "file_path": "src/app/api/users/invite/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/users/invite/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/validation.ts",
+   "file_path": "src/app/api/users/invite/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/users/invite/route.ts",
+   "predicate": "imports",
+   "target": "src/lib/api/errors.ts",
    "file_path": "src/app/api/users/invite/route.ts",
    "extractor": "ast"
   },
@@ -61102,6 +61740,27 @@
    "predicate": "imports",
    "target": "src/domain/vessel-transfer-utils.ts",
    "file_path": "src/components/domain/__tests__/vessel-transfer-dedup.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/inventory/keg-owner-deposits-plan.ts",
+   "predicate": "defines",
+   "target": "src/components/domain/inventory/keg-owner-deposits-plan.ts#planDepositSave",
+   "file_path": "src/components/domain/inventory/keg-owner-deposits-plan.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/inventory/keg-owner-deposits-plan.ts",
+   "predicate": "tested_by",
+   "target": "src/components/domain/inventory/__tests__/keg-owner-deposits-plan.test.ts",
+   "file_path": "src/components/domain/inventory/__tests__/keg-owner-deposits-plan.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/inventory/__tests__/keg-owner-deposits-plan.test.ts",
+   "predicate": "imports",
+   "target": "src/components/domain/inventory/keg-owner-deposits-plan.ts",
+   "file_path": "src/components/domain/inventory/__tests__/keg-owner-deposits-plan.test.ts",
    "extractor": "ast"
   },
   {
@@ -64061,6 +64720,13 @@
   {
    "source": "src/components/domain/shared/nav-items.ts",
    "predicate": "defines",
+   "target": "src/components/domain/shared/nav-items.ts#isNavSection",
+   "file_path": "src/components/domain/shared/nav-items.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/nav-items.ts",
+   "predicate": "defines",
    "target": "src/components/domain/shared/nav-items.ts#navigation",
    "file_path": "src/components/domain/shared/nav-items.ts",
    "extractor": "ast"
@@ -64264,35 +64930,7 @@
   {
    "source": "src/hooks/use-unit-preferences.ts",
    "predicate": "defines",
-   "target": "src/hooks/use-unit-preferences.ts#useVolumeUnit",
-   "file_path": "src/hooks/use-unit-preferences.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/hooks/use-unit-preferences.ts",
-   "predicate": "defines",
-   "target": "src/hooks/use-unit-preferences.ts#useWeightUnit",
-   "file_path": "src/hooks/use-unit-preferences.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/hooks/use-unit-preferences.ts",
-   "predicate": "defines",
-   "target": "src/hooks/use-unit-preferences.ts#useTemperatureUnit",
-   "file_path": "src/hooks/use-unit-preferences.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/hooks/use-unit-preferences.ts",
-   "predicate": "defines",
-   "target": "src/hooks/use-unit-preferences.ts#useGravityUnit",
-   "file_path": "src/hooks/use-unit-preferences.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/hooks/use-unit-preferences.ts",
-   "predicate": "defines",
-   "target": "src/hooks/use-unit-preferences.ts#useBrewMeasurementUnits",
+   "target": "src/hooks/use-unit-preferences.ts#useResolvedUnitPreferences",
    "file_path": "src/hooks/use-unit-preferences.ts",
    "extractor": "ast"
   },
@@ -64647,48 +65285,6 @@
    "extractor": "ast"
   },
   {
-   "source": "src/domain/batch-readings.ts",
-   "predicate": "imports",
-   "target": "src/domain/units.ts",
-   "file_path": "src/domain/batch-readings.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/batch-readings.ts",
-   "predicate": "defines",
-   "target": "src/domain/batch-readings.ts#READING_TYPES",
-   "file_path": "src/domain/batch-readings.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/batch-readings.ts",
-   "predicate": "defines",
-   "target": "src/domain/batch-readings.ts#validateReading",
-   "file_path": "src/domain/batch-readings.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/batch-readings.ts",
-   "predicate": "defines",
-   "target": "src/domain/batch-readings.ts#convertGravity",
-   "file_path": "src/domain/batch-readings.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/batch-readings.ts",
-   "predicate": "defines",
-   "target": "src/domain/batch-readings.ts#formatReadingValue",
-   "file_path": "src/domain/batch-readings.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/domain/batch-readings.ts",
-   "predicate": "defines",
-   "target": "src/domain/batch-readings.ts#getUnitLabel",
-   "file_path": "src/domain/batch-readings.ts",
-   "extractor": "ast"
-  },
-  {
    "source": "src/domain/brew-events.ts",
    "predicate": "imports",
    "target": "src/types/domain.ts",
@@ -64699,6 +65295,13 @@
    "source": "src/domain/brew-events.ts",
    "predicate": "imports",
    "target": "src/domain/units.ts",
+   "file_path": "src/domain/brew-events.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/brew-events.ts",
+   "predicate": "defines",
+   "target": "src/domain/brew-events.ts#toBrewMeasurementUnits",
    "file_path": "src/domain/brew-events.ts",
    "extractor": "ast"
   },
@@ -66525,6 +67128,20 @@
   {
    "source": "src/components/domain/shared/command-palette.tsx",
    "predicate": "defines",
+   "target": "src/components/domain/shared/command-palette.tsx#DASHBOARD_PAGES",
+   "file_path": "src/components/domain/shared/command-palette.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/command-palette.tsx",
+   "predicate": "defines",
+   "target": "src/components/domain/shared/command-palette.tsx#REPORT_PAGES",
+   "file_path": "src/components/domain/shared/command-palette.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/command-palette.tsx",
+   "predicate": "defines",
    "target": "src/components/domain/shared/command-palette.tsx#QUICK_ACTIONS",
    "file_path": "src/components/domain/shared/command-palette.tsx",
    "extractor": "ast"
@@ -66588,8 +67205,155 @@
   {
    "source": "src/components/domain/shared/__tests__/command-palette.test.ts",
    "predicate": "imports",
+   "target": "src/components/domain/shared/nav-items.ts",
+   "file_path": "src/components/domain/shared/__tests__/command-palette.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/__tests__/command-palette.test.ts",
+   "predicate": "imports",
    "target": "src/components/domain/shared/command-palette.tsx",
    "file_path": "src/components/domain/shared/__tests__/command-palette.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/hooks/use-mobile.ts",
+   "predicate": "defines",
+   "target": "src/hooks/use-mobile.ts#useIsMobile",
+   "file_path": "src/hooks/use-mobile.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/hooks/use-mobile.ts",
+   "predicate": "defines",
+   "target": "src/hooks/use-mobile.ts#useIsTouch",
+   "file_path": "src/hooks/use-mobile.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/separator.tsx",
+   "predicate": "imports",
+   "target": "src/lib/utils.ts",
+   "file_path": "src/components/ui/separator.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sheet.tsx",
+   "predicate": "imports",
+   "target": "src/lib/utils.ts",
+   "file_path": "src/components/ui/sheet.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sidebar.tsx",
+   "predicate": "imports",
+   "target": "src/hooks/use-mobile.ts",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sidebar.tsx",
+   "predicate": "imports",
+   "target": "src/lib/utils.ts",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sidebar.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/button.tsx",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sidebar.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/input.tsx",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sidebar.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/separator.tsx",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sidebar.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/sheet.tsx",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sidebar.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/skeleton.tsx",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/sidebar.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/tooltip.tsx",
+   "file_path": "src/components/ui/sidebar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/sidebar.tsx",
+   "file_path": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "predicate": "imports",
+   "target": "src/lib/utils.ts",
+   "file_path": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "predicate": "defines",
+   "target": "src/components/domain/shared/mobile-tab-bar.tsx#isTabActive",
+   "file_path": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "predicate": "defines",
+   "target": "src/components/domain/shared/mobile-tab-bar.tsx#MobileTabBar",
+   "file_path": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "predicate": "tested_by",
+   "target": "src/components/domain/shared/__tests__/mobile-tab-bar.test.ts",
+   "file_path": "src/components/domain/shared/__tests__/mobile-tab-bar.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/__tests__/mobile-tab-bar.test.ts",
+   "predicate": "imports",
+   "target": "src/components/domain/shared/mobile-tab-bar.tsx",
+   "file_path": "src/components/domain/shared/__tests__/mobile-tab-bar.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/nav-items.ts",
+   "predicate": "tested_by",
+   "target": "src/components/domain/shared/__tests__/nav-items.test.ts",
+   "file_path": "src/components/domain/shared/__tests__/nav-items.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/__tests__/nav-items.test.ts",
+   "predicate": "imports",
+   "target": "src/components/domain/shared/nav-items.ts",
+   "file_path": "src/components/domain/shared/__tests__/nav-items.test.ts",
    "extractor": "ast"
   },
   {
@@ -67309,13 +68073,6 @@
   {
    "source": "src/entities/brew-log/presentation.tsx",
    "predicate": "imports",
-   "target": "src/components/domain/shared/revision-history-display.tsx",
-   "file_path": "src/entities/brew-log/presentation.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/entities/brew-log/presentation.tsx",
-   "predicate": "imports",
    "target": "src/entities/brew-log/core.ts",
    "file_path": "src/entities/brew-log/presentation.tsx",
    "extractor": "ast"
@@ -67899,20 +68656,6 @@
    "predicate": "writes_to",
    "target": "session_line_items",
    "file_path": "src/hooks/use-session-line-items.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/hooks/use-mobile.ts",
-   "predicate": "defines",
-   "target": "src/hooks/use-mobile.ts#useIsMobile",
-   "file_path": "src/hooks/use-mobile.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/hooks/use-mobile.ts",
-   "predicate": "defines",
-   "target": "src/hooks/use-mobile.ts#useIsTouch",
-   "file_path": "src/hooks/use-mobile.ts",
    "extractor": "ast"
   },
   {
@@ -69424,6 +70167,13 @@
    "source": "src/components/domain/inventory/keg-owner-deposits-editor.tsx",
    "predicate": "imports",
    "target": "src/components/ui/unit-input.tsx",
+   "file_path": "src/components/domain/inventory/keg-owner-deposits-editor.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/inventory/keg-owner-deposits-editor.tsx",
+   "predicate": "imports",
+   "target": "src/components/domain/inventory/keg-owner-deposits-plan.ts",
    "file_path": "src/components/domain/inventory/keg-owner-deposits-editor.tsx",
    "extractor": "ast"
   },
@@ -71003,13 +71753,6 @@
    "extractor": "ast"
   },
   {
-   "source": "src/components/ui/sheet.tsx",
-   "predicate": "imports",
-   "target": "src/lib/utils.ts",
-   "file_path": "src/components/ui/sheet.tsx",
-   "extractor": "ast"
-  },
-  {
    "source": "src/components/ui/calendar.tsx",
    "predicate": "imports",
    "target": "src/lib/utils.ts",
@@ -71747,7 +72490,14 @@
   {
    "source": "src/contexts/prefill-store.ts",
    "predicate": "defines",
-   "target": "src/contexts/prefill-store.ts#usePrefillStore",
+   "target": "src/contexts/prefill-store.ts#setPrefill",
+   "file_path": "src/contexts/prefill-store.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/contexts/prefill-store.ts",
+   "predicate": "defines",
+   "target": "src/contexts/prefill-store.ts#consumePrefill",
    "file_path": "src/contexts/prefill-store.ts",
    "extractor": "ast"
   },
@@ -72214,13 +72964,6 @@
    "extractor": "ast"
   },
   {
-   "source": "src/components/ui/separator.tsx",
-   "predicate": "imports",
-   "target": "src/lib/utils.ts",
-   "file_path": "src/components/ui/separator.tsx",
-   "extractor": "ast"
-  },
-  {
    "source": "src/components/universal/entity-relation-table.tsx",
    "predicate": "imports",
    "target": "src/lib/supabase/client.ts",
@@ -72427,6 +73170,13 @@
    "source": "src/components/universal/entity-detail-unified.tsx",
    "predicate": "imports",
    "target": "src/hooks/use-qbo-auto-sync.ts",
+   "file_path": "src/components/universal/entity-detail-unified.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/entity-detail-unified.tsx",
+   "predicate": "imports",
+   "target": "src/hooks/use-mobile.ts",
    "file_path": "src/components/universal/entity-detail-unified.tsx",
    "extractor": "ast"
   },
@@ -72767,20 +73517,6 @@
    "extractor": "ast"
   },
   {
-   "source": "src/contexts/prefill-store.ts",
-   "predicate": "tested_by",
-   "target": "src/contexts/__tests__/prefill-store.test.ts",
-   "file_path": "src/contexts/__tests__/prefill-store.test.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/contexts/__tests__/prefill-store.test.ts",
-   "predicate": "imports",
-   "target": "src/contexts/prefill-store.ts",
-   "file_path": "src/contexts/__tests__/prefill-store.test.ts",
-   "extractor": "ast"
-  },
-  {
    "source": "src/domain/batch-additions.ts",
    "predicate": "defines",
    "target": "src/domain/batch-additions.ts#ADDITION_TYPES",
@@ -73028,14 +73764,28 @@
   {
    "source": "src/domain/ttb-utils.ts",
    "predicate": "defines",
-   "target": "src/domain/ttb-utils.ts#IN_PROCESS_SNAPSHOT_LABEL",
+   "target": "src/domain/ttb-utils.ts#IN_PROCESS_LABEL",
    "file_path": "src/domain/ttb-utils.ts",
    "extractor": "ast"
   },
   {
    "source": "src/domain/ttb-utils.ts",
    "predicate": "defines",
-   "target": "src/domain/ttb-utils.ts#getInProcessSnapshotCaveat",
+   "target": "src/domain/ttb-utils.ts#getInProcessBalanceNote",
+   "file_path": "src/domain/ttb-utils.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/ttb-utils.ts",
+   "predicate": "defines",
+   "target": "src/domain/ttb-utils.ts#LEGACY_IN_PROCESS_SNAPSHOT_LABEL",
+   "file_path": "src/domain/ttb-utils.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/ttb-utils.ts",
+   "predicate": "defines",
+   "target": "src/domain/ttb-utils.ts#getLegacyInProcessSnapshotCaveat",
    "file_path": "src/domain/ttb-utils.ts",
    "extractor": "ast"
   },
@@ -73155,6 +73905,13 @@
    "source": "src/domain/ttb-utils.ts",
    "predicate": "defines",
    "target": "src/domain/ttb-utils.ts#totalForColumn",
+   "file_path": "src/domain/ttb-utils.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/domain/ttb-utils.ts",
+   "predicate": "defines",
+   "target": "src/domain/ttb-utils.ts#checkTotalColumnCrossFoot",
    "file_path": "src/domain/ttb-utils.ts",
    "extractor": "ast"
   },
@@ -75098,6 +75855,13 @@
    "extractor": "ast"
   },
   {
+   "source": "src/lib/__tests__/batch-record-invalidation-keys.test.ts",
+   "predicate": "imports",
+   "target": "src/lib/query-keys.ts",
+   "file_path": "src/lib/__tests__/batch-record-invalidation-keys.test.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/domain/brew-events.ts",
    "predicate": "tested_by",
    "target": "src/lib/__tests__/brew-events.test.ts",
@@ -75354,20 +76118,6 @@
    "predicate": "imports",
    "target": "src/lib/query-client.ts",
    "file_path": "src/lib/__tests__/query-client.test.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/query-keys.ts",
-   "predicate": "tested_by",
-   "target": "src/lib/__tests__/query-keys.test.ts",
-   "file_path": "src/lib/__tests__/query-keys.test.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/__tests__/query-keys.test.ts",
-   "predicate": "imports",
-   "target": "src/lib/query-keys.ts",
-   "file_path": "src/lib/__tests__/query-keys.test.ts",
    "extractor": "ast"
   },
   {
@@ -76169,62 +76919,6 @@
    "extractor": "ast"
   },
   {
-   "source": "src/components/ui/sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/hooks/use-mobile.ts",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/lib/utils.ts",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/button.tsx",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/input.tsx",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/separator.tsx",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/sheet.tsx",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/skeleton.tsx",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/tooltip.tsx",
-   "file_path": "src/components/ui/sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
    "source": "src/components/domain/shared/app-sidebar.tsx",
    "predicate": "imports",
    "target": "src/contexts/permissions.tsx",
@@ -76270,13 +76964,6 @@
    "source": "src/components/domain/shared/app-sidebar.tsx",
    "predicate": "imports",
    "target": "src/components/ui/sidebar.tsx",
-   "file_path": "src/components/domain/shared/app-sidebar.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/domain/shared/app-sidebar.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/collapsible.tsx",
    "file_path": "src/components/domain/shared/app-sidebar.tsx",
    "extractor": "ast"
   },
@@ -76508,13 +77195,6 @@
    "source": "src/components/domain/shared/app-header.tsx",
    "predicate": "imports",
    "target": "src/components/ui/button.tsx",
-   "file_path": "src/components/domain/shared/app-header.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/domain/shared/app-header.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/sidebar.tsx",
    "file_path": "src/components/domain/shared/app-header.tsx",
    "extractor": "ast"
   },
@@ -77458,6 +78138,27 @@
   },
   {
    "source": "src/components/domain/shared/chat-panel.tsx",
+   "predicate": "imports",
+   "target": "src/lib/query-keys.ts",
+   "file_path": "src/components/domain/shared/chat-panel.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/chat-panel.tsx",
+   "predicate": "imports",
+   "target": "src/lib/schemas/chat-write.ts",
+   "file_path": "src/components/domain/shared/chat-panel.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/chat-panel.tsx",
+   "predicate": "invalidates",
+   "target": "batchKeys.readings",
+   "file_path": "src/components/domain/shared/chat-panel.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/shared/chat-panel.tsx",
    "predicate": "defines",
    "target": "src/components/domain/shared/chat-panel.tsx#ChatPanel",
    "file_path": "src/components/domain/shared/chat-panel.tsx",
@@ -77523,6 +78224,13 @@
    "source": "src/app/(app)/layout.tsx",
    "predicate": "imports",
    "target": "src/components/domain/shared/command-palette.tsx",
+   "file_path": "src/app/(app)/layout.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/(app)/layout.tsx",
+   "predicate": "imports",
+   "target": "src/components/domain/shared/mobile-tab-bar.tsx",
    "file_path": "src/app/(app)/layout.tsx",
    "extractor": "ast"
   },
@@ -87387,13 +88095,6 @@
    "predicate": "defines",
    "target": "src/app/(app)/reports/ttb/layout.tsx#Layout",
    "file_path": "src/app/(app)/reports/ttb/layout.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/reports/ttb-report-caveats.tsx",
-   "predicate": "imports",
-   "target": "src/domain/ttb-utils.ts",
-   "file_path": "src/components/reports/ttb-report-caveats.tsx",
    "extractor": "ast"
   },
   {

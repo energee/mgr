@@ -7,7 +7,7 @@
  * kept — the list/item/progress/clear subcomponents were removed as unused.
  */
 
-import { useDirection } from "@radix-ui/react-direction";
+import { Direction } from "radix-ui";
 import { Slot } from "@radix-ui/react-slot";
 import * as React from "react";
 import { cn } from "@/lib/utils";
@@ -169,7 +169,7 @@ function FileUpload(props: FileUploadProps) {
   const listId = React.useId();
   const labelId = React.useId();
 
-  const dir = useDirection(dirProp);
+  const dir = Direction.useDirection(dirProp);
   const listeners = useLazyRef(() => new Set<() => void>()).current;
   const files = useLazyRef<Map<File, FileState>>(() => new Map()).current;
   const inputRef = React.useRef<HTMLInputElement>(null);

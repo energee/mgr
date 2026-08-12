@@ -41,7 +41,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { useWeightUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatWeight } from "@/domain/units";
 import { Plus, Trash2, GripVertical, ChevronsUpDown, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -95,7 +95,7 @@ export function GrainBillEditor({
   onChange,
   disabled = false,
 }: GrainBillEditorProps) {
-  const weightUnit = useWeightUnit();
+  const weightUnit = useResolvedUnitPreferences().weight_unit;
   const [addOpen, setAddOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 

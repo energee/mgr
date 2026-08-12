@@ -54,11 +54,11 @@ import {
 import { BatchReadingsChartLazy as BatchReadingsChart } from "@/components/domain/batch/batch-readings-chart-lazy";
 import { format } from "date-fns";
 import type { Json } from "@/types/supabase";
-import { useGravityUnit, useTemperatureUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { batchKeys } from "@/lib/query-keys";
 import { parseUnknownError } from "@/lib/errors";
 import { unwrap } from "@/lib/supabase/query-helpers";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { consumePrefill } from "@/contexts/prefill-store";
 
 type BatchLog = {
   id: string;
@@ -77,8 +77,7 @@ export default function BatchReadingsPage({
   const { id } = use(params);
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const gravityUnit = useGravityUnit();
-  const temperatureUnit = useTemperatureUnit();
+  const { gravity_unit: gravityUnit, temperature_unit: temperatureUnit } = useResolvedUnitPreferences();
   const displayUnitFor = (readingType: string) =>
     readingType === "gravity"
       ? gravityUnit
@@ -91,7 +90,7 @@ export default function BatchReadingsPage({
   // (SENTRY-7477285482).
   const [showForm, setShowForm] = useState(false);
   useEffect(() => {
-    const { prefillData } = usePrefillStore.getState().consume();
+    const { prefillData } = consumePrefill();
     if (!prefillData) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only read from sessionStorage-backed store
     setShowForm(true);

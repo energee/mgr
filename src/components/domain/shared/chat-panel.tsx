@@ -23,7 +23,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
-  usePrefillStore,
+  setPrefill,
   type NavigationIntent,
 } from "@/contexts/prefill-store";
 import { ClaudeIcon } from "@/components/ui/claude-icon";
@@ -195,7 +195,6 @@ export function ChatPanel() {
   const { messages, status } = chat;
   const [isMaximized, setIsMaximized] = useState(false);
   const router = useRouter();
-  const setPrefill = usePrefillStore((s) => s.setPrefill);
   const isStreaming = status === "streaming";
 
   return (

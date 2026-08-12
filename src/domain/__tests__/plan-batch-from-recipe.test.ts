@@ -25,12 +25,12 @@ import {
   preparePlanBatchPrefill,
   NEW_BATCH_PATH,
 } from "@/domain/plan-batch-from-recipe";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { consumePrefill } from "@/contexts/prefill-store";
 
 beforeEach(() => {
   vi.clearAllMocks();
   // Drain any staged prefill from a previous test
-  usePrefillStore.getState().consume();
+  consumePrefill();
 });
 
 describe("preparePlanBatchPrefill", () => {
@@ -45,7 +45,7 @@ describe("preparePlanBatchPrefill", () => {
     });
 
     expect(url).toBe(NEW_BATCH_PATH);
-    expect(usePrefillStore.getState().consume().prefillData).toEqual({
+    expect(consumePrefill().prefillData).toEqual({
       recipe_id: "r-1",
       name: "Coastal - Hazy IPA",
       volume_bbl: 15,
@@ -61,7 +61,7 @@ describe("preparePlanBatchPrefill", () => {
     });
 
     expect(createClient).not.toHaveBeenCalled();
-    expect(usePrefillStore.getState().consume().prefillData).toEqual({
+    expect(consumePrefill().prefillData).toEqual({
       recipe_id: "r-2",
       name: "Pilsner",
       volume_bbl: 10,
@@ -78,7 +78,7 @@ describe("preparePlanBatchPrefill", () => {
       batch_size_bbl: 8,
     });
 
-    expect(usePrefillStore.getState().consume().prefillData).toEqual({
+    expect(consumePrefill().prefillData).toEqual({
       recipe_id: "r-3",
       name: "Stout",
       volume_bbl: 8,
@@ -93,7 +93,7 @@ describe("preparePlanBatchPrefill", () => {
       batch_size_bbl: null,
     });
 
-    expect(usePrefillStore.getState().consume().prefillData).toEqual({
+    expect(consumePrefill().prefillData).toEqual({
       recipe_id: "r-4",
       name: "Saison",
     });

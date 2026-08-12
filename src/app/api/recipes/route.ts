@@ -1,10 +1,7 @@
 import { z } from "zod";
-import {
-  withPermission,
-  paginatedResponse,
-  validateBody,
-  validateSearchParams,
-} from "@/lib/api";
+import { paginatedResponse } from "@/lib/api/response";
+import { withPermission } from "@/lib/api/auth";
+import { validateBody, validateSearchParams } from "@/lib/api/validation";
 import { recipeSchema } from "@/lib/schemas/recipe";
 import { successResponse } from "@/lib/api/response";
 import { escapeIlikePattern } from "@/lib/supabase/query-helpers";

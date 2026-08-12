@@ -41,7 +41,7 @@ import { NextStepBanner } from "@/components/domain/shared/next-step-banner";
 import { EntityBreadcrumb } from "@/components/universal/entity-breadcrumb";
 import { batchKeys, batchRecordInvalidationKeys, recipeKeys, packagingKeys } from "@/lib/query-keys";
 import { unwrap } from "@/lib/supabase/query-helpers";
-import { usePrefillStore } from "@/contexts/prefill-store";
+import { consumePrefill } from "@/contexts/prefill-store";
 
 export function BatchDetailClient({ id }: { id: string }) {
 
@@ -59,7 +59,7 @@ export function BatchDetailClient({ id }: { id: string }) {
   const [showAddToSession, setShowAddToSession] = useState(false);
 
   useEffect(() => {
-    const { openDialog } = usePrefillStore.getState().consume();
+    const { openDialog } = consumePrefill();
     if (!openDialog) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client-only read from sessionStorage-backed store
     if (openDialog === "pitch_yeast") setShowPitchYeast(true);

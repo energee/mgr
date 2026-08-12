@@ -22,7 +22,7 @@ import { setupRenderHarness } from "@/test/react-harness";
 import type { GrainBillItem } from "../grain-bill-editor";
 
 vi.mock("@/hooks/use-unit-preferences", () => ({
-  useWeightUnit: () => "lbs",
+  useResolvedUnitPreferences: () => ({ weight_unit: "lbs" }),
 }));
 vi.mock("@/hooks/use-catalog", () => ({
   useCatalog: () => ({ data: [], isLoading: false }),

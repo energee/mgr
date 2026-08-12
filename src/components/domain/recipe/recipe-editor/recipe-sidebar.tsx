@@ -14,7 +14,7 @@ import type { GrainBillItem } from "@/components/domain/recipe/grain-bill-editor
 import type { HopScheduleItem } from "@/components/domain/recipe/hop-schedule-editor";
 import { StatusBadge } from "@/components/universal/status-badge";
 import { recipeEntity } from "@/entities/recipe";
-import { useGravityUnit, useWeightUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatGravityFromSg, convertWeight, UNIT_LABELS, type WeightUnit } from "@/domain/units";
 
 /** SRM-to-hex color lookup table for continuous beer color display */
@@ -158,8 +158,7 @@ function bagLabel(count: number): string {
 
 export function RecipeSidebar() {
   const { recipe, estimates, grainItems, hopItems } = useRecipeEditor();
-  const gravityUnit = useGravityUnit();
-  const weightUnit = useWeightUnit();
+  const { gravity_unit: gravityUnit, weight_unit: weightUnit } = useResolvedUnitPreferences();
 
   const grainCalc = useMemo(() => calcGrainBags(grainItems), [grainItems]);
   const hopCalc = useMemo(() => calcHopBags(hopItems), [hopItems]);

@@ -21,13 +21,6 @@ export async function validateBody<T>(
   return parseWithSchema(schema, body);
 }
 
-export function validateParams<T>(
-  schema: ZodSchema<T>,
-  params: unknown
-): T {
-  return parseWithSchema(schema, params);
-}
-
 export function validateSearchParams<T>(
   schema: ZodSchema<T>,
   request: Request

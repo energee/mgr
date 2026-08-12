@@ -31,7 +31,7 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("@/hooks/use-unit-preferences", () => ({
-  useVolumeUnit: () => "bbl",
+  useResolvedUnitPreferences: () => ({ volume_unit: "bbl" }),
 }));
 
 vi.mock("@/hooks/use-catalog", () => ({

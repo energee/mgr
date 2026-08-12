@@ -39,7 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, GitMerge } from "lucide-react";
 import { toast } from "sonner";
 import { getStateLabel } from "@/types/entity";
-import { useGravityUnit, useVolumeUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatGravityFromSg, formatVolume } from "@/domain/units";
 import { batchEntity } from "@/entities/batch";
 import { UnitDisplay } from "@/components/ui/unit-input";
@@ -90,8 +90,7 @@ export function BatchBlendDialog({
 }: BatchBlendDialogProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const gravityUnit = useGravityUnit();
-  const volumeUnit = useVolumeUnit();
+  const { gravity_unit: gravityUnit, volume_unit: volumeUnit } = useResolvedUnitPreferences();
   const [selections, setSelections] = useState<Map<string, SourceBatchSelection>>(new Map());
   const [globalNotes, setGlobalNotes] = useState("");
 

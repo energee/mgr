@@ -27,7 +27,7 @@ import {
   daysUntilViabilityThreshold,
   type YeastForm,
 } from "@/domain/yeast-calculations";
-import { useWeightUnit } from "@/hooks/use-unit-preferences";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import { formatWeight } from "@/domain/units";
 
 // =============================================================================
@@ -151,7 +151,7 @@ function BrinkCard({
   vessel: BrinkVessel;
   pitch: ActivePitch | null;
 }) {
-  const weightUnit = useWeightUnit();
+  const weightUnit = useResolvedUnitPreferences().weight_unit;
   if (!pitch) {
     return (
       <Card className="opacity-50">

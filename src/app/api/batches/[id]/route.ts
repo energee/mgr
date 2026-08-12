@@ -1,9 +1,6 @@
-import {
-  withPermission,
-  successResponse,
-  errorResponse,
-  validateBody,
-} from "@/lib/api";
+import { successResponse, errorResponse } from "@/lib/api/response";
+import { withPermission } from "@/lib/api/auth";
+import { validateBody } from "@/lib/api/validation";
 import { batchUpdateSchema } from "@/lib/schemas/batch";
 
 export const GET = withPermission("batches:read", async (request, { supabase, params }) => {

@@ -60,8 +60,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { UnitDisplay } from "@/components/ui/unit-input";
-import { extractBrewMeasurements } from "@/domain/brew-events";
-import { useBrewMeasurementUnits } from "@/hooks/use-unit-preferences";
+import { extractBrewMeasurements, toBrewMeasurementUnits } from "@/domain/brew-events";
+import { useResolvedUnitPreferences } from "@/hooks/use-unit-preferences";
 import type { BrewEvent } from "@/types/domain";
 import { log } from "@/lib/client-logger";
 import { parseUnknownError } from "@/lib/errors";
@@ -123,7 +123,7 @@ export function BrewLogCompletionDialog({
 }: BrewLogCompletionDialogProps) {
   const supabase = createClient();
   const queryClient = useQueryClient();
-  const measurementUnits = useBrewMeasurementUnits();
+  const measurementUnits = toBrewMeasurementUnits(useResolvedUnitPreferences());
 
   const [step, setStep] = useState(1);
   const [vesselAssignments, setVesselAssignments] = useState<
