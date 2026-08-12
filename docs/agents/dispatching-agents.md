@@ -117,6 +117,43 @@ Each subagent burns context (its own + a slice of yours via the report). Two heu
 
 The harness exists to make agents reliable, not to make every task multi-agent. Solo work is the default.
 
+## Dispatched agents cannot run the quality gates
+
+**Measured 2026-08-12 across six parallel nodes, then confirmed by direct probe.** A
+dispatched expert agent does **not** get `Task`, `Agent`, or `Skill`. It therefore cannot
+dispatch `refactor-reviewer` / `transaction-safety-reviewer`, and cannot invoke
+`/simplify` or `/code-review`. Every one of the six agents reported this independently;
+four of them compensated by reading `.claude/agents/refactor-reviewer.md` and working its
+checklist by hand, and said plainly that the resulting verdict was self-assessed rather
+than an independent gate.
+
+**So: the orchestrator runs the gates, not the node.** When you fan out behaviour-preserving
+work, plan for a second pass in which the dispatching session runs `refactor-reviewer`
+against each branch. Do not write "run `/simplify`, then `/code-review --fix`, then
+`refactor-reviewer`" into a subagent brief and treat the node as gated — it cannot comply,
+and a brief that demands the impossible invites a fabricated "gates passed".
+
+This is not academic. Run centrally on the 2026-08-12 wave, those gates caught: a stale
+cross-reference pointing at the exact seam an extraction argued must not drift; a type
+narrowed from `string | null` to `string` behind an `as unknown` cast, which would have
+stopped the compiler demanding a null guard from the next caller; a service docblock
+claiming script-portability while importing `@sentry/nextjs`; and two progress receipts
+with wrong test counts. None of it was caught by the authoring agent's own review.
+
+### What the `tools:` frontmatter actually does — unresolved
+
+The six write-agent files carried `tools: Read, Grep, Glob, Bash, Edit, Write`, which looks
+like the cause. It is not obviously so. A probe dispatch of `entity-architect` reported its
+actual available set as **`Read, Bash, Edit, Write`** — four tools, narrower than the six the
+frontmatter declared, with `Grep` and `Glob` absent. So the declared list is not simply
+being honoured.
+
+The files now read `tools: "*"`, which is at least not misleading, but **this is unverified**:
+the same probe showed the change had no effect within the session that made it, consistent
+with agent definitions being resolved at session start. Whether a fresh session picks it up
+is untested. Until someone confirms it, assume dispatched agents cannot gate their own work
+and plan the central pass. Tracked in #803.
+
 ## Harness notes (optional)
 
 | Concern | Claude Code | Grok Build |
