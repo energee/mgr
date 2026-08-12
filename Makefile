@@ -59,9 +59,10 @@ check-fast: lint typecheck check-agent-config check-writes ## Layer 1: static ch
 check-writes: ## PostgREST write-atomicity ratchet (multi-write files need an RPC or tx-ok justification)
 	@bun run scripts/check-write-atomicity.ts
 
-check-agent-config: ## Validate shared agent skills and worktree tooling
+check-agent-config: ## Validate shared agent skills, worktree tooling, and shell-script unit tests
 	@bash scripts/check-agent-config.sh
 	@bash scripts/__tests__/agent-worktree.test.sh
+	@bash scripts/__tests__/compare-migration-versions.test.sh
 
 check-db: ## DB rule checks (security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / schema_registry / data-model docs / permissive RLS)
 	@bun run scripts/check-security-invoker.ts
