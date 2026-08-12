@@ -10,16 +10,18 @@ const LOGIN_EMAIL_STORAGE_KEY = "mgr:login-email";
  * Validates that a redirect path is safe (relative path only).
  * Prevents open redirect vulnerabilities.
  *
- * Rejects any value containing a backslash: WHATWG URL parsing treats `\` as
- * `/` for http(s) schemes, so `new URL("/\\evil.example.com", origin)` resolves
- * to `http://evil.example.com/` — a protocol-relative reference in disguise (#737).
+ * Rejects any value containing a backslash or an ASCII tab/CR/LF: WHATWG URL
+ * parsing treats `\` as `/` for http(s) schemes, and strips tab/newline
+ * characters entirely before parsing, so `new URL("/\\evil.example.com", origin)`
+ * and `new URL("/\t/evil.example.com", origin)` both resolve to
+ * `http://evil.example.com/` — protocol-relative references in disguise (#737).
  */
 export function isValidRedirect(path: string): boolean {
   return (
     path.startsWith("/") &&
     !path.startsWith("//") &&
     !path.includes("://") &&
-    !path.includes("\\")
+    !/[\\\t\n\r]/.test(path)
   );
 }
 

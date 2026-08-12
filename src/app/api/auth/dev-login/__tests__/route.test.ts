@@ -611,13 +611,18 @@ describe("GET /api/auth/dev-login gate", () => {
     expect(response.headers.get("location")).toBe("http://localhost:3000/");
   });
 
-  // WHATWG URL parsing treats `\` as `/` for http(s), so a backslash-prefixed
-  // "path" is a protocol-relative reference in disguise:
+  // WHATWG URL parsing treats `\` as `/` for http(s), and strips tab/newline
+  // characters entirely before parsing, so each of these "paths" is a
+  // protocol-relative reference in disguise:
   // new URL("/\\evil.example.com", origin) → http://evil.example.com/ (#737).
+  // new URL("/\t/evil.example.com", origin) → http://evil.example.com/ (same class).
   it.each([
-    ["/\\evil.example.com"],
-    ["\\\\evil.example.com"],
-  ])("rejects a backslash redirect target (%s)", async (target) => {
+    "/\\evil.example.com",
+    "/\\\\evil.example.com",
+    "/\t/evil.example.com",
+    "/\n/evil.example.com",
+    "/\r/evil.example.com",
+  ])("rejects a backslash/control-character redirect target (%s)", async (target) => {
     setupSupabase();
     vi.stubEnv("E2E_DEV_LOGIN", "1");
 
