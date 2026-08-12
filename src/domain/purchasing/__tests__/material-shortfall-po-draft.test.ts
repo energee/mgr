@@ -9,7 +9,7 @@ import {
   isShortfallRowOrderable,
   materialShortfallRowKey,
 } from "../material-shortfall-po-draft";
-import type { MaterialShortfall } from "@/hooks/use-material-planning";
+import type { MaterialShortfall } from "@/domain/material-planning";
 
 const makeRow = (
   overrides: Partial<MaterialShortfall> = {}

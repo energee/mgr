@@ -21,7 +21,7 @@
  * src/entities/po-line-item.tsx.
  */
 
-import type { MaterialShortfall } from "@/hooks/use-material-planning";
+import type { MaterialShortfall } from "@/domain/material-planning";
 import type { PODraft, POLineItemDraft } from "@/domain/purchasing/po-generator";
 
 /** Unit written to PO lines when the inventory item has no unit set. */
