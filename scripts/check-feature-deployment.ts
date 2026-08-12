@@ -52,8 +52,10 @@
  *     script then OPENS that snapshot: every table, function and trigger the
  *     declared migrations create must appear in it. That is a real check —
  *     it is what caught migration 00139, whose `margin_by_channel`,
- *     `project_finished_goods` and `project_revenue` are in the chain and not
- *     on live.
+ *     `project_finished_goods` and `project_revenue` were in the chain and not
+ *     on live (#697; those three have since been dropped from the chain by
+ *     00289_drop_orphaned_projection_rpcs.sql, so the discrepancy is closed —
+ *     the check that found it is not).
  *   - The snapshot records tables, functions, triggers, policies and RLS
  *     state — NOT views, columns or data. A migration that only adds a column
  *     or creates a view therefore has nothing this script can look for; such a

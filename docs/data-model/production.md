@@ -1406,11 +1406,9 @@ CREATE INDEX idx_batches_recipe_variant ON batches(recipe_variant_id);
 
 ## Report RPC Functions
 
-### `project_finished_goods(p_horizon_weeks)`
+### `project_finished_goods(p_horizon_weeks)` — REMOVED
 
-Returns expected finished goods output from the production pipeline. Confidence levels based on batch status: conditioning=high, fermenting=medium, planned=low. Uses `batches_in_production_by_brand` view.
-
-Returns: `brand_id, brand_name, batch_id, batch_number, batch_status, volume_bbl, estimated_ready_date, projection_week, confidence`
+Created by `00139_cogs_and_projection_rpcs.sql`, never applied to live, and dropped from the migration chain by `00289_drop_orphaned_projection_rpcs.sql` (#697). It had no callers: the reports UI projects finished goods in TypeScript (`src/domain/reports/summaries.ts`). Body preserved in git history and in `docs/plans/2026-03-05-cogs-projections-plan.md`.
 
 ---
 
