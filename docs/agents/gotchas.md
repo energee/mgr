@@ -188,15 +188,24 @@ touch $(git rev-parse --git-dir)/pr-review-ok && gh pr create ...   # ALWAYS DEN
 separate tool calls** — `touch` first, then `gh pr create` on its own. There
 is no chaining operator that evades this, and none should be looked for.
 
-**The marker is per-worktree, and that is correct.** The hook runs
-`git rev-parse --git-dir` in its own cwd, so from
-`.agents/worktrees/mgr/<name>` it resolves to
-`<main>/.git/worktrees/<name>/pr-review-ok`, not `<main>/.git/pr-review-ok`.
-Verified 2026-08-12 from a live worktree: touching the *main* checkout's
-`.git/pr-review-ok` does **not** unlock the gate there. Issue #786's original
-text claims the opposite; it is wrong. Do not "fix" this to point at the main
-checkout — the marker is consumed per PR by a paired `PostToolUse` hook, so a
-shared one would let one worktree spend another's.
+**The marker's location depends on the SESSION's cwd, not on the worktree your
+command `cd`s into.** The hook runs `git rev-parse --git-dir` in the *hook
+process's* cwd. The hook fires **before** your command, so a `cd` inside that
+command has not happened yet and cannot affect it. Both readings of #786 are
+therefore true, of different sessions — verified 2026-08-12, both observed:
+
+| Session cwd | Hook checks |
+|---|---|
+| the worktree (entered via `EnterWorktree`) | `<main>/.git/worktrees/<name>/pr-review-ok` |
+| the main checkout (a subagent that `cd`s per Bash call) | `<main>/.git/pr-review-ok` |
+
+So a subagent working in a worktree usually has to touch the **main
+checkout's** marker, while a session rooted in the worktree has to touch the
+worktree's. If you are denied with the marker apparently in place, print
+`pwd` and `git rev-parse --git-dir` with **no** `cd` — that is the path the
+hook used. Do not hardcode either one as "the fix": the resolution is correct
+as written, and the marker is consumed per PR by a paired `PostToolUse` hook,
+so forcing a shared one would let one worktree spend another's.
 
 **The matcher has no shell-quoting awareness, and it is not limited to `gh`.**
 `grep` is line-oriented and `^` anchors at every line start, so the phrase
