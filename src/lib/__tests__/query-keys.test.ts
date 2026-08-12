@@ -374,14 +374,8 @@ describe("Key factory consistency", () => {
     ]);
   });
 
-  it("orderKeys allocations and pickList", () => {
+  it("orderKeys allocations", () => {
     expect(orderKeys.allocations("o1")).toEqual(["order-allocations", "o1"]);
-    expect(orderKeys.pickList("o1")).toEqual(["order-pick-list", "o1"]);
-    expect(orderKeys.pickList("o1", "items")).toEqual([
-      "order-pick-list",
-      "o1",
-      "items",
-    ]);
   });
 
   it("inventoryKeys overview/finishedGoods/finishedGoodsAvailable", () => {

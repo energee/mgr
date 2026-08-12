@@ -5,15 +5,17 @@
  *
  * Provides touch-friendly navigation to order sub-pages:
  * - Generate Pick List (creates formal pick list with FIFO)
- * - Pick List (links to formal pick list if one exists, otherwise legacy page)
+ * - Pick List (links to the formal pick list if one exists, otherwise the
+ *   order pick-list route, which redirects there or prompts to generate one)
  * - Allocations (manage inventory allocations)
  */
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { unwrap } from "@/lib/supabase/query-helpers";
+import { usePickListForOrder } from "@/hooks/use-pick-list-for-order";
 import { pickListKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,20 +32,10 @@ type OrderQuickLinksProps = {
 export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
   const router = useRouter();
   const supabase = createClient();
+  const queryClient = useQueryClient();
 
-  // Fetch any existing formal pick list for this order (non-cancelled)
-  const { data: formalPickList } = useQuery({
-    queryKey: pickListKeys.forOrder(data.id),
-    queryFn: async () => {
-      return await unwrap(supabase
-        .from("pick_lists")
-        .select("id, status")
-        .eq("order_id", data.id)
-        .neq("status", "cancelled")
-        .limit(1)
-        .maybeSingle()) as { id: string; status: string } | null;
-    },
-  });
+  // Any existing formal pick list for this order (non-cancelled)
+  const { data: formalPickList } = usePickListForOrder(data.id);
 
   // Show generate pick list for confirmed/allocated orders (only if no active pick list exists)
   const canGenerate = ["confirmed", "scheduled"].includes(data.status) && !formalPickList;
@@ -57,6 +49,12 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
         .rpc("generate_pick_list", { p_order_id: data.id })) as string;
     },
     onSuccess: (pickListId) => {
+      // The cached forOrder result is now wrong (null → a list exists);
+      // without this, returning to the order within staleTime re-shows
+      // "Generate Pick List" and points the quick link at the empty state.
+      queryClient.invalidateQueries({
+        queryKey: pickListKeys.forOrder(data.id),
+      });
       toast.success("Pick list generated");
       router.push(`/sales/pick-lists/${pickListId}`);
     },
@@ -86,7 +84,7 @@ export function OrderQuickLinks({ data }: OrderQuickLinksProps) {
             label: "Pick List",
             description: formalPickList
               ? "View formal pick list with FIFO allocation"
-              : "View and print pick list for warehouse",
+              : "View pick list for warehouse",
             icon: ClipboardList,
           },
         ]

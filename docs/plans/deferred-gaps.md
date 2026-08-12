@@ -25,14 +25,20 @@
 ### No Bin-Level Detail in Formal Pick List
 - **Severity:** Medium
 - **Location:** `supabase/migrations/00057_pick_list_tables.sql` — `pick_list_items` table, `src/components/domain/pick-list-items.tsx`
-- **Problem:** `pick_list_items` only stores `location_id` (not `bin_id`). The formal pick list UI shows only location name. The legacy `OrderPickList` shows both bin name and location name, which is essential for warehouse travel optimization.
+- **Problem:** `pick_list_items` only stores `location_id` (not `bin_id`). The formal pick list UI shows only location name. The legacy `OrderPickList` showed both bin name and location name (essential for warehouse travel optimization); it was removed in 2026-08 when the order pick-list route migrated to `PickListItems`, so bin-level detail is no longer shown anywhere.
 - **Fix:** Migration to add `bin_id UUID REFERENCES bins(id)`, update `generate_pick_list` to store bin, update `PickListItems` to display bin name.
 
 ### No Location-Based Sort in Formal Pick List
 - **Severity:** Low-Medium
 - **Location:** `src/components/domain/pick-list-items.tsx`
-- **Problem:** Items are sorted by `sort_order` (incrementing integer from generation order). The `generate_pick_list` function iterates by order item then by FIFO date, not by warehouse location. The legacy system sorts by `location_name → bin_name → lot_number`.
+- **Problem:** Items are sorted by `sort_order` (incrementing integer from generation order). The `generate_pick_list` function iterates by order item then by FIFO date, not by warehouse location. The legacy system sorted by `location_name → bin_name → lot_number` (legacy `OrderPickList` removed 2026-08).
 - **Fix:** Update `generate_pick_list` to set `sort_order` based on location/bin, or sort client-side.
+
+### No Printable Pick Sheet
+- **Severity:** Low-Medium
+- **Location:** `src/components/domain/order/pick-list-items.tsx` (formal pick list UI)
+- **Problem:** The legacy `OrderPickList` (removed 2026-08) had a print layout — order header, numbered rows, picked-by/date/notes footer — via `window.print`. The formal pick list UI has no print path, so there is no printable warehouse pick sheet anywhere.
+- **Fix:** Add a print stylesheet/view to `PickListItems` or a dedicated print route for `pick_lists`.
 
 ### ~~Pick List Does Not Create Allocations~~ RESOLVED
 - **Severity:** Low-Medium

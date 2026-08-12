@@ -166,10 +166,6 @@ export const orderKeys = {
    *  allocation dialog's remaining-to-allocate math. Nested under
    *  allocations(id) so invalidating the list also refreshes this. */
   allocatedLots: (id: string) => ["order-allocations", id, "lots"] as const,
-  pickList: (id: string, subKey?: string) =>
-    subKey
-      ? (["order-pick-list", id, subKey] as const)
-      : (["order-pick-list", id] as const),
 };
 
 // =============================================================================
