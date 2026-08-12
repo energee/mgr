@@ -10,6 +10,79 @@
 ## Current state
 
 - **2026-08-12 (close control-character gap in redirect fix, PR #749).** `/simplify` + `/code-review --fix` on #737's backslash fix found the same bypass class survives via WHATWG's tab/CR/LF stripping (`new URL("/\t/evil.example.com", origin)` also resolves off-origin); `isValidRedirect()` now rejects `\t`/`\n`/`\r` alongside backslash, regression tests added, and the `it.each` cases were flattened/corrected so each actually exercises the check it names.
+# 2026-08-12 — P3 schema drift reconciled, live catalog re-baselined
+
+- **2026-08-12 (P3 schema drift).** Closed the standing live-drift alarm (#769) by applying the two
+  outstanding migrations to live with `scripts/db-push.sh --rebaseline-drift` and committing the
+  regenerated `supabase/live-catalog.snapshot.txt`. The drift check now exits 0 on both of its
+  assertions ("every committed migration version is applied on live" and "live database catalog
+  matches the snapshot"), where it had failed every scheduled run since at least 2026-08-10.
+
+## What the drift actually was
+
+**The snapshot was stale. Live was not corrupted, and nothing had been hand-edited.** Every one of
+the 17 lines the refresh removed traces to a committed migration in the chain. The alarm read as a
+large, alarming diff only because the snapshot had not been regenerated after several pushes, so it
+still carried the *old* hash lines for objects that later migrations had legitimately replaced.
+
+The 17 removals break down as:
+
+| Count | Source | Objects |
+|---|---|---|
+| 5 | the two migrations pushed here | `get_ttb_inventory_summary` (00287); `handle_vessel_transfer` and the three `reconcile_mongodb_*` functions (00288) |
+| 3 | 00285 section 4, already applied | the three permissive `pricing_channel_formats` "Authenticated users can …" policies, replaced by `pricing_channel_formats_select` / `_write` |
+| 9 | stale snapshot vs. already-applied 00237–00280 | `transition_entity_atomic`, `whole_unit_material_qty` (00279); `ingest_square_refund_atomic` (00277); `get_ttb_removals_summary` (00237); and five policy lines on `entity_revisions` (00275), `customers` / `customer_portal_users` / `orders` (00276), and `ai_rate_limit_buckets` (00280, whose new `ee25f986…` hash is the uniform gate hash 00280 recreates on every table) |
+
+`--rebaseline-drift` was required because live was already divergent from the snapshot, but the
+divergence was entirely of the stale-snapshot class. **No out-of-band or unreproducible change was
+accepted.** This matters for the audit record: a future operator reading it should not go hunting
+for phantom hand edits to the atomic-transition function or to portal RLS, because the chain
+explains all of them.
+
+## The ledger gap: 00288 was live before it was recorded
+
+Two migrations were unapplied by the ledger, not one: the live `supabase_migrations.schema_migrations`
+table stopped at `00286`, while `00287` and `00288` were both committed.
+
+`00288`'s DDL was nevertheless already present on live — `reconcile_mongodb_transfers`, which only
+`00288` creates, existed as a live function before this push. So its schema changes had been applied
+without its ledger row being written, during the MongoDB historical-sync work (#770, merged earlier
+the same day in `fd60d586`). Re-running it was safe (see below) and recorded the missing row.
+
+**An earlier draft of this entry claimed `scripts/check-live-drift.sh` had under-reported the
+unapplied set. That was wrong and is corrected here.** Check 1 delegates to
+`scripts/compare-migration-versions.sh`, which is purely ledger-based (`comm -23` of committed
+versions against `schema_migrations`) and never consults the catalog — it could not exhibit the
+behavior described. The real explanation is mundane: the CI run being read was from 13:17 UTC, and
+`00288` only landed on `main` later that same day, so that run legitimately saw `00287` alone. The
+tooling behaved correctly.
+
+## Safety checks before pushing
+
+Both migrations were verified re-runnable before applying, since one of them had partially applied
+already:
+
+- `00287` is a lone `CREATE OR REPLACE FUNCTION` plus a `COMMENT`.
+- `00288`'s only non-idempotent-looking statement is `ALTER COLUMN … TYPE NUMERIC` against
+  `session_line_items.planned_quantity` / `actual_quantity`, both confirmed already typed `numeric`
+  on live — a no-op. Its recreated `packaging_sessions_with_summary` view carries
+  `WITH (security_invoker = true)` as the DB rules require.
+
+## Tracker
+
+F124 (per-channel format visibility) moved from `deployment.state: "pending"` to `"live"`. Its own
+note said to flip it once an operator ran `scripts/db-push.sh`; `00285` is in the live ledger and
+both `channel_formats` and `pricing_channel_formats` appear in the regenerated snapshot.
+`make check-deploy-state` now reports 62 entries — 24 migration-backed, **24 live, 0 pending**, and
+38 audited as needing no schema change. The corresponding count sentence in `AGENTS.md` is updated
+in the same commit.
+
+## Note on 00287
+
+`00287` changes TTB Form 5130.9 beer-in-process from a live status snapshot to period-keyed history
+reconstructed from `entity_revisions` (#618, unblocks #698). Previously filed months will now report
+different — correct and reproducible — figures. This was applied with explicit operator approval.
+- **2026-08-12 (orphan RPC cleanup + reports layering).** Closed #697 by dropping `margin_by_channel`, `project_finished_goods` and `project_revenue` from the migration chain (`00289`): all three were absent from live (snapshot plus 00205's 2026-07-07 `pg_proc` diff), had zero callers under `src/` or `e2e/` including `dynamicRpc` string arguments, and the feature they were written for (F132) is audited as needing no schema change. `cogs_by_period` kept — it is on live. No live-DB change: every DROP is already a no-op there, only the three stale `_schema_registry` rows are cleaned up. Closed #783 by moving `src/lib/reports/` to `src/domain/reports/` with both tests, per the `AGENTS.md` source-layout rule; the 41 relocated fully-covered functions leaving `src/lib/**` required lowering that directory's function floor 38 to 35, documented inline as a denominator change rather than a regression. PR #790.
 - **2026-08-12 (MongoDB sync replay fixes).** Fixed the four failure classes from the first full production Mongo sync (69 recipes, 16 batches, 164 transfers, 178 packaging lines failed): migration 00288 (renumbered from 00286 — `main` picked up two unrelated migrations, `00286_suppliers_delete_revision_trail.sql` and `00287_ttb_period_keyed_in_process.sql`, via other PRs in the meantime, both colliding on version) makes reconcile RPCs replace adopted parents' children wholesale (kills the `recipe_yeasts`/`brew_log_batches` duplicate-key collisions), converts `session_line_items.planned/actual_quantity` to NUMERIC (fractional Mongo quantities like 70.5), adds `reconcile_mongodb_transfers` with a transaction-local `mgr.mongodb_sync` flag so `handle_vessel_transfer` skips live vessel claim/free during historical replay, and preserves existing PG status on state-machined rows (`batches` app-side, `brew_logs` in-RPC). Verified by a 4-scenario SQL smoke test replaying the exact production errors plus two new vitest regressions. Follow-ups from live re-runs: packaging brand resolution gained recipe/PG fallback chains and keg-size format aliases (Microstar/Lolev/Kegfleet Half→1/2 bbl, Sixtel→1/6 bbl), and `packaging_sessions` was then dropped from the full sync entirely (operator decision — the old system's packaging module was unused; still runnable via `syncEntity`). Live result: batches/recipes/brew_logs/vessel_transfers sync clean; residue is 13 `batch_logs` docs with missing/orphaned batch references (source data). Note: the migration was already applied live under version 00286 before the collision surfaced; all its statements are idempotent (CREATE OR REPLACE, DROP/CREATE VIEW, ALTER COLUMN TYPE NUMERIC USING — no one-time data writes outside ON CONFLICT upserts), so the operator's next `scripts/db-push.sh` re-running it under 00288 is a safe no-op, but `supabase_migrations.schema_migrations` will carry both a stale 00286 row and a fresh 00288 row for the same content.
 - **2026-08-12 (mobile-UX PR #746 review fixes).** Addressed two review findings on `feat/mobile-ux-simplification`: reverted the four branch commits' direct edits to `PROGRESS.md` (AGENTS.md hard constraint #18 — it's CI-generated on main, not edited on branches; the sanctioned `docs/progress/2026-08-11-mobile-ux-simplification.md` entry already covers the work) back to its pre-branch state; and added `DASHBOARD_PAGES`/`REPORT_PAGES` to `command-palette.tsx`, independent of `nav-items.ts`, restoring cmd+K access to the 9 destinations (TTB, Production Summary, Inventory Valuation, Batch Cost, Projections, COGS, Batch Trace, Inventory/Sales dashboards) the nav simplification silently dropped from the palette. New tests in `command-palette.test.ts` pin route existence and independence from the nav (`nav-items.test.ts` already asserts these hrefs stay out of the nav). `make check-fast`/lint/typecheck clean, suite 2824 green (+4), build clean.
 - **2026-08-12 (nightly `bun audit` failure fix, issue #735).** The scheduled Test workflow's `Production Build` job had failed every run from 2026-08-05 through 2026-08-11 on `bun audit --audit-level=high`, reporting 4 high-severity transitive advisories: `undici` (7.28.0, needs >=7.29.0), `fast-uri` (3.1.4, needs >=3.1.5), `nanoid` (3.3.16, needs >=3.3.17), `js-yaml` (4.3.0, needs >=4.3.1) — each exactly one patch release behind. Bumped the two existing `overrides` entries (`undici`, `fast-uri`) and added two new ones (`nanoid`, `js-yaml`) in `package.json`, regenerated `bun.lock` with `bun install`, and confirmed `make check` (lint, typecheck, unit tests, production build) stays green. Full triage (scope/reachability per package, and why `bun audit` itself couldn't be re-run to verify) recorded in `docs/security/dependency-policy.md` under the new "2026-08-12 high-severity triage" section, following the existing 2026-07-15/2026-07-29 format.
