@@ -190,6 +190,31 @@ async function upsertRows(
   return { synced, failed, errors };
 }
 
+/**
+ * Chunked `.in("id", …)` select. Unbounded selects silently truncate at
+ * PostgREST's 1000-row response cap; chunking by the ids we actually need
+ * keeps reads complete and bounded. Chunks run in parallel.
+ */
+async function selectRowsByIds<T>(
+  admin: AdminClient,
+  table: string,
+  columns: string,
+  ids: string[]
+): Promise<T[]> {
+  const CHUNK = 200;
+  const results = await Promise.all(
+    Array.from({ length: Math.ceil(ids.length / CHUNK) }, (_, i) =>
+      dynamicFrom(admin, table).select(columns).in("id", ids.slice(i * CHUNK, (i + 1) * CHUNK))
+    )
+  );
+  const rows: T[] = [];
+  for (const result of results) {
+    if (result.error) throw new Error(`Failed to read ${table}: ${result.error.message}`);
+    rows.push(...((result.data ?? []) as T[]));
+  }
+  return rows;
+}
+
 /** Call an aggregate reconciliation RPC and preserve phase/entity/operation context. */
 async function reconcileAggregate(
   admin: AdminClient,
@@ -627,6 +652,21 @@ async function syncBatches(): Promise<SyncResult> {
     codeCounts.set(base, count + 1);
   }
 
+  // For batches that already exist in Postgres, keep the PG status: the live
+  // app owns current state, and the server-side state machine (00205/00256)
+  // rejects regressions outright — a legacy Mongo doc still saying "fermenting"
+  // against a PG batch that completed fails the whole upsert chunk
+  // ("Invalid state transition: completed -> fermenting", 2026-08-12 sync).
+  // Mongo still sets status on first insert of a batch PG has never seen.
+  const existingBatches = await selectRowsByIds<{ id: string; status: string }>(
+    admin, "batches", "id, status", rows.map((row) => row.id as string)
+  );
+  const existingStatuses = new Map(existingBatches.map((b) => [b.id, b.status]));
+  for (const row of rows) {
+    const current = existingStatuses.get(row.id as string);
+    if (current !== undefined) (row as Record<string, unknown>).status = current;
+  }
+
   const result = await upsertRows("batches", rows, "id");
 
   await completeSyncLog(logId, result);
@@ -659,7 +699,24 @@ async function syncTransfers(): Promise<SyncResult> {
 
     return [row];
   });
-  const result = await upsertRows("vessel_transfers", rows);
+
+  // Historical transfers go through reconcile_mongodb_transfers (00288), which
+  // suppresses handle_vessel_transfer's live occupancy claim/free for the
+  // transaction. A plain upsert replays years of history against the trigger's
+  // "destination vessel already holds a different batch" guard — correct live,
+  // fatal for replay (2026-08-12: all 164 transfers failed on it).
+  const admin = await createAdminClient();
+  const TRANSFER_CHUNK = 50;
+  const parts = [];
+  for (let i = 0; i < rows.length; i += TRANSFER_CHUNK) {
+    parts.push(await reconcileAggregate(
+      admin,
+      "reconcile_mongodb_transfers",
+      { p_rows: rows.slice(i, i + TRANSFER_CHUNK) },
+      { phase: 3, entity: "vessel_transfers", mongoId: `chunk-${i / TRANSFER_CHUNK}` },
+    ));
+  }
+  const result = mergeResults(...parts);
 
   await completeSyncLog(logId, result);
   return { entityType: "vessel_transfers", phase: 3, ...result };
@@ -783,6 +840,41 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     (await selectIdName(admin, "brands")).map((b) => [b.name, b.id])
   );
 
+  // Fallback chains for batches without a direct beer link (2026-08-12: 166
+  // lines failed brand resolution on the direct chain alone):
+  //   Mongo: batch → recipe → recipe.beer → brand name
+  //   PG:    batch → batches.recipe_id → recipes.brand_id (recipes got
+  //          brand_id during phase 2, so this also covers name-adopted rows)
+  const mongoBatchIdToRecipe = new Map(
+    mongoBatches.filter((b) => b.recipe).map((b) => [b._id.toString(), b.recipe!.toString()])
+  );
+  const referencedPgBatchIds = [...new Set(
+    docs.flatMap((d) => (d.products ?? [])
+      .filter((p) => p.batch)
+      .map((p) => objectIdToUuid(p.batch!.toString())))
+  )];
+  const [mongoRecipeDocs, pgBatchRows] = await Promise.all([
+    db.collection<MongoRecipe>("recipes").find().toArray(),
+    selectRowsByIds<{ id: string; recipe_id: string | null }>(
+      admin, "batches", "id, recipe_id", referencedPgBatchIds
+    ),
+  ]);
+  const mongoRecipeIdToBeer = new Map(
+    mongoRecipeDocs.filter((r) => r.beer).map((r) => [r._id.toString(), r.beer!.toString()])
+  );
+  const pgRecipeRows = await selectRowsByIds<{ id: string; brand_id: string | null }>(
+    admin, "recipes", "id, brand_id",
+    [...new Set(pgBatchRows.map((b) => b.recipe_id).filter((id): id is string => !!id))]
+  );
+  const pgRecipeIdToBrandId = new Map(
+    pgRecipeRows.filter((r) => r.brand_id).map((r) => [r.id, r.brand_id as string])
+  );
+  const pgBatchIdToBrandId = new Map<string, string>();
+  for (const b of pgBatchRows) {
+    const brandId = b.recipe_id ? pgRecipeIdToBrandId.get(b.recipe_id) : undefined;
+    if (brandId) pgBatchIdToBrandId.set(b.id, brandId);
+  }
+
   // Format lookup: MongoDB formats → PG selling_formats
   // MongoDB "formats" collection has flat names (e.g. "16oz Cans - Case of 24")
   // PG has a two-level model: containers ("16oz Can") + selling_formats ("Case of 24")
@@ -836,6 +928,19 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     const container = formatByContainerName.get(lower);
     if (container) return container;
 
+    // Strategy 3b: keg-size aliases. Mongo formats are named "<owner> <size>"
+    // ("Microstar Half", "Lolev Sixtel", "Kegfleet Half"); the size word maps
+    // onto a PG keg container. The owner prefix is keg-fleet bookkeeping the
+    // PG model tracks elsewhere (keg_owners), not a distinct selling format.
+    if (/\bhalf\b/.test(lower)) {
+      const half = formatByContainerName.get("1/2 barrel");
+      if (half) return half;
+    }
+    if (/\b(sixtel|sixth)\b/.test(lower)) {
+      const sixtel = formatByContainerName.get("1/6 barrel");
+      if (sixtel) return sixtel;
+    }
+
     // Strategy 4: containment — find the longest composite key that overlaps
     let bestMatch: string | null = null;
     let bestLen = 0;
@@ -868,6 +973,10 @@ async function syncPackagingSessions(): Promise<SyncResult> {
   // 3. Build line item rows from each session's products array
   const lineItems: Record<string, unknown>[] = [];
   const lineErrors: Array<{ mongoId: string; error: string }> = [];
+  // Products with no batch pointer carry no derivable brand (NOT NULL) —
+  // they are unattributable source rows, skipped by policy (2026-08-12),
+  // not failures. The rest of their session still syncs.
+  let skippedNoBatch = 0;
 
   for (const doc of docs) {
     const pgSessionId = objectIdToUuid(doc._id.toString());
@@ -876,24 +985,39 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     for (let i = 0; i < (doc.products ?? []).length; i++) {
       const product = doc.products![i]!;
 
-      const pgBatchId = product.batch ? objectIdToUuid(product.batch.toString()) : null;
+      if (!product.batch) {
+        skippedNoBatch++;
+        continue;
+      }
 
-      // Resolve brand_id via batch → beer → brand chain (NOT NULL)
+      const pgBatchId = objectIdToUuid(product.batch.toString());
+
+      // Resolve brand_id (NOT NULL): batch → beer → brand, falling back to
+      // batch → recipe → beer → brand, then the PG batch → recipe → brand map.
       let pgBrandId: string | null = null;
-      if (product.batch) {
-        const beerId = mongoBatchIdToBeer.get(product.batch.toString());
-        if (beerId) {
-          const beerName = mongoBeerIdToName.get(beerId);
-          if (beerName) {
-            pgBrandId = brandNameToId.get(beerName) ?? null;
-          }
+      let brandFailure: string;
+      const mongoBatchId = product.batch.toString();
+      const beerId = mongoBatchIdToBeer.get(mongoBatchId)
+        ?? mongoRecipeIdToBeer.get(mongoBatchIdToRecipe.get(mongoBatchId) ?? "");
+      if (beerId) {
+        const beerName = mongoBeerIdToName.get(beerId);
+        if (beerName) {
+          pgBrandId = brandNameToId.get(beerName) ?? null;
+          brandFailure = `beer "${beerName}" has no matching PG brand`;
+        } else {
+          brandFailure = `beer ${beerId} not found in beers collection`;
         }
+      } else {
+        brandFailure = `batch ${mongoBatchId} has no beer or recipe→beer link`;
+      }
+      if (!pgBrandId) {
+        pgBrandId = pgBatchIdToBrandId.get(pgBatchId) ?? null;
       }
 
       if (!pgBrandId) {
         lineErrors.push({
           mongoId: doc._id.toString(),
-          error: `product[${i}]: could not resolve brand_id (NOT NULL constraint)`,
+          error: `product[${i}]: could not resolve brand_id — ${brandFailure}`,
         });
         continue;
       }
@@ -944,6 +1068,12 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     ...error,
     error: `phase=4 entity=packaging_sessions operation=resolve-line: ${error.error}`,
   })));
+  if (skippedNoBatch > 0) {
+    logger.warn(
+      "Skipped %d packaging line(s) with no batch reference (unattributable; policy 2026-08-12)",
+      skippedNoBatch
+    );
+  }
 
   await completeSyncLog(logId, combined);
   return { entityType: "packaging_sessions", phase: 4, ...combined };
@@ -959,8 +1089,11 @@ const PHASE_ENTITIES: Record<SyncPhase, Array<() => Promise<SyncResult>>> = {
   // Orders are intentionally absent: Beer orders.xlsx is their source of
   // truth. Mongo order sync used incomplete legacy references and erased
   // customer, selling-format, and price data on every destructive re-sync.
+  // Packaging sessions are also absent (2026-08-12): the old system's
+  // packaging module was unused, so its sessions aren't imported. The entity
+  // remains individually runnable via syncEntity("packaging_sessions").
   3: [syncBatches, syncTransfers, syncBrewLogs],
-  4: [syncBatchReadings, syncPackagingSessions],
+  4: [syncBatchReadings],
 };
 
 /** Reverse lookup: function → entity name (used in error reporting). */
