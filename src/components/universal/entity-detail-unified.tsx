@@ -120,7 +120,7 @@ import {
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
-import { AnimatedActionMenuItem } from "@/components/universal/animated-action-menu-item";
+import { ActionMenuItem } from "@/components/universal/action-menu-item";
 import { RelationTable } from "./entity-relation-table";
 import type { UseFormReturn } from "react-hook-form";
 import { log } from "@/lib/client-logger";
@@ -1424,7 +1424,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
                       displayData
                     );
                     return (
-                      <AnimatedActionMenuItem
+                      <ActionMenuItem
                         key={action.name}
                         icon={action.icon}
                         label={action.label}

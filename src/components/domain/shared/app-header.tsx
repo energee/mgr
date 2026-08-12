@@ -21,14 +21,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AnimatedUser, AnimatedSettings, AnimatedLogOut } from "@/components/icons/animated";
-import type { AnimatedIconHandle } from "@/components/icons/animated";
-import { useRef } from "react";
 import { toast } from "sonner";
 import { NotificationBell } from "@/components/domain/shared/notification-bell";
 import { ChatToggle } from "@/components/domain/shared/chat-toggle";
 import { SafeSvg } from "@/components/ui/safe-svg";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, User as UserIcon, Settings, LogOut } from "lucide-react";
 
 type AppHeaderProps = {
   user: User;
@@ -50,10 +47,6 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
     router.push("/login");
     router.refresh();
   };
-
-  const userIconRef = useRef<AnimatedIconHandle>(null);
-  const settingsIconRef = useRef<AnimatedIconHandle>(null);
-  const logoutIconRef = useRef<AnimatedIconHandle>(null);
 
   return (
     <header className="h-12 border-b flex items-center justify-between px-4">
@@ -88,14 +81,8 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2"
-              onMouseEnter={() => userIconRef.current?.startAnimation()}
-              onMouseLeave={() => userIconRef.current?.stopAnimation()}
-            >
-              <AnimatedUser ref={userIconRef} className="h-4 w-4" />
+            <Button variant="ghost" size="sm" className="gap-2">
+              <UserIcon className="h-4 w-4" />
               <span className="hidden sm:inline">{user.email}</span>
             </Button>
           </DropdownMenuTrigger>
@@ -109,21 +96,13 @@ export function AppHeader({ user, breweryName, breweryLogoSvg }: AppHeaderProps)
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => router.push("/settings")}
-              onMouseEnter={() => settingsIconRef.current?.startAnimation()}
-              onMouseLeave={() => settingsIconRef.current?.stopAnimation()}
-            >
-              <AnimatedSettings ref={settingsIconRef} className="h-4 w-4 mr-2" />
+            <DropdownMenuItem onClick={() => router.push("/settings")}>
+              <Settings className="h-4 w-4 mr-2" />
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleSignOut}
-              onMouseEnter={() => logoutIconRef.current?.startAnimation()}
-              onMouseLeave={() => logoutIconRef.current?.stopAnimation()}
-            >
-              <AnimatedLogOut ref={logoutIconRef} className="h-4 w-4 mr-2" />
+            <DropdownMenuItem onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2" />
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

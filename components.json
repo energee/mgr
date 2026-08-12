@@ -19,7 +19,6 @@
     "hooks": "@/hooks"
   },
   "registries": {
-    "@diceui": "https://diceui.com/r/{name}.json",
-    "@lucide-animated": "https://lucide-animated.com/r/{name}.json"
+    "@diceui": "https://diceui.com/r/{name}.json"
   }
 }
