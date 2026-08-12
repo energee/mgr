@@ -1071,8 +1071,11 @@ const PHASE_ENTITIES: Record<SyncPhase, Array<() => Promise<SyncResult>>> = {
   // Orders are intentionally absent: Beer orders.xlsx is their source of
   // truth. Mongo order sync used incomplete legacy references and erased
   // customer, selling-format, and price data on every destructive re-sync.
+  // Packaging sessions are also absent (2026-08-12): the old system's
+  // packaging module was unused, so its sessions aren't imported. The entity
+  // remains individually runnable via syncEntity("packaging_sessions").
   3: [syncBatches, syncTransfers, syncBrewLogs],
-  4: [syncBatchReadings, syncPackagingSessions],
+  4: [syncBatchReadings],
 };
 
 /** Reverse lookup: function → entity name (used in error reporting). */
