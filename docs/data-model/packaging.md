@@ -144,8 +144,8 @@ Line items within a packaging session. Each line item represents one product (br
 | selling_format_id | UUID | FK to [selling_formats](#selling_formats) |
 | keg_owner_id | UUID | FK to keg_owners (nullable, for keg formats) |
 | batch_id | UUID | FK to [batches](./production.md#batches) — source batch for this line item |
-| planned_quantity | INTEGER | Planned quantity |
-| actual_quantity | INTEGER | Actual quantity |
+| planned_quantity | NUMERIC | Planned quantity (NUMERIC since 00286 — MongoDB-era sessions carry fractional quantities like 70.5 cases) |
+| actual_quantity | NUMERIC | Actual quantity (NUMERIC since 00286) |
 | created_at | TIMESTAMPTZ | Created timestamp |
 
 **Unique constraint:** `(session_id, batch_id, selling_format_id) WHERE batch_id IS NOT NULL` — prevents duplicate line items for the same batch+format within a session.

@@ -627,6 +627,28 @@ async function syncBatches(): Promise<SyncResult> {
     codeCounts.set(base, count + 1);
   }
 
+  // For batches that already exist in Postgres, keep the PG status: the live
+  // app owns current state, and the server-side state machine (00205/00256)
+  // rejects regressions outright — a legacy Mongo doc still saying "fermenting"
+  // against a PG batch that completed fails the whole upsert chunk
+  // ("Invalid state transition: completed -> fermenting", 2026-08-12 sync).
+  // Mongo still sets status on first insert of a batch PG has never seen.
+  const existingStatuses = new Map<string, string>();
+  const allIds = rows.map((row) => row.id as string);
+  for (let i = 0; i < allIds.length; i += 200) {
+    const { data, error } = await dynamicFrom(admin, "batches")
+      .select("id, status")
+      .in("id", allIds.slice(i, i + 200));
+    if (error) throw new Error(`Failed to read existing batch statuses: ${error.message}`);
+    for (const b of (data ?? []) as Array<{ id: string; status: string }>) {
+      existingStatuses.set(b.id, b.status);
+    }
+  }
+  for (const row of rows) {
+    const current = existingStatuses.get(row.id as string);
+    if (current !== undefined) (row as Record<string, unknown>).status = current;
+  }
+
   const result = await upsertRows("batches", rows, "id");
 
   await completeSyncLog(logId, result);
@@ -659,7 +681,24 @@ async function syncTransfers(): Promise<SyncResult> {
 
     return [row];
   });
-  const result = await upsertRows("vessel_transfers", rows);
+
+  // Historical transfers go through reconcile_mongodb_transfers (00286), which
+  // suppresses handle_vessel_transfer's live occupancy claim/free for the
+  // transaction. A plain upsert replays years of history against the trigger's
+  // "destination vessel already holds a different batch" guard — correct live,
+  // fatal for replay (2026-08-12: all 164 transfers failed on it).
+  const admin = await createAdminClient();
+  const TRANSFER_CHUNK = 50;
+  const parts = [];
+  for (let i = 0; i < rows.length; i += TRANSFER_CHUNK) {
+    parts.push(await reconcileAggregate(
+      admin,
+      "reconcile_mongodb_transfers",
+      { p_rows: rows.slice(i, i + TRANSFER_CHUNK) },
+      { phase: 3, entity: "vessel_transfers", mongoId: `chunk-${i / TRANSFER_CHUNK}` },
+    ));
+  }
+  const result = mergeResults(...parts);
 
   await completeSyncLog(logId, result);
   return { entityType: "vessel_transfers", phase: 3, ...result };

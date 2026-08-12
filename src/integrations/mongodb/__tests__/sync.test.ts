@@ -37,6 +37,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { getMongoDb } from "../client";
 import { syncAll, syncEntity, syncPhase } from "../sync";
+import { objectIdToUuid } from "../id";
 
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 const mockedGetMongoDb = vi.mocked(getMongoDb);
@@ -344,5 +345,72 @@ describe("upsertRows error logging (via syncEntity('beer_styles'))", () => {
       },
       "Upsert error"
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 00286 replay fixes
+// ---------------------------------------------------------------------------
+
+describe("syncBatches status preservation (via syncEntity)", () => {
+  it("keeps the existing PG status for a batch the live app has moved on", async () => {
+    // currentVessel set → transformBatch derives "fermenting", but PG already
+    // says "completed" and the server-side state machine allows no way back.
+    const BATCH_OID = new ObjectId("abababababababababababab");
+    const batchUuid = objectIdToUuid(BATCH_OID.toString());
+    const { admin, writes } = makeAdminMock(
+      pgTables({ batches: { data: [{ id: batchUuid, status: "completed" }], error: null } }),
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+    mockedGetMongoDb.mockResolvedValue(
+      makeDb({
+        ...MONGO_COLLECTIONS,
+        batches: [
+          { _id: BATCH_OID, name: "B1", currentVessel: new ObjectId("acacacacacacacacacacacac") },
+        ],
+      })
+    );
+
+    await syncEntity("batches");
+
+    const upsert = writes.find((w) => w.table === "batches" && w.op === "upsert");
+    expect(upsert).toBeDefined();
+    const rows = upsert!.row as Array<{ id: string; status: string }>;
+    expect(rows.find((r) => r.id === batchUuid)?.status).toBe("completed");
+  });
+});
+
+describe("syncTransfers historical replay (via syncEntity)", () => {
+  it("routes rows through reconcile_mongodb_transfers instead of a direct upsert", async () => {
+    const VESSEL_OID = new ObjectId("adadadadadadadadadadadad");
+    const { admin, writes, rpcCalls } = makeAdminMock(
+      pgTables({ vessels: { data: [{ id: "pg-vessel-1", name: "FV1" }], error: null } }),
+      { onUnknownTable: "throw", rpc: { data: 1, error: null } }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+    mockedGetMongoDb.mockResolvedValue(
+      makeDb({
+        ...MONGO_COLLECTIONS,
+        vessels: [{ _id: VESSEL_OID, name: "FV1" }],
+        transfers: [
+          {
+            _id: new ObjectId("aeaeaeaeaeaeaeaeaeaeaeae"),
+            batch: new ObjectId("abababababababababababab"),
+            transferTo: VESSEL_OID,
+            quantity: 8,
+            date: new Date("2025-06-01T12:00:00Z"),
+          },
+        ],
+      })
+    );
+
+    await syncEntity("vessel_transfers");
+
+    const rpc = rpcCalls.filter((c) => c.fn === "reconcile_mongodb_transfers");
+    expect(rpc).toHaveLength(1);
+    expect((rpc[0]!.args as { p_rows: unknown[] }).p_rows).toHaveLength(1);
+    // The live occupancy trigger must not see a direct client-side upsert.
+    expect(writes.filter((w) => w.table === "vessel_transfers")).toHaveLength(0);
   });
 });
