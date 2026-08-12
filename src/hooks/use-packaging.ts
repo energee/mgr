@@ -18,12 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { usePackagingFormats } from "@/hooks/use-catalog";
 import { entityKeys, packagingKeys } from "@/lib/query-keys";
-import { computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
-import {
-  buildFillVolumeMap,
-  mapPackagableBatches,
-  suggestPlannedQuantity,
-} from "@/domain/packaging-planning";
+import { buildFillVolumeMap } from "@/domain/packaging-planning";
 import {
   fetchBatchesForBrand,
   fetchOpenPackagingSessions,
@@ -38,11 +33,11 @@ export type {
   RawPackagableBatchRow,
 } from "@/domain/packaging-planning";
 
+export { computeUnitFillVolumeBbl } from "@/domain/consumption-planning";
 export {
-  computeUnitFillVolumeBbl,
   mapPackagableBatches,
   suggestPlannedQuantity,
-};
+} from "@/domain/packaging-planning";
 
 /**
  * Returns a memoized Set of selling_format IDs that represent keg containers.
