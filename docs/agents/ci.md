@@ -10,7 +10,7 @@ workflow change, or the unit suite fails.
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `test.yml` | Every PR to main (docs-only included — a check has to report on every PR to be usable as a required one) | Static checks + unsharded vitest with coverage + `make check-db` / `check-wip` / `check-deploy-state` / `check-agent-config`, plus the deterministic codegraph extractor evals (`bun tools/codegraph/eval.ts --ast` / `--sql` — offline, no LLM). Playwright E2E runs on every PR too as of 2026-07-30 (#437) — see [Why E2E runs on pull requests](#why-e2e-runs-on-pull-requests) for the shape and the reasoning, including why it never did before, despite #506 having been written to do it. Only `Production Build` stays nightly / `workflow_dispatch`: it compiles against the **hosted** Supabase credentials that fork PRs cannot read, and it is also the only job that runs `bun audit`, so the **dependency audit is a nightly signal, not a PR-time one**. PRs are not left without build coverage — the E2E job runs its own `bun run build` against its local stack. E2E boots an isolated local Supabase, builds against it (`NEXT_PUBLIC_*` are inlined at build time, so the hosted-credential build artifact cannot serve it), and runs Playwright against `bun start` — the shipped artifact, not a dev server. Because that server is a production build, the job sets `E2E_DEV_LOGIN: "1"` so `/api/auth/dev-login` (how `e2e/auth.setup.ts` gets a session, absent any hosted E2E credentials) answers instead of 404ing; the flag belongs to this job alone and must never be set on a deployed environment. The flag is not sufficient by itself — on that path the route also requires the Supabase project URL to have a **loopback hostname**, which this job satisfies via its own local stack. That narrows a stray `E2E_DEV_LOGIN=1` to databases reachable only on the serving machine (#656); it is not a guarantee that no real data is reachable, since a self-hosted Supabase, a sidecar, a tunnel or a local proxy can all sit behind a loopback name. The URL is resolved through `getSupabaseUrl()` — the same accessor `createAdminClient()` uses — precisely so a build-time-inlined `NEXT_PUBLIC_*` literal cannot make the gate disagree with the database the route actually connects to. The route's separate `NODE_ENV === "development"` path now requires the same loopback hostname by default, with `DEV_LOGIN_ALLOW_REMOTE_DB=1` as an explicit per-developer opt-in for a hosted project (#679); that variable must never be set in a workflow — a contract test asserts it appears in none. Full reasoning, including what is *not* guaranteed, is in the route's docstring (`src/app/api/auth/dev-login/route.ts`). |
-| `db-lint.yml` | PR touching `supabase/migrations/**` or `supabase/config.toml` | Replays the full migration chain from scratch (`ON_ERROR_STOP`) and runs the RLS integration tests against it. |
+| `db-lint.yml` | **Every PR** (unfiltered since #713 — see [Required status checks](#required-status-checks)) | `supabase-reset` + `db-lint` replay the full migration chain from scratch (`ON_ERROR_STOP`) and run the RLS integration tests against it. The `db-lint` job's name **is** the required context `Database Lint and Integration Tests`, so it reports its own result on every PR. |
 | `shell-lint.yml` | PR touching `scripts/**` | `bash -n` + shellcheck over every shebang-bearing file under `scripts/` (selection is by shebang, not extension, so extensionless scripts like `scripts/agent-worktree` are covered). No database, no build. |
 | `live-drift.yml` | Daily schedule + dispatch | Watchdog comparing the live database catalog to `supabase/live-catalog.snapshot.txt` — catches out-of-band drift no PR would surface. Missing/changed objects FAIL; additions WARN. Also diffs the migration chain (`supabase/migrations/*.sql` version prefixes) against `supabase_migrations.schema_migrations` on live (#693): a committed-but-unapplied migration FAILs (the catalog diff alone is blind to it — snapshot and live are both post-apply artifacts); versions applied on live but absent from the chain WARN. Comparison core: `scripts/compare-migration-versions.sh` (unit-tested DB-free via `make check-agent-config`). Two tracking issues, deliberately distinct: `live-drift` (real drift) and `watchdog-down` (the check never reached the database — missing secret, billing block, connection error). While `watchdog-down` is open there is **no** drift detection at all. |
 | `nightly-watch.yml` | `workflow_run` completion of scheduled Test runs, or dispatch with a simulated `conclusion` | Opens/updates ONE `nightly-red` tracking issue when the nightly fails; closes it on the next green run. Dispatch exists so the watchdog can be exercised without waiting for a red nightly. |
@@ -495,19 +495,9 @@ longer queues behind `static -> unit-tests` it
 *sets* the PR's critical path rather than extending it: PR latency went **down**
 by ~2m40s even though a five-minute browser suite was added to every PR.
 
-**Still outstanding — the "required" half, so #437's criterion 1 is only half
-met.** The `main` ruleset declares no `required_status_checks` rule at all
-today (`gh api repos/energee/mgr/rulesets/11725742` returns `deletion`,
-`non_fast_forward`, `pull_request`, `required_linear_history` and nothing
-else), and `main` has no legacy branch protection either
-(`gh api repos/energee/mgr/branches/main/protection` -> 404 "Branch not
-protected"). So nothing is literally blocking: not `E2E Tests`, not
-`Static Checks`, not `Unit Tests`. They run and **report** on every PR, and a
-failure is a visible red X, but a merge is not prevented. Read every "gate" in
-this section as *reporting*, not *blocking*. Making those three contexts
-required is a repository-settings change (ruleset `main`, id `11725742`), not
-a workflow change, and it is a deliberate owner call — `Production Build` must
-**not** be added, since it does not run on PRs.
+**The "required" half is #713, and it is a repository-settings change** — see
+[Required status checks](#required-status-checks) below for the final list and
+the shim that makes `Database Lint and Integration Tests` eligible.
 
 **Side effect of the missing rule: `progress.yml`'s auto-merge intermittently
 fails outright (found 2026-08-02).** `progress.yml`'s `gh pr merge --auto`
@@ -526,6 +516,94 @@ lands, not a new bug to chase. **Watch for:** this note going stale once #713
 adds the required-checks rule — the failure should stop recurring, and if a
 future harvest still finds it after that rule lands, the fix didn't address
 this side effect and needs its own look.
+
+## Required status checks
+
+Four contexts, and only four, are required on `main` (ruleset `11725742`,
+rule type `required_status_checks`). The strings are the **job `name:` values**
+— GitHub matches required contexts by exact job name, not by workflow name:
+
+| Context | Workflow / job | Why it can be required |
+|---|---|---|
+| `Static Checks` | `test.yml` / `static` | Runs on every PR; no `if:`, no path filter. |
+| `Unit Tests` | `test.yml` / `unit-tests` | Same. |
+| `E2E Tests` | `test.yml` / `e2e` | Same. Verified 2026-08-12: the job carries **no** `if:` guard and no `needs:` edge, so it genuinely runs per-PR (it did not before #437 — see [Why E2E runs on pull requests](#why-e2e-runs-on-pull-requests)). |
+| `Database Lint and Integration Tests` | `db-lint.yml` / `db-lint` | Runs on every PR; no `if:`, no path filter, no `needs:`. See [why it is unfiltered](#why-db-lint-runs-on-every-pr-713). |
+
+**Deliberately advisory — never require these:**
+
+- `Production Build` (`test.yml` / `build`) carries
+  `if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'`
+  because it compiles against hosted Supabase credentials a fork PR cannot
+  read. It does not run on pull requests, so requiring it would leave **every**
+  PR permanently pending. This one is load-bearing: it is the single most
+  likely mistake when editing the ruleset.
+- `Fresh Supabase Migration Replay` (`db-lint.yml`) runs on every PR too, but
+  is left advisory: the `db-lint` job re-applies the same chain itself, so the
+  required context already covers a broken migration. Requiring both would only
+  duplicate the signal.
+- `Shell Syntax and ShellCheck` (`shell-lint.yml`) is still path-filtered at
+  `on:` (`scripts/**`) and therefore still ineligible. It was left that way on
+  purpose: it lints one directory, its findings are cheap to notice as a red X,
+  and making it eligible would mean running shellcheck on every PR for a lane
+  that has never blocked anything. If it is ever to be required, drop its
+  `paths:` filter first — requiring it as-is would hang every PR that does not
+  touch `scripts/`.
+- Everything cron-driven (`live-drift.yml`, `prod-health.yml`,
+  `nightly-watch.yml`, the agentic loops) reports nothing on a PR at all.
+
+### Why db-lint runs on every PR (#713)
+
+**The constraint.** A required context must report a conclusion on *every* PR.
+A `paths:` filter on `on:` does not produce a skipped check — GitHub never
+queues the workflow at all, so the context is simply **absent** and the PR sits
+pending forever with no way to clear it. That is why the "just require it"
+version of #713 would have made every docs-only PR unmergeable.
+
+**The resolution: delete the filter.** `db-lint.yml` triggers on every
+`pull_request`, and the `db-lint` job — whose `name:` is the required context —
+reports its own result. No detection job, no gate job, no skip to translate.
+
+**Why that is affordable.** db-lint is not the critical path. Measured on
+PR #790 (2026-08-12): the whole db-lint workflow finishes in **~3m13s** (the
+Docker-backed replay is its long pole) while `E2E Tests` takes **~5m50s** on
+every PR regardless. Adding db-lint to docs-only PRs therefore costs no
+wall-clock at all, and Actions minutes are free on this public repo. Issue #713
+assumed db-lint was "the slowest job here" and that assumption drove the
+original design; the measurement says otherwise.
+
+**What was tried first, and why it was thrown away.** The initial
+implementation kept the filter and wrapped it: a `changes` job diffing against
+`env.SCHEMA_PATHS`, the heavy jobs gated on its output, and an always-running
+`db-lint-gate` holding the required name and converting skips into conclusions.
+It worked and was well tested, but it cost +157 lines of CI YAML against the
+nine-line deletion that achieves the same guarantee — and it introduced a
+failure mode of its own:
+
+> `on: paths:` globs and git pathspecs are **different dialects**. In a git
+> pathspec `*` matches `/`, but `**/` still requires at least one directory. So
+> the copied `supabase/migrations/**/*.sql` matched
+> `supabase/migrations/sub/deep.sql` and **not**
+> `supabase/migrations/00250_x.sql`. Every migration in this repo is top-level,
+> so the pattern matched **0 of 264** — every migration PR would have skipped
+> the heavy lane and reported the required check **green**. Precisely the
+> failure the gate existed to prevent, introduced by the gate. It was caught by
+> executing the patterns, not by reading them; the reasoning had concluded the
+> opposite.
+
+That hazard is worth remembering even though the code is gone — it is why
+`docs/agents/gotchas.md` carries the glob-dialect entry, and why any future
+path-filtering work should assert by running patterns against the real tree
+rather than pinning their spelling. Deleting the filter removes the whole class.
+
+**What is pinned.** `.github/scripts/ci-workflows.test.ts` asserts that
+`db-lint.yml` carries no `paths:` filter, that exactly one job is named
+`Database Lint and Integration Tests`, that it has no job-level `if:` and no
+`needs:` (either could make it skip), that no step carries
+`continue-on-error:`, that the lint step still fails loudly, and that
+`Production Build` stays schedule-gated so it can never be added to the
+required set by accident. Each assertion was mutation-checked: reintroducing a
+`paths:` filter and adding an `if:` to the required job each red the suite.
 
 ## Rules when changing workflows
 
@@ -568,11 +646,12 @@ this side effect and needs its own look.
    that passes when it is unconfigured is worse than no check — fail loudly
    with an `::error::` instead.
 
-   This applies to the always-report set only: `test.yml`'s `static`,
-   `unit-tests` and `e2e`. `db-lint.yml` (`supabase/migrations/**`) and
-   `shell-lint.yml` (`scripts/**`) are **deliberately** path-filtered, and both
-   filters are pinned in `.github/scripts/ci-workflows.test.ts` (removing
-   either `paths:` list reds the suite) — they are opt-in lanes for the diffs
-   that need them, they report nothing on unrelated PRs, and for that reason
-   they must never be made required. Adding a job to the always-report set means giving
-   it a trigger that fires on every PR, not adding a path filter and hoping.
+   This applies to the always-report set: `test.yml`'s `static`, `unit-tests`
+   and `e2e`, plus `db-lint.yml`'s `db-lint`. **A job whose own context is
+   required may not be path-filtered, carry an `if:`, or `needs:` anything that
+   can skip** — see [why db-lint runs on every PR](#why-db-lint-runs-on-every-pr-713).
+   `shell-lint.yml` (`scripts/**`) is still path-filtered at `on:` and is
+   **deliberately not required** for that reason. Its path list is pinned in
+   `.github/scripts/ci-workflows.test.ts`. Adding a job to the always-report
+   set means giving it a trigger that fires on every PR, not adding a path
+   filter and hoping.

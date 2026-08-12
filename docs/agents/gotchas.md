@@ -173,3 +173,105 @@ command with the sandbox disabled rather than debugging the script.
 allow-list argument list exceeds `ARG_MAX` and every sandboxed command fails
 with E2BIG. Prune with `make worktree-doctor` / `scripts/agent-worktree`;
 bypass per-command in the meantime.
+
+**The pre-PR review gate cannot be satisfied in the same command it guards
+(#786).** The gate is a `PreToolUse` hook on `Bash` in `.claude/settings.json`.
+`PreToolUse` sees the *whole* command string before any of it runs, and the
+matcher is `grep -qE '(^|[;&|] *)gh +pr +create'` — the `&` of `&&` matches
+`[;&|]`. So the form AGENTS.md's "Landing the Plane" step 2 reads like:
+
+```bash
+touch $(git rev-parse --git-dir)/pr-review-ok && gh pr create ...   # ALWAYS DENIED
+```
+
+…always fails: at hook time the marker does not exist yet. Issue **two
+separate tool calls** — `touch` first, then `gh pr create` on its own. There
+is no chaining operator that evades this, and none should be looked for.
+
+**The marker's location depends on the SESSION's cwd, not on the worktree your
+command `cd`s into.** The hook runs `git rev-parse --git-dir` in the *hook
+process's* cwd. The hook fires **before** your command, so a `cd` inside that
+command has not happened yet and cannot affect it. Both readings of #786 are
+therefore true, of different sessions — verified 2026-08-12, both observed:
+
+| Session cwd | Hook checks |
+|---|---|
+| the worktree (entered via `EnterWorktree`) | `<main>/.git/worktrees/<name>/pr-review-ok` |
+| the main checkout (a subagent that `cd`s per Bash call) | `<main>/.git/pr-review-ok` |
+
+So a subagent working in a worktree usually has to touch the **main
+checkout's** marker, while a session rooted in the worktree has to touch the
+worktree's. If you are denied with the marker apparently in place, print
+`pwd` and `git rev-parse --git-dir` with **no** `cd` — that is the path the
+hook used. Do not hardcode either one as "the fix": the resolution is correct
+as written, and the marker is consumed per PR by a paired `PostToolUse` hook,
+so forcing a shared one would let one worktree spend another's.
+
+**The matcher has no shell-quoting awareness, and it is not limited to `gh`.**
+`grep` is line-oriented and `^` anchors at every line start, so the phrase
+appearing inside a quoted string, a heredoc body, or a PR body draft trips the
+gate even though nothing would execute. Observed 2026-08-12: a **`git commit
+-F -`** whose heredoc message *described* this very footgun was denied, because
+the message body contained the phrase on its own line. The hook matches on the
+`Bash` tool, not on the program being run — any command whose text contains the
+phrase is denied, `git commit` included. Pass PR bodies with `--body-file`,
+never inline, and keep the phrase out of commit messages (describe it, e.g.
+"the PR-create gate", rather than quoting it). Conversely it
+under-matches — `$(gh pr create ...)`, `xargs gh pr create`, `gh --repo x pr
+create` all slip past — so treat it as a reminder, not an enforcement boundary.
+A quoting-aware version would have to strip quoted spans and heredoc bodies
+before matching, e.g.
+
+```sh
+jq -r '.tool_input.command // ""' \
+  | perl -0777 -pe "s/<<-?['\"]?(\w+)['\"]?.*?^\1\$//gms; s/'[^']*'//g; s/\"(\\\\.|[^\"\\\\])*\"//g" \
+  | grep -qE '(^|[;&|] *)gh +pr +create'
+```
+
+…but `.claude/settings.json` is harness configuration: agents must not edit
+their own hooks or permissions, and the sandbox denies writes there. Applying
+that change is an owner action.
+
+**`/code-review` and `/simplify` have no repo-side definition, so nothing in
+this repo can scope them to your worktree (#785).** Verified 2026-08-12: they
+exist in neither `.claude/skills/`, `.agents/skills/`, `~/.claude/skills/`,
+nor any plugin cache — they are built-in CLI skills, and they resolve their
+diff against the **session's** cwd/checkout. A subagent working in
+`.agents/worktrees/mgr/<name>` still has the session rooted at the main
+checkout, which is how `--fix` silently edited the wrong tree three times in
+the 2.0 streamlining waves. There is no configuration fix. Mitigations, in
+order of preference:
+
+1. Run them from a session whose cwd *is* the worktree (`EnterWorktree`), not
+   from a subagent whose cwd was only ever set per-Bash-call.
+2. Never pass `--fix` from a subagent. Review the findings and apply the edits
+   yourself with absolute paths into your worktree.
+3. Before committing, run `git status` in the **main** checkout as well — a
+   stray modification there is the signature of this bug.
+
+**`[skip ci]` in a commit message strands a required check pending.** GitHub
+suppresses the whole workflow run, so `Static Checks`, `Unit Tests`,
+`E2E Tests` and `Database Lint and Integration Tests` never report — and a
+required context that never reports cannot be cleared. No workflow-side design
+can close this — dropping db-lint's `paths:` filter (#713) fixes filtered-out
+runs, not suppressed ones. Never put `[skip ci]` in a commit that will become a PR;
+`progress.yml` already avoids it deliberately for this reason.
+
+**`make check | tail` reports `tail`'s exit code, not `make`'s — so a failing
+gate looks green.** A pipeline's status is its *last* command's, so
+`make check 2>&1 | tail -20` exits 0 even when `make check` failed. Observed
+2026-08-12: three consecutive runs were reported as "exit code 0" while the
+build step was actually failing. Capture the real status:
+
+```sh
+set -o pipefail && make check > /tmp/check.log 2>&1; echo "EXIT=$?"
+```
+
+`${PIPESTATUS[0]}` also works, but only when read immediately — it is reset by
+the next command, including the `echo` you were about to inspect it with.
+
+**Two `make check` runs in the same worktree collide.** `next build` refuses to
+start while another `next build` is running and exits 1 with "Another next
+build process is already running", which reads exactly like a real build
+failure. Serialize them; if one is wedged, `pkill -f "<worktree>/node_modules/.bin/next build"`
+before retrying.

@@ -5,17 +5,23 @@ name: Database Security Lint
 # from the trigger paths — dependency bumps were replaying the full migration
 # chain for no schema signal. The daily live-drift watchdog covers
 # out-of-band schema changes.
+#
+# #713: `Database Lint and Integration Tests` is a REQUIRED status check on
+# `main`, so it must report a conclusion on EVERY pull request. A `paths:`
+# filter on `on:` cannot do that — GitHub never queues the workflow for a
+# filtered-out PR, so the required context stays pending forever and a
+# docs-only PR becomes unmergeable. The filter is therefore gone and this
+# workflow runs unconditionally.
+#
+# Running it everywhere is affordable: measured on PR #790 (2026-08-12) this
+# workflow finishes in ~3m13s (the Docker-backed replay is its long pole)
+# while `E2E Tests` in test.yml takes ~5m50s on every PR regardless. db-lint
+# is therefore never the critical path, and Actions minutes are free on this
+# public repo. That measurement is the whole reason there is no shim here:
+# an always-reporting gate job around a filtered heavy lane was built first
+# (+157 lines) and discarded in favour of deleting nine.
 on:
   pull_request:
-    paths:
-      - "supabase/migrations/**/*.sql"
-      - "supabase/config.toml"
-      - "supabase/functions/**"
-      - "src/__tests__/integration/**"
-      - "scripts/migration-dry-run.sh"
-      - "scripts/live-catalog.sql"
-      - "vitest.integration.config.ts"
-      - ".github/workflows/db-lint.yml"
   workflow_dispatch:
 
 concurrency:

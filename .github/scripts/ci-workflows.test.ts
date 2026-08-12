@@ -415,14 +415,33 @@ describe("GitHub Actions performance contracts", () => {
     expect(dbWorkflow).toContain("bun run test:integration");
     // The integration suite is excluded from `make check` (it needs a live
     // Postgres — see vitest.config.ts), so db-lint is the ONLY gate that runs
-    // it. Pin its trigger paths: a PR that drops a migration's trigger, or
-    // deletes the spec asserting it, must still start this job.
-    expect(dbWorkflow, "db-lint must run on migration changes").toContain(
-      '- "supabase/migrations/**/*.sql"',
-    );
-    expect(dbWorkflow, "db-lint must run on integration-spec changes").toContain(
-      '- "src/__tests__/integration/**"',
-    );
+    // it. Since #713 it runs on EVERY pull request, with no `paths:` filter:
+    // `Database Lint and Integration Tests` is a REQUIRED status check on
+    // `main`, and GitHub never queues a workflow whose `paths:` filter excludes
+    // the PR — the context would stay pending forever and a docs-only PR could
+    // never merge.
+    //
+    // Running it everywhere is affordable because it is not the critical path.
+    // Measured on PR #790 (2026-08-12): this workflow ~3m13s (the Docker-backed
+    // replay is its long pole) against `E2E Tests` at ~5m50s on every PR
+    // regardless. Actions minutes are free on this public repo.
+    //
+    // An earlier attempt kept the filter and wrapped it in an always-reporting
+    // gate job. It was discarded, but the bug it surfaced is worth recording:
+    // translating `on: paths:` globs into git pathspecs is not copying. In a
+    // pathspec `*` matches `/`, but `**/` still demands at least one directory,
+    // so `supabase/migrations/**/*.sql` matched `.../sub/deep.sql` and NOT
+    // `.../00250_x.sql`. Every migration here is top-level, so it selected
+    // nothing real and every migration PR would have reported this check green.
+    // Deleting the filter removes that whole class of failure.
+    const dbOnBlock = uncommented(dbWorkflow.match(/^on:\n([\s\S]*?)\n(?=\S)/m)?.[1] ?? "");
+    expect(dbOnBlock, "db-lint.yml must have an `on:` block").not.toBe("");
+    expect(dbOnBlock, "db-lint.yml must trigger on pull_request").toMatch(/^ {2}pull_request:/m);
+    expect(
+      dbOnBlock,
+      "db-lint.yml must carry no `paths:` filter — its job name is a required context, and a filtered-out PR never reports one",
+    ).not.toMatch(/^\s*paths(-ignore)?:/m);
+
     // SHA-pinned (tag as trailing comment) per docs/security/dependency-policy.md.
     expect(dbWorkflow).toMatch(/supabase\/setup-cli@[0-9a-f]{40} # v3/);
     expect(dbWorkflow).toContain('version: "2.109.1"');
@@ -437,6 +456,69 @@ describe("GitHub Actions performance contracts", () => {
     expect(shellWorkflow, "shell-lint must run on script changes").toContain(
       '- "scripts/**"',
     );
+  });
+
+  // #713: `Database Lint and Integration Tests` is a REQUIRED status check on
+  // `main`. A required context has exactly two ways to go wrong:
+  //
+  //   1. It never reports — the PR is unmergeable forever. Caused by filtering
+  //      the workflow out of a run, or by letting the job skip.
+  //   2. It reports green over checks that did not run or did not pass. That is
+  //      strictly worse than no gate, because it is a gate everyone believes.
+  //
+  // Option 2 of #713 makes both structurally impossible rather than handled:
+  // the job runs unconditionally on every PR and reports its own result, so
+  // there is no filter to mistranslate and no skip to convert.
+  it("keeps the required database context unfiltered, unskippable and self-reporting", () => {
+    const workflow = read(".github/workflows/db-lint.yml");
+    const jobs = jobBlocks(workflow);
+    const REQUIRED_CONTEXT = "Database Lint and Integration Tests";
+
+    // Exactly one job carries the required name. GitHub matches required
+    // contexts by exact job name, so two would make it ambiguous which one
+    // satisfies the rule.
+    const named = [...jobs.entries()].filter(([, block]) =>
+      new RegExp(`^ {4}name: ${REQUIRED_CONTEXT}\\s*$`, "m").test(uncommented(block)),
+    );
+    expect(
+      named.map(([id]) => id),
+      `exactly one job in db-lint.yml must be named "${REQUIRED_CONTEXT}"`,
+    ).toEqual(["db-lint"]);
+
+    const required = uncommented(jobs.get("db-lint")!);
+
+    // It must be unconditional. Any job-level `if:` can evaluate false, and a
+    // job that does not run reports nothing at all.
+    expect(
+      required.match(/^ {4}if:\s*(.+?)\s*$/m)?.[1],
+      "the required job must carry no job-level `if:` — anything conditional can fail to report",
+    ).toBeUndefined();
+
+    // It must not depend on anything that can skip: a skipped dependency skips
+    // the dependent, which is failure mode 1 by another route.
+    expect(
+      declaredNeeds(jobs.get("db-lint")!),
+      "the required job must not wait on another job — a skipped dependency would skip it too",
+    ).toEqual([]);
+
+    // Its own exit code IS the check, so nothing may swallow a failure.
+    expect(
+      required,
+      "no step in the required job may carry `continue-on-error:`",
+    ).not.toMatch(/^ {8}continue-on-error:/m);
+
+    // The lint step must still fail loudly rather than only printing a report.
+    expectFailsLoudly(required, /::error::Database security lint failed/, "an ERROR-level lint finding");
+
+    // `Production Build` must never join the required set: it is schedule-gated
+    // in test.yml, so requiring it would leave every PR pending — the exact
+    // failure this whole test exists to prevent, in the other workflow.
+    const testWorkflow = read(".github/workflows/test.yml");
+    const build = uncommented(jobBlocks(testWorkflow).get("build")!);
+    expect(
+      build,
+      "Production Build must stay schedule-gated, and must therefore stay OUT of the required contexts",
+    ).toMatch(/^ {4}if: github\.event_name == 'schedule'/m);
   });
 
   it("uses built-in psql and parallelizes only the selected Sentry fixes", () => {
