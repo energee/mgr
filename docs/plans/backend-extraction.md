@@ -106,16 +106,40 @@ frontend must know to call that RPC and what to do with the result.
 
 ## Tier 3 — Hook → service extraction (highest risk, 762 lines)
 
-### T3.1 — `use-material-planning.ts` (520 lines, **no tests**)
+### T3.1 — `use-material-planning.ts` — **DONE**
 
-`useCalculateOrderMaterials` (line 401) recalculates the shipping-material BOM when an order
-line changes. Core business logic implemented as a React hook — a new frontend must either
-reimplement it or drag React in to call it.
+> **The target named below no longer exists.** This entry was written on 2026-07-13 against a
+> 520-line file whose headline problem was `useCalculateOrderMaterials` at line 401 — the
+> order shipping-material recalculation. Commit `4f3461c2` (#505) moved that into the atomic
+> `recalculate_order_materials` path in migration 00265, and the hook was deleted. By the time
+> T3.1 ran the file was 376 lines with four read hooks and no such function. Do not go looking
+> for it.
 
-- Characterization tests first. **This is the riskiest single file in the plan.**
-- Split: pure BOM math → `src/domain/`; Supabase reads/writes → a material-planning service.
-- The hook becomes a thin React-Query wrapper over the service. Keep the hook — the current
-  frontend still needs it; it just stops *owning* the logic.
+The logic actually still stranded in React was `useSessionMaterialPreview`: the
+*planned*-quantity packaging BOM rollup — whole-unit ratio recovery, the per-batch ceiling
+(M8), on-hand flooring, shortfall and sort — all living inside a `useQuery` `queryFn`, so the
+only way to compute it was to render a component. That is what was extracted:
+
+- `src/domain/material-planning.ts` — row shapes plus the pure math
+  (`collectSellingFormatIds`, `computeSessionMaterialRequirements`,
+  `applyOnHandToRequirements`, `filterShortfallsByDemandSource`).
+- `src/services/material-planning-service.ts` — the four Supabase reads and the
+  short-circuits between them.
+- `src/hooks/use-material-planning.ts` — React-Query wrappers only, still re-exporting the row
+  types for existing UI import sites.
+
+Both new modules are React-free. A side effect: `src/domain/purchasing/material-shortfall-po-draft.ts`
+no longer imports its `MaterialShortfall` type from a hook.
+
+**Deliberately not merged** with `computeBomConsumption` (`src/domain/consumption-planning.ts`),
+which looks near-identical. That is the *actual*-quantity depletion path and differs on
+non-positive quantities, zero-valued results, and return shape; merging them would be a
+behavior change wearing a dedup costume. Both are pinned to `WHOLE_UNIT_PARITY_CASES` instead.
+
+Verification: 28 characterization tests written against the pre-extraction hook
+(`src/hooks/__tests__/use-material-planning.test.tsx`), green before the split and unchanged
+after; plus a throwaway differential fuzz of the old algorithm against the new over 3000
+random sessions, which agreed exactly.
 
 ### T3.2 — `use-packaging.ts` (242 lines, has tests)
 
