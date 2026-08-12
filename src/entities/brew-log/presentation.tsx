@@ -11,7 +11,6 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { BrewLogTimeline } from "@/components/domain/brew/brew-log-timeline";
 import { BrewEventTimelineActions } from "@/components/domain/brew/brew-event-timeline";
 import { BrewLogSplitOverview } from "@/components/domain/brew/brew-log-split-overview";
-import { createRevisionHistoryDisplay } from "@/components/domain/shared/revision-history-display";
 import type { BrewLog } from "./core";
 import { brewLogStateMachine, statusOptions } from "./core";
 
@@ -124,14 +123,9 @@ export const brewLogPresentation: EntityPresentation<BrewLog> = {
         },
       ],
     },
-    {
-      id: "revision-history",
-      title: "Revision History",
-      component: createRevisionHistoryDisplay("brew_logs"),
-      collapsible: true,
-      defaultCollapsed: true,
-    },
   ],
+  // No revision-history section: brew_logs has no log_entity_revision() trigger,
+  // so a revisions view would be permanently empty (#695).
 
   // ---------------------------------------------------------------------------
   // Actions
