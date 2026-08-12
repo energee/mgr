@@ -15,6 +15,10 @@
  *   blur/Enter (one write per edit, not per keystroke); a database trigger
  *   recalculates shipping materials in the same transaction, and invalid input
  *   reverts to the saved value
+ *
+ * Add-row visibility, the buffered-edit map and the heading/Cancel shell come
+ * from the shared line-items editor primitives
+ * (src/components/domain/shared/line-items-editor.tsx).
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -29,7 +33,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -50,7 +53,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Trash2, Loader2, DollarSign, RefreshCw } from "lucide-react";
+import { Loader2, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { orderKeys, finishedGoodKeys, materialPlanningKeys } from "@/lib/query-keys";
 import { useBrands, usePackagingFormats, useKegOwners, formatVolumeLabel } from "@/hooks/use-catalog";
@@ -59,6 +62,17 @@ import {
   type EditableItemField,
 } from "@/domain/sales/order-item-edit-utils";
 import { log } from "@/lib/client-logger";
+import {
+  AddLineButton,
+  DeleteLineButton,
+  LineItemEditInput,
+  LineItemsEditorShell,
+  LineItemsEmptyRow,
+  LineItemsLoading,
+  LineItemsTotalFooter,
+  useAddRow,
+  useLineItemEdits,
+} from "@/components/domain/shared/line-items-editor";
 
 // =============================================================================
 // Types
@@ -197,15 +211,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
 
   // New item form state
   const [newItem, setNewItem] = useState<NewItemState>({ ...EMPTY_NEW_ITEM });
-  const [showAddRow, setShowAddRow] = useState(false);
-
-  // Local buffer for existing-row qty/price edits, keyed by `${itemId}:${field}`.
-  // Raw strings are held while typing and committed on blur/Enter via
-  // commitItemEdit — one Supabase write (and one shipping-materials recalc)
-  // per edit instead of per keystroke, and a mid-edit refetch can no longer
-  // snap the controlled input back to the last-saved value. Mirrors the
-  // pendingPicks pattern in pick-list-items.tsx.
-  const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
+  const addRow = useAddRow();
 
   // Fetch order details including customer_id
   const { data: order } = useQuery({
@@ -345,7 +351,7 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderKeys.items(orderId) });
       setNewItem({ ...EMPTY_NEW_ITEM });
-      setShowAddRow(false);
+      addRow.close();
       toast.success("Item added");
       invalidateOrderMaterials();
     },
@@ -388,29 +394,14 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     },
   });
 
-  // Buffer a keystroke for an existing row's qty/price input
-  const setPendingEdit = (itemId: string, field: EditableItemField, raw: string) => {
-    setPendingEdits((prev) => ({ ...prev, [`${itemId}:${field}`]: raw }));
-  };
-
-  // Commit a buffered qty/price edit on blur/Enter. Invalid input
-  // (empty/NaN/out-of-range) is dropped so the field reverts to the saved
-  // value; unchanged values skip the write entirely.
-  const commitItemEdit = (item: OrderItemRow, field: EditableItemField) => {
-    const key = `${item.id}:${field}`;
-    const raw = pendingEdits[key];
-    if (raw === undefined) return; // nothing typed since last commit
-    setPendingEdits((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    const parsed = parseItemFieldEdit(field, raw);
-    if (parsed === null) return; // revert to saved value
-    const current = field === "quantity" ? item.quantity : item.unit_price;
-    if (parsed === current) return; // no-op — avoid write + materials recalc
-    updateItem.mutate({ id: item.id, field, value: parsed });
-  };
+  // Buffered qty/price edits on existing rows, committed on blur/Enter — one
+  // Supabase write (and one shipping-materials recalc) per edit instead of per
+  // keystroke. Invalid input (empty/NaN/out-of-range) is dropped so the field
+  // reverts to the saved value; unchanged values skip the write entirely.
+  const edits = useLineItemEdits<EditableItemField>({
+    parse: parseItemFieldEdit,
+    onCommit: (id, field, value) => updateItem.mutate({ id, field, value }),
+  });
 
   // Handle format change for existing items
   const handleFormatChange = async (itemId: string, formatId: string) => {
@@ -500,26 +491,10 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
     addItem.mutate(newItem);
   };
 
-  if (itemsLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (itemsLoading) return <LineItemsLoading />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Line Items</h3>
-        {!readOnly && !showAddRow && (
-          <Button size="sm" variant="outline" onClick={() => setShowAddRow(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Item
-          </Button>
-        )}
-      </div>
-
+    <LineItemsEditorShell addLabel="Add Item" canAdd={!readOnly} addRow={addRow}>
       <Table>
         <TableHeader>
           <TableRow>
@@ -638,15 +613,13 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 {readOnly ? (
                   item.quantity
                 ) : (
-                  <Input
+                  <LineItemEditInput
+                    edits={edits}
+                    rowId={item.id}
+                    field="quantity"
+                    savedValue={item.quantity}
                     type="number"
                     min={1}
-                    value={pendingEdits[`${item.id}:quantity`] ?? item.quantity}
-                    onChange={(e) => setPendingEdit(item.id, "quantity", e.target.value)}
-                    onBlur={() => commitItemEdit(item, "quantity")}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitItemEdit(item, "quantity");
-                    }}
                     className="h-8 w-full"
                   />
                 )}
@@ -656,16 +629,14 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                   item.unit_price ? `$${item.unit_price.toFixed(2)}` : "—"
                 ) : (
                   <div className="flex items-center gap-1">
-                    <Input
+                    <LineItemEditInput
+                      edits={edits}
+                      rowId={item.id}
+                      field="unit_price"
+                      savedValue={item.unit_price}
                       type="number"
                       step="0.01"
                       min={0}
-                      value={pendingEdits[`${item.id}:unit_price`] ?? item.unit_price ?? ""}
-                      onChange={(e) => setPendingEdit(item.id, "unit_price", e.target.value)}
-                      onBlur={() => commitItemEdit(item, "unit_price")}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitItemEdit(item, "unit_price");
-                      }}
                       className="h-8 w-full"
                       placeholder="0.00"
                     />
@@ -697,23 +668,18 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
               </TableCell>
               {!readOnly && (
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Remove item"
-                    className="h-8 w-8 text-destructive"
+                  <DeleteLineButton
+                    label="Remove item"
                     onClick={() => deleteItem.mutate(item.id)}
                     disabled={deleteItem.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  />
                 </TableCell>
               )}
             </TableRow>
           ))}
 
           {/* Add new item row */}
-          {showAddRow && (
+          {addRow.showAddRow && (
             <TableRow>
               <TableCell>
                 <Combobox
@@ -874,26 +840,16 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
                 ${(newItem.quantity * newItem.unit_price).toFixed(2)}
               </TableCell>
               <TableCell>
-                <div className="flex gap-1">
-                  <Button
-                    size="icon"
-                    aria-label="Add item"
-                    className="h-8 w-8"
-                    onClick={handleAdd}
-                    disabled={addItem.isPending}
-                  >
-                    {addItem.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Plus className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+                <AddLineButton
+                  label="Add item"
+                  onClick={handleAdd}
+                  isPending={addItem.isPending}
+                />
               </TableCell>
             </TableRow>
           )}
 
-          {showAddRow && newItem.brand_id && newItem.format_id && !kegFormatIds.has(newItem.format_id) && (
+          {addRow.showAddRow && newItem.brand_id && newItem.format_id && !kegFormatIds.has(newItem.format_id) && (
             <TableRow>
               <TableCell colSpan={readOnly ? 5 : 6}>
                 <AvailabilityPanel brandId={newItem.brand_id} sellingFormatId={newItem.format_id} />
@@ -902,36 +858,21 @@ export function OrderItemsEditor({ orderId, customerId, readOnly = false }: Orde
           )}
 
           {/* Empty state */}
-          {(!items || items.length === 0) && !showAddRow && (
-            <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                No line items yet. Click &quot;Add Item&quot; to add products to this order.
-              </TableCell>
-            </TableRow>
+          {(!items || items.length === 0) && !addRow.showAddRow && (
+            <LineItemsEmptyRow colSpan={6}>
+              No line items yet. Click &quot;Add Item&quot; to add products to this order.
+            </LineItemsEmptyRow>
           )}
         </TableBody>
         {items && items.length > 0 && (
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={4} className="text-right font-medium">
-                Order Total
-              </TableCell>
-              <TableCell className="text-right font-bold text-lg">
-                ${total.toFixed(2)}
-              </TableCell>
-              {!readOnly && <TableCell />}
-            </TableRow>
-          </TableFooter>
+          <LineItemsTotalFooter
+            labelColSpan={4}
+            label="Order Total"
+            amount={total}
+            trailingCell={!readOnly}
+          />
         )}
       </Table>
-
-      {showAddRow && (
-        <div className="flex justify-end">
-          <Button variant="ghost" size="sm" onClick={() => setShowAddRow(false)}>
-            Cancel
-          </Button>
-        </div>
-      )}
-    </div>
+    </LineItemsEditorShell>
   );
 }
