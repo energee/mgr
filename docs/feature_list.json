@@ -677,7 +677,7 @@
       "state": "passing",
       "migrations": [],
       "evidence": "docs/plans/2026-03-05-cogs-projections-{design,plan}.md",
-      "notes": "Audited []: the shipped COGS/projections UI queries base tables directly and calls none of 00139's RPCs; three of those RPCs are absent from live — orphaned-RPC drift tracked in #697, not an anchor of this feature."
+      "notes": "Audited []: the shipped COGS/projections UI queries base tables directly and does its aggregation in TypeScript (src/domain/reports/), calling none of 00139's RPCs. The three RPCs that were in the chain but absent from live (margin_by_channel, project_finished_goods, project_revenue) were dropped from the chain by 00289_drop_orphaned_projection_rpcs.sql, closing #697; they were never an anchor of this feature."
     },
     {
       "id": "F133",

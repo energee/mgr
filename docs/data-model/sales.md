@@ -719,11 +719,9 @@ ORDER BY created_at DESC;
 
 ## Report RPC Functions
 
-### `project_revenue(p_horizon_weeks, p_include_drafts)`
+### `project_revenue(p_horizon_weeks, p_include_drafts)` — REMOVED
 
-Revenue projections by week and sales channel from future orders. Groups by `DATE_TRUNC('week', scheduled_date/requested_date)` and sales channel. Customers without a sales channel are grouped as "Uncategorized".
-
-Returns: `projection_week, channel_id, channel_name, order_count, total_units, total_revenue, includes_drafts`
+Created by `00139_cogs_and_projection_rpcs.sql`, never applied to live, and dropped from the migration chain by `00289_drop_orphaned_projection_rpcs.sql` (#697). It had no callers: the projections report aggregates the order book in TypeScript (`src/domain/reports/summaries.ts`). Body preserved in git history and in `docs/plans/2026-03-05-cogs-projections-plan.md`.
 
 ---
 

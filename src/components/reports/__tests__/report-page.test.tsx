@@ -5,7 +5,7 @@
  *
  * The five report pages under src/app/(app)/reports/ were migrated onto this
  * scaffold as a behavior-preserving refactor. The summary math that moved out
- * of those pages is covered by src/lib/__tests__/report-summaries.test.ts, but
+ * of those pages is covered by src/domain/__tests__/report-summaries.test.ts, but
  * the larger half of that diff was JSX moving into these components — and a
  * green lint/typecheck/build proves nothing about column headers, empty
  * states, expand rows, or label association.

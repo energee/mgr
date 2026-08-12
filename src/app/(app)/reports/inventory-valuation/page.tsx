@@ -42,7 +42,7 @@ import {
   buildBatchCostMap,
   type FinishedGoodDisplayRow,
   type RawMaterialRow,
-} from "@/lib/reports/summaries";
+} from "@/domain/reports/summaries";
 
 // =============================================================================
 // Types

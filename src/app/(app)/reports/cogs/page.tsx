@@ -15,7 +15,7 @@
  * Each tab derives its specific view from this shared data via useMemo.
  *
  * The pure aggregation math (proportional SKU cost allocation, period
- * bucketing, cost/unit helpers) lives in src/lib/reports/cogs.ts so it can be
+ * bucketing, cost/unit helpers) lives in src/domain/reports/cogs.ts so it can be
  * unit-tested; this page only owns the queries and rendering.
  *
  * The header ExportMenu downloads a CSV of whichever tab's table is active.
@@ -35,7 +35,7 @@ import {
   type CogsAllocationRow,
   type CogsFinishedGoodRow,
   type SkuFinishedGoodRow,
-} from "@/lib/reports/cogs";
+} from "@/domain/reports/cogs";
 import { formatCurrency, formatBbl } from "@/lib/format";
 import { fetchBatchIngredientDetail } from "@/domain/report-utils";
 import {
@@ -78,7 +78,7 @@ import {
   computeCogsBatchSummary,
   computeCogsPeriodSummary,
   computeCogsSkuSummary,
-} from "@/lib/reports/summaries";
+} from "@/domain/reports/summaries";
 import { CogsPeriodChartLazy } from "@/components/domain/reports/cogs-period-chart-lazy";
 
 // =============================================================================
@@ -304,7 +304,7 @@ export default function CogsReportPage() {
         (allFgForBatches ?? []) as CogsFinishedGoodRow[]
       );
 
-      // Pure proportional-allocation math lives in src/lib/reports/cogs.ts.
+      // Pure proportional-allocation math lives in src/domain/reports/cogs.ts.
       // Cast the joined brand/format objects to the lib's input shape.
       const skuRows: SkuFinishedGoodRow[] = fgRows.map((fg) => ({
         batch_id: fg.batch_id,
@@ -363,7 +363,7 @@ export default function CogsReportPage() {
         }
       }
 
-      // Pure bucketing/category math lives in src/lib/reports/cogs.ts.
+      // Pure bucketing/category math lives in src/domain/reports/cogs.ts.
       return buildPeriodRows(allocations, batches, categoryByLotId, granularity);
     },
     enabled: activeTab === "by-period" && !!sharedData,

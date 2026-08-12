@@ -7,7 +7,7 @@
  * ExportMenu, a filter card, an error alert, a grid of summary stat cards,
  * one or more table cards with loading skeletons / empty states, and a
  * closing disclaimer note. These components centralize that scaffold; each
- * page keeps only its queries, its summary math (src/lib/reports/), and any
+ * page keeps only its queries, its summary math (src/domain/reports/), and any
  * genuinely report-specific rendering (expandable rows, category grouping).
  *
  * Components:

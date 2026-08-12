@@ -1,6 +1,6 @@
 /**
  * Characterization tests for the pure report summary/aggregation calculations
- * in src/lib/reports/summaries.ts. These functions were extracted verbatim
+ * in src/domain/reports/summaries.ts. These functions were extracted verbatim
  * from the report pages (cogs, batch-cost, production-summary,
  * inventory-valuation, projections); the expectations below pin the behavior
  * the pages shipped with.
@@ -18,8 +18,8 @@ import {
   aggregateFinishedGoodsValuation,
   buildBatchCostMap,
   groupIngredientsBySource,
-} from "@/lib/reports/summaries";
-import type { CogsSkuRow, CogsPeriodRow } from "@/lib/reports/cogs";
+} from "@/domain/reports/summaries";
+import type { CogsSkuRow, CogsPeriodRow } from "@/domain/reports/cogs";
 
 // =============================================================================
 // COGS — By Batch summary

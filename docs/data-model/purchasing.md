@@ -342,11 +342,9 @@ Returns per-batch cost breakdown using allocation data from inventory lots. Pivo
 
 Returns: `batch_id, batch_number, recipe_name, brand_name, volume_bbl, malt_cost, hop_cost, yeast_cost, adjunct_cost, other_cost, total_ingredient_cost, total_landed_cost, cost_per_bbl, has_allocation_data`
 
-### `margin_by_channel(p_start_date, p_end_date)`
+### `margin_by_channel(p_start_date, p_end_date)` — REMOVED
 
-Revenue vs estimated COGS by sales channel. Estimates unit COGS via `recipes_with_cogs.cogs_per_bbl / calculate_units_per_bbl()`. Customers without a sales channel are grouped as "Uncategorized".
-
-Returns: `channel_id, channel_name, order_count, total_units, total_revenue, total_cogs, gross_margin, margin_pct`
+Created by `00139_cogs_and_projection_rpcs.sql`, never applied to live, and dropped from the migration chain by `00289_drop_orphaned_projection_rpcs.sql` (#697). It had no callers: the COGS report computes margin in TypeScript (`src/domain/reports/cogs.ts`). Body preserved in git history and in `docs/plans/2026-03-05-cogs-projections-plan.md`.
 
 ---
 

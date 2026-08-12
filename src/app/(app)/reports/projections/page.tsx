@@ -36,7 +36,7 @@ import {
 import {
   groupIngredientsBySource,
   type GroupedIngredientRow,
-} from "@/lib/reports/summaries";
+} from "@/domain/reports/summaries";
 
 // =============================================================================
 // Types

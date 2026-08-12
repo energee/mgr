@@ -40,7 +40,7 @@ import {
   StatValue,
 } from "@/components/reports/report-page";
 import { IngredientDetailTable } from "@/components/reports/ingredient-detail-table";
-import { computeBatchCostSummary } from "@/lib/reports/summaries";
+import { computeBatchCostSummary } from "@/domain/reports/summaries";
 
 // =============================================================================
 // Types
