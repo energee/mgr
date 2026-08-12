@@ -346,7 +346,7 @@ describe("revise_packaging_session below-committed guard", () => {
       ).rejects.toThrow(/already allocated/);
       await client.query("ROLLBACK TO SAVEPOINT before_revision");
 
-      const after = await client.query<{ quantity: number; status: string; actual_quantity: number }>(
+      const after = await client.query<{ quantity: number; status: string; actual_quantity: string }>(
         `SELECT fg.quantity, ps.status, sli.actual_quantity
          FROM finished_goods fg
          JOIN packaging_sessions ps ON ps.id = $2
@@ -354,8 +354,10 @@ describe("revise_packaging_session below-committed guard", () => {
          WHERE fg.id = $1`,
         [fgRows[0].id, fx.sessionId, fx.lineAId]
       );
+      // actual_quantity is NUMERIC (since 00288, for fractional MongoDB quantities),
+      // so the pg driver returns it as a string rather than a number.
       expect(after.rows).toEqual([
-        { quantity: 96, status: "completed", actual_quantity: 96 },
+        { quantity: 96, status: "completed", actual_quantity: "96" },
       ]);
     } finally {
       await client.query("ROLLBACK");

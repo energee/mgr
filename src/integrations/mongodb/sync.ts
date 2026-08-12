@@ -700,7 +700,7 @@ async function syncTransfers(): Promise<SyncResult> {
     return [row];
   });
 
-  // Historical transfers go through reconcile_mongodb_transfers (00286), which
+  // Historical transfers go through reconcile_mongodb_transfers (00288), which
   // suppresses handle_vessel_transfer's live occupancy claim/free for the
   // transaction. A plain upsert replays years of history against the trigger's
   // "destination vessel already holds a different batch" guard — correct live,

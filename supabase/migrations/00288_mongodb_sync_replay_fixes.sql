@@ -1,5 +1,5 @@
 -- =============================================================================
--- 00286 — Fix MongoDB historical-sync replay failures
+-- 00288 — Fix MongoDB historical-sync replay failures
 -- =============================================================================
 -- Four failure classes surfaced by a full sync run against production Mongo
 -- (all captured in mongodb_sync_log error_details, 2026-08-12):
@@ -75,12 +75,12 @@ LEFT JOIN (
 ) agg ON agg.session_id = ps.id;
 
 COMMENT ON VIEW packaging_sessions_with_summary
-  IS 'Packaging sessions with aggregated line item counts, brand names, quantity totals, and variance. Recreated in 00286 (identical body to 00278) around the planned/actual_quantity INTEGER->NUMERIC change.';
+  IS 'Packaging sessions with aggregated line item counts, brand names, quantity totals, and variance. Recreated in 00288 (identical body to 00278) around the planned/actual_quantity INTEGER->NUMERIC change.';
 
 COMMENT ON COLUMN session_line_items.planned_quantity IS
-  'Planned units for this line. NUMERIC since 00286: MongoDB-era sessions carry fractional quantities (e.g. 70.5 cases, 3.33 kegs).';
+  'Planned units for this line. NUMERIC since 00288: MongoDB-era sessions carry fractional quantities (e.g. 70.5 cases, 3.33 kegs).';
 COMMENT ON COLUMN session_line_items.actual_quantity IS
-  'Actually-packaged units for this line. NUMERIC since 00286 (see planned_quantity).';
+  'Actually-packaged units for this line. NUMERIC since 00288 (see planned_quantity).';
 
 -- =============================================================================
 -- PART 2 — recipe aggregate: children are owned wholesale by a mapped parent
@@ -173,7 +173,7 @@ BEGIN
   VALUES ('recipes', p_mongo_id, v_recipe_id)
   ON CONFLICT (entity_type, mongo_id) DO UPDATE SET pg_id = EXCLUDED.pg_id;
 
-  -- 00286: a MongoDB-owned recipe owns its ingredient list wholesale. Replace
+  -- 00288: a MongoDB-owned recipe owns its ingredient list wholesale. Replace
   -- children by parent id rather than diffing against mappings: pre-mapping
   -- child rows (including those brought in by name-adoption above) have no
   -- mapping entry, and leaving them beside freshly-inserted deterministic-id
@@ -295,7 +295,7 @@ BEGIN
   VALUES (v_brew_id, p_brew_log->>'brew_number', (p_brew_log->>'brew_date')::DATE,
           COALESCE(p_brew_log->>'status', 'completed'), COALESCE(p_brew_log->'events', '[]'::JSONB),
           p_brew_log->'legacy_data', p_brew_log->>'notes')
-  -- 00286: keep the existing status on update — brew_logs is state-machined
+  -- 00288: keep the existing status on update — brew_logs is state-machined
   -- (validate_state_transition), and forcing the source's status onto a row
   -- the live app has moved on rejects the whole reconcile (same class as the
   -- batches "completed -> fermenting" failure; PG owns current state, the
@@ -307,7 +307,7 @@ BEGIN
   VALUES ('brew_logs', p_mongo_id, v_brew_id)
   ON CONFLICT (entity_type, mongo_id) DO UPDATE SET pg_id = EXCLUDED.pg_id;
 
-  -- 00286: replace children wholesale (see recipe reconciler). Pre-mapping rows
+  -- 00288: replace children wholesale (see recipe reconciler). Pre-mapping rows
   -- adopted via brew_number collide on brew_log_batches_brew_log_id_batch_id_key
   -- otherwise. No table references brew_log_batches.
   DELETE FROM brew_log_batches WHERE brew_log_id = v_brew_id;
@@ -395,7 +395,7 @@ BEGIN
     v_line_mongo_id := v_line->>'mongo_id';
     SELECT pg_id INTO v_line_id FROM mongodb_sync_mappings
       WHERE entity_type = 'session_line_items' AND mongo_id = v_line_mongo_id;
-    -- 00286: adopt an unmapped line occupying this line's natural key
+    -- 00288: adopt an unmapped line occupying this line's natural key
     -- (uq_session_line_items_batch_format) instead of colliding with it.
     -- Lines can be referenced by finished_goods, so unlike recipe/brew
     -- children they are adopted in place, never deleted and reinserted.
@@ -467,7 +467,7 @@ DECLARE
   v_alloc   numeric;
   v_empties boolean;
 BEGIN
-  -- 00286: historical replay from MongoDB — record the row, skip live vessel
+  -- 00288: historical replay from MongoDB — record the row, skip live vessel
   -- claim/free entirely (see migration header).
   IF current_setting('mgr.mongodb_sync', true) = 'on' THEN
     RETURN NEW;

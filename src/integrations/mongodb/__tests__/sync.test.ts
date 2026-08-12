@@ -349,7 +349,7 @@ describe("upsertRows error logging (via syncEntity('beer_styles'))", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 00286 replay fixes
+// 00288 replay fixes
 // ---------------------------------------------------------------------------
 
 describe("syncBatches status preservation (via syncEntity)", () => {

@@ -74,11 +74,14 @@ describe("MongoDB aggregate reconciliation RPCs", () => {
         [recipeId],
       );
       expect(afterRetry).toEqual([{ count: "1", name: `Changed ${suffix}`, boil_time_min: 90 }]);
+      // 00288: a mapped recipe owns its ingredient list wholesale, so the reconcile
+      // above (called with an empty malts array) deletes this pre-existing row along
+      // with every other child, rather than leaving it untouched.
       const { rows: manualRows } = await db.query<{ id: string }>(
         "SELECT id FROM recipe_malts WHERE id = $1",
         [manualRecipeMaltId],
       );
-      expect(manualRows).toEqual([{ id: manualRecipeMaltId }]);
+      expect(manualRows).toEqual([]);
     });
   });
 
