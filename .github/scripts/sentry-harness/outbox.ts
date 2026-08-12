@@ -59,12 +59,13 @@ export type OutboxPlan = {
  * agent session.
  *
  * Stated honestly, because the first version of this list said otherwise: this
- * is **not** a general defense against a hostile patch, and it does not remove
- * "the one path" by which agent-authored text reaches an executor. A test file
- * the patch adds runs in CI on the resulting PR like any other file — prompt
- * step 5 requires one — and that residual is tracked in #699, not closed here.
- * What the list does is refuse the *build and automation surface*: the places
- * where a change is executed without anyone reading it as code under review.
+ * is **not** a general defense against a hostile patch. What the list does is
+ * refuse the *build and automation surface*: the places where a change is
+ * executed without anyone reading it as code under review. Test files used to
+ * be the disclosed gap — prompt step 5 requires one, and it ran in CI on the
+ * unreviewed fix PR like any other file (#699). That path is now closed by the
+ * quarantine below (`validatePatch` + the conditional exclude in
+ * `vitest.config.ts`), not by this prefix list.
  *
  * Prefix matching, so a bare filename entry (`Makefile`) also rejects
  * `Makefile.local`. Over-rejection is the safe direction here: the fallback is
@@ -87,6 +88,47 @@ export const FORBIDDEN_PATCH_PREFIXES = [
   ".claude/",
   ".agents/",
 ] as const;
+
+/**
+ * The one filename shape an agent-authored test may take (#699).
+ *
+ * Prompt step 5 requires a reproducing Vitest test, and until this rule that
+ * test executed in CI on the unreviewed fix PR under `test.yml` — agent code
+ * reaching an executor one hop later, in a different workflow. The remedy is a
+ * quarantine, not a ban: the test must be a NEW file under `src/` named
+ * `<name>.sentry.test.ts(x)`, and `vitest.config.ts` excludes that
+ * pattern when the CI run's head ref is a `sentry-fix/` branch. The test
+ * still runs in the agent's own job (schedule/dispatch runs have no head
+ * ref), locally, and on every run after a human reviews and merges the PR —
+ * it just never executes on the PR the agent authored before review.
+ *
+ * Enforced here so the vitest exclude cannot be dodged: any other path CI
+ * selects as a test — vitest's `*.test.*`/`*.spec.*` globs, Playwright's
+ * `e2e/` tree, the integration suite `db-lint.yml` runs — is rejected,
+ * including *modifications* to existing test files, which would otherwise be
+ * an unquarantined place to put code. Over-rejection is the safe direction:
+ * the prompt's fallback is an investigation issue.
+ */
+export const SENTRY_TEST_FILE_RE = /^src\/.+\.sentry\.test\.tsx?$/;
+
+/**
+ * Paths CI executes as tests without the quarantine name being enough:
+ * Playwright's `testDir` (`playwright.config.ts`) and the integration suite's
+ * `include` root (`vitest.integration.config.ts`). Pinned against both by
+ * ci-workflows.test.ts so a config change can't silently drift this list.
+ */
+export const EXECUTED_TEST_DIRS = ["e2e/", "src/__tests__/integration/"] as const;
+
+/** Anything vitest or Playwright would select as a test file. */
+const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/;
+
+/** True when a patch path is a test file CI would execute unreviewed, and isn't quarantine-shaped. */
+function isUnquarantinedTestPath(path: string): boolean {
+  const inExecutedDir = EXECUTED_TEST_DIRS.some((dir) => path.startsWith(dir));
+  const isExecuted = TEST_FILE_RE.test(path) || inExecutedDir;
+  const isQuarantined = SENTRY_TEST_FILE_RE.test(path) && !inExecutedDir;
+  return isExecuted && !isQuarantined;
+}
 
 /** Refuse absurd patches outright rather than pushing them. */
 export const MAX_PATCH_BYTES = 2 * 1024 * 1024;
@@ -305,6 +347,13 @@ export function validatePatch(plan: OutboxPlan, patch: string): string[] {
   if (forbidden.length > 0) {
     fail(
       `patch touches CI or a build/tooling entry point (${forbidden.join(", ")}); make that change by hand`,
+    );
+  }
+
+  const unquarantined = paths.filter(isUnquarantinedTestPath);
+  if (unquarantined.length > 0) {
+    fail(
+      `patch touches test files CI would execute on the unreviewed fix PR (${unquarantined.join(", ")}); agent-authored tests must be NEW files named src/**/<name>.sentry.test.ts, and existing tests must be left alone (#699)`,
     );
   }
 
