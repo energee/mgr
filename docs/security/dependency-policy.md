@@ -56,7 +56,7 @@ All four were cleared by patching; no exception was needed.
 | `nanoid` | Development/build-only transitive dependency of `postcss` (itself overridden to 8.5.25), reachable through `next`, `@tailwindcss/postcss`, Vite, and Vitest while compiling repository-controlled stylesheets. | New exact override 3.3.17, inside `postcss@8.5.25`'s declared `^3.3.16` range. Clears GHSA-2v37-7h3g-55p8 (indefinite loop when a custom generator's `size` is zero). |
 | `js-yaml` | Development-only transitive dependency of `@eslint/eslintrc`; reachable while ESLint parses its own config. | New exact override 4.3.1, inside `@eslint/eslintrc`'s declared `^4.3.0` range. Clears GHSA-5p4m-2wfm-xmqj (quadratic CPU consumption in `!!omap` resolution). |
 
-Verified with `bun install` (regenerates `bun.lock` against the new overrides) and `make check` (lint, typecheck, unit tests, production build all green). `bun audit` itself could not be re-run in the environment that produced this fix — outbound access to its advisory endpoint was blocked there — so the fix instead confirms each installed version against the minimum patched version `bun audit` printed in the failing run's log, which is exact and sufficient: all four packages resolve to precisely the version `bun audit` names as the lower bound of the patched range.
+Verified with `bun install` (regenerates `bun.lock` against the new overrides) and `make check` (lint, typecheck, unit tests, production build all green). `bun audit` itself could not be re-run in the environment that produced this fix — outbound access to its advisory endpoint was blocked there — so the fix instead confirms each installed version against the minimum patched version `bun audit` printed in the failing run's log.
 
 ## Remediation
 
