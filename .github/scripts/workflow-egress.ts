@@ -352,6 +352,38 @@ export function readOnlyMintContradictions(path: string, contents: string): stri
     );
 }
 
+const UNSCOPED_GH_API_GRANT = /^Bash\(gh api (?:-X|--method) GET:\*\)$/;
+
+/**
+ * `path (job: name): grant` for every `Bash(gh api ...)` a job's
+ * `--allowedTools` grants without pinning the method to GET (issue #736).
+ * `gh api` is a raw REST client — with the job's write-capable token
+ * (a bound `github_token` or, absent one, the Claude App token
+ * {@link readOnlyMintContradictions} tracks) an unscoped grant reaches the
+ * PR-merge and Contents endpoints, defeating "never merge, never touch code"
+ * prompts that are otherwise prose-only. Read-only reaches such as review-
+ * comment listing only ever need `gh api -X GET`.
+ */
+export function unscopedGhApiGrants(path: string, contents: string): string[] {
+  let jobs: AgentJob[];
+  try {
+    jobs = agentJobsOf(contents);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
+    return [`${path}: is not parseable YAML (${reason}), so gh api grants cannot be checked`];
+  }
+
+  return jobs.flatMap((job) => {
+    const grants = toolsIn(
+      job.steps.flatMap((step) => step.argStrings.flatMap((args) => flagValues(args, "allowedTools"))),
+    ).filter((tool) => tool.startsWith("Bash(gh api"));
+
+    return grants
+      .filter((grant) => !UNSCOPED_GH_API_GRANT.test(grant))
+      .map((grant) => `${path} (job: ${job.name}): grants ${grant} — scope it to GET`);
+  });
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -6,6 +6,7 @@ import {
   agentWriteScopeInventory,
   auditWorkflowEgress,
   readOnlyMintContradictions,
+  unscopedGhApiGrants,
 } from "./workflow-egress";
 
 function read(relativePath: string): string {
@@ -1142,21 +1143,12 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).toContain("docs/agents/quality.md");
   });
 
-  // Issue #736: `Bash(gh api:*)` is a raw REST client — with the job's
-  // write-capable token it reaches the PR-merge and Contents APIs, defeating
-  // "never merge, never touch code" prompts that are otherwise prose-only.
-  // Every gh grant must be scoped to a safe prefix; for `gh api` that means
-  // pinning the method to GET (e.g. `Bash(gh api -X GET:*)`), the shape the
-  // agents' legitimate reads (review-comment listing) actually use.
+  // Issue #736: an unscoped `Bash(gh api:*)` grant is a raw REST client that,
+  // with the job's write-capable token, reaches the PR-merge and Contents
+  // APIs — defeating "never merge, never touch code" prompts that are
+  // otherwise prose-only. See `unscopedGhApiGrants` for the rule.
   it("never grants unscoped gh api in any workflow's --allowedTools", () => {
-    for (const path of workflows) {
-      const grants = read(path).match(/Bash\(gh api[^)]*\)/g) ?? [];
-      for (const grant of grants) {
-        expect(grant, `${path} grants ${grant} — scope it to GET`).toMatch(
-          /^Bash\(gh api (-X|--method) GET:\*\)$/,
-        );
-      }
-    }
+    expect(workflows.flatMap((path) => unscopedGhApiGrants(path, read(path)))).toEqual([]);
   });
 
   // The weekly distillation is the loop that gardens the other loops: it must
