@@ -43,6 +43,21 @@ Seven of the eight were cleared by patching. The eighth has no compatible patche
 
 Nested/scoped `overrides` (npm's `"minimatch@3": { … }` form) are **not** usable here: Bun 1.3.10 emits `warn: Bun currently does not support nested "overrides"` and ignores them. Per-major transitive pinning therefore has to be done in `bun.lock`, verified with `bun install --frozen-lockfile`.
 
+## 2026-08-12 high-severity triage
+
+The nightly scheduled Test run had failed on the `Production Build` job every scheduled run from 2026-08-05 through 2026-08-11 (issue #735; runs 30983756151, 31086547981, 31158412724, 31368150372, 31468790698). The failing step was again this gate: 4 high advisories, each one patch release behind an already-pinned or previously-unpinned transitive package.
+
+All four were cleared by patching; no exception was needed.
+
+| Dependency | Scope and reachability | Resolution |
+|---|---|---|
+| `undici` | Mixed scope: development through `jsdom`, production through server-side DOM sanitization (`isomorphic-dompurify`). | Existing exact override advanced 7.28.0 → 7.29.0. Clears GHSA-4cwx-7wf7-3272 (cross-user cache-directive information disclosure and parse-time crash). |
+| `fast-uri` | Build-time transitive dependency of ESLint and Sentry/Webpack schema validation (`ajv`); not shipped as an application request handler. | Existing exact override advanced 3.1.4 → 3.1.5. Clears GHSA-7p8r-x3mc-p8w7 (host confusion via backslash authority introducer). |
+| `nanoid` | Development/build-only transitive dependency of `postcss` (itself overridden to 8.5.25), reachable through `next`, `@tailwindcss/postcss`, Vite, and Vitest while compiling repository-controlled stylesheets. | New exact override 3.3.17, inside `postcss@8.5.25`'s declared `^3.3.16` range. Clears GHSA-2v37-7h3g-55p8 (indefinite loop when a custom generator's `size` is zero). |
+| `js-yaml` | Development-only transitive dependency of `@eslint/eslintrc`; reachable while ESLint parses its own config. | New exact override 4.3.1, inside `@eslint/eslintrc`'s declared `^4.3.0` range. Clears GHSA-5p4m-2wfm-xmqj (quadratic CPU consumption in `!!omap` resolution). |
+
+Verified with `bun install` (regenerates `bun.lock` against the new overrides) and `make check` (lint, typecheck, unit tests, production build all green). `bun audit` itself could not be re-run in the environment that produced this fix — outbound access to its advisory endpoint was blocked there — so the fix instead confirms each installed version against the minimum patched version `bun audit` printed in the failing run's log.
+
 ## Remediation
 
 1. Update the direct dependency that introduces the vulnerable package when a compatible release is available.
