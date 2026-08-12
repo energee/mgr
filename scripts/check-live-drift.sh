@@ -96,7 +96,9 @@ fi
 # LC_ALL=C sort is a belt-and-suspenders no-op that guarantees byte-stable order
 # on any runner.
 current="$(mktemp)"
-trap 'rm -f "$current"' EXIT
+committed_versions="$(mktemp)"
+live_versions="$(mktemp)"
+trap 'rm -f "$current" "$committed_versions" "$live_versions"' EXIT
 psql "$SUPABASE_DB_URL" -tA --no-psqlrc -v ON_ERROR_STOP=1 -f "$QUERY" \
   | LC_ALL=C sort > "$current"
 
@@ -129,10 +131,6 @@ fi
 # A committed migration whose version row is absent on live means db push was
 # never run for it: the catalog diff below is blind to that (snapshot and live
 # both predate the apply), so it is checked explicitly here.
-committed_versions="$(mktemp)"
-live_versions="$(mktemp)"
-trap 'rm -f "$current" "$committed_versions" "$live_versions"' EXIT
-
 for f in supabase/migrations/*.sql; do
   b="${f##*/}"
   printf '%s\n' "${b%%_*}"
@@ -151,6 +149,8 @@ fi
 migrations_rc=0
 bash scripts/compare-migration-versions.sh "$committed_versions" "$live_versions" \
   || migrations_rc=$?
+# >1 (usage error) shouldn't occur here — this call always passes two files
+# this script just created — but propagate it rather than swallowing it.
 if (( migrations_rc > 1 )); then
   exit "$migrations_rc"
 fi

@@ -59,6 +59,9 @@ if [[ -n "$unapplied" ]]; then
 fi
 
 # Surface non-clean results on the workflow run page, not just in the logs.
+# unapplied and live_only are independent conditions (both can be non-empty
+# in the same run), so each gets its own block rather than an if/else that
+# would silently drop one when both fire.
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" && ( -n "$unapplied" || -n "$live_only" ) ]]; then
   {
     if [[ -n "$unapplied" ]]; then
@@ -69,14 +72,16 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" && ( -n "$unapplied" || -n "$live_only" ) ]]
       echo '```'
       echo ""
       echo 'Apply with `scripts/db-push.sh` and commit the regenerated snapshot.'
-    else
+      echo ""
+    fi
+    if [[ -n "$live_only" ]]; then
       echo "## Migration chain: WARN (live-only migration versions)"
       echo ""
       echo '```'
       printf '%s\n' "$live_only"
       echo '```'
+      echo ""
     fi
-    echo ""
   } >> "$GITHUB_STEP_SUMMARY"
 fi
 

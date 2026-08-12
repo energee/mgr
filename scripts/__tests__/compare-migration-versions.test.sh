@@ -66,11 +66,8 @@ printf '%s' "$out" | grep -q '20260416162155' || fail "timestamp version should 
 # 7. FAIL results land in GITHUB_STEP_SUMMARY when set.
 summary="$TMP_ROOT/summary.md"
 : > "$summary"
-printf '%s' $'00001\n00282\n' > "$TMP_ROOT/committed"
-printf '%s' $'00001\n' > "$TMP_ROOT/live"
 rc=0
-GITHUB_STEP_SUMMARY="$summary" bash "$SCRIPT" "$TMP_ROOT/committed" "$TMP_ROOT/live" \
-  >/dev/null || rc=$?
+out=$(GITHUB_STEP_SUMMARY="$summary" run_compare $'00001\n00282\n' $'00001\n') || rc=$?
 assert_eq "$rc" "1"
 grep -q '00282' "$summary" || fail "step summary should list the unapplied version"
 
@@ -81,5 +78,16 @@ assert_eq "$rc" "2"
 rc=0
 bash "$SCRIPT" "$TMP_ROOT/committed" "$TMP_ROOT/does-not-exist" >/dev/null 2>&1 || rc=$?
 assert_eq "$rc" "2"
+
+# 9. Both classes at once still land in GITHUB_STEP_SUMMARY — the FAIL section
+# must not crowd out the WARN section (regression check for the if/else that
+# used to make them mutually exclusive).
+summary="$TMP_ROOT/summary-mixed.md"
+: > "$summary"
+rc=0
+out=$(GITHUB_STEP_SUMMARY="$summary" run_compare $'00001\n00282\n' $'00001\n00299\n') || rc=$?
+assert_eq "$rc" "1"
+grep -q '00282' "$summary" || fail "mixed step summary should list the unapplied version"
+grep -q '00299' "$summary" || fail "mixed step summary should also list the live-only version"
 
 echo "compare-migration-versions tests passed"
