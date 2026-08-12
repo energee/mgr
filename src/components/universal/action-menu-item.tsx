@@ -8,7 +8,7 @@
  */
 
 import Link from "next/link";
-import { Copy, Delete, Eye, SquarePen } from "lucide-react";
+import { Copy, Eye, SquarePen, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
@@ -17,8 +17,8 @@ const actionIconMap: Record<string, LucideIcon> = {
   view: Eye,
   edit: SquarePen,
   pencil: SquarePen,
-  trash: Delete,
-  delete: Delete,
+  trash: Trash2,
+  delete: Trash2,
   copy: Copy,
   clone: Copy,
 };
