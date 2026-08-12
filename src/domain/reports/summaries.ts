@@ -4,11 +4,11 @@
  * inventory-valuation, projections).
  *
  * These were extracted verbatim from the page-level useMemo bodies so they
- * can be unit-tested (see src/lib/__tests__/report-summaries.test.ts).
+ * can be unit-tested (see src/domain/__tests__/report-summaries.test.ts).
  * The pages own querying and rendering; this module owns the math.
  */
 
-import type { CogsSkuRow, CogsPeriodRow } from "@/lib/reports/cogs";
+import type { CogsSkuRow, CogsPeriodRow } from "@/domain/reports/cogs";
 
 // =============================================================================
 // COGS report summaries

@@ -140,9 +140,16 @@ export default defineConfig({
           functions: 50,
           branches: 50,
           statements: 50,
+          // functions: 38 -> 35 on 2026-08-12 (#783). NOT a coverage
+          // regression — src/lib/reports/{cogs,summaries}.ts moved to
+          // src/domain/reports/, taking 41 fully-covered functions out of this
+          // directory's denominator. Measured src/lib/** functions went
+          // 43.64% -> 37.84% with no test deleted and no line uncovered; the
+          // same functions now count under src/domain/** (measured 97.39%).
+          // Other src/lib/** floors kept as-is (measured 59.51/58.96/59.69).
           "src/lib/**": {
             lines: 50,
-            functions: 38,
+            functions: 35,
             branches: 45,
             statements: 50,
           },

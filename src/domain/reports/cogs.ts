@@ -4,7 +4,7 @@
  * Pure aggregation / business logic for the Cost of Goods Sold report
  * (src/app/(app)/reports/cogs/page.tsx). All functions are data-in → data-out
  * with no Supabase calls, so the math is unit-testable in isolation
- * (see src/lib/__tests__/cogs.test.ts). The page owns the queries and passes
+ * (see src/domain/__tests__/reports-cogs.test.ts). The page owns the queries and passes
  * the fetched rows here.
  *
  * Covers:

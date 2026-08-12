@@ -1,5 +1,5 @@
 /**
- * Unit tests for the pure COGS report calculations (src/lib/reports/cogs.ts):
+ * Unit tests for the pure COGS report calculations (src/domain/reports/cogs.ts):
  * cost/unit aggregation helpers, proportional SKU cost allocation, and
  * period bucketing with ingredient-category breakdown.
  */
@@ -12,7 +12,7 @@ import {
   buildPeriodRows,
   type CogsAllocationRow,
   type SkuFinishedGoodRow,
-} from "@/lib/reports/cogs";
+} from "@/domain/reports/cogs";
 
 // =============================================================================
 // Fixtures

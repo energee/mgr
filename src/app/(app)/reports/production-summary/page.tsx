@@ -42,7 +42,7 @@ import {
   aggregateProduction,
   computeAvgDaysInTank,
   type ProductionAggregate,
-} from "@/lib/reports/summaries";
+} from "@/domain/reports/summaries";
 import {
   startOfMonth,
   endOfMonth,
