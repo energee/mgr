@@ -67,6 +67,35 @@ describe("get_ttb_inventory_summary volume math", () => {
   });
 });
 
+describe("get_ttb_inventory_summary in-process period keying (issue #618)", () => {
+  const body = latestFunctionBody("get_ttb_inventory_summary");
+
+  it("derives the in-process terms from batch status HISTORY, not the live batches table", () => {
+    // Pre-00287, ip_ending summed `batches.volume_bbl WHERE status IN (...)`
+    // with no date filter at all — a live snapshot, so re-running a closed
+    // month returned a different number every time a batch changed status.
+    // The period-keyed definition reconstructs status at the period boundaries
+    // from entity_revisions and must not read batches' current status at all.
+    expect(body!).toMatch(/entity_revisions/);
+    expect(body!).toMatch(/entity_type = 'batches'/);
+    expect(body!).not.toMatch(/FROM batches/);
+  });
+
+  it("keys ip_beginning on period_start and ip_ending on period_end", () => {
+    // One boundary reconstruction per term. Both filter revision history by
+    // changed_at strictly before the boundary, which is also what guarantees
+    // a month's in_process_ending equals the next month's in_process_beginning.
+    expect(body!).toMatch(/r\.changed_at < pd\.period_start/);
+    expect(body!).toMatch(/r\.changed_at < pd\.period_end_ts/);
+  });
+
+  it("counts a batch by its RECORDED status at the boundary, latest revision winning", () => {
+    expect(body!).toMatch(/DISTINCT ON \(r\.entity_id\)/);
+    expect(body!).toMatch(/new_data->>'status'/);
+    expect(body!).toMatch(/'fermenting',\s*'conditioning',\s*'packaging'/);
+  });
+});
+
 describe("get_ttb_production_summary volume math", () => {
   const body = latestFunctionBody("get_ttb_production_summary");
 

@@ -14,11 +14,12 @@ import {
   getTaxClassLabel,
   getYearOptions,
   checkRowIdentities,
+  checkTotalColumnCrossFoot,
   collectIdentityFailures,
   collectIdentityExemptions,
   formatIdentityExemptionDisclosure,
   getIdentityExemptionReason,
-  getInProcessSnapshotCaveat,
+  getInProcessBalanceNote,
   getReportExemptionDisclosure,
   isIdentityCheckedTaxClass,
   getSummaryCardScopeNote,
@@ -467,9 +468,14 @@ describe("Total column caveat (issue #670)", () => {
     expect(caveat).toContain("left the brewery and no packaged line reports it again");
   });
 
-  it("discloses that the Total column does not cross-foot", () => {
+  it("states the checked cross-foot identity instead of disclaiming the column (issue #698)", () => {
+    // Since checkTotalColumnCrossFoot exists, the Total column's arithmetic IS
+    // verified — accounting for the cellar removals explicitly — so the caveat
+    // must state the checked relationship, not apologize that nothing checks it.
     const caveat = getTotalScopeCaveat(rows) ?? "";
-    expect(caveat).toContain("does not cross-foot");
+    expect(caveat).not.toContain("does not cross-foot");
+    expect(caveat).toContain("cross-foots");
+    expect(caveat).toContain("checks automatically");
   });
 
   it("states the cross-foot direction the way the arithmetic actually goes", () => {
@@ -513,6 +519,83 @@ describe("Total column caveat (issue #670)", () => {
   });
 });
 
+describe("Total column cross-foot check (issue #698)", () => {
+  /** A report whose packaged rows balance; the cellar row carries removals. */
+  function balancedReport(): TTBReportRow[] {
+    return [
+      makeCellarRow(), // total_removals 1.5, ending structurally 0
+      makeRow({
+        ttb_tax_class: "keg",
+        beginning_inventory_bbl: 100,
+        beer_produced_bbl: 40,
+        total_available_bbl: 140,
+        total_removals_bbl: 33.75,
+        ending_inventory_bbl: 106.25,
+      }),
+      makeRow({
+        ttb_tax_class: "bottled",
+        beginning_inventory_bbl: 20,
+        beer_produced_bbl: 25,
+        total_available_bbl: 45,
+        taxpaid_domestic_bbl: 8,
+        total_removals_bbl: 8,
+        ending_inventory_bbl: 37,
+      }),
+    ];
+  }
+
+  it("passes a report whose packaged rows balance, accounting for the cellar removals explicitly", () => {
+    const rows = balancedReport();
+    // The naive subtraction genuinely does not foot — that is issue #698's gap…
+    const naiveGap =
+      totalForColumn(rows, "total_available_bbl") -
+      totalForColumn(rows, "total_removals_bbl") -
+      totalForColumn(rows, "ending_inventory_bbl");
+    expect(naiveGap).toBeCloseTo(-1.5, 10); // exactly the cellar removals
+    // …so the check must add the exempt classes' removals back, not assert the
+    // identity that provably cannot hold.
+    expect(checkTotalColumnCrossFoot(rows)).toBeNull();
+  });
+
+  it("flags a Total column that breaks even after the cellar removals are added back", () => {
+    const rows = [makeCellarRow(), makeBrokenKegRow()];
+    const failure = checkTotalColumnCrossFoot(rows);
+    expect(failure).not.toBeNull();
+    expect(failure).toContain(TOTAL_COLUMN_LABEL);
+    expect(failure).toContain("ending inventory");
+  });
+
+  it("keeps internal tracker references out of the failure copy", () => {
+    const failure = checkTotalColumnCrossFoot([makeCellarRow(), makeBrokenKegRow()]) ?? "";
+    expect(failure).not.toContain("#698");
+    expect(failure).not.toContain("issue");
+  });
+
+  it("uses the same 0.005 bbl tolerance as the per-row identities", () => {
+    const nearlyBalanced = balancedReport().map((row) =>
+      row.ttb_tax_class === "keg" ? { ...row, ending_inventory_bbl: 106.254 } : row
+    );
+    expect(checkTotalColumnCrossFoot(nearlyBalanced)).toBeNull();
+    const over = balancedReport().map((row) =>
+      row.ttb_tax_class === "keg" ? { ...row, ending_inventory_bbl: 106.26 } : row
+    );
+    expect(checkTotalColumnCrossFoot(over)).not.toBeNull();
+  });
+
+  it("reduces to the plain identity when the report holds no exempt class", () => {
+    const packagedOnly = [
+      makeRow({
+        ttb_tax_class: "keg",
+        total_available_bbl: 50,
+        total_removals_bbl: 10,
+        ending_inventory_bbl: 40,
+      }),
+    ];
+    expect(checkTotalColumnCrossFoot(packagedOnly)).toBeNull();
+    expect(checkTotalColumnCrossFoot([])).toBeNull();
+  });
+});
+
 describe("summary card scope note (issue #670)", () => {
   const rows = [
     makeCellarRow(),
@@ -545,18 +628,23 @@ describe("summary card scope note (issue #670)", () => {
 });
 
 describe("disclosure text shared by screen, CSV and print (issue #618)", () => {
-  it("names the period in the snapshot caveat when one is given", () => {
-    const caveat = getInProcessSnapshotCaveat("June 2026");
-    expect(caveat).toContain("fermenting");
-    expect(caveat).toContain("not a balance as of the end of June 2026");
+  it("describes the in-process figures as period-end balances from the audit trail, naming the period", () => {
+    // Migration 00287 keys the in-process terms on batch status *history*
+    // (entity_revisions) at the period boundaries, so the old "current
+    // snapshot" caveat would now be false: closed months ARE reproducible.
+    const note = getInProcessBalanceNote("June 2026");
+    expect(note).toContain("fermenting");
+    expect(note).toContain("the end of June 2026");
+    expect(note).toContain("audit trail");
+    expect(note).not.toContain("snapshot");
   });
 
   it("falls back to a generic period-end phrasing without a period label", () => {
-    expect(getInProcessSnapshotCaveat()).toContain("not a balance as of the period end");
+    expect(getInProcessBalanceNote()).toContain("the period end");
   });
 
   it("carries no internal tracker reference", () => {
-    expect(getInProcessSnapshotCaveat("June 2026")).not.toContain("#618");
+    expect(getInProcessBalanceNote("June 2026")).not.toContain("#618");
   });
 
   it("returns null when nothing was exempt, so callers can omit the line", () => {
@@ -572,7 +660,7 @@ describe("disclosure text shared by screen, CSV and print (issue #618)", () => {
     const disclosure = getReportExemptionDisclosure([makeCellarRow(), makeRow()]);
     expect(disclosure).toContain("Not accounting-identity checked:");
     expect(disclosure).toContain("Cellar (In-Process)");
-    expect(disclosure).toContain("in-process columns");
+    expect(disclosure).toContain("beer-in-process line");
     // Only the exempt class is named — the keg row was checked.
     expect(disclosure).not.toContain("Kegs");
     expect(disclosure).not.toContain("#618");
