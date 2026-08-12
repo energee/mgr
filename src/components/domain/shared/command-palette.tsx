@@ -7,8 +7,12 @@
  *
  * 1. Navigation — all navigation targets from the shared nav config
  *    (`nav-items.ts`, the same source the sidebar uses): direct links under
- *    "Pages" plus one group per nav section, plus Help and (permission-gated)
- *    Settings.
+ *    "Pages" plus one group per nav section, plus the "Dashboards" and
+ *    "Reports" sub-page groups (`DASHBOARD_PAGES`/`REPORT_PAGES` below —
+ *    kept independent of `nav-items.ts` since the 2026-07-12 nav
+ *    simplification dropped those sub-pages from the sidebar/tab-bar nav in
+ *    favor of in-page switchers, but cmd+K still jumps straight to them),
+ *    plus Help and (permission-gated) Settings.
  * 2. Quick actions — permission-gated create/receive shortcuts ("New Batch",
  *    "New Order", "Receive PO") whose routes are derived from entity configs.
  * 3. Record search — once the query reaches MIN_SEARCH_CHARS, key entities
@@ -52,12 +56,21 @@ import { inventoryLotEntity } from "@/entities/inventory-lot";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 import {
   AnimatedBatches,
+  AnimatedChartColumn,
+  AnimatedChartLine,
+  AnimatedCircleDollarSign,
+  AnimatedCog,
   AnimatedFileCheck,
   AnimatedFileStack,
   AnimatedFileText,
+  AnimatedHandCoins,
   AnimatedHelpCircle,
+  AnimatedPackage,
+  AnimatedRoute,
   AnimatedSettings,
+  AnimatedShieldCheck,
   AnimatedShoppingCart,
+  AnimatedTelescope,
   AnimatedUsers,
 } from "@/components/icons/animated";
 import {
@@ -182,6 +195,33 @@ function toSearchResult(
     subtitle,
   };
 }
+
+// =============================================================================
+// Dashboard and report sub-pages
+// =============================================================================
+
+/**
+ * Dashboard and report sub-pages reachable only via in-page switchers
+ * (DashboardSwitcher pills, the /reports index) since the 2026-07-12 nav
+ * simplification dropped their nav entries in favor of the "Dashboard" and
+ * "Reports" direct links. Kept independent of `nav-items.ts` — which nav-items.test.ts
+ * pins to exactly 2 links + 4 sections — so cmd+K can still jump straight
+ * to them without re-adding nav clutter. Exported for tests.
+ */
+export const DASHBOARD_PAGES: NavItem[] = [
+  { label: "Inventory Dashboard", href: "/dashboard/inventory", icon: AnimatedPackage },
+  { label: "Sales Dashboard", href: "/dashboard/sales", icon: AnimatedChartLine },
+];
+
+export const REPORT_PAGES: NavItem[] = [
+  { label: "TTB Report", href: "/reports/ttb", icon: AnimatedShieldCheck },
+  { label: "Production Summary", href: "/reports/production-summary", icon: AnimatedChartColumn },
+  { label: "Inventory Valuation", href: "/reports/inventory-valuation", icon: AnimatedHandCoins },
+  { label: "Batch Cost", href: "/reports/batch-cost", icon: AnimatedCircleDollarSign },
+  { label: "Projections", href: "/reports/projections", icon: AnimatedTelescope },
+  { label: "COGS", href: "/reports/cogs", icon: AnimatedCog },
+  { label: "Batch Trace", href: "/reports/trace", icon: AnimatedRoute },
+];
 
 // =============================================================================
 // Quick actions
@@ -395,6 +435,30 @@ export function CommandPalette() {
             ))}
           </CommandGroup>
         ))}
+        <CommandGroup heading="Dashboards">
+          {DASHBOARD_PAGES.map((item) => (
+            <CommandItem
+              key={item.href}
+              value={`Dashboards ${item.label}`}
+              onSelect={() => navigate(item.href)}
+            >
+              <item.icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="Reports">
+          {REPORT_PAGES.map((item) => (
+            <CommandItem
+              key={item.href}
+              value={`Reports ${item.label}`}
+              onSelect={() => navigate(item.href)}
+            >
+              <item.icon className="h-4 w-4" />
+              <span>{item.label}</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
         <CommandGroup heading="Quick actions">
           {QUICK_ACTIONS.filter((action) => can(action.permission)).map(
             (action) => (
