@@ -17,13 +17,63 @@
  * not-loading result — so the test targets the editor's own layout logic.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { act } from "react";
 import { setupRenderHarness } from "@/test/react-harness";
+import { click, setInputValue } from "@/test/dom-events";
 import type { HopScheduleItem } from "../hop-schedule-editor";
 import { getHopUtilizationFactor } from "@/domain/recipe-estimate-calc";
 
+// Captures the Sortable's reorder callback, per-row Select onValueChange
+// handlers (in render order), and the mocked catalog data for interactions.
+const captured = vi.hoisted(() => ({
+  reorder: undefined as ((items: unknown[]) => void) | undefined,
+  selects: [] as ((value: string) => void)[],
+  catalog: [] as unknown[],
+}));
+
 vi.mock("@/hooks/use-catalog", () => ({
-  useCatalog: () => ({ data: [], isLoading: false }),
+  useCatalog: () => ({ data: captured.catalog, isLoading: false }),
+}));
+vi.mock("@/components/ui/select", () => ({
+  Select: ({
+    children,
+    onValueChange,
+  }: {
+    children: React.ReactNode;
+    onValueChange?: (value: string) => void;
+  }) => {
+    if (onValueChange) captured.selects.push(onValueChange);
+    return <div>{children}</div>;
+  },
+  SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SelectValue: () => null,
+}));
+// Radix popover + cmdk stubs: render inline so the add-from-catalog list is
+// reachable without portal/pointer plumbing; CommandItem becomes a button.
+vi.mock("@/components/ui/popover", () => ({
+  Popover: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PopoverContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+vi.mock("@/components/ui/command", () => ({
+  Command: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CommandInput: () => null,
+  CommandList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CommandEmpty: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CommandGroup: ({ children, heading }: { children: React.ReactNode; heading?: React.ReactNode }) => (
+    <div>
+      <span>{heading}</span>
+      {children}
+    </div>
+  ),
+  CommandItem: ({ children, onSelect }: { children: React.ReactNode; onSelect?: () => void }) => (
+    <button type="button" data-testid="cmd-item" onClick={() => onSelect?.()}>
+      {children}
+    </button>
+  ),
 }));
 vi.mock("@/components/ui/unit-input", () => ({
   UnitDisplay: ({ value, unitType }: { value: number | null | undefined; unitType: string }) => (
@@ -31,7 +81,16 @@ vi.mock("@/components/ui/unit-input", () => ({
   ),
 }));
 vi.mock("@/components/ui/sortable", () => ({
-  Sortable: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  Sortable: ({
+    children,
+    onValueChange,
+  }: {
+    children: React.ReactNode;
+    onValueChange?: (items: unknown[]) => void;
+  }) => {
+    captured.reorder = onValueChange;
+    return <>{children}</>;
+  },
   SortableContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SortableItem: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SortableItemHandle: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -41,6 +100,12 @@ vi.mock("@/components/ui/sortable", () => ({
 import { HopScheduleEditor } from "../hop-schedule-editor";
 
 const { render } = setupRenderHarness();
+
+beforeEach(() => {
+  captured.reorder = undefined;
+  captured.selects = [];
+  captured.catalog = [];
+});
 
 const noop = () => {};
 
@@ -133,5 +198,77 @@ describe("HopScheduleEditor", () => {
     // render() self-cleans (unmounts the prior tree) before mounting the next.
     const empty = render(<HopScheduleEditor items={[]} onChange={noop} />);
     expect(empty.textContent).not.toContain("Added during lautering");
+  });
+
+  describe("interactions", () => {
+    const twoItems = (): HopScheduleItem[] => [
+      { id: "h1", hop_id: "hop1", weight_oz: 16, timing: "boil", boil_time_min: 60, position: 0, hop: cascade },
+      { id: "h2", hop_id: "hop2", weight_oz: 32, timing: "dry_hop", boil_time_min: null, position: 1, hop: citra },
+    ];
+
+    it("adds a catalog hop with boil/60min defaults at the end", () => {
+      captured.catalog = [cascade];
+      const onChange = vi.fn();
+      const c = render(<HopScheduleEditor items={twoItems()} onChange={onChange} />);
+      click(c.querySelector('[data-testid="cmd-item"]'));
+      const added = onChange.mock.calls[0][0] as HopScheduleItem[];
+      expect(added).toHaveLength(3);
+      expect(added[2]).toMatchObject({
+        hop_id: "hop1",
+        weight_oz: 0,
+        timing: "boil",
+        boil_time_min: 60,
+        position: 2,
+        hop: cascade,
+      });
+      expect(added[2].id).toBeTruthy();
+    });
+
+    it("removes a row and renumbers remaining positions", () => {
+      const onChange = vi.fn();
+      const c = render(<HopScheduleEditor items={twoItems()} onChange={onChange} />);
+      const firstRowButtons = c.querySelectorAll("tbody tr")[0].querySelectorAll("button");
+      click(firstRowButtons[firstRowButtons.length - 1]);
+      expect(onChange).toHaveBeenCalledWith([
+        expect.objectContaining({ id: "h2", position: 0 }),
+      ]);
+    });
+
+    it("stores a weight edit in canonical oz (input is lbs)", () => {
+      const onChange = vi.fn();
+      const c = render(<HopScheduleEditor items={twoItems()} onChange={onChange} />);
+      const row0Inputs = c.querySelectorAll("tbody tr")[0].querySelectorAll('input[type="number"]');
+      setInputValue(row0Inputs[row0Inputs.length - 1] as HTMLInputElement, "2");
+      const updated = onChange.mock.calls[0][0] as HopScheduleItem[];
+      expect(updated[0]).toMatchObject({ id: "h1", weight_oz: 32 });
+    });
+
+    it("nulls boil time when timing leaves the boil, and restores 60 when returning", () => {
+      const onChange = vi.fn();
+      render(<HopScheduleEditor items={twoItems()} onChange={onChange} />);
+      // Row 0 (boil, 60 min) -> dry_hop clears boil_time_min.
+      act(() => captured.selects[0]("dry_hop"));
+      expect((onChange.mock.calls[0][0] as HopScheduleItem[])[0]).toMatchObject({
+        timing: "dry_hop",
+        boil_time_min: null,
+      });
+      // Row 1 (dry_hop, null) -> boil defaults boil_time_min to 60.
+      act(() => captured.selects[1]("boil"));
+      expect((onChange.mock.calls[1][0] as HopScheduleItem[])[1]).toMatchObject({
+        timing: "boil",
+        boil_time_min: 60,
+      });
+    });
+
+    it("persists a reorder with renumbered positions", () => {
+      const onChange = vi.fn();
+      const items = twoItems();
+      render(<HopScheduleEditor items={items} onChange={onChange} />);
+      act(() => captured.reorder!([items[1], items[0]]));
+      expect(onChange).toHaveBeenCalledWith([
+        expect.objectContaining({ id: "h2", position: 0 }),
+        expect.objectContaining({ id: "h1", position: 1 }),
+      ]);
+    });
   });
 });

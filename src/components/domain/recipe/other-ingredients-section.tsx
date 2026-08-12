@@ -38,7 +38,8 @@ import {
   useRegisterSaver,
   type RecipeChildSection,
 } from "@/components/domain/recipe/recipe-editor/recipe-editor-context";
-import { Plus, Trash2, ChevronsUpDown } from "lucide-react";
+import { RemoveRowCell } from "@/components/ui/sortable-rows";
+import { Plus, ChevronsUpDown } from "lucide-react";
 
 // =============================================================================
 // Types
@@ -530,17 +531,7 @@ function IngredientTab({
                     />
                   ))}
                   {editing && (
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeItem(index)}
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+                    <RemoveRowCell onClick={() => removeItem(index)} />
                   )}
                 </TableRow>
               );
