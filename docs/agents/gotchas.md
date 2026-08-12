@@ -253,8 +253,8 @@ order of preference:
 suppresses the whole workflow run, so `Static Checks`, `Unit Tests`,
 `E2E Tests` and `Database Lint and Integration Tests` never report — and a
 required context that never reports cannot be cleared. No workflow-side design
-can close this (the shim in `db-lint.yml` covers path filtering, not run
-suppression). Never put `[skip ci]` in a commit that will become a PR;
+can close this — dropping db-lint's `paths:` filter (#713) fixes filtered-out
+runs, not suppressed ones. Never put `[skip ci]` in a commit that will become a PR;
 `progress.yml` already avoids it deliberately for this reason.
 
 **`make check | tail` reports `tail`'s exit code, not `make`'s — so a failing

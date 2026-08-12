@@ -1,8 +1,6 @@
-import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parse } from "yaml";
 import {
   AGENT_ACTION,
   agentWriteScopeInventory,
@@ -417,65 +415,33 @@ describe("GitHub Actions performance contracts", () => {
     expect(dbWorkflow).toContain("bun run test:integration");
     // The integration suite is excluded from `make check` (it needs a live
     // Postgres — see vitest.config.ts), so db-lint is the ONLY gate that runs
-    // it. Pin its trigger paths: a PR that drops a migration's trigger, or
-    // deletes the spec asserting it, must still start this job. Since #713 the
-    // list lives in `env.SCHEMA_PATHS` (git pathspecs consumed by the
-    // `changes` job) rather than in `on: paths:` — same patterns, one level
-    // down, because a required context cannot be path-filtered at `on:`.
+    // it. Since #713 it runs on EVERY pull request, with no `paths:` filter:
+    // `Database Lint and Integration Tests` is a REQUIRED status check on
+    // `main`, and GitHub never queues a workflow whose `paths:` filter excludes
+    // the PR — the context would stay pending forever and a docs-only PR could
+    // never merge.
     //
-    // Pinned by RUNNING the patterns, not by spelling them. A string pin was
-    // the original form and it could not have caught what it was there to
-    // catch: the list was translated from GitHub's `on: paths:` globs to git
-    // pathspecs, and the dialects differ — `*` matches `/` in a pathspec, but
-    // `**/` still demands at least one directory, so
-    // `supabase/migrations/**/*.sql` matched `.../sub/deep.sql` and NOT
-    // `.../00250_x.sql`. Every migration in this repo is top-level, so the
-    // pattern matched nothing real: migration PRs would have skipped the heavy
-    // lane and reported the required check GREEN. `git ls-files` against the
-    // actual tree is the only assertion that fails on that.
-    const schemaPaths = String(parse(dbWorkflow).env?.SCHEMA_PATHS ?? "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-    expect(schemaPaths.length).toBeGreaterThanOrEqual(8);
-
-    const selected = new Set(
-      execFileSync("git", ["ls-files", "--", ...schemaPaths], { encoding: "utf8" })
-        .split("\n")
-        .filter(Boolean),
-    );
-
-    // Every real migration must be selected — not "at least one", or a
-    // pattern that catches a single stray file would look healthy.
-    const migrations = readdirSync(resolve(process.cwd(), "supabase/migrations"))
-      .filter((file) => file.endsWith(".sql"))
-      .map((file) => `supabase/migrations/${file}`);
-    expect(migrations.length).toBeGreaterThan(100);
+    // Running it everywhere is affordable because it is not the critical path.
+    // Measured on PR #790 (2026-08-12): this workflow ~3m13s (the Docker-backed
+    // replay is its long pole) against `E2E Tests` at ~5m50s on every PR
+    // regardless. Actions minutes are free on this public repo.
+    //
+    // An earlier attempt kept the filter and wrapped it in an always-reporting
+    // gate job. It was discarded, but the bug it surfaced is worth recording:
+    // translating `on: paths:` globs into git pathspecs is not copying. In a
+    // pathspec `*` matches `/`, but `**/` still demands at least one directory,
+    // so `supabase/migrations/**/*.sql` matched `.../sub/deep.sql` and NOT
+    // `.../00250_x.sql`. Every migration here is top-level, so it selected
+    // nothing real and every migration PR would have reported this check green.
+    // Deleting the filter removes that whole class of failure.
+    const dbOnBlock = uncommented(dbWorkflow.match(/^on:\n([\s\S]*?)\n(?=\S)/m)?.[1] ?? "");
+    expect(dbOnBlock, "db-lint.yml must have an `on:` block").not.toBe("");
+    expect(dbOnBlock, "db-lint.yml must trigger on pull_request").toMatch(/^ {2}pull_request:/m);
     expect(
-      migrations.filter((file) => !selected.has(file)),
-      "SCHEMA_PATHS does not select every migration — those PRs would skip the heavy lane and report the required check green",
-    ).toEqual([]);
+      dbOnBlock,
+      "db-lint.yml must carry no `paths:` filter — its job name is a required context, and a filtered-out PR never reports one",
+    ).not.toMatch(/^\s*paths(-ignore)?:/m);
 
-    // The other lanes the heavy job is the only gate for.
-    for (const file of [
-      "vitest.integration.config.ts",
-      ".github/workflows/db-lint.yml",
-      "supabase/config.toml",
-      "scripts/live-catalog.sql",
-      "scripts/migration-dry-run.sh",
-    ]) {
-      expect(selected, `SCHEMA_PATHS must select ${file}`).toContain(file);
-    }
-    expect(
-      [...selected].some((file) => file.startsWith("src/__tests__/integration/")),
-      "SCHEMA_PATHS must select the integration specs — db-lint is the only gate that runs them",
-    ).toBe(true);
-
-    // …and must NOT select the whole tree, which would make the filter a
-    // no-op and every PR pay for the heavy lane.
-    for (const file of ["package.json", "AGENTS.md", "src/lib/query-keys.ts"]) {
-      expect(selected, `SCHEMA_PATHS must not select ${file}`).not.toContain(file);
-    }
     // SHA-pinned (tag as trailing comment) per docs/security/dependency-policy.md.
     expect(dbWorkflow).toMatch(/supabase\/setup-cli@[0-9a-f]{40} # v3/);
     expect(dbWorkflow).toContain('version: "2.109.1"');
@@ -493,106 +459,66 @@ describe("GitHub Actions performance contracts", () => {
   });
 
   // #713: `Database Lint and Integration Tests` is a REQUIRED status check on
-  // `main`, and a required context has exactly two ways to go wrong:
+  // `main`. A required context has exactly two ways to go wrong:
   //
-  //   1. It never reports. A `paths:` filter on `on:` means GitHub does not
-  //      queue the workflow at all for a docs-only PR, so the context stays
-  //      pending forever and the PR is unmergeable. That is why the filter
-  //      moved into the `changes` job.
-  //   2. It reports green over checks that failed. That is strictly worse than
-  //      having no gate, because it is a gate everyone believes.
+  //   1. It never reports — the PR is unmergeable forever. Caused by filtering
+  //      the workflow out of a run, or by letting the job skip.
+  //   2. It reports green over checks that did not run or did not pass. That is
+  //      strictly worse than no gate, because it is a gate everyone believes.
   //
-  // Both are pinned here. The heavy jobs are allowed to skip; the job carrying
-  // the required NAME is not, and it must translate every non-success
-  // conclusion into a non-zero exit.
-  it("always reports the required database context without laundering a failure into green", () => {
+  // Option 2 of #713 makes both structurally impossible rather than handled:
+  // the job runs unconditionally on every PR and reports its own result, so
+  // there is no filter to mistranslate and no skip to convert.
+  it("keeps the required database context unfiltered, unskippable and self-reporting", () => {
     const workflow = read(".github/workflows/db-lint.yml");
     const jobs = jobBlocks(workflow);
     const REQUIRED_CONTEXT = "Database Lint and Integration Tests";
 
-    // 1. No path filter on the trigger — the whole point of the shim.
-    const onBlock = workflow.match(/^on:\n([\s\S]*?)\n(?=\S)/m)?.[1] ?? "";
-    expect(onBlock).not.toBe("");
-    expect(onBlock, "db-lint.yml must trigger on pull_request").toMatch(/^ {2}pull_request:/m);
-    expect(
-      uncommented(onBlock),
-      "db-lint.yml must carry no `paths:` filter on `on:` — GitHub never queues a filtered-out PR, so the required context would stay pending forever",
-    ).not.toMatch(/^\s*paths(-ignore)?:/m);
-
-    // 2. Exactly one job carries the required context name, and it is the gate
-    //    (not a heavy job that is allowed to skip). GitHub matches required
-    //    contexts by exact job name, so a second job with this name would make
-    //    which one satisfies the rule ambiguous.
+    // Exactly one job carries the required name. GitHub matches required
+    // contexts by exact job name, so two would make it ambiguous which one
+    // satisfies the rule.
     const named = [...jobs.entries()].filter(([, block]) =>
       new RegExp(`^ {4}name: ${REQUIRED_CONTEXT}\\s*$`, "m").test(uncommented(block)),
     );
     expect(
       named.map(([id]) => id),
       `exactly one job in db-lint.yml must be named "${REQUIRED_CONTEXT}"`,
-    ).toEqual(["db-lint-gate"]);
+    ).toEqual(["db-lint"]);
 
-    const gate = uncommented(jobs.get("db-lint-gate")!);
+    const required = uncommented(jobs.get("db-lint")!);
 
-    // 3. The gate runs unconditionally. Any `if:` other than `always()` can
-    //    evaluate false, and a job that does not run reports nothing at all.
+    // It must be unconditional. Any job-level `if:` can evaluate false, and a
+    // job that does not run reports nothing at all.
     expect(
-      gate.match(/^ {4}if:\s*(.+?)\s*$/m)?.[1],
-      "the gate job's only permitted job-level `if:` is `always()` — anything narrower can fail to report",
-    ).toBe("always()");
+      required.match(/^ {4}if:\s*(.+?)\s*$/m)?.[1],
+      "the required job must carry no job-level `if:` — anything conditional can fail to report",
+    ).toBeUndefined();
+
+    // It must not depend on anything that can skip: a skipped dependency skips
+    // the dependent, which is failure mode 1 by another route.
     expect(
-      gate,
-      "no step in the gate job may carry `continue-on-error:` — the gate's exit code IS the required check",
+      declaredNeeds(jobs.get("db-lint")!),
+      "the required job must not wait on another job — a skipped dependency would skip it too",
+    ).toEqual([]);
+
+    // Its own exit code IS the check, so nothing may swallow a failure.
+    expect(
+      required,
+      "no step in the required job may carry `continue-on-error:`",
     ).not.toMatch(/^ {8}continue-on-error:/m);
 
-    // 4. The gate observes every heavy job. A heavy job missing from `needs:`
-    //    is a job whose failure the required context cannot see.
-    expect(declaredNeeds(jobs.get("db-lint-gate")!).sort()).toEqual([
-      "changes",
-      "db-lint",
-      "supabase-reset",
-    ]);
+    // The lint step must still fail loudly rather than only printing a report.
+    expectFailsLoudly(required, /::error::Database security lint failed/, "an ERROR-level lint finding");
 
-    // 5. The heavy jobs are gated on the detection job's output, not on `on:`.
-    for (const job of ["supabase-reset", "db-lint"]) {
-      expect(
-        uncommented(jobs.get(job)!),
-        `the ${job} job must be gated on the changes job's output`,
-      ).toMatch(/^ {4}if: needs\.changes\.outputs\.schema == 'true'$/m);
-    }
-
-    // 6. The gate must actually read each dependency's conclusion, and must
-    //    exit 1 on anything but the expected one. Pinning the `::error::`
-    //    message alone would be satisfied by prose over a gate that always
-    //    exits 0 — the failure mode the rest of this file exists to catch.
-    for (const result of ["needs.changes.result", "needs.supabase-reset.result", "needs.db-lint.result"]) {
-      expect(gate, `the gate must read ${result}`).toContain(result);
-    }
-    expectFailsLoudly(gate, /::error::Change detection reported/, "an unusable diff");
-    expectFailsLoudly(gate, /::error::Schema-relevant paths changed but the heavy lane/, "a failed heavy lane");
-    expectFailsLoudly(gate, /::error::No schema-relevant change was detected, but the heavy lane/, "a heavy lane that ran and did not succeed");
-
-    // 7. The comparisons themselves, not just the messages. `success` is the
-    //    only conclusion that may pass when the heavy lane ran, and `skipped`
-    //    the only one that may pass when it did not — a rewrite to
-    //    `!= "definitely-not-a-conclusion"` would leave every assertion above
-    //    satisfied while the gate could never fire.
-    expect(gate).toMatch(/\$REPLAY_RESULT" != "success"/);
-    expect(gate).toMatch(/\$LINT_RESULT" != "success"/);
-    expect(gate).toMatch(/\$REPLAY_RESULT" != "skipped"/);
-    expect(gate).toMatch(/\$LINT_RESULT" != "skipped"/);
-
-    // 8. Detection fails OPEN into the heavy lane. If it decided "false" on an
-    //    unknown diff, the gate would report green over unverified schema.
-    const changes = uncommented(jobs.get("changes")!);
-    expect(changes, "the detection job needs full history to reach the PR base").toContain(
-      "fetch-depth: 0",
-    );
+    // `Production Build` must never join the required set: it is schedule-gated
+    // in test.yml, so requiring it would leave every PR pending — the exact
+    // failure this whole test exists to prevent, in the other workflow.
+    const testWorkflow = read(".github/workflows/test.yml");
+    const build = uncommented(jobBlocks(testWorkflow).get("build")!);
     expect(
-      changes.match(/echo "schema=(true|false)"/g),
-      "every unknown-diff branch of the detection job must set schema=true",
-    ).toContain('echo "schema=true"');
-    expect(changes).toContain('if [ "$EVENT_NAME" != "pull_request" ]');
-    expect(changes).toContain("git merge-base");
+      build,
+      "Production Build must stay schedule-gated, and must therefore stay OUT of the required contexts",
+    ).toMatch(/^ {4}if: github\.event_name == 'schedule'/m);
   });
 
   it("uses built-in psql and parallelizes only the selected Sentry fixes", () => {

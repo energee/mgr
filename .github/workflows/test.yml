@@ -220,13 +220,14 @@ jobs:
   #     16:07:01Z) for a 7m55s PR; without it, run 30569164797 started e2e and
   #     static in the same second (18:09:29Z) and the whole PR took 5m14s.
   #
-  # Those three rules bind any job whose OWN context is required, which is the
-  # case for all three jobs here. db-lint.yml (#713) is the one sanctioned
-  # variation and not a counter-example: its heavy jobs do carry a filter, a
-  # `needs:` edge and a deliberate skip, but their context is NOT the required
-  # one — a separate always-running gate job holds that name and converts their
-  # skip into an explicit conclusion. The invariant is unchanged; only the job
-  # that carries the required name may never skip.
+  # Those three rules bind any job whose OWN context is required on `main`,
+  # which is true of `Static Checks`, `Unit Tests` and `E2E Tests` here, and of
+  # `Database Lint and Integration Tests` in db-lint.yml (#713). A required
+  # context must report a conclusion on every pull request, so such a job may
+  # never be filtered out of a run, skipped, or made to depend on something
+  # that can skip. That is why db-lint.yml no longer carries a `paths:` filter.
+  # `Production Build` is deliberately NOT required, precisely because it is
+  # schedule-gated below and would otherwise leave every PR pending forever.
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
