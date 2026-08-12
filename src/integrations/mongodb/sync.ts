@@ -953,6 +953,10 @@ async function syncPackagingSessions(): Promise<SyncResult> {
   // 3. Build line item rows from each session's products array
   const lineItems: Record<string, unknown>[] = [];
   const lineErrors: Array<{ mongoId: string; error: string }> = [];
+  // Products with no batch pointer carry no derivable brand (NOT NULL) —
+  // they are unattributable source rows, skipped by policy (2026-08-12),
+  // not failures. The rest of their session still syncs.
+  let skippedNoBatch = 0;
 
   for (const doc of docs) {
     const pgSessionId = objectIdToUuid(doc._id.toString());
@@ -961,13 +965,18 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     for (let i = 0; i < (doc.products ?? []).length; i++) {
       const product = doc.products![i]!;
 
+      if (!product.batch) {
+        skippedNoBatch++;
+        continue;
+      }
+
       const pgBatchId = product.batch ? objectIdToUuid(product.batch.toString()) : null;
 
       // Resolve brand_id (NOT NULL): batch → beer → brand, falling back to
       // batch → recipe → beer → brand, then the PG batch → recipe → brand map.
       let pgBrandId: string | null = null;
-      let brandFailure = "product has no batch reference";
-      if (product.batch) {
+      let brandFailure = "unresolvable";
+      {
         const mongoBatchId = product.batch.toString();
         const beerId = mongoBatchIdToBeer.get(mongoBatchId)
           ?? mongoRecipeIdToBeer.get(mongoBatchIdToRecipe.get(mongoBatchId) ?? "");
@@ -1041,6 +1050,12 @@ async function syncPackagingSessions(): Promise<SyncResult> {
     ...error,
     error: `phase=4 entity=packaging_sessions operation=resolve-line: ${error.error}`,
   })));
+  if (skippedNoBatch > 0) {
+    logger.warn(
+      "Skipped %d packaging line(s) with no batch reference (unattributable; policy 2026-08-12)",
+      skippedNoBatch
+    );
+  }
 
   await completeSyncLog(logId, combined);
   return { entityType: "packaging_sessions", phase: 4, ...combined };
