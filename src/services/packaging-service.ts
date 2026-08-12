@@ -35,7 +35,14 @@ type Client = SupabaseClient<Database>;
 /** An open (planned/in_progress) packaging session, as listed for pickers. */
 export type OpenPackagingSession = {
   id: string;
-  session_date: string;
+  /**
+   * Nullable, matching `packaging_sessions.session_date` in the generated
+   * schema. Declaring it non-nullable would silently drop the guard the
+   * compiler owes a new call site — the existing picker already handles null
+   * (packaging-batch-dialog.tsx renders "No date"), and that guard should keep
+   * looking necessary, because it is.
+   */
+  session_date: string | null;
   status: string;
 };
 
