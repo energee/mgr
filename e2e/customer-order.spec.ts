@@ -63,19 +63,19 @@ test.describe("Customer order — portal", () => {
     await context.close();
   });
 
-  // SKIPPED — NOT AUTOMATABLE, tracked in #706 (and #437).
-  // Two independent blockers, either of which is sufficient:
-  //   1. There is no portal order-placement UI to drive (see this file's
-  //      header). This is a missing feature, not a missing test.
-  //   2. Even for the read-only portal views, portal auth is OTP/magic-link
-  //      only (`shouldCreateUser: false`, portal-login-form.tsx), so a second
-  //      Playwright storageState would have to scrape a one-time code out of
-  //      the local mail catcher on every run.
-  // Blocker 1 must be resolved product-side before this is worth writing;
-  // (2) alone would be a solvable-but-costly harness problem.
+  // SKIPPED — still blocked on the PRODUCT, tracked in #706 (and #437).
+  // This used to list two blockers. The second — no way to hold an
+  // authenticated portal session, because portal auth is OTP/magic-link only
+  // (`shouldCreateUser: false`, portal-login-form.tsx) — is now solved:
+  // `e2e/portal-auth.setup.ts` logs in over a real OTP read from the local
+  // mail catcher and the `chromium-portal` project consumes that state (see
+  // e2e/portal-orders.spec.ts for authenticated portal coverage).
+  // What remains is blocker 1: there is no portal order-placement UI to drive
+  // (see this file's header). That is a missing feature, not a missing test,
+  // and it must be resolved product-side before this is worth writing.
   test.skip("customer places an order through the portal", async () => {
-    // Requires: portal order-placement UI (does not exist), plus a portal
-    // customer storageState obtained via the emailed OTP.
+    // Requires: portal order-placement UI (does not exist). The portal
+    // storageState this would run under already exists — see above.
   });
 });
 

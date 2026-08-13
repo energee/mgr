@@ -21,3 +21,30 @@ schema_paths = []
 # the migration chain from an empty database.
 enabled = false
 sql_paths = ["./seed.sql"]
+
+# Auth settings below exist so the LOCAL stack can produce a sign-in email the
+# app's own login forms accept. Without them the defaults emit a 6-digit code
+# inside Supabase's stock magic-link template, which has no code in it at all —
+# so no OTP login (staff or portal) is drivable locally, including from
+# Playwright (e2e/portal-auth.setup.ts).
+#
+# NEVER run `supabase config push` against this repo. Unlike `db push`, it
+# sends this section to the linked hosted project, and hosted auth is managed
+# from the dashboard. Nothing in the repo runs it — keep it that way.
+#
+# site_url is deliberately NOT set here: the local default is already
+# http://localhost:3000, the harness drives the OTP *code* path rather than the
+# link path, and it is the one key whose accidental push would break hosted
+# magic links outright.
+[auth]
+
+[auth.email]
+# Must match OTP_LENGTH in src/components/auth/otp-code-input.tsx — the Verify
+# button stays disabled until exactly this many digits are entered.
+otp_length = 8
+
+[auth.email.template.magic_link]
+# The repo's own template (also pasted into the hosted dashboard) is the only
+# one that renders `{{ .Token }}`.
+subject = "Your MGR sign-in link"
+content_path = "./supabase/templates/magic-link.html"

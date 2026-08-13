@@ -10,8 +10,8 @@
  *  - Per-spec deterministic UUID namespaces (playwright.config.ts runs specs
  *    fullyParallel against one shared database): batch-transfer uses
  *    `e2e00001-…`, recipe-editor `e2e00002-…`, packaging-session `e2e00003-…`,
- *    customer-order `e2e00004-…`, production-workflow `e2e00005-…`. New specs
- *    must claim a fresh second segment.
+ *    customer-order `e2e00004-…`, production-workflow `e2e00005-…`, portal auth
+ *    `e2e00006-…`. New specs must claim a fresh second segment.
  *  - Seed in beforeAll of a describe block that contains a SINGLE test, so
  *    only one worker ever runs the hooks (fullyParallel schedules tests, not
  *    files, onto workers — two workers running the same file's hooks would
@@ -873,6 +873,115 @@ export async function seedProductionFixtures(seed: SupabaseClient): Promise<void
         recipe_id: PRODUCTION_IDS.recipe,
         status: "planned",
         volume_bbl: 10,
+      })
+    ).error
+  );
+}
+
+// =============================================================================
+// Portal-auth fixtures (namespace e2e00006-…)
+// =============================================================================
+
+export const PORTAL_IDS = {
+  customer: "e2e00006-0000-4000-8000-000000000001",
+  order: "e2e00006-0000-4000-8000-000000000002",
+} as const;
+
+export const PORTAL_CUSTOMER_NAME = "E2E Portal Customer 706";
+/**
+ * The portal user's email, and the customer's.
+ *
+ * They must match: `create_user_profile()` grants the 'customer' role — the
+ * only role the portal layout accepts — by comparing the new auth user's email
+ * against `customers.email` (migration 00201). A mismatch produces a 'viewer'
+ * staff account that the portal locks out.
+ */
+export const PORTAL_USER_EMAIL = "e2e-portal-706@brewery.test";
+export const PORTAL_ORDER_NUMBER = "E2E-PORTAL-706";
+
+/**
+ * Removes the portal user, its customer, and the seeded order.
+ *
+ * The auth user goes last: `customer_portal_users.user_id` and
+ * `user_profiles.id` both cascade from `auth.users`, so deleting it cleans up
+ * the link and the profile too. Safe to run when nothing exists.
+ */
+export async function cleanupPortalFixtures(seed: SupabaseClient): Promise<void> {
+  assertOk(
+    "delete portal order",
+    (await seed.from("orders").delete().eq("id", PORTAL_IDS.order)).error
+  );
+  assertOk(
+    "delete portal customer",
+    (await seed.from("customers").delete().eq("id", PORTAL_IDS.customer)).error
+  );
+
+  // listUsers() defaults to perPage: 50. On a local dev database with more
+  // auth users than that, the portal user falls off page 1, cleanup silently
+  // no-ops, and the createUser below then hard-fails on the duplicate email —
+  // an error that never names the real cause.
+  const { data: list, error: listError } = await seed.auth.admin.listUsers({ perPage: 1000 });
+  assertOk("list auth users", listError);
+  const existing = list?.users.find(
+    (user) => user.email?.toLowerCase() === PORTAL_USER_EMAIL
+  );
+  if (existing) {
+    assertOk("delete portal auth user", (await seed.auth.admin.deleteUser(existing.id)).error);
+  }
+}
+
+/**
+ * Seeds a portal customer, an auth user for it, the junction row that grants
+ * portal access, and one order so the orders list has a row to assert on.
+ *
+ * Order matters: the customer row must exist BEFORE the auth user is created,
+ * because the profile trigger reads it to decide the role (see
+ * PORTAL_USER_EMAIL). `email_confirm: true` skips the confirmation mail, so
+ * the only email in the mailbox is the sign-in code the setup project reads.
+ *
+ * The link row is written explicitly rather than left to the portal layout's
+ * first-login auto-link, so the fixture is one deterministic state instead of
+ * a side effect of the page under test.
+ */
+export async function seedPortalFixtures(seed: SupabaseClient): Promise<void> {
+  assertOk(
+    "insert portal customer",
+    (
+      await seed.from("customers").insert({
+        id: PORTAL_IDS.customer,
+        name: PORTAL_CUSTOMER_NAME,
+        customer_type: "wholesale",
+        email: PORTAL_USER_EMAIL,
+        is_active: true,
+      })
+    ).error
+  );
+
+  const { data: created, error: createError } = await seed.auth.admin.createUser({
+    email: PORTAL_USER_EMAIL,
+    email_confirm: true,
+  });
+  assertOk("create portal auth user", createError);
+  const userId = created?.user?.id;
+  if (!userId) throw new Error('E2E seed step "create portal auth user" returned no user.');
+
+  assertOk(
+    "insert portal link",
+    (
+      await seed.from("customer_portal_users").insert({
+        customer_id: PORTAL_IDS.customer,
+        user_id: userId,
+      })
+    ).error
+  );
+  assertOk(
+    "insert portal order",
+    (
+      await seed.from("orders").insert({
+        id: PORTAL_IDS.order,
+        customer_id: PORTAL_IDS.customer,
+        order_number: PORTAL_ORDER_NUMBER,
+        status: "draft",
       })
     ).error
   );

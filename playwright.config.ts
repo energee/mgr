@@ -55,14 +55,31 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
-    { name: "setup", testMatch: /.*\.setup\.ts/ },
+    // Anchored so it does NOT also pick up portal-auth.setup.ts, which writes a
+    // different storage state and must run only for the portal project.
+    { name: "setup", testMatch: /(^|\/)auth\.setup\.ts$/ },
+    { name: "setup-portal", testMatch: /(^|\/)portal-auth\.setup\.ts$/ },
     {
       name: "chromium",
+      // Portal specs need the portal session, not the staff one.
+      testIgnore: /(^|\/)portal-.*\.(spec|setup)\.ts$/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/user.json",
       },
       dependencies: ["setup"],
+    },
+    {
+      // Customer-portal session: a portal user is a different auth user with a
+      // different role, so it cannot share the staff storage state. Its setup
+      // logs in over OTP via the local mail catcher — see portal-auth.setup.ts.
+      name: "chromium-portal",
+      testMatch: /(^|\/)portal-.*\.spec\.ts$/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/portal.json",
+      },
+      dependencies: ["setup-portal"],
     },
   ],
   // Only boot a dev server for localhost targets; a remote base URL is

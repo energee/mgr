@@ -21,6 +21,7 @@
 /blob-report/
 /playwright/.cache/
 e2e/.auth/user.json
+e2e/.auth/portal.json
 
 # next.js
 /.next/
