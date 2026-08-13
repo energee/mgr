@@ -104,7 +104,14 @@ export function buildSearchTool(
 
       for (const [name, param] of Object.entries(config.params)) {
         const value = args[name];
-        if (value === undefined) continue;
+        // Every tool this factory replaced guarded its optional filters on
+        // truthiness (`if (status) q = q.eq(...)`), so "" produced no
+        // predicate. An undefined-only check would change that: models
+        // routinely emit "" for an optional string, and `eq(status, "")`
+        // against an enum column raises 22P02 rather than returning the
+        // unfiltered list. No migrated tool takes an optional number, so
+        // skipping "" is exactly the original behaviour and nothing more.
+        if (value === undefined || value === "") continue;
         q =
           param.op === "ilike"
             ? q.ilike(param.column, `%${escapeIlikePattern(String(value))}%`)

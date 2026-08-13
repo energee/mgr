@@ -261,6 +261,8 @@ const CASES: ToolCase[] = [
   },
 ];
 
+const UUID_RE = /^[0-9a-fA-F-]{36}$/;
+
 describe.each(CASES)("$tool", (c) => {
   it("advertises its argument defaults", () => {
     const tools = createChatTools(withRows(c.table, []).supabase) as AnyTools;
@@ -283,6 +285,32 @@ describe.each(CASES)("$tool", (c) => {
     }
     // Rows are returned as-is: no reshaping between PostgREST and the model.
     expect(result).toEqual([{ id: "row-1" }]);
+  });
+
+  it("ignores empty-string arguments, as the hand-written tools did", async () => {
+    // Models routinely emit "" for an optional string. Every tool this factory
+    // replaced guarded on truthiness, so "" meant "no filter"; an
+    // undefined-only guard would instead emit eq(status, "") — which raises
+    // 22P02 against the enum and date columns these tools filter on, turning a
+    // full list into a thrown error. Asserting the predicates are ABSENT is
+    // the point: the rest of this suite passes either way.
+    const sb = withRows(c.table, []);
+    const tools = createChatTools(sb.supabase) as AnyTools;
+
+    // uuid-validated params (brandId) are excluded: their schema rejects ""
+    // before the query is ever built, so they cannot reach the guard.
+    const blanked: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(c.filtered.args)) {
+      if (typeof value === "string" && !UUID_RE.test(value)) blanked[key] = "";
+    }
+    await run(tools, c.tool, blanked);
+
+    // Only the base filters the tool always applies may appear.
+    for (const method of ["eq", "ilike", "gte", "lte"]) {
+      expect(calls(sb, c.table, method)).toEqual(c.baseCalls?.[method] ?? []);
+    }
+    // A blanked embed filter must not flip the select to an inner join either.
+    expect(calls(sb, c.table, "select")).toEqual([[c.select]]);
   });
 
   it("turns each optional argument into a predicate", async () => {
