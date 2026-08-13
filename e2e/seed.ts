@@ -916,7 +916,11 @@ export async function cleanupPortalFixtures(seed: SupabaseClient): Promise<void>
     (await seed.from("customers").delete().eq("id", PORTAL_IDS.customer)).error
   );
 
-  const { data: list, error: listError } = await seed.auth.admin.listUsers();
+  // listUsers() defaults to perPage: 50. On a local dev database with more
+  // auth users than that, the portal user falls off page 1, cleanup silently
+  // no-ops, and the createUser below then hard-fails on the duplicate email —
+  // an error that never names the real cause.
+  const { data: list, error: listError } = await seed.auth.admin.listUsers({ perPage: 1000 });
   assertOk("list auth users", listError);
   const existing = list?.users.find(
     (user) => user.email?.toLowerCase() === PORTAL_USER_EMAIL
