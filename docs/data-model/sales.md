@@ -48,8 +48,9 @@ revoked user's next page load whenever their auth email matched
 - Every read filters `revoked_at IS NULL`: the portal layout, the Portal Access
   list route, and the RLS policies `customer_portal_users_customer_select`,
   `customer_orders_select`, `customer_order_items_select`,
-  `change_requests_customer_insert`, `customers_customer_select` and
-  `orders_customer_lock`.
+  `change_requests_customer_insert`, `customers_customer_select`,
+  `orders_customer_lock`, `orders_customer_insert` and
+  `order_items_customer_insert`.
 - The auto-link only provisions a customer with **no row at all** for that user,
   and only when `COALESCE(is_active, true)` — matching `create_user_profile()`
   and the invite route's 409 for a deactivated customer.
@@ -66,9 +67,22 @@ junction before provisioning; a later failure removes only a newly added link
 and restores (or removes) only the profile state created by that attempt. It
 never deletes the pre-existing Auth identity or an earlier customer link.
 
+Portal customers may also **create** their own orders, not only amend
+staff-created ones. `orders_customer_insert` and `order_items_customer_insert`
+(00290) admit an order for the caller's own customer in `draft` — the
+staff-confirm state — with `scheduled_date`, `fulfilled_date` and `is_export`
+unset and `order_items.unit_price` NULL. Pricing is resolved server-side
+through `get_price_for_customer` (`src/services/pricing-service.ts`) when staff
+confirm, so the portal cannot set prices. `orders_customer_lock` still carries
+`WITH CHECK (false)`, so a customer cannot modify an order after creating it.
+`orders.order_number` gained a DEFAULT of `generate_next_order_number()`, which
+is SECURITY DEFINER so the shared ORD- series advances correctly for a caller
+whose RLS hides other customers' orders.
+
 **Migration:** `00095_customer_portal_many_to_many.sql` (original),
 `00252_restore_customer_portal_users.sql` (hosted-database restoration and
-current RLS policies).
+current RLS policies), `00290_portal_customer_order_insert.sql` (customer
+order placement).
 
 ---
 
