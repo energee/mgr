@@ -9,6 +9,9 @@
  *    ~16 hand-crafted search/detail tools.
  * 2. **Specialized query tools** — Domain-specific queries that require
  *    custom SQL joins, aggregations, or views not covered by generic search.
+ *    The single-table filtered searches among these are config-driven: their
+ *    configs live in `./search-tools.ts` and are instantiated here by
+ *    `createSearchTools`.
  * 3. **RPC tools** — Wrappers around Supabase RPC calls to PostgreSQL functions.
  * 4. **Navigation tools** — Return NavigationIntent objects that the client
  *    renders as action cards for the user to review and submit.
@@ -42,6 +45,7 @@ import { inventoryService } from "@/services/inventory-service";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
 import { coreRegistry } from "@/entities/cores";
 import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
+import { createSearchTools } from "./search-tools";
 
 /** Execute an RPC call and throw on error. */
 async function rpc<T>(
@@ -91,6 +95,24 @@ async function resolveBatch(
   }
   throw new Error("Either batchId or batchNumber is required");
 }
+
+/**
+ * Single-column name/number lookups performed by `lookupEntity`. Each is a
+ * case-insensitive partial match on one column, capped at five rows, with the
+ * matched column doubling as the human-readable display value.
+ */
+const LOOKUP_TARGETS: ReadonlyArray<{
+  type: string;
+  table: string;
+  column: string;
+  /** Restrict to active rows — only customers can be deactivated. */
+  activeOnly?: boolean;
+}> = [
+  { type: "recipe", table: "recipes", column: "name" },
+  { type: "customer", table: "customers", column: "name", activeOnly: true },
+  { type: "brand", table: "brands", column: "name" },
+  { type: "order", table: "orders", column: "order_number" },
+];
 
 /**
  * Sorted, comma-separated list of registry entity names. Built once at module
@@ -516,32 +538,11 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
       },
     }),
 
-    getFinishedGoods: tool({
-      description:
-        "Get finished goods inventory with availability. Filter by brand or selling format.",
-      inputSchema: z.object({
-        brandId: z.string().uuid().optional().describe("Filter by brand UUID"),
-        query: z.string().optional().describe("Search by brand name"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ brandId, query: searchQuery, limit }) => {
-        let q = supabase
-          .from("finished_goods_with_availability")
-          .select(
-            "id, lot_number, brand_name, selling_format_name, total_quantity, allocated_quantity, reserved_quantity, available_quantity, production_date, best_by_date"
-          )
-          .gt("available_quantity", 0)
-          .order("brand_name")
-          .limit(limit);
-
-        if (brandId) q = q.eq("brand_id", brandId);
-        if (searchQuery) q = q.ilike("brand_name", `%${escapeIlikePattern(searchQuery)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
+    // Config-driven single-table search tools (getFinishedGoods, searchOrders,
+    // getCustomers, searchBrewLogs, searchPurchaseOrders, searchSuppliers,
+    // searchPickLists, searchYeastPitches, getKegInventory) — see
+    // ./search-tools.ts for their configs and the shared factory.
+    ...createSearchTools(supabase),
 
     lookupEntity: tool({
       description:
@@ -595,109 +596,29 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           );
         }
 
-        if (should("recipe")) {
+        // The remaining four are the same query with a different table and
+        // display column, so they are driven off a table rather than written
+        // out four times. Batches stay bespoke above: they match on two
+        // columns and de-duplicate across them.
+        for (const target of LOOKUP_TARGETS) {
+          if (!should(target.type)) continue;
+          let q = dynamicFrom(supabase, target.table)
+            .select(`id, ${target.column}`)
+            .ilike(target.column, `%${escaped}%`);
+          if (target.activeOnly) q = q.eq("is_active", true);
           queries.push(
-            supabase
-              .from("recipes")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((r) => ({ type: "recipe", id: r.id, display: r.name }))
-              )
-          );
-        }
-
-        if (should("customer")) {
-          queries.push(
-            supabase
-              .from("customers")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .eq("is_active", true)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((c) => ({ type: "customer", id: c.id, display: c.name }))
-              )
-          );
-        }
-
-        if (should("brand")) {
-          queries.push(
-            supabase
-              .from("brands")
-              .select("id, name")
-              .ilike("name", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((b) => ({ type: "brand", id: b.id, display: b.name }))
-              )
-          );
-        }
-
-        if (should("order")) {
-          queries.push(
-            supabase
-              .from("orders")
-              .select("id, order_number")
-              .ilike("order_number", `%${escaped}%`)
-              .limit(5)
-              .then(({ data }) =>
-                (data || []).map((o) => ({ type: "order", id: o.id, display: o.order_number }))
-              )
+            q.limit(5).then(({ data }: { data: Record<string, string>[] | null }) =>
+              (data || []).map((row) => ({
+                type: target.type,
+                id: row.id,
+                display: row[target.column],
+              })),
+            ),
           );
         }
 
         const allResults = await Promise.all(queries);
         return allResults.flat();
-      },
-    }),
-
-    searchOrders: tool({
-      description:
-        "Search orders by status, customer name, or date range. Returns order headers with customer info.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by status: draft, confirmed, scheduled, picking, packed, fulfilled, cancelled"
-          ),
-        customerName: z
-          .string()
-          .optional()
-          .describe("Filter by customer name (partial match)"),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Order date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Order date end (YYYY-MM-DD)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, customerName, startDate, endDate, limit }) => {
-        const customerJoin = customerName
-          ? "customer:customers!inner(id, name)"
-          : "customer:customers(id, name)";
-        let q = supabase
-          .from("orders")
-          .select(
-            `id, order_number, status, order_date, requested_date, scheduled_date, notes, ${customerJoin}`
-          )
-          .order("order_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("order_date", startDate);
-        if (endDate) q = q.lte("order_date", endDate);
-        if (customerName)
-          q = q.ilike("customers.name", `%${escapeIlikePattern(customerName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
       },
     }),
 
@@ -717,305 +638,6 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           )
           .eq("id", orderId)
           .single();
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    getCustomers: tool({
-      description:
-        "Search customers by name. Returns customer info with order statistics.",
-      inputSchema: z.object({
-        query: z.string().optional().describe("Search by customer name"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ query: searchQuery, limit }) => {
-        let q = supabase
-          .from("customers_with_order_summary")
-          .select(
-            "id, name, customer_type, contact_name, email, phone, total_orders, total_revenue, pending_orders, last_order_date"
-          )
-          .eq("is_active", true)
-          .order("name")
-          .limit(limit);
-
-        if (searchQuery) q = q.ilike("name", `%${escapeIlikePattern(searchQuery)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchBrewLogs: tool({
-      description:
-        "Search brew logs (hot-side brew day records) by status, date range, or brew number. Returns brew log headers with recipe info.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe("Filter by status: draft, in_progress, completed, cancelled"),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Brew date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Brew date end (YYYY-MM-DD)"),
-        brewNumber: z
-          .string()
-          .optional()
-          .describe("Filter by brew number (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, brewNumber, limit }) => {
-        let q = supabase
-          .from("brew_logs")
-          .select(
-            "id, brew_number, brew_date, status, notes, recipe:recipes(id, name)"
-          )
-          .order("brew_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (brewNumber)
-          q = q.ilike("brew_number", `%${escapeIlikePattern(brewNumber)}%`);
-        if (startDate) q = q.gte("brew_date", startDate);
-        if (endDate) q = q.lte("brew_date", endDate);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchPurchaseOrders: tool({
-      description:
-        "Search purchase orders by status, date range, or supplier name. Returns PO headers with supplier info.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by status: draft, submitted, confirmed, partial, fulfilled, cancelled"
-          ),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Order date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Order date end (YYYY-MM-DD)"),
-        supplierName: z
-          .string()
-          .optional()
-          .describe("Filter by supplier name (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, supplierName, limit }) => {
-        const supplierJoin = supplierName
-          ? "supplier:suppliers!inner(id, name)"
-          : "supplier:suppliers(id, name)";
-        let q = supabase
-          .from("purchase_orders")
-          .select(
-            `id, po_number, status, order_date, expected_date, shipping_cost, tax, notes, ${supplierJoin}`
-          )
-          .order("order_date", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("order_date", startDate);
-        if (endDate) q = q.lte("order_date", endDate);
-        if (supplierName)
-          q = q.ilike("suppliers.name", `%${escapeIlikePattern(supplierName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchSuppliers: tool({
-      description:
-        "Search suppliers by name. Returns supplier contact info, payment terms, and lead times.",
-      inputSchema: z.object({
-        query: z.string().optional().describe("Search by supplier name"),
-        isActive: z
-          .boolean()
-          .optional()
-          .default(true)
-          .describe("Filter by active status (default true)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ query: searchQuery, isActive, limit }) => {
-        let q = supabase
-          .from("suppliers")
-          .select(
-            "id, name, contact_name, contact_email, contact_phone, payment_terms, default_lead_time_days, is_active"
-          )
-          .order("name")
-          .limit(limit);
-
-        if (isActive !== undefined) q = q.eq("is_active", isActive);
-        if (searchQuery) q = q.ilike("name", `%${escapeIlikePattern(searchQuery)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchPickLists: tool({
-      description:
-        "Search pick lists by status, date range, or customer name. Returns pick list details with order info and progress.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe("Filter by status: pending, in_progress, completed, cancelled"),
-        startDate: z
-          .string()
-          .optional()
-          .describe("Generated-at date start (YYYY-MM-DD)"),
-        endDate: z
-          .string()
-          .optional()
-          .describe("Generated-at date end (YYYY-MM-DD)"),
-        customerName: z
-          .string()
-          .optional()
-          .describe("Filter by customer name (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, startDate, endDate, customerName, limit }) => {
-        let q = supabase
-          .from("pick_list_details")
-          .select(
-            "id, status, generated_at, order_id, order_number, customer_name, total_items, items_picked, assigned_to_name"
-          )
-          .order("generated_at", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (startDate) q = q.gte("generated_at", startDate);
-        if (endDate) q = q.lte("generated_at", endDate);
-        if (customerName)
-          q = q.ilike("customer_name", `%${escapeIlikePattern(customerName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return data;
-      },
-    }),
-
-    searchYeastPitches: tool({
-      description:
-        "Search yeast pitches with viability and strain details. Filter by status or strain name. Each row includes the strain's recommended_max_generations and an over_recommended_generation flag for spotting tired yeast past its recommended repitch limit.",
-      inputSchema: z.object({
-        status: z
-          .string()
-          .optional()
-          .describe("Filter by status: available, pitched, harvested, expired, discarded"),
-        strainName: z
-          .string()
-          .optional()
-          .describe("Filter by yeast strain name (partial match)"),
-        limit: z.number().optional().default(20).describe("Max results"),
-      }),
-      execute: async ({ status, strainName, limit }) => {
-        // yeast_pitches_with_details was replaced by yeast_pitches_with_remaining
-        // (migration 00158); that view has no batch_code, so vessel_name is
-        // returned instead.
-        let q = dynamicFrom(supabase, "yeast_pitches_with_remaining")
-          .select(
-            "id, status, source_type, generation, initial_viability, estimated_viability, viability_status, days_old, strain_id, strain_name, strain_code, strain_manufacturer, vessel_name, location_name"
-          )
-          .order("created_at", { ascending: false })
-          .limit(limit);
-
-        if (status) q = q.eq("status", status);
-        if (strainName)
-          q = q.ilike("strain_name", `%${escapeIlikePattern(strainName)}%`);
-
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-
-        // The view predates yeasts.recommended_max_generations (migration
-        // 00176) and doesn't expose it, so fetch it per strain and annotate
-        // each pitch with an over_recommended_generation flag.
-        const rows = (data ?? []) as Array<
-          Record<string, unknown> & {
-            strain_id: string | null;
-            generation: number | null;
-          }
-        >;
-        const strainIds = [
-          ...new Set(rows.map((r) => r.strain_id).filter((id) => id != null)),
-        ];
-        const maxGenByStrain = new Map<string, number | null>();
-        if (strainIds.length > 0) {
-          const { data: strains, error: strainsError } = await supabase
-            .from("yeasts")
-            .select("id, recommended_max_generations")
-            .in("id", strainIds);
-          if (strainsError) throw new Error(strainsError.message);
-          for (const s of strains ?? []) {
-            maxGenByStrain.set(s.id, s.recommended_max_generations);
-          }
-        }
-
-        return rows.map((r) => {
-          const maxGen = r.strain_id
-            ? (maxGenByStrain.get(r.strain_id) ?? null)
-            : null;
-          return {
-            ...r,
-            recommended_max_generations: maxGen,
-            over_recommended_generation:
-              maxGen != null && r.generation != null && r.generation >= maxGen,
-          };
-        });
-      },
-    }),
-
-    getKegInventory: tool({
-      description:
-        "Get keg inventory with type, owner, location, and contents. Filter by state (empty/filled/shipped), keg type, or location.",
-      inputSchema: z.object({
-        state: z
-          .string()
-          .optional()
-          .describe(
-            "Filter by keg state: empty, filled, shipped, returned, lost, retired"
-          ),
-        kegTypeName: z
-          .string()
-          .optional()
-          .describe("Filter by keg type name (partial match)"),
-        locationName: z
-          .string()
-          .optional()
-          .describe("Filter by location name (partial match)"),
-        limit: z.number().optional().default(50).describe("Max results"),
-      }),
-      execute: async ({ state, kegTypeName, locationName, limit }) => {
-        let q = dynamicFrom(supabase, "keg_inventory_with_details")
-          .select(
-            "id, keg_type_name, volume_bbl, keg_owner_name, state, location_name, quantity"
-          )
-          .order("keg_type_name")
-          .limit(limit);
-
-        if (state) q = q.eq("state", state);
-        if (kegTypeName)
-          q = q.ilike("keg_type_name", `%${escapeIlikePattern(kegTypeName)}%`);
-        if (locationName)
-          q = q.ilike("location_name", `%${escapeIlikePattern(locationName)}%`);
-
-        const { data, error } = await q;
         if (error) throw new Error(error.message);
         return data;
       },
