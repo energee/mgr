@@ -77,12 +77,17 @@ confirm, so the portal cannot set prices. `orders_customer_lock` still carries
 `WITH CHECK (false)`, so a customer cannot modify an order after creating it.
 `orders.order_number` gained a DEFAULT of `generate_next_order_number()`, which
 is SECURITY DEFINER so the shared ORD- series advances correctly for a caller
-whose RLS hides other customers' orders.
+whose RLS hides other customers' orders. The customer INSERT policy also
+requires the completed row to match that next shared-series value (00291), so
+a portal caller cannot supply a large suffix that overflows or otherwise
+poisons later number generation. Staff retain explicit-number entry through
+their separate write policy.
 
 **Migration:** `00095_customer_portal_many_to_many.sql` (original),
 `00252_restore_customer_portal_users.sql` (hosted-database restoration and
 current RLS policies), `00290_portal_customer_order_insert.sql` (customer
-order placement).
+order placement), `00291_portal_order_number_guard.sql` (shared order-number
+sequence guard).
 
 ---
 

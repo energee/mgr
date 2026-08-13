@@ -154,6 +154,36 @@ describe("orders_customer_insert — customer scoping (00290, constraint 1)", ()
       ),
     );
   });
+
+  it("denies a customer-supplied order number outside the next shared-series value", async () => {
+    // A customer-chosen trailing integer becomes the MAX() input for every
+    // later generated order number. INT_MAX would make the next staff or
+    // customer insert overflow instead of merely choosing a cosmetic label.
+    await expectRlsDenied((db) =>
+      db.query(
+        `INSERT INTO orders (customer_id, order_number, status, order_date)
+         VALUES (
+           $1,
+           'ORD-' || to_char(CURRENT_DATE, 'YYYY') || '-2147483647',
+           'draft',
+           CURRENT_DATE
+         )`,
+        [OWN_CUSTOMER_ID],
+      ),
+    );
+  });
+
+  it("keeps explicit order numbers available to staff writers", async () => {
+    await withRoleClient("sales", async (db) => {
+      const { rows } = await db.query<{ order_number: string }>(
+        `INSERT INTO orders (customer_id, order_number, status, order_date)
+         VALUES ($1, 'STAFF-C1-EXPLICIT-291', 'draft', CURRENT_DATE)
+         RETURNING order_number`,
+        [OWN_CUSTOMER_ID],
+      );
+      expect(rows[0].order_number).toBe("STAFF-C1-EXPLICIT-291");
+    });
+  });
 });
 
 describe("orders_customer_insert — staff-confirm state (00290, constraint 2)", () => {
