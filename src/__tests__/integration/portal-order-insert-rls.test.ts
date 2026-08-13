@@ -47,6 +47,9 @@ const RLS_VIOLATION = "42501";
 
 const adminPool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+/** Set when this suite had to seed a shipping default; removed in afterAll. */
+let seededShippingDefaultId: string | null = null;
+
 beforeAll(async () => {
   await adminPool.query(
     `INSERT INTO customers (id, name, customer_type, email, is_active)
@@ -69,6 +72,18 @@ beforeAll(async () => {
      ON CONFLICT (customer_id, user_id) DO UPDATE SET revoked_at = NULL`,
     [OWN_CUSTOMER_ID, PORTAL_USER_ID],
   );
+  // The order-materials trigger short-circuits when no shipping default is
+  // configured, so an empty table makes every order_items test vacuous with
+  // respect to that path. Seed one so the trigger body actually runs, and
+  // remember the id so afterAll removes only what this suite added.
+  const seeded = await adminPool.query<{ id: string }>(
+    `INSERT INTO brewery_shipping_defaults (material_role, inventory_item_id)
+     SELECT 'pallet', id FROM inventory_items
+     WHERE NOT EXISTS (SELECT 1 FROM brewery_shipping_defaults)
+     LIMIT 1
+     RETURNING id`,
+  );
+  seededShippingDefaultId = seeded.rows[0]?.id ?? null;
 });
 
 afterAll(async () => {
@@ -81,12 +96,23 @@ afterAll(async () => {
      )`,
     customerIds,
   );
+  await adminPool.query(
+    `DELETE FROM order_materials WHERE order_id IN (
+       SELECT id FROM orders WHERE customer_id = ANY($1::uuid[])
+     )`,
+    customerIds,
+  );
   await adminPool.query("DELETE FROM orders WHERE customer_id = ANY($1::uuid[])", customerIds);
   await adminPool.query(
     "DELETE FROM customer_portal_users WHERE customer_id = ANY($1::uuid[])",
     customerIds,
   );
   await adminPool.query("DELETE FROM customers WHERE id = ANY($1::uuid[])", customerIds);
+  if (seededShippingDefaultId) {
+    await adminPool.query("DELETE FROM brewery_shipping_defaults WHERE id = $1", [
+      seededShippingDefaultId,
+    ]);
+  }
   await adminPool.end();
   await teardownPool();
 });
@@ -175,10 +201,89 @@ describe("orders_customer_insert — staff-owned columns (00290, constraint 3)",
       ),
     );
   });
+
+  it("denies attaching the order to a staff-scheduled delivery", async () => {
+    // customer_orders_select hands a customer the delivery_id of their own
+    // past orders, so this value is harvestable rather than guessed.
+    const { rows } = await adminPool.query<{ id: string }>(
+      "INSERT INTO deliveries (delivery_number, status) VALUES ('E2E-C1-290', 'planned') RETURNING id",
+    );
+    const deliveryId = rows[0].id;
+    try {
+      await expectRlsDenied((db) =>
+        db.query(
+          `INSERT INTO orders (customer_id, status, order_date, delivery_id)
+           VALUES ($1, 'draft', CURRENT_DATE, $2)`,
+          [OWN_CUSTOMER_ID, deliveryId],
+        ),
+      );
+    } finally {
+      await adminPool.query("DELETE FROM deliveries WHERE id = $1", [deliveryId]);
+    }
+  });
+
+  it("denies seeding the optimistic-lock version above 1", async () => {
+    // increment_version() (00141) is an unguarded OLD.version + 1, so a row
+    // inserted at INT_MAX makes every later staff UPDATE raise 22003.
+    await expectRlsDenied((db) =>
+      db.query(
+        `INSERT INTO orders (customer_id, status, order_date, version)
+         VALUES ($1, 'draft', CURRENT_DATE, 2147483647)`,
+        [OWN_CUSTOMER_ID],
+      ),
+    );
+  });
+});
+
+describe("revoked portal links cannot insert (00290 + 00276)", () => {
+  // The policies' headline property is that they use the revocation-aware
+  // subquery. Without this block, deleting `AND revoked_at IS NULL` from
+  // either policy leaves the whole suite green.
+  async function withRevokedLink(run: () => Promise<void>): Promise<void> {
+    await adminPool.query(
+      "UPDATE customer_portal_users SET revoked_at = now() WHERE customer_id = $1 AND user_id = $2",
+      [OWN_CUSTOMER_ID, PORTAL_USER_ID],
+    );
+    try {
+      await run();
+    } finally {
+      await adminPool.query(
+        "UPDATE customer_portal_users SET revoked_at = NULL WHERE customer_id = $1 AND user_id = $2",
+        [OWN_CUSTOMER_ID, PORTAL_USER_ID],
+      );
+    }
+  }
+
+  it("denies a revoked user creating an order for their former customer", async () => {
+    await withRevokedLink(async () => {
+      await expectRlsDenied((db) =>
+        db.query(
+          `INSERT INTO orders (customer_id, status, order_date)
+           VALUES ($1, 'draft', CURRENT_DATE)`,
+          [OWN_CUSTOMER_ID],
+        ),
+      );
+    });
+  });
+
+  it("denies a revoked user adding items to a pre-existing draft order", async () => {
+    await withRevokedLink(async () => {
+      await expectRlsDenied((db) =>
+        db.query("INSERT INTO order_items (order_id, quantity) VALUES ($1, 2)", [
+          OWN_DRAFT_ORDER_ID,
+        ]),
+      );
+    });
+  });
 });
 
 describe("order_items_customer_insert — pricing stays server-side (00290, constraint 3)", () => {
   it("allows an unpriced line on the caller's own draft order", async () => {
+    // beforeAll seeds brewery_shipping_defaults deliberately. Without a row
+    // there, recalculate_order_materials() returns before touching
+    // order_materials and this test passes no matter who may write that
+    // table — which is exactly how the trigger's 42501 stayed invisible on an
+    // empty local database until review caught it.
     await withRoleClient("active_customer", async (db) => {
       const { rows } = await db.query<{ unit_price: string | null }>(
         `INSERT INTO order_items (order_id, quantity)
@@ -188,6 +293,21 @@ describe("order_items_customer_insert — pricing stays server-side (00290, cons
       );
       expect(rows[0].unit_price).toBeNull();
     });
+  });
+
+  it("runs the order-materials recalculation with definer rights", async () => {
+    // The behavioral half of this guard is the positive control above: with a
+    // brewery_shipping_defaults row present, recalculate_order_materials()
+    // reaches its order_materials upsert, which requires orders:write. Under
+    // the original invoker rights that raised 42501 and aborted the customer's
+    // insert outright. Assert the security mode directly too, because the
+    // upsert is conditional on a non-zero pallet count and a future fixture
+    // change could quietly stop exercising it.
+    const { rows } = await adminPool.query<{ prosecdef: boolean }>(
+      "SELECT prosecdef FROM pg_proc WHERE proname = 'recalculate_order_materials_after_item_write'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].prosecdef).toBe(true);
   });
 
   it("denies a customer-supplied unit_price", async () => {

@@ -72,8 +72,17 @@ $$;
 COMMENT ON FUNCTION generate_next_order_number IS
   'Generates the next sales order number in ORD-YYYY-NNN format, safe under concurrency. SECURITY DEFINER so portal customers, whose RLS hides other customers orders, still advance the shared series (00290).';
 
+-- The function is granted to PUBLIC and to `anon` by default, and PostgREST
+-- exposes every public function as an RPC. Under invoker rights that was
+-- harmless — an anonymous caller's RLS returned no rows, so it always answered
+-- ORD-YYYY-001. Under definer rights it would answer with the brewery's true
+-- year-to-date order count, giving anyone holding the (browser-shipped) anon
+-- key an unauthenticated order-volume feed. Only inserting roles need it.
+REVOKE EXECUTE ON FUNCTION public.generate_next_order_number() FROM PUBLIC, anon;
+
 -- With the DEFAULT in place the portal client omits order_number entirely.
 -- Staff forms keep prefilling it explicitly, so their behavior is unchanged.
+-- The DEFAULT is evaluated as the inserting role, which retains EXECUTE.
 ALTER TABLE public.orders
   ALTER COLUMN order_number SET DEFAULT generate_next_order_number();
 
@@ -91,10 +100,20 @@ CREATE POLICY orders_customer_insert ON public.orders
     )
     -- Staff-confirm state only. Never confirmed/scheduled/fulfillable.
     AND status = 'draft'
-    -- Fulfillment-side columns are staff-owned.
+    -- Fulfillment-side columns are staff-owned. delivery_id is included
+    -- deliberately: customer_orders_select hands a customer the delivery_id of
+    -- their own past orders, so without this an inserted draft could attach
+    -- itself to a staff-scheduled delivery run and surface in
+    -- deliveries_with_summary / pick_list_details before staff confirm it.
     AND scheduled_date IS NULL
     AND fulfilled_date IS NULL
+    AND delivery_id IS NULL
     AND COALESCE(is_export, FALSE) = FALSE
+    -- version seeds the optimistic lock (00141). increment_version() is an
+    -- unguarded NEW.version := OLD.version + 1, so a row inserted at INT_MAX
+    -- makes every later staff UPDATE — confirm, cancel, schedule — raise
+    -- 22003 and strands the order beyond repair short of a DELETE.
+    AND version = 1
   );
 
 COMMENT ON POLICY orders_customer_insert ON public.orders IS
@@ -121,3 +140,68 @@ CREATE POLICY order_items_customer_insert ON public.order_items
 
 COMMENT ON POLICY order_items_customer_insert ON public.order_items IS
   'Portal customers may add line items to their own draft orders. unit_price must be NULL — staff price the order at confirm time (00290).';
+
+-- =============================================================================
+-- 3. ORDER-MATERIALS RECALCULATION MUST SURVIVE AN UNTRUSTED INSERTER
+-- =============================================================================
+
+-- trg_order_items_recalculate_materials fires on every order_items write and
+-- runs recalculate_order_materials(), which upserts into order_materials and
+-- reads brewery_shipping_defaults, customer_pallet_configs and
+-- customer_shipping_materials. Until now the only role that could insert an
+-- order_items row already held orders:write, so invoker rights were fine.
+-- Opening the table to portal customers breaks that assumption two ways:
+--
+--   1. order_materials_write requires orders:write, so the upsert raises 42501
+--      and aborts the customer's whole line-item insert. This is not
+--      hypothetical — it reproduces the moment brewery_shipping_defaults has
+--      any row, which is why it was invisible on an empty local database.
+--   2. customer_pallet_configs and customer_shipping_materials require
+--      customers:read on SELECT. A customer sees zero rows, so the LEFT JOIN
+--      falls back to the generic pallet quantity and customer-specific
+--      overrides are silently dropped — portal- and staff-created orders would
+--      compute different materials from identical input. A silent divergence
+--      is worse than the error above.
+--
+-- Promoting the trigger wrapper to definer rights fixes both: the nested
+-- SECURITY INVOKER call to recalculate_order_materials() then also runs as the
+-- owner. Trigger functions are not directly callable, so this adds no RPC
+-- surface. Body is unchanged from 00159/00172 apart from the security clause.
+-- security-definer: justified the order-materials estimate must be computed identically no matter who wrote the line item; a portal customer holds neither orders:write for the order_materials upsert nor customers:read for the pallet/shipping overrides, and the trigger is reachable only through a write that RLS has already authorised.
+CREATE OR REPLACE FUNCTION recalculate_order_materials_after_item_write()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_order_id UUID;
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND OLD.order_id IS NOT DISTINCT FROM NEW.order_id
+     AND OLD.quantity IS NOT DISTINCT FROM NEW.quantity
+     AND OLD.selling_format_id IS NOT DISTINCT FROM NEW.selling_format_id THEN
+    RETURN NEW;
+  END IF;
+
+  FOR v_order_id IN
+    SELECT DISTINCT order_id
+    FROM unnest(
+      CASE
+        WHEN TG_OP = 'INSERT' THEN ARRAY[NEW.order_id]
+        WHEN TG_OP = 'DELETE' THEN ARRAY[OLD.order_id]
+        ELSE ARRAY[OLD.order_id, NEW.order_id]
+      END
+    ) AS affected(order_id)
+    WHERE order_id IS NOT NULL
+    ORDER BY order_id
+  LOOP
+    -- Cascading order deletion removes child rows after the parent is gone.
+    IF EXISTS (SELECT 1 FROM orders WHERE id = v_order_id) THEN
+      PERFORM recalculate_order_materials(v_order_id);
+    END IF;
+  END LOOP;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
