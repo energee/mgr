@@ -45,8 +45,10 @@ export async function syncCustomer(customerId: string): Promise<{ qboId: string;
   }
 
   const existing = await getMapping("customer", customerId);
-  const action = existing ? "update" : "create";
-  const logId = await createSyncLog("customer", customerId, action);
+  // Placeholder based only on the local mapping — the name-match lookup below
+  // can still resolve to an update even when this says "create". Corrected
+  // before the sync log is closed out and before it is returned to the caller.
+  const logId = await createSyncLog("customer", customerId, existing ? "update" : "create");
 
   try {
     const qboCustomer: QBOCustomer = {
@@ -60,6 +62,7 @@ export async function syncCustomer(customerId: string): Promise<{ qboId: string;
 
     // Resolve the QBO ID: existing mapping, name match, or create new
     const existingQboId = existing?.qbo_entity_id ?? await findExistingQBOCustomer(customer.name);
+    const action: "create" | "update" = existingQboId ? "update" : "create";
 
     const result = existingQboId
       ? await sparseUpdateCustomer(existingQboId, qboCustomer)
@@ -67,7 +70,7 @@ export async function syncCustomer(customerId: string): Promise<{ qboId: string;
 
     const qboId = result.Customer.Id!;
     await upsertMapping("customer", customerId, "Customer", qboId);
-    await updateSyncLog(logId, "success", result);
+    await updateSyncLog(logId, "success", result, undefined, action);
     return { qboId, action };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

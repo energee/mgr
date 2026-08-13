@@ -156,7 +156,15 @@ export async function updateSyncLog(
   logId: string,
   status: "success" | "error",
   responsePayload?: unknown,
-  errorMessage?: string
+  errorMessage?: string,
+  /**
+   * Corrects the action recorded at `createSyncLog` time. Needed by syncs
+   * (customer/supplier) whose real create-vs-update outcome is only known
+   * after a name-match lookup that happens later than the initial log write —
+   * without this the audit trail can say "create" for a sync that actually
+   * updated an existing QBO record.
+   */
+  action?: SyncAction
 ): Promise<void> {
   const admin = await createAdminClient();
   const { error } = await admin
@@ -166,6 +174,7 @@ export async function updateSyncLog(
       response_payload: (responsePayload ?? null) as Json,
       error_message: errorMessage ?? null,
       completed_at: new Date().toISOString(),
+      ...(action ? { action } : {}),
     })
     .eq("id", logId);
   if (error) {
