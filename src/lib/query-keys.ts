@@ -647,6 +647,14 @@ export const portalKeys = {
   all: () => ["portal"] as const,
   orders: (customerIds: string[]) => ["portal", "orders", ...customerIds] as const,
   cutoff: (orderId: string) => ["portal", "cutoff", orderId] as const,
+  /**
+   * Indicative tier prices shown while a customer builds an order, keyed by the
+   * customer whose tier resolves them. Display only — the portal never persists
+   * a price (`order_items.unit_price` must be NULL under the 00290 policy);
+   * staff price the order at confirm time.
+   */
+  indicativePrices: (customerId: string) =>
+    ["portal", "indicative-prices", customerId] as const,
 };
 
 /** Staff-side management of customer-to-portal-user access links. */
