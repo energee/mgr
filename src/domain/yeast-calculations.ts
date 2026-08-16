@@ -163,8 +163,7 @@ export function calculatePitchingRate(
       // Rough estimate: 100mL starter per 10B cells needed
       // 10B = 10,000,000 thousand
       const shortageBillion = shortageThousand / 1_000_000;
-      starterVolumeMl =
-        Math.ceil((shortageBillion * 10) / 100) * 100; // Round to nearest 100mL
+      starterVolumeMl = Math.ceil(shortageBillion / 10) * 100; // Round to nearest 100mL
     }
   } else if (packagesNeeded > 2) {
     // Without knowing available cells, recommend starter if >2 packs needed
