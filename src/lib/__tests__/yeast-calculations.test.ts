@@ -140,6 +140,15 @@ describe("calculatePitchingRate", () => {
     const result = calculatePitchingRate(0.5, 10, "ale", 5_000_000_000_000);
     expect(result.starterRecommended).toBe(false);
   });
+
+  it("computes starterVolumeMl as ~10mL per billion-cell shortage, rounded up to 100mL", () => {
+    // 1 BBL ale @ 1P, 0 cells available: cellsNeededThousand = 88,011,000,
+    // so shortageThousand is the same (88,011,000 > 50,000,000 threshold).
+    // shortageBillion = 88.011 -> raw volume 880.11mL -> rounds up to 900mL.
+    const result = calculatePitchingRate(1, 1, "ale", 0);
+    expect(result.starterRecommended).toBe(true);
+    expect(result.starterVolumeMl).toBe(900);
+  });
 });
 
 // =============================================================================
