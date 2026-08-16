@@ -71,6 +71,57 @@ the 80-turn cap from #598 was hitting the ceiling simply stopped recurring.
 Re-open the investigation the next time a scheduled run hits
 `error_max_turns`; until then there is nothing to revise.)
 
+(Checked again 2026-08-16, and the answer changed: the pattern has not
+receded and permission-denial counts are climbing, not falling. Four
+consecutive scheduled runs, 08-13 through 08-16 (run IDs 31681652529,
+31783185641, 31872144951, 31934072087): 08-13 hit `error_max_turns` again
+(81 turns, 9 denials); 08-14 failed in a third, previously-unseen shape — the
+very first turn errored out (1 turn, `is_error: true`, $0 cost, 364ms) with
+no `permission_denials` field at all, consistent with the same-day Sentry
+Error Harness `rate_limit` failures noted below rather than a permission
+denial; 08-15 finished cleanly at the API level (`is_error: false`, 49 turns)
+but with 6 permission denials and ended with **neither a PR nor
+`quiet-run.md`**, failing `require-durable-outcome` exactly as gap #2 above
+predicts; 08-16 succeeded — opened a PR — but with **27 permission denials**,
+the highest count recorded since this pattern was first tracked on 07-26
+(previous high: 20 on 07-26, then 18 on 08-08). The 08-12 falsification bar
+("two more consecutive scheduled runs land a PR or `quiet-run.md` with zero
+permission denials") has not been met, and denial counts on the runs that did
+finish (6, then 27) moved the wrong direction. The diagnostic step named on
+07-26 and repeated in the 08-12 distillation — a one-off run with
+`show_full_output: true`, or an equivalent way to surface the denied tool
+name from `claude-code-action`'s redacted job log — still has not happened,
+three weeks on. Separately, gap #2's proposed fix — giving `bug-patrol.yml`'s
+prompt the same explicit "whatever the outcome, end by writing
+`quiet-run.md`" closing guardrail `sentry-harness.yml`'s prompt already
+carries — also still has not landed, and 08-15 is a second observed instance
+of exactly the failure that guardrail would catch. Both are workflow-file
+changes outside this loop's own edit scope; this note exists so the next
+session that opens `bug-patrol.yml` does not have to re-derive that both are
+still open, and to retire the "recheck permission-denial trend" framing —
+without the diagnostic above, the count alone no longer tells you anything:
+it has now moved in both directions between consecutive runs.)
+
+(New this week, and possibly the explanation for part of the above: Anthropic
+API `rate_limit` errors hit two different scheduled agentic workflows in the
+same window. Sentry Error Harness's "Fix error" jobs failed with
+`"error": "rate_limit"` at the first turn on two consecutive scheduled runs —
+08-13 (run 31728002914, job 94541175983, MGR-17) and 08-14 (run 31825650874,
+jobs 94849093727/94849093761/94849094338 — all 3 parallel fix-error jobs that
+ran failed the same way within the same ~90-second window). Bug Patrol's
+08-14 run (job 94713191689, cited above) failed with the identical shape — 1
+turn, `is_error: true`, $0 cost, 364ms — though its `error` field is not
+visible in the captured log (`claude-code-action` hides full output), so it
+is consistent with, not confirmed as, the same cause. No run since 08-14 has
+repeated this shape. One data point short of a pattern: logged here so a
+second occurrence is recognized immediately instead of re-diagnosed from
+scratch. If it recurs on 2+ more scheduled runs across either workflow, check
+whether an account-level concurrent-request or per-minute token limit is
+being exceeded when multiple scheduled Claude workflows overlap, or when
+sentry-harness's 3 parallel fix-error jobs launch simultaneously — this is a
+capacity problem, not a prompt or `--max-turns` problem, and raising the turn
+cap would not help it.)
+
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
 the week's merges actually moved codebase health — its trend log is the
@@ -124,6 +175,30 @@ fix is "clear the queue," not "revise the prompt." Falsifies if next week's
 scoreboard shows merges resuming without a queue-clearing session; stays a
 live risk to scoreboard-reading — recheck it every week — as long as 5+
 mergeable automated PRs stay open past 7 days.
+
+**A loop that opens zero PRs across the full 4-week window has a third
+possible cause, distinct from the two above: conservative-by-design triage,
+not a broken loop.** `loop-scoreboard.md` currently shows sentry-fix at 20
+scheduled runs / 0 PRs opened over the last 4 weeks — literally "all quiet,"
+the scoreboard's own retire/revise trigger. Checked 2026-08-16: the
+Sentry-sourced issue actually filed in that window (#775, opened 08-12) is
+explicitly classification-(B) or worse in the harness's own A-D scheme — it
+needs a human schema/business-rule decision, not a null-check or query typo
+— and the pattern before the scoreboard's window (#636-#642, #492-#526, all
+closed as dev-env credential noise, removed routes, or transient HMR
+artifacts) shows this loop routes most of what it finds into `needs-human`
+issues or closed-as-resolved, not PRs, by design: a high bar for
+classification-A auto-fix is the intended behavior, not a malfunction. Before
+naming sentry-fix a retire/revise candidate on the 0/20 count alone, check
+what its `score-errors` job actually found each run — the scored-but-not-
+auto-fixed issues, not just the PR count — via `gh issue list --search
+"sentry" --state all`. A 0/20 window is exactly what "correctly declining to
+force-fix classification-B+ errors" looks like from the scoreboard alone, and
+is indistinguishable from "broken" without reading what it filed instead.
+Falsifies (as a concern, not as evidence the loop works) if a future week
+shows a classification-A-eligible Sentry error scored and *not* turned into
+either a PR or a `needs-human` issue — that would mean real auto-fixable work
+is being silently dropped rather than conservatively deferred.)
 
 ## Worker epochs
 
