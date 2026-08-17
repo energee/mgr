@@ -16,14 +16,18 @@ const fixture = vi.hoisted(() => ({
   supabase: null as any,
 }));
 
+// Phase 4B moved this route from a single `withPermission("batches:write")`
+// wrapper to `withAuth` + a per-action `requirePermission`, so each write is
+// gated on its own target instead of all four inheriting the batch permission.
+// Per-action mapping is asserted in write-route-4b.test.ts.
 vi.mock("@/lib/api/auth", () => ({
-  withPermission:
-    (_permission: string, handler: (...args: never[]) => unknown) =>
-    async (request: NextRequest) =>
+  withAuth:
+    (handler: (...args: never[]) => unknown) => async (request: NextRequest) =>
       handler(request as never, {
         user: { id: "brewer-1" },
         supabase: fixture.supabase,
       } as never),
+  requirePermission: async () => {},
 }));
 
 import { POST } from "../write/route";

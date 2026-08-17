@@ -54,7 +54,11 @@ import {
 } from "@/components/ai-elements/tool";
 import { cn } from "@/lib/utils";
 import { useChatContext } from "@/contexts/chat-context";
-import { batchKeys } from "@/lib/query-keys";
+import {
+  batchKeys,
+  batchRecordInvalidationKeys,
+  entityKeys,
+} from "@/lib/query-keys";
 import type { ConfirmWriteIntent } from "@/lib/schemas/chat-write";
 
 function isNavigationIntent(result: unknown): result is NavigationIntent {
@@ -75,7 +79,48 @@ function isConfirmWriteIntent(result: unknown): result is ConfirmWriteIntent {
   );
 }
 
-type ConfirmWriteStatus = "idle" | "saving" | "saved" | "dismissed";
+/**
+ * `unknown` is the state after a request that never produced an HTTP response.
+ * The write may or may not have committed, so Confirm is NOT re-offered — see
+ * `confirm` below.
+ */
+type ConfirmWriteStatus =
+  | "idle"
+  | "saving"
+  | "saved"
+  | "unknown"
+  | "dismissed";
+
+/**
+ * Caches a confirmed write invalidates, narrowed on the `writeAction`
+ * discriminant. Each union member carries its own params — there is no shared
+ * `batchId` to reach for, which is the schema's trust boundary doing its job.
+ * A new write action fails to compile here until its caches are declared.
+ */
+function invalidationKeysFor(
+  intent: ConfirmWriteIntent,
+): readonly (readonly unknown[])[] {
+  switch (intent.writeAction) {
+    case "add_batch_reading":
+      return [batchKeys.readings(intent.params.batchId)];
+    case "transition_batch":
+      // Status touches the list, the detail record, and the view behind it.
+      return [
+        batchKeys.all(),
+        ...batchRecordInvalidationKeys(intent.params.batchId),
+      ];
+    case "create_batch":
+      // batchKeys.all() alone does not refresh the batches list: that list is
+      // an EntityList over the view, so it must be invalidated too — the same
+      // pairing every other batch-creating path uses (batches-client.tsx,
+      // start-brew-day-dialog.tsx).
+      return [batchKeys.all(), entityKeys.all("batches_with_brew_info")];
+    case "create_packaging_session":
+      // The packaging page is an EntityList over the summary view; nothing
+      // reads packagingKeys.schedule(), so invalidating it refreshed nothing.
+      return [entityKeys.all("packaging_sessions_with_summary")];
+  }
+}
 
 /**
  * Confirmation gate for AI-proposed writes (Phase 4C). The tool only
@@ -83,10 +128,16 @@ type ConfirmWriteStatus = "idle" | "saving" | "saved" | "dismissed";
  * which POSTs the pending payload to /api/chat/write (executed under the
  * user's session, so RLS is the authority).
  *
- * ponytail: status lives in component state, so a remount (panel closed and
- * reopened mid-conversation) re-offers Confirm on an already-saved card;
- * readings are append-only, worst case is a duplicate reading the user can
- * delete. Persist confirmed toolCallIds in the chat context if that bites.
+ * Known gap: status lives in component state, so a remount (panel closed and
+ * reopened mid-conversation) re-offers Confirm on an already-saved card. That
+ * used to be justified with "readings are append-only, worst case is a
+ * duplicate reading the user can delete" — true when a `batch_logs` row was
+ * the only write, and false since Phase 4B, because a replayed
+ * `create_batch` or `create_packaging_session` produces a real duplicate
+ * record. The in-flight case is handled (see `confirm`'s `unknown` state);
+ * the remount case is not, and the durable fix is the same one either way:
+ * thread the AI SDK `toolCallId` through the payload and dedupe it
+ * server-side, so a replay is a no-op rather than a second row.
  */
 function ConfirmWriteCard({ intent }: { intent: ConfirmWriteIntent }) {
   const [status, setStatus] = useState<ConfirmWriteStatus>("idle");
@@ -96,8 +147,10 @@ function ConfirmWriteCard({ intent }: { intent: ConfirmWriteIntent }) {
   const confirm = async () => {
     setStatus("saving");
     setError(null);
+
+    let res: Response;
     try {
-      const res = await fetch("/api/chat/write", {
+      res = await fetch("/api/chat/write", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -105,17 +158,38 @@ function ConfirmWriteCard({ intent }: { intent: ConfirmWriteIntent }) {
           params: intent.params,
         }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error?.message ?? `Request failed (${res.status})`);
-      }
-      setStatus("saved");
-      queryClient.invalidateQueries({
-        queryKey: batchKeys.readings(intent.params.batchId),
-      });
-    } catch (e) {
+    } catch {
+      // No HTTP response: the request may never have reached the server, or it
+      // committed and the reply was lost (backgrounded tab, dropped Wi-Fi,
+      // edge timeout). These are indistinguishable from here, and re-arming
+      // Confirm on the second case creates a duplicate — a second production
+      // batch or packaging session, which nothing downstream would reconcile.
+      // So this is terminal for the card: the user re-checks, then asks again.
+      setStatus("unknown");
+      setError(
+        "We couldn't tell whether this saved. Check before trying again — asking twice could create it twice.",
+      );
+      return;
+    }
+
+    if (!res.ok) {
+      // A real HTTP status means the server decided: nothing was written, so
+      // re-offering Confirm is safe and usually the right next step.
+      const body = await res.json().catch(() => null);
       setStatus("idle");
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(body?.error?.message ?? `Request failed (${res.status})`);
+      return;
+    }
+
+    // Committed. Mark saved *before* invalidating, and never let a cache
+    // refresh failure report a successful write as failed.
+    setStatus("saved");
+    try {
+      for (const queryKey of invalidationKeysFor(intent)) {
+        queryClient.invalidateQueries({ queryKey });
+      }
+    } catch {
+      // Stale list, saved record. Not worth surfacing as a write error.
     }
   };
 
@@ -128,6 +202,9 @@ function ConfirmWriteCard({ intent }: { intent: ConfirmWriteIntent }) {
         </p>
       ) : status === "dismissed" ? (
         <p className="text-muted-foreground">Dismissed — nothing was saved.</p>
+      ) : status === "unknown" ? (
+        // Deliberately offers no Confirm: see `confirm`'s network-failure path.
+        <p className="text-amber-600">{error}</p>
       ) : (
         <>
           {error && <p className="mb-2 text-destructive">{error}</p>}
@@ -181,12 +258,10 @@ const TOOL_TITLES: Record<string, string> = {
   // Utility tools
   lookupEntity: "Lookup Entity",
   getAppGuide: "App Guide",
-  // Navigation tools
+  // Confirm-gated write tools — all four propose; none write directly
   createBatch: "Create Batch",
   transitionBatch: "Transition Batch",
-  addBatchReading: "Add Reading",
   createPackagingSession: "Create Packaging Session",
-  // Confirm-gated write tools
   recordBatchReading: "Record Reading",
 };
 
