@@ -348,7 +348,7 @@ jobs:
       # green gate. Raise both together as scaffolds get implemented.
       - name: Assert the browser suite actually ran
         env:
-          E2E_MIN_PASSING: "21"
+          E2E_MIN_PASSING: "22"
         run: |
           set -euo pipefail
           results="${RUNNER_TEMP}/playwright-results.json"

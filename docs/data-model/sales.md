@@ -83,11 +83,30 @@ a portal caller cannot supply a large suffix that overflows or otherwise
 poisons later number generation. Staff retain explicit-number entry through
 their separate write policy.
 
+Those policies are the write half. The **read** half needs its own path: a
+customer has to see which products are orderable, and
+`finished_goods_with_availability` is `security_invoker` over `finished_goods`,
+whose `finished_goods_select` policy requires `inventory:read` — a staff
+permission the `customer` role does not hold. A portal customer therefore
+selects **zero** rows from it. `get_portal_available_products()` (00292) closes
+that gap: `SECURITY DEFINER`, it aggregates the view per (brand, selling
+format) and returns only identity plus an availability count — never lot
+numbers, batch links, dates or notes — and returns nothing at all unless the
+caller is a non-revoked portal user. `EXECUTE` is revoked from `PUBLIC`/`anon`.
+Widening `finished_goods_select` was rejected as the alternative: it would
+expose every lot and internal note to customers to solve a product-list
+problem.
+
+The same gap silently emptied the "Add Item" list in the change-request builder
+from the day it shipped, since both portal surfaces read availability through
+`src/components/portal/use-finished-good-availability.ts`.
+
 **Migration:** `00095_customer_portal_many_to_many.sql` (original),
 `00252_restore_customer_portal_users.sql` (hosted-database restoration and
 current RLS policies), `00290_portal_customer_order_insert.sql` (customer
 order placement), `00291_portal_order_number_guard.sql` (shared order-number
-sequence guard).
+sequence guard), `00292_portal_available_products.sql` (customer-readable
+product list).
 
 ---
 

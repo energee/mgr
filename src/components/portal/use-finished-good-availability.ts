@@ -2,7 +2,13 @@
  * Shared finished-goods availability for the customer portal.
  *
  * Both portal write surfaces cap what a customer may ask for against the same
- * number — the unallocated quantity in `finished_goods_with_availability`:
+ * number — the unallocated quantity behind `get_portal_available_products()`
+ * (migration 00292), which aggregates `finished_goods_with_availability` per
+ * (brand, selling format). It is read through that definer-rights RPC rather
+ * than the view directly: the view is SECURITY INVOKER over a table gated on
+ * `inventory:read`, a permission the 'customer' role does not hold, so
+ * selecting it as a portal customer returned zero rows and silently emptied
+ * both pickers.
  *
  *   - `change-request-builder.tsx` caps a proposed line at
  *     `originalQuantity + available` (the quantity already reserved for that
@@ -24,9 +30,18 @@
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { dynamicFrom } from "@/services/types";
+import { dynamicRpc } from "@/services/types";
 import { unwrap } from "@/lib/supabase/query-helpers";
 import { inventoryKeys } from "@/lib/query-keys";
+
+/** One row as `get_portal_available_products()` (00292) returns it. */
+type PortalAvailableProduct = {
+  brand_id: string;
+  brand_name: string;
+  selling_format_id: string | null;
+  selling_format_name: string | null;
+  available_quantity: number;
+};
 
 /** One sellable (brand x selling format) pair with unallocated stock. */
 export type FinishedGoodAvailability = {
@@ -66,13 +81,26 @@ export function useFinishedGoodAvailability(): FinishedGoodAvailabilityResult {
   >({
     queryKey: inventoryKeys.finishedGoodsAvailable(),
     queryFn: async () => {
-      return (await unwrap(
-        dynamicFrom(supabase, "finished_goods_with_availability")
-          .select(
-            "brand_id, selling_format_id, available_quantity, brands(id, name), selling_formats(id, name)"
-          )
-          .gt("available_quantity", 0)
-      )) as unknown as FinishedGoodAvailability[];
+      // Read through the RPC, not the view. `finished_goods_with_availability`
+      // is SECURITY INVOKER over a table gated on `inventory:read`, which the
+      // 'customer' role does not hold — selecting it as a portal customer
+      // returns zero rows, which silently emptied this list on both portal
+      // surfaces. `get_portal_available_products` (00292) is SECURITY DEFINER
+      // and exposes only brand/format identity plus a count.
+      const rows = (await unwrap(
+        dynamicRpc(supabase, "get_portal_available_products")
+      )) as unknown as PortalAvailableProduct[];
+
+      // Re-nest into the view's shape so both consumers stay unchanged.
+      return rows.map((row) => ({
+        brand_id: row.brand_id,
+        selling_format_id: row.selling_format_id,
+        available_quantity: row.available_quantity,
+        brands: { id: row.brand_id, name: row.brand_name },
+        selling_formats: row.selling_format_id
+          ? { id: row.selling_format_id, name: row.selling_format_name ?? "" }
+          : null,
+      }));
     },
   });
 

@@ -358,22 +358,22 @@
       "id": "F114",
       "area": "sales",
       "title": "Customer order portal (view + change requests)",
-      "user_visible_behavior": "External-facing portal where invited customers sign in to view their orders and submit change requests. Customers do NOT place orders — staff place orders on their behalf, by design (invite-only portal, staff confirm everything). Shipped routes: portal login, orders list, order detail, change-request/new.",
-      "verification": "bun e2e ./e2e/customer-order.spec.ts",
+      "user_visible_behavior": "External-facing portal where invited customers sign in, view their orders, submit change requests, and place their own orders. A customer-placed order is always a draft: staff confirm it and apply pricing before anything ships. Routes: portal login, orders list, order detail, change-request/new, orders/new.",
+      "verification": "bun e2e ./e2e/customer-order.spec.ts ./e2e/portal-orders.spec.ts",
       "state": "passing",
       "migrations": [
         "00089_customer_portal_schema.sql",
-        "00095_customer_portal_many_to_many.sql"
+        "00095_customer_portal_many_to_many.sql",
+        "00290_portal_customer_order_insert.sql",
+        "00291_portal_order_number_guard.sql",
+        "00292_portal_available_products.sql"
       ],
-      "evidence": "docs/plans/2026-02-08-customer-order-portal-{design,plan}.md, e2e/customer-order.spec.ts",
-      "notes": "E2E covers the staff-side chain end to end (confirm -> FIFO allocate -> schedule -> pick -> pack -> fulfil, asserted DB-side). The title overstates what shipped: the portal has NO order-placement UI (login, orders list, order detail, change-request only), so customers cannot place orders — staff do it on their behalf. That gap is the one remaining test.skip in the spec and is tracked in #706.",
+      "evidence": "docs/plans/2026-02-08-customer-order-portal-{design,plan}.md, docs/plans/2026-08-12-phase-4-rebaselined.md, e2e/customer-order.spec.ts, e2e/portal-orders.spec.ts",
+      "notes": "E2E covers the staff-side chain end to end (confirm -> FIFO allocate -> schedule -> pick -> pack -> fulfil, asserted DB-side) plus, since Phase 4 node C2, customer-side order placement in portal-orders.spec.ts under the chromium-portal OTP session. Placement rests on three migrations: 00290 (narrow customer INSERT policy pinning status=draft and unit_price NULL), 00291 (order-number guard), 00292 (get_portal_available_products). 00292 exists because the portal's READ path was broken: finished_goods_with_availability is security_invoker over a table gated on inventory:read, a permission the customer role lacks, so the product picker was empty on this surface AND on the older change-request builder. #706's earlier closure covered only the documentation half.",
       "deployment": {
-        "state": "live",
-        "observed_live_on": "2026-07-16",
-        "verified_by": [
-          "supabase/live-catalog.snapshot.txt",
-          "#545"
-        ]
+        "state": "pending",
+        "pending_since": "2026-08-17",
+        "tracking_issue": 818
       }
     },
     {
