@@ -27,6 +27,19 @@
 -- never lot numbers, batch links, dates or notes — and returns nothing at all
 -- unless the caller is a non-revoked portal user.
 --
+-- Disclosure this DOES accept, stated so it is a decision and not an oversight:
+-- the result is the brewery's whole orderable catalog and its total free stock,
+-- identical for every portal customer. It is not scoped per customer, because a
+-- customer must be able to see what they may order. A competitor holding a
+-- portal invite therefore gets a live catalog-and-stock feed. Narrowing it
+-- would mean a per-customer product entitlement model, which does not exist in
+-- this schema; if one is ever added, this WHERE clause is where it belongs.
+--
+-- Not checked here: `user_profiles.status`. A suspended user whose
+-- customer_portal_users row is un-revoked still reads. That matches every
+-- existing portal policy rather than weakening them, so it is a portal-wide
+-- gap (#441), not something this function should diverge on alone.
+--
 -- security-definer: justified a portal customer must not hold `inventory:read` (that is a staff permission) but must still learn which finished goods are orderable; this exposes only brand/format identity and a count, and only to non-revoked portal users.
 CREATE OR REPLACE FUNCTION get_portal_available_products()
 RETURNS TABLE (

@@ -150,7 +150,14 @@ export function OrderBuilder() {
     setLines((prev) => {
       const updated = [...prev];
       const line = { ...updated[index] };
-      const max = getAvailable(line.brandId, line.sellingFormatId);
+      // `getAvailable` returns 0 for anything no longer in the availability
+      // map — which happens for real: staff allocate the last of a product
+      // while the customer has the page open, React Query refetches on focus,
+      // and the pair drops out. Clamping to that 0 would silently set the line
+      // to zero, and `quantity > 0` is in 00290's WITH CHECK, so submit would
+      // fail *after* the parent order row was already inserted, stranding a
+      // zero-line draft that had consumed an ORD- number.
+      const max = Math.max(1, getAvailable(line.brandId, line.sellingFormatId));
       line.quantity = Math.min(Math.max(1, value), max);
       updated[index] = line;
       return updated;
@@ -165,9 +172,19 @@ export function OrderBuilder() {
       // A customer cannot clean that up (there is no customer DELETE policy),
       // but staff see a zero-line draft, and a draft is never fulfillable, so
       // the failure is visible and inert rather than silent.
-      // ponytail: orphan-on-failure accepted; upgrade path is a single
-      // SECURITY DEFINER RPC inserting order + lines together, mirroring
-      // apply_change_request (00264).
+      // Sharper than "one stray draft": 00291 makes the order INSERT consume
+      // the shared ORD- sequence, so each failed attempt burns a real order
+      // number, and the customer's only recovery is pressing Submit again —
+      // there is no resume-into-existing-draft path and no customer DELETE.
+      // Repeated failures therefore leave N numbered empty drafts, so the
+      // item-insert failure is surfaced explicitly below rather than as a raw
+      // error toast that invites retrying.
+      // tx-ok: the two inserts are not required to succeed together. A draft
+      // with no line items is inert — never fulfillable, visible to staff, and
+      // the customer is told explicitly that the order exists but is empty.
+      // Making them atomic needs a SECURITY DEFINER RPC inserting order and
+      // lines together (mirroring apply_change_request, 00264), which 00290
+      // deliberately did not build; tracked as the upgrade path here.
       const order = (await unwrap(
         dynamicFrom(supabase, "orders")
           .insert({
@@ -182,17 +199,27 @@ export function OrderBuilder() {
           .single()
       )) as unknown as { id: string };
 
-      await unwrap(
-        dynamicFrom(supabase, "order_items").insert(
-          lines.map((line) => ({
-            order_id: order.id,
-            brand_id: line.brandId,
-            selling_format_id: line.sellingFormatId ?? null,
-            quantity: line.quantity,
-            // unit_price omitted on purpose — 00290 requires it to be NULL.
-          }))
-        )
-      );
+      try {
+        await unwrap(
+          dynamicFrom(supabase, "order_items").insert(
+            lines.map((line) => ({
+              order_id: order.id,
+              brand_id: line.brandId,
+              selling_format_id: line.sellingFormatId ?? null,
+              quantity: line.quantity,
+              // unit_price omitted on purpose — 00290 requires it to be NULL.
+            }))
+          )
+        );
+      } catch (cause) {
+        // The order row is already committed and cannot be removed from here.
+        // Say so plainly instead of letting a generic failure toast imply
+        // nothing happened — retrying would create a second numbered draft.
+        throw new Error(
+          "Your order was created but its items could not be added. Please contact your brewery rather than submitting again — resubmitting would create a second order.",
+          { cause }
+        );
+      }
 
       return order.id;
     },
