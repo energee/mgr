@@ -13,9 +13,7 @@
  *    configs live in `./search-tools.ts` and are instantiated here by
  *    `createSearchTools`.
  * 3. **RPC tools** — Wrappers around Supabase RPC calls to PostgreSQL functions.
- * 4. **Navigation tools** — Return NavigationIntent objects that the client
- *    renders as action cards for the user to review and submit.
- * 5. **Confirm-gated write tools** — Return ConfirmWriteIntent objects
+ * 4. **Confirm-gated write tools** — Return ConfirmWriteIntent objects
  *    (`action: "confirm_write"`). Nothing is written here: the client renders
  *    a Confirm/Cancel card and, on confirm, POSTs the payload to
  *    `/api/chat/write`, which re-validates and executes under the caller's
@@ -123,8 +121,9 @@ const ENTITY_NAMES_LIST = Array.from(coreRegistry.keys()).sort().join(", ");
 
 /**
  * Create chat tools bound to an authenticated Supabase client.
- * Read tools query data directly. Navigation tools return a NavigationIntent
- * that the client renders as an action card — the user reviews and submits.
+ * Read tools query data directly. Write tools persist nothing: they return a
+ * ConfirmWriteIntent the client renders as a Confirm/Cancel card, and only an
+ * explicit confirmation POSTs it to /api/chat/write.
  */
 export function createChatTools(supabase: SupabaseClient<Database>) {
   return {
@@ -651,18 +650,24 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
     }),
 
     // =========================================================================
-    // Navigation Tools (return NavigationIntent for the client to handle)
+    // Confirm-gated write tools. Each returns a ConfirmWriteIntent and
+    // persists nothing; the client renders a Confirm/Cancel card and POSTs to
+    // /api/chat/write. Before Phase 4B these navigated to a pre-filled form.
     // =========================================================================
 
     createBatch: tool({
       description:
-        "Prepare a new batch from a recipe. Returns a navigation action that opens the batch creation form with pre-filled data. The user will review and submit the form.",
+        "Create a new planned batch from a recipe. Returns a pending write the user must confirm before anything is saved.",
       inputSchema: z.object({
         recipeName: z
           .string()
           .optional()
           .describe("Recipe name to search for"),
         recipeId: z.string().uuid().optional().describe("Recipe UUID if known"),
+        name: z
+          .string()
+          .optional()
+          .describe("Batch name. Defaults to the recipe name."),
         plannedStartDate: z
           .string()
           .optional()
@@ -675,9 +680,10 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
       execute: async ({
         recipeName,
         recipeId,
+        name,
         plannedStartDate,
         targetVolumeBbl,
-      }) => {
+      }): Promise<ConfirmWriteIntent> => {
         let recipe: {
           id: string;
           name: string;
@@ -709,32 +715,30 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           throw new Error("Either recipeName or recipeId is required");
         }
 
-        const prefillData: Record<string, unknown> = {
-          recipe_id: recipe.id,
-        };
-        if (plannedStartDate)
-          prefillData.planned_start_date = plannedStartDate;
-        if (targetVolumeBbl) {
-          prefillData.volume_bbl = targetVolumeBbl;
-        } else if (recipe.volume_bbl) {
-          prefillData.volume_bbl = recipe.volume_bbl;
-        }
+        const volumeBbl = targetVolumeBbl ?? recipe.volume_bbl ?? undefined;
+        const batchName = name?.trim() || recipe.name;
 
         const datePart = plannedStartDate
           ? ` planned for ${plannedStartDate}`
           : "";
+        const volumePart = volumeBbl ? ` at ${volumeBbl} bbl` : "";
         return {
-          action: "navigate" as const,
-          url: "/production/batches/new",
-          prefillData,
-          description: `Create a new batch of ${recipe.name}${datePart}`,
+          action: "confirm_write" as const,
+          writeAction: "create_batch" as const,
+          params: {
+            recipeId: recipe.id,
+            name: batchName,
+            ...(plannedStartDate ? { plannedStartDate } : {}),
+            ...(volumeBbl !== undefined ? { volumeBbl } : {}),
+          },
+          description: `Create planned batch "${batchName}" from ${recipe.name}${volumePart}${datePart}`,
         };
       },
     }),
 
     transitionBatch: tool({
       description:
-        "Navigate to a batch to perform a state transition. For start fermentation, the dialog opens automatically. For other transitions (conditioning, packaging, complete), navigates to the batch detail page where the user clicks the action.",
+        "Move a batch to a new state (fermenting, conditioning, packaging, completed). Returns a pending write the user must confirm before it is applied. Cancelling or archiving a batch is not available here — those run their own RPCs.",
       inputSchema: z.object({
         batchId: z.string().uuid().optional().describe("The batch UUID"),
         batchNumber: z
@@ -763,75 +767,45 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           );
         }
 
-        const dialogMap: Record<string, string> = {
-          fermenting: "start_fermentation",
-        };
-
-        const openDialog = dialogMap[toState];
-        const toLabel = formatStateLabel(toState);
-
-        const description = openDialog
-          ? `Move batch #${batch.batch_code} from ${batch.status} to ${toLabel}`
-          : `Navigate to batch #${batch.batch_code} — click "${toLabel}" in the Actions menu to transition from ${batch.status}`;
-
+        // The check above is advisory: it gives the model a useful error rather
+        // than a confirmation the server would reject. `/api/chat/write`
+        // re-resolves the batch and re-checks the transition before writing,
+        // because the batch can move between this proposal and the confirm.
         return {
-          action: "navigate" as const,
-          url: `/production/batches/${batch.id}`,
-          openDialog,
-          description,
+          action: "confirm_write" as const,
+          writeAction: "transition_batch" as const,
+          params: { batchId: batch.id, toState },
+          description: `Move batch #${batch.batch_code} from ${formatStateLabel(batch.status)} to ${formatStateLabel(toState)}`,
         };
       },
     }),
 
-    addBatchReading: tool({
-      description:
-        "Navigate to the batch readings page to record a fermentation reading (gravity, pH, temperature, etc.). Opens the reading form automatically.",
-      inputSchema: z.object({
-        batchId: z.string().uuid().optional().describe("The batch UUID"),
-        batchNumber: z
-          .string()
-          .optional()
-          .describe("The batch number to search for"),
-      }),
-      execute: async ({ batchId, batchNumber }) => {
-        const batch = await resolveBatch(supabase, batchId, batchNumber);
-
-        const activeStates = ["fermenting", "conditioning", "packaging"];
-        if (!activeStates.includes(batch.status)) {
-          throw new Error(
-            `Batch Code${batch.batch_code} is "${batch.status}" — readings can only be added to batches that are fermenting, conditioning, or packaging.`
-          );
-        }
-
-        return {
-          action: "navigate" as const,
-          url: `/production/batches/${batch.id}/readings`,
-          prefillData: { autoShowForm: true },
-          description: `Add a reading to batch #${batch.batch_code}`,
-        };
-      },
-    }),
+    // `addBatchReading` (navigational — open the readings form) was removed in
+    // Phase 4B in favour of `recordBatchReading` below, which persists the
+    // value through the confirmation gate. Two tools for one intent made the
+    // model choose between "record the number the user just stated" and "open
+    // a form they can already reach from the batch page"; the gated write
+    // strictly dominates, so the navigational twin is gone.
 
     createPackagingSession: tool({
       description:
-        "Prepare a new packaging session. Returns a navigation action that opens the packaging session form with pre-filled data. The user will review and submit the form.",
+        "Create a new packaging session on a given date. Returns a pending write the user must confirm before it is saved.",
       inputSchema: z.object({
-        sessionDate: z.string().describe("Session date (YYYY-MM-DD)"),
+        sessionDate: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .describe("Session date (YYYY-MM-DD)"),
         notes: z
           .string()
+          .max(2000)
           .optional()
           .describe("Optional session notes or special instructions"),
       }),
       execute: async ({ sessionDate, notes }) => {
-        const prefillData: Record<string, unknown> = {
-          session_date: sessionDate,
-        };
-        if (notes) prefillData.notes = notes;
-
         return {
-          action: "navigate" as const,
-          url: "/production/packaging/new",
-          prefillData,
+          action: "confirm_write" as const,
+          writeAction: "create_packaging_session" as const,
+          params: { sessionDate, ...(notes ? { notes } : {}) },
           description: `Create a packaging session for ${sessionDate}`,
         };
       },
@@ -844,7 +818,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
 
     recordBatchReading: tool({
       description:
-        "Record a fermentation reading (gravity, temperature, pH, pressure, dissolved oxygen, diacetyl, clarity) directly on a batch. Use when the user states the measured value in chat. Returns a pending write the user must confirm before it is saved. To open the readings form instead, use addBatchReading.",
+        "Record a fermentation reading (gravity, temperature, pH, pressure, dissolved oxygen, diacetyl, clarity) directly on a batch. Use when the user states the measured value in chat. Returns a pending write the user must confirm before it is saved.",
       inputSchema: z.object({
         batchId: z.string().uuid().optional().describe("The batch UUID"),
         batchNumber: z
