@@ -1,0 +1,1 @@
+- **2026-08-17 (CI audit gate unblocked).** Bumped the `overrides.nanoid` pin 3.3.17 → 3.3.18 (GHSA-2v37-7h3g-55p8) so `bun audit --audit-level=high` passes again in the nightly Test workflow's Production Build job.
