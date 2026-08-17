@@ -82,8 +82,10 @@ export const PREDICATES = [
 export const Predicate = z.enum(PREDICATES);
 export type Predicate = z.infer<typeof Predicate>;
 
-/** Which pass produced a fact. Lets queries filter to exact-only edges. */
-export const Extractor = z.enum(["ast", "sql", "llm"]);
+/** Which pass produced a fact. Lets queries filter to exact-only edges.
+ *  `tracker` = parsed from docs/feature_list.json (features.ts) — declared
+ *  facts, exact as written, kept honest by `make check-deploy-state`. */
+export const Extractor = z.enum(["ast", "sql", "llm", "tracker"]);
 export type Extractor = z.infer<typeof Extractor>;
 
 /**

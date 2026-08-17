@@ -51,6 +51,15 @@ One exception: auto-refresh carries LLM edges over rather than re-running them
 | Data access (exact) | `reads_from` `writes_to` `invokes` `invalidates` |
 | Database (snapshot + DDL, exact) | `protects` `requires` `fires_on` `executes` `derives_from` `creates` |
 | Boundary (LLM, validated) | `triggered_by` `documented_in` `verifies` |
+| Tracker (feature_list.json, exact as declared) | `requires` (feature→migration), `documented_in`, `verifies` (test→feature) |
+
+Features (`F###`) are first-class nodes: "what backs F201" or "which features
+need this migration" are one-hop queries.
+
+For maintenance sweeps, run `bun tools/codegraph/doctor.ts` — standing checks
+for stale-cache, multi-write-without-atomic-RPC, dead DB objects, and untested
+write paths, ratcheted against `tools/codegraph/doctor-allowlist.json` (CI runs
+`--strict`; findings are leads, not verdicts).
 
 ## Worked examples
 

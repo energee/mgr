@@ -19,6 +19,7 @@ import { join } from "node:path";
 import type { StoredEntity, StoredRelation } from "./schema";
 import { runAstPass } from "./ast";
 import { runSqlPass } from "./sql";
+import { runFeaturesPass } from "./features";
 import { resolveGraph, type ResolutionReport } from "./resolve";
 
 export const GRAPH_PATH = "tools/codegraph/graph.json";
@@ -47,7 +48,7 @@ export type Graph = {
  * forever. Bump this whenever a change under tools/codegraph/ alters what the
  * deterministic passes emit (same idiom as PROMPT_VERSION in extract.ts).
  */
-const EXTRACTOR_VERSION = 2;
+const EXTRACTOR_VERSION = 3;
 
 /**
  * Glob patterns for every file the extraction passes read. Keep in sync with
@@ -58,6 +59,7 @@ const INPUT_GLOBS = [
   "src/**/*.tsx",
   "supabase/migrations/*.sql",
   "supabase/live-catalog.snapshot.txt",
+  "docs/feature_list.json",
   "docs/agents/*.md",
   "docs/spec/*.md",
   "docs/data-model/*.md",
@@ -275,7 +277,7 @@ export async function rebuild(
   ) => Promise<{ fresh: GraphPart; reExtracted: Set<string> }>,
 ): Promise<{ graph: Graph; merge: MergeReport; resolution: ResolutionReport }> {
   const prev = tryLoad(repoRoot);
-  const parts: GraphPart[] = [runSqlPass(repoRoot), runAstPass(repoRoot)];
+  const parts: GraphPart[] = [runSqlPass(repoRoot), runAstPass(repoRoot), runFeaturesPass(repoRoot)];
 
   let reExtracted = new Set<string>();
   if (llm) {
