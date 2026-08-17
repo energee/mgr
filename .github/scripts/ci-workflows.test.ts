@@ -551,6 +551,24 @@ describe("GitHub Actions performance contracts", () => {
     // not a merge-blocking guarantee.
     expect(progressWorkflow).not.toContain("[skip ci]");
     expect(progressWorkflow).toContain("--auto");
+
+    // enablePullRequestAutoMerge races the PR's own checks starting up and
+    // intermittently answers "unstable status" (~1/3 of runs, e.g. run
+    // 31555267032, which left bot PR #805 stranded open) — the merge must be
+    // retried, not failed on the first attempt.
+    expect(progressWorkflow).toMatch(/for attempt in[\s\S]*gh pr merge/);
+  });
+
+  // The pack step must never name a gitignored path inside an `:(exclude)`
+  // pathspec on `git add`: git treats that as an explicit add of an ignored
+  // path and exits 1 ("paths are ignored by one of your .gitignore files:
+  // outbox"), which silently discarded real classification-(A) patches on
+  // most scheduled runs after the credential split (docs/agents/ci.md).
+  // /outbox/ and /sentry-outcome.md are gitignored, so a plain `git add -A`
+  // already skips them.
+  it("packs the sentry outbox without excluding ignored paths on git add", () => {
+    const sentryWorkflow = read(".github/workflows/sentry-harness.yml");
+    expect(sentryWorkflow).not.toMatch(/git add[^\n]*:\(exclude\)/);
   });
 
   // Supply-chain contract (see docs/security/dependency-policy.md): every

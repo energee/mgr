@@ -70,13 +70,25 @@ jobs:
             pr_number="${pr_url##*/}"
           fi
 
-          # --auto: queue the merge behind whatever checks are required rather
-          # than merging immediately. No context is required on `main` today,
-          # so this currently merges as soon as GitHub allows; it is here so
-          # the job keeps working unchanged once contexts are made required
-          # (an immediate merge would start failing at that point).
-          gh pr merge "$pr_number" \
-            --auto \
-            --squash \
-            --delete-branch \
-            --subject "docs(progress): rebuild PROGRESS.md"
+          # --auto: queue the merge behind the required checks (#713 made
+          # Static/Unit/E2E/db-lint required on main). GitHub intermittently
+          # answers "Pull request is in unstable status
+          # (enablePullRequestAutoMerge)" when the PR's checks have not started
+          # reporting yet — a race, not a real failure (~1/3 of runs before
+          # this retry; see docs/agents/ci.md). Retry with backoff instead of
+          # going red and leaving the bot PR open (#805 was one).
+          for attempt in 1 2 3 4; do
+            if gh pr merge "$pr_number" \
+              --auto \
+              --squash \
+              --delete-branch \
+              --subject "docs(progress): rebuild PROGRESS.md"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "gh pr merge attempt ${attempt} failed; retrying in $((attempt * 15))s"
+              sleep "$((attempt * 15))"
+            fi
+          done
+          echo "::error::could not enable auto-merge for PR #${pr_number} after 4 attempts"
+          exit 1
