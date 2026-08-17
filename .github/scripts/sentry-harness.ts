@@ -37,13 +37,23 @@ function requireEnv(name: string): string {
 // sentry-fix PRs), silently disabling dedup. Fetch the plain PR list and
 // let the branch regex in dedup.ts pick out sentry-fix branches.
 function ghList<T>(subcommand: "pr" | "issue", args: string[]): T {
-  const result = spawnSync("gh", [subcommand, "list", ...args], {
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    throw new Error(`gh ${subcommand} list failed: ${result.stderr}`);
+  // GitHub's API intermittently answers 503 (run 32049984584 died on one);
+  // retry with linear backoff so a single blip does not fail the whole
+  // scheduled run.
+  const maxAttempts = 3;
+  let lastStderr = "";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = spawnSync("gh", [subcommand, "list", ...args], {
+      encoding: "utf8",
+    });
+    if (result.status === 0) return JSON.parse(result.stdout) as T;
+    lastStderr = result.stderr;
+    if (attempt < maxAttempts) {
+      console.error(`[harness] gh ${subcommand} list failed (attempt ${attempt}/${maxAttempts}), retrying: ${result.stderr.trim()}`);
+      Bun.sleepSync(attempt * 5000);
+    }
   }
-  return JSON.parse(result.stdout) as T;
+  throw new Error(`gh ${subcommand} list failed: ${lastStderr}`);
 }
 
 function ghPrList<T>(args: string[]): T {

@@ -89,6 +89,11 @@ jobs:
                 you ran (git log ranges, gh queries, files inspected) and their key
                 output. A deterministic step verifies this file — a run that ends
                 with neither a PR nor this file fails red.
+              - If a command is permission-denied, switch to an allowed tool
+                (Grep/Read instead of shell text tools) rather than retrying it.
+                A denial is NEVER a reason to end silently: if denials or anything
+                else stop you from opening a PR, you MUST still write `quiet-run.md`
+                with the denied commands quoted under `Evidence:` before you finish.
           # Writing bug fixes is a mechanically gated task (PR + required CI +
           # human review), so the lighter model is appropriate; raise if fix
           # quality proves insufficient.
@@ -97,11 +102,14 @@ jobs:
           # read-only shell (ls/cat/head/tail/wc/rg/find) were missing, so the
           # agent spent turns hitting walls. Denied-tool retries are pure
           # waste — grant the cheap read-only set and give it the same turn
-          # budget the health audit gets.
+          # budget the health audit gets. The 2026-08-13..17 runs died the
+          # same way (11 denials, then a silent finish with no PR and no
+          # quiet-run.md): grep/jq/diff joined the read-only set, and the
+          # prompt now says a denial never excuses ending without an outcome.
           claude_args: |
             --max-turns 80
             --model claude-sonnet-5
-            --allowedTools "Task,TodoWrite,Edit,Write,Read,Grep,Glob,Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh label list:*),Bash(make check-fast:*),Bash(bun run test:*),Bash(bun install:*),Bash(bunx vitest run:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(rg:*),Bash(find:*)"
+            --allowedTools "Task,TodoWrite,Edit,Write,Read,Grep,Glob,Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh label list:*),Bash(make check-fast:*),Bash(bun run test:*),Bash(bun install:*),Bash(bunx vitest run:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(rg:*),Bash(find:*),Bash(grep:*),Bash(jq:*),Bash(diff:*)"
             --disallowedTools "WebFetch,WebSearch"
 
       # A green agent step proves nothing by itself (see the action's

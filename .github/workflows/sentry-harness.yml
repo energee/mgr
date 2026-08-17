@@ -268,10 +268,15 @@ jobs:
           set -euo pipefail
           mkdir -p outbox
           printf '%s\n' "$BASE_SHA" > outbox/base-sha
-          # Stage everything except the outbox itself and the (never-committed)
-          # outcome marker, then diff the index against the base commit — this
-          # captures both uncommitted edits and any commit the agent made.
-          git add -A -- . ':(exclude)outbox' ':(exclude)sentry-outcome.md'
+          # Stage everything, then diff the index against the base commit —
+          # this captures both uncommitted edits and any commit the agent made.
+          # The outbox and outcome marker need no exclude here: both are
+          # gitignored (/outbox/, /sentry-outcome.md), so `git add -A` skips
+          # them — and naming an ignored path inside an `:(exclude)` pathspec
+          # is exactly what made this step exit 1 on most scheduled runs since
+          # the credential split ("paths are ignored by one of your .gitignore
+          # files: outbox"; see docs/agents/ci.md).
+          git add -A
           git diff --cached --binary "$BASE_SHA" -- . \
             ':(exclude)outbox' ':(exclude)sentry-outcome.md' > outbox/fix.patch
           echo "Packed $(wc -c < outbox/fix.patch) patch bytes; plan.json:"

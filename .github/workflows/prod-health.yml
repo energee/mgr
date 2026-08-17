@@ -184,13 +184,26 @@ jobs:
           set -euo pipefail
           title="Production health probe failing"
 
+          # GitHub's own API intermittently answers 503 (run 32050218566 went
+          # red on one after a HEALTHY verdict); retry each gh call with a
+          # short backoff so an API blip does not fail the probe.
+          retry() {
+            local i
+            for i in 1 2; do
+              "$@" && return 0
+              echo "attempt ${i} failed: $*; retrying in $((i * 5))s" >&2
+              sleep "$((i * 5))"
+            done
+            "$@"
+          }
+
           gh label create "$LABEL" \
             --repo "$REPO" \
             --color B60205 \
             --description "Production deployment is failing its health probe" \
             2>/dev/null || true
 
-          existing="$(gh issue list \
+          existing="$(retry gh issue list \
             --repo "$REPO" \
             --label "$LABEL" \
             --state open \
@@ -199,13 +212,13 @@ jobs:
 
           if [ "$HEALTHY" = "false" ]; then
             if [ -n "$existing" ]; then
-              gh issue comment "$existing" --repo "$REPO" \
+              retry gh issue comment "$existing" --repo "$REPO" \
                 --body "Still failing: ${RUN_URL}
 
           ${FAILURES}"
               echo "Updated existing tracking issue #${existing}" >> "$GITHUB_STEP_SUMMARY"
             else
-              gh issue create --repo "$REPO" --title "$title" --label "$LABEL" \
+              retry gh issue create --repo "$REPO" --title "$title" --label "$LABEL" \
                 --body "The scheduled production health probe could not verify the deployed artifact: ${RUN_URL}
 
           ${FAILURES}
@@ -215,8 +228,8 @@ jobs:
               echo "Opened tracking issue (production probe failing)" >> "$GITHUB_STEP_SUMMARY"
             fi
           elif [ -n "$existing" ]; then
-            gh issue comment "$existing" --repo "$REPO" \
+            retry gh issue comment "$existing" --repo "$REPO" \
               --body "Production is answering again: ${RUN_URL}. Closing."
-            gh issue close "$existing" --repo "$REPO"
+            retry gh issue close "$existing" --repo "$REPO"
             echo "Closed tracking issue #${existing} (production recovered)" >> "$GITHUB_STEP_SUMMARY"
           fi

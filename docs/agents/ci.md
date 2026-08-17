@@ -161,17 +161,11 @@ it, because the next scheduled run scores fresh issues, not the one that just
 failed to land. The same pack-step failure signature ("paths are ignored by
 one of your .gitignore files: outbox", then "Process completed with exit code
 1") also fired standalone on job 91225679847 (2026-07-31, classification B,
-harmless there since no patch was needed). Not fixed here — it needs a
-workflow-file change. Whoever picks this up: stop the two mechanisms from
-fighting each other — either write the patch to a location outside the repo
-tree (`$RUNNER_TEMP`) instead of a gitignored in-tree directory, or drop the
-`.gitignore` entry and rely solely on the `:(exclude)` pathspec to keep
-`outbox/` out of the diff — and consider whether a discarded
-classification-(A) fix should re-file as a `needs-human` issue instead of
-vanishing with no trace. **Watch for:** this exact
-`git add`/ignored-path error recurring in a `sentry-harness.yml` run log, or
-another `land-fix` failure reading "packed patch is empty" against a
-classification-A plan — either means the fix above hasn't landed yet.
+harmless there since no patch was needed). **FIXED 2026-08-17:** the pack step now runs a plain
+`git add -A` (both paths are gitignored, so the excludes were redundant on the
+add), and a contract in `ci-workflows.test.ts` ("packs the sentry outbox
+without excluding ignored paths on git add") pins it. The re-file-as-issue
+idea for discarded classification-(A) fixes remains unimplemented.
 
 **What is still true for `fix-error` after that split.** It can still execute
 arbitrary code and still reach the network, and two credentials remain readable
@@ -219,15 +213,13 @@ for this exact ignored-path message first — and do not read the loop as
 unhealthy from Actions-tab history alone; check the PR list instead (`gh pr
 list --state open --label sentry-fix --json number,createdAt,statusCheckRollup`;
 10 of 10 `sentry-fix` PRs opened since 2026-07-12 have merged, per the loop
-scoreboard). **Not fixable from here**, since it requires a workflow-file
-change: the likely fix is to drop the redundant `:(exclude)outbox` pathspec
-(the directory is already gitignored, so a plain `git add -A -- .` already
-skips it without an explicit exclude) or to write the patch to `$RUNNER_TEMP`
-instead of an in-tree gitignored directory. **Watch for:** this exact message
-recurring in a future "Pack the agent outbox" step log, or a `land-fix`
-failure reading "packed patch is empty" or "classification must be one of A,
-B, C, D" against a plan the agent actually wrote correctly — either means the
-fix hasn't landed yet.
+scoreboard). **FIXED 2026-08-17:** the pack step now runs a plain
+`git add -A` — both paths are gitignored, so the `:(exclude)` pathspecs were
+redundant on the add and were what made git error. A contract in
+`ci-workflows.test.ts` ("packs the sentry outbox without excluding ignored
+paths on git add") keeps them out. If a future "Pack the agent outbox" step
+still logs the ignored-path message, something reintroduced an `:(exclude)`
+on the add.
 
 **The outbox is itself a publishing channel, by construction.** `pr-body.md`,
 `issue-body.md` and `comment-body.md` are agent-authored free text that a
@@ -509,13 +501,12 @@ recent `Build PROGRESS.md` runs (10 of the last 30 as of 2026-08-01) fail with
 "unstable" rather than something GitHub will queue behind, because there is no
 `required_status_checks` rule for it to queue behind. This is not data loss:
 `progress.yml` retriggers on the next push to `docs/progress/**`, and the
-retry has so far always succeeded. It is noisy enough to read as a fresh
-regression each time someone notices it, so treat a
-lone `Build PROGRESS.md` failure with this exact error as expected until #713
-lands, not a new bug to chase. **Watch for:** this note going stale once #713
-adds the required-checks rule — the failure should stop recurring, and if a
-future harvest still finds it after that rule lands, the fix didn't address
-this side effect and needs its own look.
+retry has so far always succeeded. #713's required-checks rule did not stop
+the recurrence (run 31555267032, 2026-08-12, failed the same way and left bot
+PR #805 stranded open), so as of 2026-08-17 the merge step retries
+`gh pr merge --auto` up to 4× with backoff before going red; the retry shape
+is pinned in `ci-workflows.test.ts`. A `Build PROGRESS.md` run that still
+fails with this error exhausted all retries and deserves a look.
 
 ## Required status checks
 
