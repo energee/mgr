@@ -885,7 +885,19 @@ export async function seedProductionFixtures(seed: SupabaseClient): Promise<void
 export const PORTAL_IDS = {
   customer: "e2e00006-0000-4000-8000-000000000001",
   order: "e2e00006-0000-4000-8000-000000000002",
+  // Brand -> container -> selling format -> in-stock lot. A portal customer
+  // can only order what `get_portal_available_products()` (00292) returns, so
+  // placing an order needs real unallocated stock; without it the order
+  // builder's picker is empty and the flow cannot start.
+  brand: "e2e00006-0000-4000-8000-000000000003",
+  container: "e2e00006-0000-4000-8000-000000000004",
+  format: "e2e00006-0000-4000-8000-000000000005",
 } as const;
+
+export const PORTAL_BRAND_NAME = "E2E Portal Brand 706";
+export const PORTAL_FORMAT_NAME = "E2E Portal 6-Pack 706";
+/** Units in the seeded lot — the per-line cap the order builder enforces. */
+export const PORTAL_LOT_QUANTITY = 40;
 
 export const PORTAL_CUSTOMER_NAME = "E2E Portal Customer 706";
 /**
@@ -907,9 +919,33 @@ export const PORTAL_ORDER_NUMBER = "E2E-PORTAL-706";
  * the link and the profile too. Safe to run when nothing exists.
  */
 export async function cleanupPortalFixtures(seed: SupabaseClient): Promise<void> {
+  // Every order for this customer, not just PORTAL_IDS.order: the placement
+  // spec creates orders with server-generated ids and ORD- numbers, and those
+  // would otherwise pin the customer row and fail the delete below.
   assertOk(
-    "delete portal order",
-    (await seed.from("orders").delete().eq("id", PORTAL_IDS.order)).error
+    "delete portal orders",
+    (await seed.from("orders").delete().eq("customer_id", PORTAL_IDS.customer))
+      .error
+  );
+  // Stock teardown runs child -> parent: finished_goods references both the
+  // brand and the selling format, and selling_formats references the container.
+  assertOk(
+    "delete portal finished_goods",
+    (await seed.from("finished_goods").delete().eq("brand_id", PORTAL_IDS.brand))
+      .error
+  );
+  assertOk(
+    "delete portal selling_format",
+    (await seed.from("selling_formats").delete().eq("id", PORTAL_IDS.format))
+      .error
+  );
+  assertOk(
+    "delete portal container",
+    (await seed.from("containers").delete().eq("id", PORTAL_IDS.container)).error
+  );
+  assertOk(
+    "delete portal brand",
+    (await seed.from("brands").delete().eq("id", PORTAL_IDS.brand)).error
   );
   assertOk(
     "delete portal customer",
@@ -982,6 +1018,55 @@ export async function seedPortalFixtures(seed: SupabaseClient): Promise<void> {
         customer_id: PORTAL_IDS.customer,
         order_number: PORTAL_ORDER_NUMBER,
         status: "draft",
+      })
+    ).error
+  );
+
+  // Orderable stock. Seeded directly rather than produced by a packaging
+  // session — packaging-session.spec.ts already covers lot creation, and the
+  // subject here is order placement. No batch_id, which keeps it out of the
+  // batch -> finished_good allocation the packaging trigger would add.
+  assertOk(
+    "insert portal brand",
+    (
+      await seed
+        .from("brands")
+        .insert({ id: PORTAL_IDS.brand, name: PORTAL_BRAND_NAME, is_active: true })
+    ).error
+  );
+  assertOk(
+    "insert portal container",
+    (
+      await seed.from("containers").insert({
+        id: PORTAL_IDS.container,
+        name: "E2E Portal 12oz Can 706",
+        type: "package",
+        volume_oz: 12,
+        is_active: true,
+      })
+    ).error
+  );
+  assertOk(
+    "insert portal selling_format",
+    (
+      await seed.from("selling_formats").insert({
+        id: PORTAL_IDS.format,
+        container_id: PORTAL_IDS.container,
+        name: PORTAL_FORMAT_NAME,
+        unit_count: 6,
+        is_active: true,
+      })
+    ).error
+  );
+  assertOk(
+    "insert portal finished_good",
+    (
+      await seed.from("finished_goods").insert({
+        brand_id: PORTAL_IDS.brand,
+        selling_format_id: PORTAL_IDS.format,
+        quantity: PORTAL_LOT_QUANTITY,
+        lot_number: `E2E-PORTAL-LOT-${Date.now()}`,
+        production_date: new Date().toISOString().slice(0, 10),
       })
     ).error
   );

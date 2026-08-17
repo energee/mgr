@@ -33,3 +33,25 @@ src/integrations/quickbooks/token-manager.ts
 src/integrations/square/catalog.ts
 src/services/consumption-service.ts
 src/services/inventory-count-service.ts
+
+# ---------------------------------------------------------------------------
+# Second baseline (2026-08-17, #822). These also predate the gate — but they
+# were invisible to it rather than grandfathered by it: the FROM pattern
+# matched only `.from(`, never the repo's own `dynamicFrom(supabase, "table")`
+# helper, so every file written that way counted zero writes and was skipped.
+# Widening the pattern surfaced them all at once.
+#
+# NONE OF THESE HAS BEEN AUDITED. They are listed to keep the gate green while
+# the debt stays visible — which is the opposite of a claim that they are
+# correct. entity-service.ts and entity-delete-dialog.tsx (5 awaited writes
+# each, on paths every entity in the app flows through) are the two to look at
+# first. Remove each line as its file is fixed — same ratchet as above.
+src/app/api/customers/[id]/invite/route.ts
+src/app/api/square/reconcile-draft-sales/route.ts
+src/components/domain/order/customer-pallet-configs.tsx
+src/components/domain/packaging/selling-format-bom-editor.tsx
+src/components/domain/packaging/shipping-material-roles-editor.tsx
+src/components/universal/entity-delete-dialog.tsx
+src/components/universal/entity-detail-unified.tsx
+src/integrations/mongodb/sync.ts
+src/services/entity-service.ts

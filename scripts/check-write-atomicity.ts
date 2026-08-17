@@ -27,7 +27,12 @@ import { join } from "node:path";
 const SRC_DIR = "src";
 const ALLOWLIST_PATH = "scripts/check-write-atomicity.allowlist.txt";
 const MUTATION = /\.(insert|update|delete|upsert)\s*\(/;
-const FROM = /\.from\s*\(/;
+// Matches both `supabase.from(` and the repo's own `dynamicFrom(supabase, "t")`
+// helper. Without the second alternative this gate was blind to every file
+// written through dynamicFrom — the preferred pattern wherever the generated
+// types lag the migration chain — and reported them clean rather than
+// unexamined. A silent pass is worse than a noisy one for an atomicity gate.
+const FROM = /(\.|\bdynamic)[Ff]rom\s*\(/;
 // How far past an `await` the chain is allowed to stretch (multiline chains).
 const CHAIN_WINDOW = 300;
 

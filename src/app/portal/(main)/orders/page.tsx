@@ -16,6 +16,8 @@ import {
 import { StatusBadge } from "@/components/universal/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyStateHint } from "@/components/universal/empty-state-hint";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { orderEntity } from "@/entities/order";
 import { formatDate as sharedFormatDate } from "@/lib/format";
@@ -47,9 +49,17 @@ export default function PortalOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
-        <p className="text-muted-foreground">View and track your orders.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+          <p className="text-muted-foreground">View and track your orders.</p>
+        </div>
+        <Button asChild>
+          <Link href="/portal/orders/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Place Order
+          </Link>
+        </Button>
       </div>
 
       <Card>
@@ -64,7 +74,7 @@ export default function PortalOrdersPage() {
               ))}
             </div>
           ) : !orders || orders.length === 0 ? (
-            <EmptyStateHint message="You don't have any orders yet. Once your brewery places an order on your behalf, it will appear here." />
+            <EmptyStateHint message="You don't have any orders yet. Place one with the button above, or your brewery can create one on your behalf." />
           ) : (
             <Table>
               <TableHeader>

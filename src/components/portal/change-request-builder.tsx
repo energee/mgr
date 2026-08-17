@@ -6,12 +6,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { unwrap } from "@/lib/supabase/query-helpers";
-import {
-  entityKeys,
-  changeRequestKeys,
-  inventoryKeys,
-} from "@/lib/query-keys";
+import { entityKeys, changeRequestKeys } from "@/lib/query-keys";
 import { usePortalCustomer } from "@/contexts/portal";
+import {
+  availabilityKey,
+  useFinishedGoodAvailability,
+} from "./use-finished-good-availability";
 import {
   Card,
   CardContent,
@@ -56,14 +56,6 @@ type OrderItem = {
   selling_formats: { id: string; name: string } | null;
 }
 
-type FinishedGoodAvailability = {
-  brand_id: string;
-  selling_format_id: string | null;
-  available_quantity: number;
-  brands: { id: string; name: string } | null;
-  selling_formats: { id: string; name: string } | null;
-}
-
 type ItemChange = {
   changeType: "modify" | "remove" | "add" | null;
   orderItemId?: string;
@@ -85,13 +77,6 @@ function formatName(item: ItemChange): string {
 
 function formatType(item: ItemChange): string {
   return item.sellingFormatName || "-";
-}
-
-function availabilityKey(
-  brandId: string,
-  sellingFormatId?: string
-): string {
-  return `${brandId}|${sellingFormatId ?? ""}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,19 +111,8 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
     enabled: !!orderId,
   });
 
-  // ---- Query: Available Finished Goods ----
-  const { data: availableGoods } = useQuery<FinishedGoodAvailability[]>({
-    queryKey: inventoryKeys.finishedGoodsAvailable(),
-    queryFn: async () => {
-      return await unwrap(
-        dynamicFrom(supabase, "finished_goods_with_availability")
-          .select(
-            "brand_id, selling_format_id, available_quantity, brands(id, name), selling_formats(id, name)"
-          )
-          .gt("available_quantity", 0)
-      ) as unknown as FinishedGoodAvailability[];
-    },
-  });
+  // ---- Available finished goods (shared with the order builder) ----
+  const { availableGoods, getAvailable } = useFinishedGoodAvailability();
 
   // ---- Initialize changes from order items ----
   if (orderItems && !initialized) {
@@ -157,28 +131,9 @@ export function ChangeRequestBuilder({ orderId }: { orderId: string }) {
     setInitialized(true);
   }
 
-  // ---- Availability lookup map ----
-  const availabilityMap = useMemo(() => {
-    const map = new Map<string, number>();
-    if (availableGoods) {
-      for (const fg of availableGoods) {
-        const key = availabilityKey(
-          fg.brand_id,
-          fg.selling_format_id ?? undefined
-        );
-        map.set(key, fg.available_quantity);
-      }
-    }
-    return map;
-  }, [availableGoods]);
-
   // ---- Compute max quantities ----
   function getMaxQuantity(item: ItemChange): number {
-    const key = availabilityKey(
-      item.brandId,
-      item.sellingFormatId
-    );
-    const available = availabilityMap.get(key) ?? 0;
+    const available = getAvailable(item.brandId, item.sellingFormatId);
     if (item.orderItemId && item.originalQuantity != null) {
       // Existing item: can go up to current + available unallocated
       return item.originalQuantity + available;

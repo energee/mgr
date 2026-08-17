@@ -63,20 +63,18 @@ test.describe("Customer order — portal", () => {
     await context.close();
   });
 
-  // SKIPPED — still blocked on the PRODUCT, tracked in #706 (and #437).
-  // This used to list two blockers. The second — no way to hold an
-  // authenticated portal session, because portal auth is OTP/magic-link only
-  // (`shouldCreateUser: false`, portal-login-form.tsx) — is now solved:
-  // `e2e/portal-auth.setup.ts` logs in over a real OTP read from the local
-  // mail catcher and the `chromium-portal` project consumes that state (see
-  // e2e/portal-orders.spec.ts for authenticated portal coverage).
-  // What remains is blocker 1: there is no portal order-placement UI to drive
-  // (see this file's header). That is a missing feature, not a missing test,
-  // and it must be resolved product-side before this is worth writing.
-  test.skip("customer places an order through the portal", async () => {
-    // Requires: portal order-placement UI (does not exist). The portal
-    // storageState this would run under already exists — see above.
-  });
+  // Both blockers are gone, and the test now lives in portal-orders.spec.ts
+  // rather than here. It has to: order placement runs as a portal customer,
+  // and only `portal-*.spec.ts` is picked up by the `chromium-portal` project
+  // whose storageState is the OTP session. This file runs under the staff
+  // session, which cannot reach /portal/orders/new.
+  //
+  // For the record, since this file carried a "NOT AUTOMATABLE" note for so
+  // long: blocker 2 (no way to hold a portal session) was solved by
+  // e2e/portal-auth.setup.ts; blocker 1 (no order-placement UI) by Phase 4
+  // node C2 — migration 00290 for the customer INSERT policy, 00292 so a
+  // customer can read the products to order at all, and
+  // src/components/portal/order-builder.tsx.
 });
 
 // Single-test describe: with fullyParallel only one worker ever runs these
