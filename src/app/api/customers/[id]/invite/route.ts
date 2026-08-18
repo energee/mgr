@@ -139,6 +139,13 @@ async function ensureCustomerProfile(
   const roles = profile?.roles ?? null;
   if (roles && isPortalUser(roles)) {
     if (profile?.status !== "active") {
+      // tx-ok: the profile and portal-link writes cannot share a SQL
+      // transaction — they interleave with auth-admin API calls
+      // (createUser/generateLink/updateUserById) and OTP email delivery. A
+      // mid-sequence failure is compensated instead: compensateNewPortalUser
+      // deletes the fresh auth user, and compensateExistingPortalUser restores
+      // the exact prior profile/link state in FK-safe order (#548, #605),
+      // naming any leftover rows for the operator when cleanup itself fails.
       const activatedProfile = await unwrap(
         dynamicFrom(adminDb, "user_profiles")
           .update({ status: "active", updated_at: new Date().toISOString() })
