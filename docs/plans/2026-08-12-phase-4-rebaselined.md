@@ -1,7 +1,12 @@
 # Phase 4, re-baselined against the tree
 
-**Status:** awaiting approval — Phase 1 of the two-phase process. No implementation code written.
-**Date:** 2026-08-12
+**Status:** EXECUTED — every node is merged; schedule nothing from this plan. A (buildSearchTool
+factory) = PR #808. B (generic chat writes behind the confirm gate) = PR #820. C1 (portal INSERT
+policy, migrations 00290 + the 00291 sequence guard) = PR #809, live. C2 (order builder + 00292)
+= PR #821; 00292 applied live 2026-08-18 (#818, PR #828). C3 (Mailpit OTP harness) = PR #807;
+exercised 2026-08-18 — chromium-portal 3/3 and customer-order 5/5 pass locally. Closeout entry:
+`docs/progress/2026-08-18-phase4-closeout.md`.
+**Date:** 2026-08-12 (executed by 2026-08-18)
 **Baseline:** `main` @ `dcec7c13`
 
 ## Why this document exists
