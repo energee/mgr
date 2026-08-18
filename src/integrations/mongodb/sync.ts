@@ -69,6 +69,12 @@ const HOP_TIMING_MAP: Record<string, string> = {
 // Sync log helpers
 // =============================================================================
 
+// tx-ok: replay tooling, safe by idempotency rather than one transaction.
+// Multi-row source aggregates (recipes, transfers, brew logs, readings,
+// packaging) already go through reconcile_mongodb_* RPCs — atomic per source
+// document. The remaining raw writes are re-runnable upserts keyed on stable
+// UUIDs/names (a re-sync repairs a partial run) plus mongodb_sync_log
+// bookkeeping, which is deliberately non-fatal (see completeSyncLog).
 async function createSyncLog(entityType: SyncEntityType, phase: SyncPhase): Promise<string> {
   const admin = await createAdminClient();
   const { data, error } = await dynamicFrom(admin, "mongodb_sync_log")

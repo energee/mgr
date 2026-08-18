@@ -47,4 +47,3 @@ src/services/inventory-count-service.ts
 # each, on paths every entity in the app flows through) are the two to look at
 # first. Remove each line as its file is fixed — same ratchet as above.
 src/components/universal/entity-detail-unified.tsx
-src/integrations/mongodb/sync.ts
