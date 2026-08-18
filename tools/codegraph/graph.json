@@ -1,9 +1,9 @@
 {
- "commit": "48dec4c4a320f9071ddda61788cf6f693eeb81ef",
- "built_at": "2026-08-18T00:13:40.550Z",
+ "commit": "336cc92ef79f4b89795e10114fa55c8170e85753",
+ "built_at": "2026-08-18T15:49:12.797Z",
  "inputs": {
   "count": 1376,
-  "digest": "179baf3f5840a128"
+  "digest": "49e5faf9194b02ae"
  },
  "nodes": [
   {
@@ -478,6 +478,15 @@
    "name": "get_planned_batches_by_day",
    "type": "DB_FUNCTION",
    "description": "Postgres function get_planned_batches_by_day(p_days integer), confirmed live.",
+   "file_path": "supabase/live-catalog.snapshot.txt",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "snapshot"
+  },
+  {
+   "name": "get_portal_available_products",
+   "type": "DB_FUNCTION",
+   "description": "Postgres function get_portal_available_products(), confirmed live.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -53601,6 +53610,13 @@
    "extractor": "sql"
   },
   {
+   "source": "00292_portal_available_products.sql",
+   "predicate": "creates",
+   "target": "get_portal_available_products",
+   "file_path": "supabase/migrations/00292_portal_available_products.sql",
+   "extractor": "sql"
+  },
+  {
    "source": "src/lib/sentry-config.ts",
    "predicate": "defines",
    "target": "src/lib/sentry-config.ts#sentryBaseConfig",
@@ -67289,6 +67305,13 @@
    "source": "src/components/portal/use-finished-good-availability.ts",
    "predicate": "defines",
    "target": "src/components/portal/use-finished-good-availability.ts#useFinishedGoodAvailability",
+   "file_path": "src/components/portal/use-finished-good-availability.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/portal/use-finished-good-availability.ts",
+   "predicate": "invokes",
+   "target": "get_portal_available_products",
    "file_path": "src/components/portal/use-finished-good-availability.ts",
    "extractor": "ast"
   },
