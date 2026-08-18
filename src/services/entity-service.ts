@@ -190,6 +190,10 @@ export const entityService = {
         return err({ code: "VALIDATION", issues: parsed.error.issues });
       }
 
+      // tx-ok: the gate's file-level count sums writes across methods, but no
+      // call path here performs more than one — create/update/remove each issue
+      // a single awaited mutation (update and remove have mutually exclusive
+      // branches), and transition delegates to the transition_entity_atomic RPC.
       const { data: created, error } = await dynamicFrom(supabase, entity.table)
         .insert(parsed.data)
         .select()

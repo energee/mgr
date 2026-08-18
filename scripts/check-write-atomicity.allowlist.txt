@@ -54,4 +54,3 @@ src/components/domain/packaging/shipping-material-roles-editor.tsx
 src/components/universal/entity-delete-dialog.tsx
 src/components/universal/entity-detail-unified.tsx
 src/integrations/mongodb/sync.ts
-src/services/entity-service.ts
