@@ -204,6 +204,11 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     const failures: Failure[] = [];
     const now = new Date().toISOString();
 
+    // tx-ok: crash-safe by idempotency rather than one transaction. All
+    // allocations for a sale land in a SINGLE insert statement keyed
+    // `square_draft_sale:<id>`; a crash before the reconciled_at stamp leaves a
+    // keyed-but-unstamped sale that the next run repairs (re-stamp, never
+    // re-allocate), and the sync-log write is deliberately non-fatal.
     const markReconciled = async (saleId: string) => {
       const { error } = await dynamicFrom(admin, "square_draft_sales")
         .update({ reconciled_at: now })
