@@ -559,6 +559,33 @@ describe("GitHub Actions performance contracts", () => {
     expect(progressWorkflow).toMatch(/for attempt in[\s\S]*gh pr merge/);
   });
 
+  // #796: the committed graph.json must be kept fresh by automation — the
+  // refresh bot mirrors progress.yml (bot PR + retried auto-merge), rebuilds
+  // ONLY the deterministic passes, and its trigger paths must include the
+  // extractor code itself so an EXTRACTOR_VERSION bump refreshes the artifact.
+  it("refreshes the committed codegraph through an auto-merged bot PR", () => {
+    const workflow = read(".github/workflows/codegraph-refresh.yml");
+
+    expect(workflow).toContain("pull-requests: write");
+    expect(workflow).toContain("tools/codegraph/build.ts");
+    expect(workflow).toContain("gh pr create");
+    expect(workflow).toContain("gh pr merge");
+    expect(workflow).toMatch(/for attempt in[\s\S]*gh pr merge/);
+    expect(workflow).toContain('- "tools/codegraph/**"');
+    expect(workflow).toContain('- "docs/feature_list.json"');
+    expect(workflow).not.toContain("[skip ci]");
+    // Deterministic only: the refresh job must never invoke the LLM pass.
+    expect(workflow).not.toContain("--llm");
+  });
+
+  // The doctor ratchet runs inside the required Static Checks job: it must
+  // rebuild the graph for the PR's own tree first (the committed graph.json
+  // can lag), and it must run strict so unallowlisted findings go red.
+  it("runs the codegraph doctor strictly in Static Checks", () => {
+    const workflow = read(".github/workflows/test.yml");
+    expect(workflow).toMatch(/build\.ts\n\s+bun tools\/codegraph\/doctor\.ts --strict/);
+  });
+
   // The pack step must never name a gitignored path inside an `:(exclude)`
   // pathspec on `git add`: git treats that as an explicit add of an ignored
   // path and exits 1 ("paths are ignored by one of your .gitignore files:

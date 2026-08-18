@@ -94,6 +94,17 @@ jobs:
       - name: Agent configuration checks
         run: make check-agent-config
 
+      # Graph doctor ratchet: rebuild the deterministic graph for THIS tree
+      # (the committed graph.json may lag the PR), then fail on any finding
+      # not in tools/codegraph/doctor-allowlist.json — new stale-cache /
+      # multi-write / dead-db / untested-write patterns surface on the PR
+      # that introduces them. Re-baseline deliberately with
+      # `bun tools/codegraph/doctor.ts --baseline` when a finding is accepted.
+      - name: Codegraph doctor
+        run: |
+          bun tools/codegraph/build.ts
+          bun tools/codegraph/doctor.ts --strict
+
   unit-tests:
     # Single unsharded job: sharding across two runners doubled the
     # install/setup overhead and needed a third job to merge coverage blobs.

@@ -48,6 +48,7 @@ refresh them explicitly with `bun tools/codegraph/update.ts --llm`.
 | `query.ts <q> [--hops N] [--answer] [--exact]` | Serialize a subgraph; optionally answer | instant / one model call |
 | `summarize.ts [--degree N] [--dry-run]` | Profile domain hub nodes | ~11s per hub |
 | `eval.ts [--sql\|--llm]` | Score extractors against gold sets | one model call per LLM case |
+| `doctor.ts [--strict\|--baseline]` | Standing maintenance checks (see below) | instant, $0 |
 
 ## How it is built
 
@@ -66,11 +67,40 @@ Views are the exception — the snapshot has no VIEW lines, yet 20 of the 88
 relations the app queries are views, so views come from the migration chain and
 are tagged `db_source: "chain"` to mark them snapshot-unverified.
 
-**3. LLM pass (`extract.ts`) — narrow, validated.** Runs `gpt-5.3-codex-spark`
+**3. Tracker pass (`features.ts`) — free, declared.** `docs/feature_list.json`
+is machine-readable and gate-enforced (`make check-deploy-state`), so FEATURE
+edges are parsed, not inferred: `requires` to each declared migration,
+`documented_in` to docs named in evidence, `verifies` from test files named in
+the verification command (directories expand; only paths that exist on disk
+count). Tagged `extractor: "tracker"`.
+
+**4. LLM pass (`extract.ts`) — narrow, validated.** Runs `gpt-5.3-codex-spark`
 via `codex exec` (ChatGPT subscription; no API key on this machine) with
 `--output-schema` enforcing the shape server-side. It may emit only
 `triggered_by` / `documented_in` / `verifies` and only boundary entity types.
 Results cache by content hash.
+
+## Doctor: the graph asking its own questions
+
+`doctor.ts` codifies defect classes this repo has actually shipped as standing
+queries: **stale-cache** (client module writes a table, invalidates no query
+key), **multi-write** (2+ tables written in one file with no atomic RPC —
+issue #822's class), **dead-db** (live object no app code touches), and
+**untested-writes**. Findings ratchet against `doctor-allowlist.json`:
+`--baseline` grandfathers today's state, CI (`Static Checks`) runs `--strict`
+against a fresh rebuild so new findings fail the PR that introduces them, and
+allowlist entries are deleted as they are cleaned up. Findings are leads, not
+verdicts — e.g. a DB function used only inside RLS policy expressions has no
+incoming graph edge and reads as dead (the graph has no policy→function
+edges).
+
+## Staying fresh, part 2: the committed artifact
+
+Local consumers always get a fresh graph (auto-refresh above), but the
+COMMITTED `graph.json` used to drift for weeks (#796).
+`.github/workflows/codegraph-refresh.yml` now rebuilds the deterministic
+passes on every push to main that touches an input and lands the diff through
+an auto-merged bot PR, mirroring `progress.yml`.
 
 ## Why the LLM does so little
 

@@ -52,6 +52,8 @@ const nodeTestGlobs = [
   ".github/scripts/**/*.test.ts",
   // Harness scripts (feature-tracker gates, etc.) — pure Node, never a DOM.
   "scripts/**/*.test.ts",
+  // Codegraph passes and doctor — pure Node, operate on graph.json.
+  "tools/codegraph/**/*.test.ts",
 ];
 
 export default defineConfig({
