@@ -209,6 +209,11 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     // `square_draft_sale:<id>`; a crash before the reconciled_at stamp leaves a
     // keyed-but-unstamped sale that the next run repairs (re-stamp, never
     // re-allocate), and the sync-log write is deliberately non-fatal.
+    // Residual: exactly-once is app-enforced only — the idempotency index is
+    // non-unique (00215, one key tags several rows), so two CONCURRENT runs
+    // can both pass the alreadyKeyed read and double-allocate when stock
+    // covers 2× the draw. Manual integrations:manage route, low traffic;
+    // closing it means an advisory lock or a 00257-style RPC (see #822).
     const markReconciled = async (saleId: string) => {
       const { error } = await dynamicFrom(admin, "square_draft_sales")
         .update({ reconciled_at: now })
