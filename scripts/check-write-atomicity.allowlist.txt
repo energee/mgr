@@ -46,6 +46,5 @@ src/services/inventory-count-service.ts
 # correct. entity-service.ts and entity-delete-dialog.tsx (5 awaited writes
 # each, on paths every entity in the app flows through) are the two to look at
 # first. Remove each line as its file is fixed — same ratchet as above.
-src/components/domain/packaging/shipping-material-roles-editor.tsx
 src/components/universal/entity-detail-unified.tsx
 src/integrations/mongodb/sync.ts

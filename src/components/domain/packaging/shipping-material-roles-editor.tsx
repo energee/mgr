@@ -142,6 +142,9 @@ export function ShippingMaterialRolesEditor({
     queryClient.invalidateQueries({ queryKey });
   };
 
+  // tx-ok: three independent single-write mutations (set / change / remove),
+  // each fired by a distinct user gesture on one role row — no code path
+  // chains two writes, so a failure never strands a half-applied sequence.
   const insertMutation = useMutation({
     mutationFn: async ({ role, item }: { role: MaterialRole; item: InventoryItem }) => {
       const row: Record<string, unknown> = {
