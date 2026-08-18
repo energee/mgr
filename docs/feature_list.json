@@ -369,11 +369,11 @@
         "00292_portal_available_products.sql"
       ],
       "evidence": "docs/plans/2026-02-08-customer-order-portal-{design,plan}.md, docs/plans/2026-08-12-phase-4-rebaselined.md, e2e/customer-order.spec.ts, e2e/portal-orders.spec.ts",
-      "notes": "E2E covers the staff-side chain end to end (confirm -> FIFO allocate -> schedule -> pick -> pack -> fulfil, asserted DB-side) plus, since Phase 4 node C2, customer-side order placement in portal-orders.spec.ts under the chromium-portal OTP session. Placement rests on three migrations: 00290 (narrow customer INSERT policy pinning status=draft and unit_price NULL), 00291 (order-number guard), 00292 (get_portal_available_products). 00292 exists because the portal's READ path was broken: finished_goods_with_availability is security_invoker over a table gated on inventory:read, a permission the customer role lacks, so the product picker was empty on this surface AND on the older change-request builder. #706's earlier closure covered only the documentation half. Order placement is LIVE-BLOCKED on #818: 00292 is not applied to production, so until it is, the portal product picker is empty there and a customer cannot place an order despite what user_visible_behavior promises. state=passing describes the branch, never the live database — see deployment.",
+      "notes": "E2E covers the staff-side chain end to end (confirm -> FIFO allocate -> schedule -> pick -> pack -> fulfil, asserted DB-side) plus, since Phase 4 node C2, customer-side order placement in portal-orders.spec.ts under the chromium-portal OTP session. Placement rests on three migrations: 00290 (narrow customer INSERT policy pinning status=draft and unit_price NULL), 00291 (order-number guard), 00292 (get_portal_available_products). 00292 exists because the portal's READ path was broken: finished_goods_with_availability is security_invoker over a table gated on inventory:read, a permission the customer role lacks, so the product picker was empty on this surface AND on the older change-request builder. #706's earlier closure covered only the documentation half. 00292 was applied to production on 2026-08-18 (#818), unblocking the live product picker. state=passing describes the branch, never the live database — see deployment.",
       "deployment": {
-        "state": "pending",
-        "pending_since": "2026-08-17",
-        "tracking_issue": 818
+        "state": "live",
+        "observed_live_on": "2026-08-18",
+        "verified_by": ["supabase/live-catalog.snapshot.txt", "#818"]
       }
     },
     {

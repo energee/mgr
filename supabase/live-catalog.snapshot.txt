@@ -51,6 +51,7 @@ FUNC|get_enum_values(p_enum_type text, p_active_only boolean)|5ee344c6230c20627a
 FUNC|get_inventory_overview()|e1070268226b1d91407ab540aefaa027
 FUNC|get_inventory_trends(p_days integer)|7ebcf4de3b90a86ea8fd91a151ad5184
 FUNC|get_planned_batches_by_day(p_days integer)|b81e3103e7c58fbb9715b2b84c6ab043
+FUNC|get_portal_available_products()|49ef9bf75399641fc38ffcce0d1c8c21
 FUNC|get_price_for_customer(p_customer_id uuid, p_format_id uuid, p_brand_id uuid, p_style_id uuid, p_effective_date date)|9e139087b82dddccda575ad301d4b5ee
 FUNC|get_production_trends(p_days integer)|2b59b8943ca59f68b9507fdabfa44071
 FUNC|get_recipe_summary(p_recipe_id uuid)|4a8a8ca1232fb53747f62e4e24ff48ea
