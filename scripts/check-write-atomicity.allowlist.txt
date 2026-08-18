@@ -51,6 +51,5 @@ src/app/api/square/reconcile-draft-sales/route.ts
 src/components/domain/order/customer-pallet-configs.tsx
 src/components/domain/packaging/selling-format-bom-editor.tsx
 src/components/domain/packaging/shipping-material-roles-editor.tsx
-src/components/universal/entity-delete-dialog.tsx
 src/components/universal/entity-detail-unified.tsx
 src/integrations/mongodb/sync.ts
