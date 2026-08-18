@@ -69,6 +69,12 @@ const HOP_TIMING_MAP: Record<string, string> = {
 // Sync log helpers
 // =============================================================================
 
+// tx-ok: replay tooling, safe by idempotency rather than one transaction.
+// Multi-row source aggregates (recipes, transfers, brew logs, readings,
+// packaging) already go through reconcile_mongodb_* RPCs — atomic per source
+// document. The remaining raw writes are re-runnable upserts keyed on stable
+// UUIDs/names (a re-sync repairs a partial run) plus mongodb_sync_log
+// bookkeeping, which is deliberately non-fatal (see completeSyncLog).
 async function createSyncLog(entityType: SyncEntityType, phase: SyncPhase): Promise<string> {
   const admin = await createAdminClient();
   const { data, error } = await dynamicFrom(admin, "mongodb_sync_log")
@@ -337,7 +343,15 @@ async function syncSuppliers(): Promise<SyncResult> {
   // objectId-derived id. Without this the suppliers table re-duplicates on
   // every sync (and now fails the unique name index from migration 00252).
   const admin = await createAdminClient();
-  const { data: existing } = await admin.from("suppliers").select("id, name");
+  // A discarded read error here would empty idByName and turn the upsert into
+  // a duplicate-name collision (suppliers_name_lower_key) — fail loudly like
+  // the other FK-resolution reads (audit SF-5).
+  const { data: existing, error: existingError } = await admin
+    .from("suppliers")
+    .select("id, name");
+  if (existingError) {
+    throw new Error(`Failed to read suppliers for id reuse: ${existingError.message}`);
+  }
   const idByName = new Map(
     (existing ?? []).map((s) => [normalizeSupplierName(s.name), s.id])
   );

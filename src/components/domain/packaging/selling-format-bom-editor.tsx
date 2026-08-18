@@ -115,6 +115,9 @@ export function SellingFormatBOMEditor({
     });
   };
 
+  // tx-ok: three independent single-write mutations (add / blur-save / delete),
+  // each fired by a distinct user gesture on a distinct BOM row — no code path
+  // chains two writes, so a failure never strands a half-applied sequence.
   const insertMutation = useMutation({
     mutationFn: async (item: InventoryItem) => {
       await unwrap(

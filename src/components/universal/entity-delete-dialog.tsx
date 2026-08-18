@@ -64,6 +64,11 @@ export function EntityDeleteDialog({
   const mutation = useMutation({
     mutationFn: async () => {
       loadingIdRef.current = toast.loading(verbing);
+      // tx-ok: every path issues at most one write per record and rows are
+      // independent by design — the single dialog does one UPDATE or DELETE,
+      // bulk soft is one bulk UPDATE, and bulk hard is one bulk DELETE whose
+      // per-row fallback (executeBulkDelete) intentionally lets each row
+      // succeed or fail alone, reporting failures per-row for retry.
       const result = isSoft
         ? await dynamicFrom(supabase, entityTable)
             .update({ is_active: false } as Record<string, unknown>)

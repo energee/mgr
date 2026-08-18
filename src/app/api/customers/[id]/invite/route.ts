@@ -139,6 +139,16 @@ async function ensureCustomerProfile(
   const roles = profile?.roles ?? null;
   if (roles && isPortalUser(roles)) {
     if (profile?.status !== "active") {
+      // tx-ok: safe by compensation, not one transaction. The two DB writes
+      // (profile, then portal link) are adjacent and could share an RPC, but
+      // the provisioning sequence continues with auth-admin metadata and OTP
+      // email calls whose failure must ALSO undo those committed writes — so
+      // compensation is required regardless, and it covers the whole sequence:
+      // compensateNewPortalUser deletes the fresh auth user (profile and link
+      // rows follow via ON DELETE CASCADE), and compensateExistingPortalUser
+      // restores the exact prior profile/link state in FK-safe order (#548,
+      // #605), naming any leftover rows when cleanup itself fails. An RPC for
+      // the write pair would only shrink the compensated window (#822).
       const activatedProfile = await unwrap(
         dynamicFrom(adminDb, "user_profiles")
           .update({ status: "active", updated_at: new Date().toISOString() })
@@ -315,6 +325,7 @@ function errorMessage(error: unknown): string {
 async function compensateNewPortalUser(
   adminDb: AdminClient,
   userId: string,
+  email: string,
   provisioningError: unknown,
 ): Promise<never> {
   const { error: deleteError } =
@@ -324,12 +335,14 @@ async function compensateNewPortalUser(
       {
         provisioningError: errorMessage(provisioningError),
         compensationError: deleteError.message,
+        userId,
+        email,
       },
       "Customer portal provisioning compensation failed",
     );
     throw new ApiError(
       "INTERNAL_ERROR",
-      `Portal provisioning failed (${errorMessage(provisioningError)}), and removing the incomplete account also failed (${deleteError.message}). Repair the account before retrying.`,
+      `Portal provisioning failed (${errorMessage(provisioningError)}), and removing the incomplete account also failed (${deleteError.message}). Repair auth user ${userId} (${email}) before retrying.`,
       500,
     );
   }
@@ -641,6 +654,7 @@ export const POST = withPermission(
         return await compensateNewPortalUser(
           adminDb,
           newUserId,
+          email,
           provisioningError,
         );
       }

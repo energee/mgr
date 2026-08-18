@@ -131,6 +131,9 @@ export function CustomerPalletConfigs({
     });
   };
 
+  // tx-ok: three independent single-write mutations (add / blur-save / delete),
+  // each fired by a distinct user gesture on a distinct row — no code path
+  // chains two writes, so a failure leaves every other row's state truthful.
   const insertMutation = useMutation({
     mutationFn: async (format: SellingFormat) => {
       await unwrap(dynamicFrom(supabase, "customer_pallet_configs")
