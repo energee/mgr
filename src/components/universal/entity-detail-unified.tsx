@@ -1024,6 +1024,10 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
     const loadingId = toast.loading(isCreateMode ? "Creating..." : "Saving...");
     try {
       if (isCreateMode) {
+        // tx-ok: the two writes in this file are the create-mode INSERT and the
+        // no-version-column UPDATE below — mutually exclusive branches of one
+        // save; every save issues exactly one mutation (versioned saves go
+        // through updateWithOptimisticLock, also a single UPDATE).
         const newRow = await unwrap(
           dynamicFrom(supabase, entity.table)
             .insert(result.data)
