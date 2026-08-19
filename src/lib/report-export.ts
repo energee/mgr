@@ -5,8 +5,8 @@
  * Used for TTB compliance reports and other data exports.
  */
 
-import { formatBbl } from "@/lib/format";
 import {
+  formatTtbBbl,
   getTaxClassLabel,
   getTotalScopeCaveat,
   getInProcessBalanceNote,
@@ -229,10 +229,10 @@ function createDataRow(
   const row: CSVRow = { "Line Item": totalScopedLineLabel(reportData, label, field) };
 
   reportData.forEach((r) => {
-    row[getTaxClassLabel(r.ttb_tax_class)] = formatBbl(r[field] || 0);
+    row[getTaxClassLabel(r.ttb_tax_class)] = formatTtbBbl(r[field] || 0);
   });
 
-  row[TOTAL_COLUMN_LABEL] = formatBbl(totalForColumn(reportData, field));
+  row[TOTAL_COLUMN_LABEL] = formatTtbBbl(totalForColumn(reportData, field));
   return row;
 }
 
@@ -251,7 +251,7 @@ export function exportBatchDetailsToCSV(
     "Batch Code": b.batch_code,
     Name: b.name,
     Status: b.status,
-    "Volume (BBL)": formatBbl(b.volume_bbl || 0),
+    "Volume (BBL)": formatTtbBbl(b.volume_bbl || 0),
   }));
 
   // Add total row
@@ -260,7 +260,7 @@ export function exportBatchDetailsToCSV(
     "Batch Code": "TOTAL",
     Name: "",
     Status: "",
-    "Volume (BBL)": formatBbl(total),
+    "Volume (BBL)": formatTtbBbl(total),
   });
 
   const csv = toCSV(rows);
@@ -311,14 +311,14 @@ export function generateTTBPrintHTML(
   // printed Total cannot mean something else (#670).
   function createRow(label: string, field: TTBVolumeField, indent = false): string {
     const cells = reportData
-      .map((r) => `<td style="text-align: right; padding: 8px; border: 1px solid #ccc; font-family: monospace;">${formatBbl(r[field] || 0)}</td>`)
+      .map((r) => `<td style="text-align: right; padding: 8px; border: 1px solid #ccc; font-family: monospace;">${formatTtbBbl(r[field] || 0)}</td>`)
       .join("");
     const total = totalForColumn(reportData, field);
     const labelStyle = indent ? "padding-left: 24px;" : "font-weight: bold;";
     return `<tr>
       <td style="${labelStyle} padding: 8px; border: 1px solid #ccc;">${totalScopedLineLabel(reportData, label, field)}</td>
       ${cells}
-      <td style="text-align: right; padding: 8px; border: 1px solid #ccc; font-family: monospace; font-weight: bold;">${formatBbl(total)}</td>
+      <td style="text-align: right; padding: 8px; border: 1px solid #ccc; font-family: monospace; font-weight: bold;">${formatTtbBbl(total)}</td>
     </tr>`;
   }
 
