@@ -626,8 +626,9 @@ describe("Total column parity (issue #670)", () => {
     const csv = buildTTBReportCSV(rows, 2026, 6);
     const produced = totalScopedLineLabel(rows, "Beer Produced/Packaged", "beer_produced_bbl");
     const producedLine = csv.split("\n").find((l) => l.startsWith(`${produced},`));
-    // Line Item, Cellar, Kegs, Canned/Bottled, Total
-    expect(producedLine?.split(",")).toEqual([produced, "62.5", "40", "25", "65"]);
+    // Line Item, Cellar, Kegs, Canned/Bottled, Total — barrel figures carry the
+    // fixed 2 decimals Form 5130.9 requires (formatTtbBbl), matching the screen.
+    expect(producedLine?.split(",")).toEqual([produced, "62.50", "40.00", "25.00", "65.00"]);
   });
 
   it("heads the column plainly, because its scope is per line, not per column", () => {
