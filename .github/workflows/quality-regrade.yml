@@ -53,7 +53,7 @@ jobs:
 
       - name: Re-grade and open a docs-only PR
         id: agent
-        uses: anthropics/claude-code-action@6b082c41935b4c8a3b8b0ef85ba4ba4d9eeb8975 # v1
+        uses: anthropics/claude-code-action@9d7150bc8a3dae8149739a88019d192b579ad90c # v1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
