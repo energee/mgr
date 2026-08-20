@@ -171,11 +171,11 @@ describe("GitHub Actions performance contracts", () => {
 
   // Public-repo contract (2026-07-24): static, unit and E2E run on EVERY PR —
   // including docs-only ones — so their contexts always report, which is the
-  // precondition for making them required status checks on main. (None is
-  // required today; ruleset 11725742 declares no `required_status_checks`
-  // rule. That is a settings change, not a workflow one.) Only the
-  // hosted-credential build stays on the weekday nightly schedule (design note
-  // in test.yml's header).
+  // precondition for making them required status checks on main — which they
+  // became on 2026-08-12 (#713): ruleset 11725742 now declares a
+  // `required_status_checks` rule naming Static Checks, Unit Tests, E2E Tests
+  // and Database Lint and Integration Tests. Only the hosted-credential build
+  // stays on the weekday nightly schedule (design note in test.yml's header).
   it("keeps the PR lane unsharded and defers only the hosted build to the nightly schedule", () => {
     const workflow = read(".github/workflows/test.yml");
 
@@ -545,10 +545,11 @@ describe("GitHub Actions performance contracts", () => {
     expect(progressWorkflow).toContain("gh pr create");
     expect(progressWorkflow).toContain("gh pr merge");
     // Check compatibility: the bot PR must run the PR checks ([skip ci] would
-    // suppress them) and wait for them via --auto. NB `--auto` only actually
-    // waits where a check is *required*, and none is on `main` today (ruleset
-    // 11725742 has no `required_status_checks` rule) — so this pins the shape,
-    // not a merge-blocking guarantee.
+    // suppress them) and wait for them via --auto. Since #713 the four
+    // contexts ARE required on `main` (ruleset 11725742), so --auto does wait.
+    // The remaining hole is #844: the bot PR is authored with
+    // `secrets.GITHUB_TOKEN`, which triggers no workflows, so the required
+    // contexts never report and --auto waits on checks that will never start.
     expect(progressWorkflow).not.toContain("[skip ci]");
     expect(progressWorkflow).toContain("--auto");
 
