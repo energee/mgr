@@ -1,9 +1,9 @@
 {
- "commit": "5812e0697f70c73c469f1f79f956247071ddd58f",
- "built_at": "2026-08-18T23:26:25.749Z",
+ "commit": "1abfb107aeca601907386390126d9db41e451a5b",
+ "built_at": "2026-08-20T18:39:08.140Z",
  "inputs": {
-  "count": 1376,
-  "digest": "5852b73b318a3cd8"
+  "count": 1377,
+  "digest": "2ff84cf9a5239de9"
  },
  "nodes": [
   {
@@ -26807,6 +26807,14 @@
    "type": "TEST",
    "description": "TEST at src/lib/__tests__/query-client.test.ts.",
    "file_path": "src/lib/__tests__/query-client.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/__tests__/report-export.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/lib/__tests__/report-export.test.ts.",
+   "file_path": "src/lib/__tests__/report-export.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -75844,13 +75852,6 @@
   {
    "source": "src/lib/report-export.ts",
    "predicate": "imports",
-   "target": "src/lib/format.ts",
-   "file_path": "src/lib/report-export.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/lib/report-export.ts",
-   "predicate": "imports",
    "target": "src/domain/ttb-utils.ts",
    "file_path": "src/lib/report-export.ts",
    "extractor": "ast"
@@ -76259,6 +76260,27 @@
    "predicate": "imports",
    "target": "src/lib/query-client.ts",
    "file_path": "src/lib/__tests__/query-client.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/report-export.ts",
+   "predicate": "tested_by",
+   "target": "src/lib/__tests__/report-export.test.ts",
+   "file_path": "src/lib/__tests__/report-export.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/__tests__/report-export.test.ts",
+   "predicate": "imports",
+   "target": "src/lib/report-export.ts",
+   "file_path": "src/lib/__tests__/report-export.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/__tests__/report-export.test.ts",
+   "predicate": "imports",
+   "target": "src/domain/ttb-utils.ts",
+   "file_path": "src/lib/__tests__/report-export.test.ts",
    "extractor": "ast"
   },
   {
