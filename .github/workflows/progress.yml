@@ -46,11 +46,17 @@ jobs:
           git add PROGRESS.md
           # No skip-ci marker: static, unit and E2E report on every PR, so the
           # bot PR must let them run (they pass — nothing depends on
-          # PROGRESS.md) rather than suppressing them. They are NOT required
-          # status checks — ruleset `main` (11725742) declares no
-          # `required_status_checks` rule — so `--auto` below does not actually
-          # wait on them today; keep the marker off anyway, so the day they are
-          # made required this job does not start hanging.
+          # PROGRESS.md) rather than suppressing them. Since 2026-08-12 (#713)
+          # they ARE required status checks on `main`, so `--auto` genuinely
+          # waits on them now.
+          #
+          # KNOWN BREAKAGE, not fixed here (#844): this job authors its PR with
+          # `secrets.GITHUB_TOKEN`, and a GITHUB_TOKEN-authored PR triggers no
+          # workflows at all — so the required contexts never report and the PR
+          # is BLOCKED with nothing red to fix, leaving `--auto` waiting
+          # forever. That is exactly how bot PR #836 stranded (2026-08-18 ->
+          # 2026-08-20). Until this job holds an app or PAT credential, its PRs
+          # need a human close/reopen to make the checks start.
           git commit -m "docs(progress): rebuild PROGRESS.md"
 
           remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"

@@ -1,7 +1,9 @@
 # Nightly generative bug hunt. Finds ONE small, high-confidence defect in
 # recently changed code, fixes it minimally, and opens a PR for human review.
-# Never merges — a human is the gate (the PR checks report but are not
-# required: ruleset `main` declares no `required_status_checks`). Bounded by
+# Never merges — a human is the gate, on top of the four checks ruleset `main`
+# (11725742) has required since 2026-08-12 (#713). This lane opens its PR with
+# an app token rather than `secrets.GITHUB_TOKEN`, which is what keeps those
+# checks running on it at all (#844). Bounded by
 # --max-turns and timeout so a single run's token spend is capped. Only runs on
 # schedule/dispatch, so there is no fork-PR / untrusted-comment trigger surface.
 name: Nightly Bug Patrol

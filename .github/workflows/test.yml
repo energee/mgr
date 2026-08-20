@@ -1,11 +1,17 @@
 # CI model (public repo — Actions minutes are unlimited/free):
 # Static, unit AND Playwright E2E run on EVERY PR, including docs-only ones,
-# so their contexts always report. NOTE: none of them is a *required* status
-# check today — ruleset `main` (id 11725742) declares no `required_status_checks`
-# rule at all, and the branch has no legacy protection, so a red check here is
-# a visible failure but does not block a merge. Making them required is an
-# owner-only repository-settings change (docs/agents/ci.md). What this file
-# controls is that the contexts always report, which is the precondition.
+# so their contexts always report. All three ARE required status checks on
+# `main` as of 2026-08-12 (#713): ruleset `main` (id 11725742) declares a
+# `required_status_checks` rule naming `Static Checks`, `Unit Tests`,
+# `E2E Tests` and `Database Lint and Integration Tests` (db-lint.yml), so a red
+# check here blocks the merge. Older comments claiming none is required are
+# stale — read the ruleset, not the prose.
+#
+# The corollary bit on bot PRs #836/#837 (found 2026-08-20): a required context
+# has to REPORT, and a pull request opened with `secrets.GITHUB_TOKEN` triggers
+# no workflows at all. Such a PR has no `Static Checks` to satisfy and sits
+# BLOCKED forever with nothing red to fix. A job that opens a PR it expects to
+# merge must use an app or PAT credential, never GITHUB_TOKEN.
 #
 # Nothing here is path-filtered, and only `build` carries an event gate:
 # GitHub reports a job that did not run as "skipped", and a skipped check reads
