@@ -1,9 +1,9 @@
 {
- "commit": "a2bb1cb0eea4aa475068b505c00517bbd0ee5eda",
- "built_at": "2026-08-21T19:28:47.438Z",
+ "commit": "747da3d8362ddf8e72460b29f07ff9c2314302c7",
+ "built_at": "2026-08-21T22:54:14.910Z",
  "inputs": {
   "count": 1384,
-  "digest": "91f40126c1b3eb08"
+  "digest": "1a45818f8ee36b8f"
  },
  "nodes": [
   {
@@ -22008,6 +22008,16 @@
    "file_path": "src/hooks/use-persisted-page-size.ts",
    "aliases": [
     "usePersistedPageSize"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/hooks/use-persisted-page-size.ts#usePersistedPagination",
+   "type": "FUNCTION",
+   "description": "Exported function 'usePersistedPagination' in src/hooks/use-persisted-page-size.ts.",
+   "file_path": "src/hooks/use-persisted-page-size.ts",
+   "aliases": [
+    "usePersistedPagination"
    ],
    "extractor": "ast"
   },
@@ -67610,6 +67620,13 @@
    "source": "src/hooks/use-persisted-page-size.ts",
    "predicate": "defines",
    "target": "src/hooks/use-persisted-page-size.ts#usePersistedPageSize",
+   "file_path": "src/hooks/use-persisted-page-size.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/hooks/use-persisted-page-size.ts",
+   "predicate": "defines",
+   "target": "src/hooks/use-persisted-page-size.ts#usePersistedPagination",
    "file_path": "src/hooks/use-persisted-page-size.ts",
    "extractor": "ast"
   },
