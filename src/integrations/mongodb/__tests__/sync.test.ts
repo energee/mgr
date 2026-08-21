@@ -446,7 +446,7 @@ describe("upsertRows error logging (via syncEntity('beer_styles'))", () => {
 // 00288 replay fixes
 // ---------------------------------------------------------------------------
 
-// Status preservation is a DB-side property since 00297: the RPCs'
+// Status preservation is a DB-side property since 00298: the RPCs'
 // ON CONFLICT update omits `status`, so existing rows keep their live value
 // with no app-side read-modify-write TOCTOU window (#855; previously fd60d58
 // for batches, #839 for vessels). App tests therefore pin the RPC name+args
