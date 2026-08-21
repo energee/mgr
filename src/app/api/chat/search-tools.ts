@@ -32,23 +32,23 @@ import { dynamicFrom, type DynamicQueryBuilder } from "@/services/types";
 import { escapeIlikePattern } from "@/lib/supabase/query-helpers";
 
 /** PostgREST predicate an optional search argument maps to. */
-export type SearchPredicate = "eq" | "ilike" | "gte" | "lte";
+type SearchPredicate = "eq" | "ilike" | "gte" | "lte";
 
 /**
  * One optional search argument: the Zod schema the model sees, and the
  * column/predicate it becomes when supplied. `ilike` arguments are wrapped as
  * a `%…%` substring match with LIKE metacharacters escaped.
  */
-export type SearchParam = {
+type SearchParam = {
   op: SearchPredicate;
   column: string;
   schema: z.ZodTypeAny;
 };
 
 /** Arguments a tool was called with, minus `limit`. */
-export type SearchArgs = Record<string, unknown>;
+type SearchArgs = Record<string, unknown>;
 
-export type SearchToolConfig = {
+type SearchToolConfig = {
   /** Tool description shown to the model. */
   description: string;
   /** Table or view to query. */
@@ -71,7 +71,7 @@ export type SearchToolConfig = {
 };
 
 /** Build one search tool bound to an authenticated Supabase client. */
-export function buildSearchTool(
+function buildSearchTool(
   config: SearchToolConfig,
   supabase: SupabaseClient<Database>,
 ) {
@@ -216,7 +216,7 @@ async function annotateYeastGenerations(
  * These names are user-visible: `src/components/domain/shared/chat-panel.tsx`
  * maps them to display labels.
  */
-export const SEARCH_TOOL_CONFIGS: Record<string, SearchToolConfig> = {
+const SEARCH_TOOL_CONFIGS: Record<string, SearchToolConfig> = {
   getFinishedGoods: {
     description:
       "Get finished goods inventory with availability. Filter by brand or selling format.",

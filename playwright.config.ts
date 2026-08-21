@@ -58,11 +58,18 @@ export default defineConfig({
     // Anchored so it does NOT also pick up portal-auth.setup.ts, which writes a
     // different storage state and must run only for the portal project.
     { name: "setup", testMatch: /(^|\/)auth\.setup\.ts$/ },
-    { name: "setup-portal", testMatch: /(^|\/)portal-auth\.setup\.ts$/ },
+    {
+      name: "setup-portal",
+      testMatch: /(^|\/)portal-auth\.setup\.ts$/,
+      // Remove the seeded portal fixtures once every dependent project is done
+      // (#810) — they are real customer/order/auth rows on a shared local DB.
+      teardown: "teardown-portal",
+    },
+    { name: "teardown-portal", testMatch: /(^|\/)portal-auth\.teardown\.ts$/ },
     {
       name: "chromium",
       // Portal specs need the portal session, not the staff one.
-      testIgnore: /(^|\/)portal-.*\.(spec|setup)\.ts$/,
+      testIgnore: /(^|\/)portal-.*\.(spec|setup|teardown)\.ts$/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/user.json",
@@ -93,9 +100,12 @@ export default defineConfig({
       command: process.env.CI ? "bun start" : "bun dev",
       // Probe a lightweight route that also confirms the isolated database is
       // ready. Compiling the full root page exceeded Playwright's implicit
-      // 60-second startup limit on a cold GitHub Actions runner.
+      // 60-second startup limit on a cold GitHub Actions runner. Locally,
+      // `next dev --turbopack`'s cold start can itself exceed 60s (#802), so
+      // the local budget is generous — reuseExistingServer means a warm dev
+      // server skips it entirely.
       url: SERVER_READY_URL,
-      timeout: process.env.CI ? 120_000 : 60_000,
+      timeout: process.env.CI ? 120_000 : 240_000,
       // Next reads PORT, so BASE_URL moves the server and the tests together.
       // Only PORT is listed because Playwright merges this object *over*
       // process.env when it spawns the command — everything the CI job exports

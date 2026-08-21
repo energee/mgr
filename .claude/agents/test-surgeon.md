@@ -2,9 +2,9 @@
 name: test-surgeon
 description: Use when writing new tests, repairing failing tests, or adding characterization coverage before a refactor. MUST BE USED before any refactor touches an untested component under src/components/, src/domain/, or src/services/.
 # tools = Claude Code allowlist (other harnesses ignore)
-tools: "*"  # Was an explicit list, which silently excluded Task and Skill:
-# a dispatched agent could not run refactor-reviewer, /simplify or /code-review
-# and had to self-assess its own diff. Found 2026-08-12 across six nodes.
+tools: "*"  # Confirmed 2026-08-18 (#803): "*" grants Agent + Skill to a
+# dispatched agent, so it can run refactor-reviewer, /simplify and /code-review
+# itself. Was an explicit list, which silently excluded them (2026-08-12).
 capability: read-write
 ---
 

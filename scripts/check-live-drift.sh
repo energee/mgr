@@ -6,9 +6,11 @@
 #
 # 1. Migration chain vs live (#693): compares the numeric version prefixes of
 #    supabase/migrations/*.sql against supabase_migrations.schema_migrations
-#    on live. A committed-but-unapplied migration FAILs (exit 1); a live-only
-#    version (applied but not in the chain — usually an in-flight feature
-#    branch) WARNs. The catalog diff below cannot catch this class: both the
+#    on live. A committed-but-unapplied migration FAILs (exit 4 when the
+#    catalog is otherwise clean — see #812: this is the normal pre-push state,
+#    distinct from real drift so db-push.sh can treat it as informational); a
+#    live-only version (applied but not in the chain — usually an in-flight
+#    feature branch) WARNs. The catalog diff below cannot catch this class: both the
 #    live catalog and the committed snapshot are post-apply artifacts, so a
 #    migration that was never pushed leaves both sides agreeing. Comparison
 #    logic lives in scripts/compare-migration-versions.sh (unit-testable
@@ -145,7 +147,10 @@ fi
 
 # 0 = clean/WARN, 1 = committed-but-unapplied migrations exist. The catalog
 # diff still runs either way; a migration failure is folded into the final
-# exit code so both verdicts appear in one run.
+# exit code so both verdicts appear in one run. When the catalog itself is
+# clean, unapplied migrations exit 4 rather than 1 (#812): that state is the
+# expected precondition of every push, not drift, and db-push.sh must be able
+# to tell the two apart without demanding --rebaseline-drift.
 migrations_rc=0
 bash scripts/compare-migration-versions.sh "$committed_versions" "$live_versions" \
   || migrations_rc=$?
@@ -162,6 +167,11 @@ added="$(LC_ALL=C comm -13 "$SNAPSHOT" "$current")"
 
 if [[ -z "$missing" && -z "$added" ]]; then
   echo "OK: live database catalog matches supabase/live-catalog.snapshot.txt."
+  # 1 -> 4 ONLY here, where the catalog is fully clean: unapplied-migrations-
+  # only, the normal pre-push state (#812, see header). Any catalog delta —
+  # including additions-only WARN — keeps exit 1 below so the pre-push gate
+  # still stops and asks.
+  if (( migrations_rc == 1 )); then exit 4; fi
   exit "$migrations_rc"
 fi
 

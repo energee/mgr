@@ -17,9 +17,11 @@
 # Both gates FAIL CLOSED:
 #
 #   * BEFORE pushing, the live-drift check runs in report mode. Confirmed
-#     pre-existing drift (exit 1) ABORTS the push unless the explicit
+#     pre-existing catalog drift (exit 1) ABORTS the push unless the explicit
 #     --rebaseline-drift flag is passed (the flag is consumed here, not
-#     forwarded to supabase). A connection/config failure (exit 2+) always
+#     forwarded to supabase). Committed-but-unapplied migrations with a clean
+#     catalog (exit 4) are informational — that is the precondition of every
+#     push, not drift (#812). A connection/config failure (exit 2/3) always
 #     aborts — the post-push refresh would fail the same way, leaving the
 #     push applied with a stale snapshot.
 #   * AFTER the refresh, every line present in the old snapshot but absent
@@ -75,8 +77,17 @@ else
 fi
 precheck_rc=0
 bash scripts/check-live-drift.sh || precheck_rc=$?
-# Exit 1 is the only "drift confirmed" code; anything else (2 = config/
-# connection error, 3 = psql query failure, ...) means the check never ran.
+# Exit 1 = catalog drift confirmed. Exit 4 = committed-but-unapplied
+# migrations with a clean catalog — the normal state before every push, and
+# exactly what the push resolves, so it is informational here (#812).
+# Anything else (2 = config/connection error, 3 = psql query failure, ...)
+# means the check never ran.
+if [[ $precheck_rc -eq 4 ]]; then
+  echo ""
+  echo "Unapplied committed migrations found (see above) and the live catalog"
+  echo "matches the snapshot — no drift. Continuing: this push applies them."
+  precheck_rc=0
+fi
 if [[ $precheck_rc -ne 0 && $precheck_rc -ne 1 ]]; then
   echo "" >&2
   echo "ERROR: the pre-push drift check could not run (see above). Refusing to" >&2
