@@ -63,6 +63,7 @@ check-agent-config: ## Validate shared agent skills, worktree tooling, and shell
 	@bash scripts/check-agent-config.sh
 	@bash scripts/__tests__/agent-worktree.test.sh
 	@bash scripts/__tests__/compare-migration-versions.test.sh
+	@bash scripts/__tests__/pr-review-gate.test.sh
 
 check-db: ## DB rule checks (security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / schema_registry / data-model docs / permissive RLS)
 	@bun run scripts/check-security-invoker.ts
