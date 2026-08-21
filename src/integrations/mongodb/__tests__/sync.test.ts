@@ -335,6 +335,9 @@ describe("upsertRows error logging (via syncEntity('beer_styles'))", () => {
     const result = await syncEntity("beer_styles");
 
     expect(result).toMatchObject({ entityType: "beer_styles", synced: 0, failed: 1 });
+    // A failed chunk upsert retries row-by-row (so one bad row doesn't fail
+    // the whole chunk); with a single style in this fixture, the retry logs
+    // the same underlying error again, now tagged with that row's identity.
     expect(mockedLoggerError).toHaveBeenCalledWith(
       {
         err: expect.objectContaining({
@@ -343,8 +346,99 @@ describe("upsertRows error logging (via syncEntity('beer_styles'))", () => {
         table: "beer_styles",
         batchIndex: 0,
       },
-      "Upsert error"
+      "Upsert error, retrying chunk row-by-row"
     );
+    expect(mockedLoggerError).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({
+          message: "null value in column \"name\" violates not-null constraint",
+        }),
+        table: "beer_styles",
+        mongoId: "Stout",
+      },
+      "Upsert error (row retry)"
+    );
+  });
+
+  it("isolates one bad row in a chunk instead of failing every row in it", async () => {
+    // The batched upsert fails (simulating a trigger-raised error on one row);
+    // the row-by-row retry then succeeds for the good rows and fails only the
+    // bad one, instead of reporting all 3 as failed.
+    mockedGetMongoDb.mockResolvedValue(
+      makeDb({
+        styles: [
+          { _id: new ObjectId("111111111111111111111111"), name: "Pilsner" },
+          { _id: new ObjectId("222222222222222222222222"), name: "" },
+          { _id: new ObjectId("333333333333333333333333"), name: "Stout" },
+        ],
+      })
+    );
+
+    const responses = [
+      { data: null, error: { message: "batch upsert failed" } }, // chunked upsert
+      { data: [{}], error: null }, // retry: Pilsner
+      { data: null, error: { message: "null value in column \"name\" violates not-null constraint" } }, // retry: ""
+      { data: [{}], error: null }, // retry: Stout
+    ];
+    const { admin } = makeAdminMock(
+      {
+        mongodb_sync_log: { data: { id: "log-1" }, error: null },
+        beer_styles: () => responses.shift()!,
+      },
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    const result = await syncEntity("beer_styles");
+
+    expect(result).toMatchObject({ entityType: "beer_styles", synced: 2, failed: 1 });
+    expect(result.errors).toEqual([
+      { mongoId: "", error: "null value in column \"name\" violates not-null constraint" },
+    ]);
+  });
+
+  it("bails out of the row-by-row retry after consecutive failures instead of grinding through a systemically-broken chunk", async () => {
+    // Every row fails the same way (e.g. a missing column) — after
+    // MAX_CONSECUTIVE_FAILURES straight failures with nothing synced, the
+    // retry gives up on the rest of the chunk rather than re-issuing all 5
+    // rows as separate round-trips.
+    mockedGetMongoDb.mockResolvedValue(
+      makeDb({
+        styles: [1, 2, 3, 4, 5].map((n) => ({
+          _id: new ObjectId(n.toString().repeat(24).slice(0, 24)),
+          name: `Bad${n}`,
+        })),
+      })
+    );
+
+    const systemicError = { message: "column \"category\" of relation \"beer_styles\" does not exist" };
+    // Only 4 responses configured (1 batch + 3 individual retries): if the
+    // implementation doesn't bail out after 3 consecutive failures, the 5th
+    // call finds no queued response left and the test fails loudly.
+    const responses = [
+      { data: null, error: systemicError },
+      { data: null, error: systemicError },
+      { data: null, error: systemicError },
+      { data: null, error: systemicError },
+    ];
+    const { admin } = makeAdminMock(
+      {
+        mongodb_sync_log: { data: { id: "log-1" }, error: null },
+        beer_styles: () => responses.shift()!,
+      },
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+
+    const result = await syncEntity("beer_styles");
+
+    expect(result).toMatchObject({ entityType: "beer_styles", synced: 0, failed: 5 });
+    expect(result.errors).toEqual([
+      { mongoId: "Bad1", error: systemicError.message },
+      { mongoId: "Bad2", error: systemicError.message },
+      { mongoId: "Bad3", error: systemicError.message },
+      { mongoId: "chunk-aborted-after-3-consecutive-failures", error: systemicError.message },
+    ]);
   });
 });
 

@@ -109,6 +109,11 @@ async function completeSyncLog(
 // Generic upsert helper
 // =============================================================================
 
+/** Parse a PostgREST `onConflict` spec ("id" or "a,b") into its column names. */
+function parseConflictColumns(onConflict: string): string[] {
+  return onConflict.split(",").map((c) => c.trim());
+}
+
 /**
  * Drop rows that share an onConflict key with an earlier row in the same array
  * (last one wins). A single upsert() call maps to one INSERT ... ON CONFLICT
@@ -129,7 +134,7 @@ function dedupeByConflictKey(
   onConflict: string,
   table: string
 ): Record<string, unknown>[] {
-  const conflictColumns = onConflict.split(",").map((c) => c.trim());
+  const conflictColumns = parseConflictColumns(onConflict);
   const hasConflictKey = (row: Record<string, unknown>) =>
     conflictColumns.every((c) => row[c] !== undefined);
 
@@ -156,6 +161,77 @@ function dedupeByConflictKey(
   return [...seen.values(), ...passthrough];
 }
 
+/** Best-effort row identifier for error reporting when a row has no `id` (e.g. name-keyed upserts). */
+function rowIdentifier(row: Record<string, unknown>, onConflict: string): string {
+  const conflictColumn = parseConflictColumns(onConflict)[0] ?? "id";
+  const candidate = row.id ?? row[conflictColumn];
+  return typeof candidate === "string" || typeof candidate === "number" ? String(candidate) : "unknown";
+}
+
+/**
+ * Retry a chunk row-by-row after its batched upsert failed. A single bad row
+ * (e.g. a check_violation raised by a trigger, not just an ON CONFLICT
+ * collision — dedupeByConflictKey already handles that case) rolls back the
+ * whole `INSERT ... ON CONFLICT` statement, so without this every other row
+ * in the chunk is reported failed even though only one row is actually bad
+ * (same collateral-damage shape Sentry MGR-18 diagnosed for a single bad
+ * historical vessel_transfers row tripping handle_vessel_transfer's occupancy
+ * guard — vessel_transfers itself no longer goes through this function; it
+ * moved to reconcile_mongodb_transfers in 00288, before this change).
+ *
+ * A systemic failure (bad column, permissions, every row rejected the same
+ * way) looks identical to a bad row at the start of a chunk, so bail out
+ * after MAX_CONSECUTIVE_FAILURES straight failures with nothing yet synced
+ * and fail the remainder in bulk — otherwise a table-wide outage turns one
+ * fast chunk failure into up to BATCH_SIZE sequential round-trips per chunk,
+ * risking the sync route's 60s request budget for no extra signal.
+ */
+const MAX_CONSECUTIVE_FAILURES = 3;
+/** Cap on individually-logged/reported row errors per chunk — the same bound `syncBatchReadings`/`syncPackagingSessions` use for their error slices, so one bad chunk can't blow up `mongodb_sync_log.error_details` or Sentry volume. */
+const MAX_ROW_ERRORS_REPORTED = 10;
+
+async function upsertRowsIndividually(
+  admin: AdminClient,
+  table: string,
+  rows: Record<string, unknown>[],
+  onConflict: string,
+  chunkError: string
+): Promise<{ synced: number; failed: number; errors: Array<{ mongoId: string; error: string }> }> {
+  let synced = 0;
+  let failed = 0;
+  let consecutiveFailures = 0;
+  const errors: Array<{ mongoId: string; error: string }> = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    if (synced === 0 && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      const remaining = rows.length - i;
+      failed += remaining;
+      // Always recorded, even when row errors already filled the cap — the
+      // abort is the most important error in the chunk.
+      errors.push({ mongoId: `chunk-aborted-after-${i}-consecutive-failures`, error: chunkError });
+      break;
+    }
+
+    const row = rows[i]!;
+    const { error } = await dynamicFrom(admin, table)
+      .upsert([row], { onConflict, ignoreDuplicates: false });
+    if (error) {
+      failed++;
+      consecutiveFailures++;
+      const mongoId = rowIdentifier(row, onConflict);
+      if (errors.length < MAX_ROW_ERRORS_REPORTED) {
+        logger.error({ err: error, table, mongoId }, "Upsert error (row retry)");
+        errors.push({ mongoId, error: error.message });
+      }
+    } else {
+      synced++;
+      consecutiveFailures = 0;
+    }
+  }
+
+  return { synced, failed, errors };
+}
+
 async function upsertRows(
   table: string,
   rows: Record<string, unknown>[],
@@ -176,21 +252,22 @@ async function upsertRows(
     const { error } = await dynamicFrom(admin, table)
       .upsert(batch, { onConflict, ignoreDuplicates: false });
 
-    if (error) {
-      // Pass the PostgrestError instance itself (not a message-only printf
-      // template) so logger.ts's `instanceof Error` check routes this to
-      // Sentry.captureException with the real message/stack/code (audit
-      // SENTRY-7542174707 — a bare printf template here silently degraded to
-      // a generic captureMessage with no table/batch/error diagnostic).
-      logger.error({ err: error, table, batchIndex: i / BATCH_SIZE }, "Upsert error");
-      failed += batch.length;
-      errors.push({
-        mongoId: `batch-${i / BATCH_SIZE}`,
-        error: error.message,
-      });
-    } else {
+    if (!error) {
       synced += batch.length;
+      continue;
     }
+
+    // Pass the PostgrestError instance itself (not a message-only printf
+    // template) so logger.ts's `instanceof Error` check routes this to
+    // Sentry.captureException with the real message/stack/code (audit
+    // SENTRY-7542174707 — a bare printf template here silently degraded to
+    // a generic captureMessage with no table/batch/error diagnostic).
+    logger.error({ err: error, table, batchIndex: i / BATCH_SIZE }, "Upsert error, retrying chunk row-by-row");
+
+    const retried = await upsertRowsIndividually(admin, table, batch, onConflict, error.message);
+    synced += retried.synced;
+    failed += retried.failed;
+    errors.push(...retried.errors);
   }
 
   return { synced, failed, errors };
@@ -821,7 +898,7 @@ async function syncBatchReadings(): Promise<SyncResult> {
   const combined = {
     synced: reconciled.synced,
     failed: reconciled.failed + errors.length,
-    errors: [...reconciled.errors, ...errors.slice(0, 10)],
+    errors: [...reconciled.errors, ...errors.slice(0, MAX_ROW_ERRORS_REPORTED)],
   };
 
   await completeSyncLog(logId, combined);
@@ -1078,7 +1155,7 @@ async function syncPackagingSessions(): Promise<SyncResult> {
 
   const combined = mergeResults(...results);
   combined.failed += lineErrors.length;
-  combined.errors.push(...lineErrors.slice(0, 10).map((error) => ({
+  combined.errors.push(...lineErrors.slice(0, MAX_ROW_ERRORS_REPORTED).map((error) => ({
     ...error,
     error: `phase=4 entity=packaging_sessions operation=resolve-line: ${error.error}`,
   })));
