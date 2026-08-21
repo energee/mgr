@@ -84,8 +84,9 @@ export async function saveTokens(
   opts?: { expectedRefreshToken?: string }
 ): Promise<{ saved: boolean }> {
   const admin = await createAdminClient();
+  const isRefresh = opts?.expectedRefreshToken !== undefined;
 
-  if (opts?.expectedRefreshToken !== undefined) {
+  if (isRefresh) {
     // tx-ok: the CAS below and the 3-row upsert after it are two PostgREST
     // requests, deliberately ordered so every crash window self-heals: the
     // refresh token (the one-shot credential) commits first, so a crash
@@ -100,7 +101,7 @@ export async function saveTokens(
       .from("system_settings")
       .update({ value: tokens.refreshToken })
       .eq("key", SETTINGS_KEYS.refreshToken)
-      .eq("value", JSON.stringify(opts.expectedRefreshToken))
+      .eq("value", JSON.stringify(opts!.expectedRefreshToken))
       .select("key");
     if (error) throw new Error(`Failed to save QBO tokens: ${error.message}`);
     if (!data || data.length === 0) return { saved: false };
@@ -111,9 +112,7 @@ export async function saveTokens(
     { key: SETTINGS_KEYS.realmId, value: tokens.realmId },
     { key: SETTINGS_KEYS.expiresAt, value: tokens.expiresAt },
     // Refresh path: the CAS above already wrote the refresh-token row.
-    ...(opts?.expectedRefreshToken === undefined
-      ? [{ key: SETTINGS_KEYS.refreshToken, value: tokens.refreshToken }]
-      : []),
+    ...(isRefresh ? [] : [{ key: SETTINGS_KEYS.refreshToken, value: tokens.refreshToken }]),
   ];
   const { error } = await admin
     .from("system_settings")
