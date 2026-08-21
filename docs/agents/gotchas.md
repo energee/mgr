@@ -188,49 +188,29 @@ touch $(git rev-parse --git-dir)/pr-review-ok && gh pr create ...   # ALWAYS DEN
 separate tool calls** — `touch` first, then `gh pr create` on its own. There
 is no chaining operator that evades this, and none should be looked for.
 
-**The marker's location depends on the SESSION's cwd, not on the worktree your
-command `cd`s into.** The hook runs `git rev-parse --git-dir` in the *hook
-process's* cwd. The hook fires **before** your command, so a `cd` inside that
-command has not happened yet and cannot affect it. Both readings of #786 are
-therefore true, of different sessions — verified 2026-08-12, both observed:
-
-| Session cwd | Hook checks |
-|---|---|
-| the worktree (entered via `EnterWorktree`) | `<main>/.git/worktrees/<name>/pr-review-ok` |
-| the main checkout (a subagent that `cd`s per Bash call) | `<main>/.git/pr-review-ok` |
-
-So a subagent working in a worktree usually has to touch the **main
-checkout's** marker, while a session rooted in the worktree has to touch the
-worktree's. If you are denied with the marker apparently in place, print
+**The marker's location follows the SESSION's cwd, not the worktree your
+command `cd`s into.** Since #786 the gate lives in
+`scripts/hooks/pr-review-gate.sh` (unit-tested in
+`scripts/__tests__/pr-review-gate.test.sh`) and resolves the git-dir from the
+hook payload's `cwd` — the session's working directory. A session rooted in a
+worktree checks `<main>/.git/worktrees/<name>/pr-review-ok`; one rooted in the
+main checkout checks `<main>/.git/pr-review-ok`. The hook fires **before**
+your command, so a `cd` inside the gated command itself cannot move the
+resolution. If you are denied with the marker apparently in place, print
 `pwd` and `git rev-parse --git-dir` with **no** `cd` — that is the path the
-hook used. Do not hardcode either one as "the fix": the resolution is correct
-as written, and the marker is consumed per PR by a paired `PostToolUse` hook,
-so forcing a shared one would let one worktree spend another's.
+hook used. The marker is consumed per PR by the paired `PostToolUse` mode of
+the same script, resolved the same way, so one worktree cannot spend
+another's.
 
-**The matcher has no shell-quoting awareness, and it is not limited to `gh`.**
-`grep` is line-oriented and `^` anchors at every line start, so the phrase
-appearing inside a quoted string, a heredoc body, or a PR body draft trips the
-gate even though nothing would execute. Observed 2026-08-12: a **`git commit
--F -`** whose heredoc message *described* this very footgun was denied, because
-the message body contained the phrase on its own line. The hook matches on the
-`Bash` tool, not on the program being run — any command whose text contains the
-phrase is denied, `git commit` included. Pass PR bodies with `--body-file`,
-never inline, and keep the phrase out of commit messages (describe it, e.g.
-"the PR-create gate", rather than quoting it). Conversely it
-under-matches — `$(gh pr create ...)`, `xargs gh pr create`, `gh --repo x pr
-create` all slip past — so treat it as a reminder, not an enforcement boundary.
-A quoting-aware version would have to strip quoted spans and heredoc bodies
-before matching, e.g.
-
-```sh
-jq -r '.tool_input.command // ""' \
-  | perl -0777 -pe "s/<<-?['\"]?(\w+)['\"]?.*?^\1\$//gms; s/'[^']*'//g; s/\"(\\\\.|[^\"\\\\])*\"//g" \
-  | grep -qE '(^|[;&|] *)gh +pr +create'
-```
-
-…but `.claude/settings.json` is harness configuration: agents must not edit
-their own hooks or permissions, and the sandbox denies writes there. Applying
-that change is an owner action.
+**The matcher strips heredoc bodies and quoted spans before matching (#786),
+but still under-matches.** `scripts/hooks/pr-review-gate.sh` removes heredoc
+bodies and single/double-quoted spans first, so the phrase appearing as *data*
+(an issue-comment body, a commit message, an `echo`) no longer trips the gate
+— the 2026-08-12 `git commit -F -` denial is fixed. The stripping is
+line-oriented and approximate: if a command is denied that shouldn't be,
+prefer `--body-file` over inline bodies. Conversely it under-matches —
+`$(gh pr create ...)`, `xargs gh pr create`, `gh --repo x pr create` all slip
+past — so treat it as a reminder, not an enforcement boundary.
 
 **`/code-review` and `/simplify` have no repo-side definition, so nothing in
 this repo can scope them to your worktree (#785).** Verified 2026-08-12: they
