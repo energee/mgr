@@ -1,13 +1,15 @@
 /**
- * saveTokens optimistic-lock tests (#840).
+ * saveTokens persistence tests (#840, #855).
  *
- * The refresh path must compare-and-swap the qbo_refresh_token row against the
- * token the refresh consumed, and discard the whole write when a concurrent
- * refresh (another serverless instance) already rotated it — last-write-wins
- * here strands the QBO connection with a dead pair.
+ * Persistence is one `save_qbo_tokens_atomic` RPC (00297): all four
+ * system_settings rows commit in a single transaction, and on the refresh
+ * path the RPC compare-and-swaps DB-side against the refresh token this
+ * refresh consumed — a concurrent refresh (another serverless instance)
+ * that already rotated the pair makes it return false, and last-write-wins
+ * here would strand the QBO connection with a dead pair.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { makeAdminMock, type Write } from "@/test/supabase-admin-mock";
+import { makeAdminMock } from "@/test/supabase-admin-mock";
 
 vi.mock("@/lib/supabase/server", () => ({
   createAdminClient: vi.fn(),
@@ -26,19 +28,10 @@ const TOKENS = {
   expiresAt: "2026-01-01T00:00:00.000Z",
 };
 
-let casFilters: unknown[][] = [];
-
-function setup(casMatches: boolean): Write[] {
-  casFilters = [];
-  const { admin, writes } = makeAdminMock({
-    system_settings: ({ ops, calls }) => {
-      if (!ops.includes("update")) return { data: [], error: null };
-      casFilters.push(...calls.filter((c) => c.method === "eq").map((c) => c.args));
-      return { data: casMatches ? [{ key: "qbo_refresh_token" }] : [], error: null };
-    },
-  });
+function setup(rpcResult: { data: unknown; error: { message: string } | null }) {
+  const { admin, writes, rpcCalls } = makeAdminMock({}, { rpc: rpcResult });
   mockedCreateAdminClient.mockResolvedValue(admin as never);
-  return writes;
+  return { writes, rpcCalls };
 }
 
 beforeEach(() => {
@@ -46,42 +39,48 @@ beforeEach(() => {
 });
 
 describe("saveTokens", () => {
-  it("refresh path: CAS hit persists, without rewriting the refresh row in the upsert", async () => {
-    const writes = setup(true);
+  it("refresh path: passes the consumed refresh token as the CAS expectation", async () => {
+    const { rpcCalls, writes } = setup({ data: true, error: null });
 
     const result = await saveTokens(TOKENS, { expectedRefreshToken: "rt-old" });
 
     expect(result).toEqual({ saved: true });
-    const update = writes.find((w) => w.op === "update");
-    expect(update?.row).toEqual({ value: "rt-new" });
-    // `value` is JSONB: the CAS filter must be the JSON-encoded literal, or
-    // PostgREST rejects the cast with 22P02 (verified against local
-    // PostgREST 2026-08-21) and every refresh-path persist fails.
-    expect(casFilters).toContainEqual(["value", JSON.stringify("rt-old")]);
-    const upsert = writes.find((w) => w.op === "upsert");
-    const keys = (upsert?.row as Array<{ key: string }>).map((r) => r.key);
-    expect(keys).toEqual(["qbo_access_token", "qbo_realm_id", "qbo_token_expires_at"]);
+    expect(rpcCalls).toEqual([
+      {
+        fn: "save_qbo_tokens_atomic",
+        args: {
+          p_access_token: "at-new",
+          p_refresh_token: "rt-new",
+          p_realm_id: "realm-1",
+          p_expires_at: "2026-01-01T00:00:00.000Z",
+          p_expected_refresh_token: "rt-old",
+        },
+      },
+    ]);
+    // Everything goes through the RPC — no direct table writes remain.
+    expect(writes).toHaveLength(0);
   });
 
-  it("refresh path: CAS miss discards the write entirely", async () => {
-    const writes = setup(false);
+  it("refresh path: CAS miss (RPC returns false) reports saved: false", async () => {
+    setup({ data: false, error: null });
 
     const result = await saveTokens(TOKENS, { expectedRefreshToken: "rt-stale" });
 
     expect(result).toEqual({ saved: false });
-    expect(writes.filter((w) => w.op === "upsert")).toHaveLength(0);
   });
 
-  it("connect path: no expected token, all four rows upserted unconditionally", async () => {
-    const writes = setup(true);
+  it("connect path: no expected token, CAS expectation is null (unconditional write)", async () => {
+    const { rpcCalls } = setup({ data: true, error: null });
 
     const result = await saveTokens(TOKENS);
 
     expect(result).toEqual({ saved: true });
-    expect(writes.filter((w) => w.op === "update")).toHaveLength(0);
-    const upsert = writes.find((w) => w.op === "upsert");
-    const keys = (upsert?.row as Array<{ key: string }>).map((r) => r.key);
-    expect(keys).toContain("qbo_refresh_token");
-    expect(keys).toHaveLength(4);
+    expect(rpcCalls[0]?.args).toMatchObject({ p_expected_refresh_token: null });
+  });
+
+  it("throws on RPC error", async () => {
+    setup({ data: null, error: { message: "boom" } });
+
+    await expect(saveTokens(TOKENS)).rejects.toThrow("Failed to save QBO tokens: boom");
   });
 });

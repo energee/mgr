@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { dynamicRpc } from "@/services/types";
 
 type QBOTokens = {
   accessToken: string;
@@ -64,15 +65,16 @@ export async function getClientCredentials(): Promise<{ clientId: string; client
 /**
  * Persist a QBO token set.
  *
- * `expectedRefreshToken` (the refresh path) adds an optimistic lock (#840):
- * the in-process single-flight guard in client.ts only dedups refreshes within
+ * One `save_qbo_tokens_atomic` RPC (00297): all four rows commit in a single
+ * transaction, serialized by an advisory xact lock. `expectedRefreshToken`
+ * (the refresh path) makes it a DB-side compare-and-swap (#840): the
+ * in-process single-flight guard in client.ts only dedups refreshes within
  * one serverless instance, so two instances can both refresh against Intuit
- * and race to persist. The refresh-token row is written with a compare-and-
- * swap against the token this refresh consumed; if it no longer matches, a
- * concurrent refresh already persisted a newer pair and this write is
- * discarded (`saved: false`) instead of clobbering it last-write-wins.
- * Omitting `expectedRefreshToken` (the OAuth connect path) writes
- * unconditionally.
+ * and race to persist. If the stored refresh token no longer matches the one
+ * this refresh consumed, a concurrent refresh already persisted a newer pair
+ * and this write is discarded (`saved: false`) instead of clobbering it
+ * last-write-wins. Omitting `expectedRefreshToken` (the OAuth connect path)
+ * writes unconditionally.
  */
 export async function saveTokens(
   tokens: {
@@ -84,41 +86,15 @@ export async function saveTokens(
   opts?: { expectedRefreshToken?: string }
 ): Promise<{ saved: boolean }> {
   const admin = await createAdminClient();
-  const isRefresh = opts?.expectedRefreshToken !== undefined;
-
-  if (isRefresh) {
-    // tx-ok: the CAS below and the 3-row upsert after it are two PostgREST
-    // requests, deliberately ordered so every crash window self-heals: the
-    // refresh token (the one-shot credential) commits first, so a crash
-    // before the upsert leaves an old-but-consistent access/expiry pair whose
-    // next refresh reads the already-persisted new refresh token. A CAS miss
-    // writes nothing.
-    //
-    // `value` is JSONB and supabase-js stores these tokens as JSON strings,
-    // so the filter must compare against the JSON-encoded literal — a raw
-    // token is not valid JSON and PostgREST would reject the cast (22P02).
-    const { data, error } = await admin
-      .from("system_settings")
-      .update({ value: tokens.refreshToken })
-      .eq("key", SETTINGS_KEYS.refreshToken)
-      .eq("value", JSON.stringify(opts!.expectedRefreshToken))
-      .select("key");
-    if (error) throw new Error(`Failed to save QBO tokens: ${error.message}`);
-    if (!data || data.length === 0) return { saved: false };
-  }
-
-  const rows = [
-    { key: SETTINGS_KEYS.accessToken, value: tokens.accessToken },
-    { key: SETTINGS_KEYS.realmId, value: tokens.realmId },
-    { key: SETTINGS_KEYS.expiresAt, value: tokens.expiresAt },
-    // Refresh path: the CAS above already wrote the refresh-token row.
-    ...(isRefresh ? [] : [{ key: SETTINGS_KEYS.refreshToken, value: tokens.refreshToken }]),
-  ];
-  const { error } = await admin
-    .from("system_settings")
-    .upsert(rows, { onConflict: "key" });
+  const { data, error } = await dynamicRpc(admin, "save_qbo_tokens_atomic", {
+    p_access_token: tokens.accessToken,
+    p_refresh_token: tokens.refreshToken,
+    p_realm_id: tokens.realmId,
+    p_expires_at: tokens.expiresAt,
+    p_expected_refresh_token: opts?.expectedRefreshToken ?? null,
+  });
   if (error) throw new Error(`Failed to save QBO tokens: ${error.message}`);
-  return { saved: true };
+  return { saved: data === true };
 }
 
 export async function clearTokens(): Promise<void> {

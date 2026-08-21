@@ -1,0 +1,1 @@
+- **2026-08-21 (QBO token persist made atomic).** Replaced #850's app-side two-request CAS with `save_qbo_tokens_atomic` (00297, the 00257/00293 advisory-lock pattern): all four qbo_* system_settings rows commit in one transaction and the refresh-path compare-and-swap moves DB-side (`to_jsonb`), removing the supabase-js JSONB-encoding coupling and the torn CAS-miss window (#855).
