@@ -1,9 +1,9 @@
 {
- "commit": "1abfb107aeca601907386390126d9db41e451a5b",
- "built_at": "2026-08-20T18:39:08.140Z",
+ "commit": "19e714d7b3d4f4b2c5d1ef784ab7bd9b48bda4d5",
+ "built_at": "2026-08-21T15:09:12.521Z",
  "inputs": {
-  "count": 1377,
-  "digest": "2ff84cf9a5239de9"
+  "count": 1380,
+  "digest": "a466d2b7c1fb7456"
  },
  "nodes": [
   {
@@ -1018,6 +1018,15 @@
    "name": "reconcile_mongodb_transfers",
    "type": "DB_FUNCTION",
    "description": "Postgres function reconcile_mongodb_transfers(p_rows jsonb), confirmed live.",
+   "file_path": "supabase/live-catalog.snapshot.txt",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "snapshot"
+  },
+  {
+   "name": "reconcile_square_draft_sale_atomic",
+   "type": "DB_FUNCTION",
+   "description": "Postgres function reconcile_square_draft_sale_atomic(p_sale_id uuid, p_rows jsonb, p_reconciled_at timestamp with time zone), confirmed live.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -11583,6 +11592,14 @@
    "extractor": "sql"
   },
   {
+   "name": "00293_reconcile_draft_sale_atomic.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00293_reconcile_draft_sale_atomic.sql.",
+   "file_path": "supabase/migrations/00293_reconcile_draft_sale_atomic.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
    "name": "20260416162155_remote_applied.sql",
    "type": "MIGRATION",
    "description": "Migration 20260416162155_remote_applied.sql.",
@@ -12091,6 +12108,14 @@
    "type": "TEST",
    "description": "TEST at src/__tests__/integration/square-draft-sales-schema.test.ts.",
    "file_path": "src/__tests__/integration/square-draft-sales-schema.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/square-reconcile-draft-sale-atomic.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/square-reconcile-draft-sale-atomic.test.ts.",
+   "file_path": "src/__tests__/integration/square-reconcile-draft-sale-atomic.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -15946,26 +15971,6 @@
    "description": "Source module at src/app/api/chat/search-tools.ts.",
    "file_path": "src/app/api/chat/search-tools.ts",
    "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/app/api/chat/search-tools.ts#buildSearchTool",
-   "type": "FUNCTION",
-   "description": "Exported function 'buildSearchTool' in src/app/api/chat/search-tools.ts.",
-   "file_path": "src/app/api/chat/search-tools.ts",
-   "aliases": [
-    "buildSearchTool"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/app/api/chat/search-tools.ts#SEARCH_TOOL_CONFIGS",
-   "type": "FUNCTION",
-   "description": "Exported function 'SEARCH_TOOL_CONFIGS' in src/app/api/chat/search-tools.ts.",
-   "file_path": "src/app/api/chat/search-tools.ts",
-   "aliases": [
-    "SEARCH_TOOL_CONFIGS"
-   ],
    "extractor": "ast"
   },
   {
@@ -26409,6 +26414,14 @@
    "type": "TEST",
    "description": "TEST at src/integrations/quickbooks/__tests__/sync-utils.test.ts.",
    "file_path": "src/integrations/quickbooks/__tests__/sync-utils.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/integrations/quickbooks/__tests__/token-manager.test.ts.",
+   "file_path": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -53625,6 +53638,13 @@
    "extractor": "sql"
   },
   {
+   "source": "00293_reconcile_draft_sale_atomic.sql",
+   "predicate": "creates",
+   "target": "reconcile_square_draft_sale_atomic",
+   "file_path": "supabase/migrations/00293_reconcile_draft_sale_atomic.sql",
+   "extractor": "sql"
+  },
+  {
    "source": "src/lib/sentry-config.ts",
    "predicate": "defines",
    "target": "src/lib/sentry-config.ts#sentryBaseConfig",
@@ -57532,22 +57552,8 @@
   },
   {
    "source": "src/app/api/chat/search-tools.ts",
-   "predicate": "defines",
-   "target": "src/app/api/chat/search-tools.ts#buildSearchTool",
-   "file_path": "src/app/api/chat/search-tools.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/app/api/chat/search-tools.ts",
    "predicate": "reads_from",
    "target": "yeasts",
-   "file_path": "src/app/api/chat/search-tools.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/app/api/chat/search-tools.ts",
-   "predicate": "defines",
-   "target": "src/app/api/chat/search-tools.ts#SEARCH_TOOL_CONFIGS",
    "file_path": "src/app/api/chat/search-tools.ts",
    "extractor": "ast"
   },
@@ -60705,6 +60711,13 @@
    "source": "src/app/api/square/reconcile-draft-sales/route.ts",
    "predicate": "reads_from",
    "target": "allocations",
+   "file_path": "src/app/api/square/reconcile-draft-sales/route.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/api/square/reconcile-draft-sales/route.ts",
+   "predicate": "invokes",
+   "target": "reconcile_square_draft_sale_atomic",
    "file_path": "src/app/api/square/reconcile-draft-sales/route.ts",
    "extractor": "ast"
   },
@@ -75742,6 +75755,34 @@
    "predicate": "imports",
    "target": "src/integrations/quickbooks/sync-utils.ts",
    "file_path": "src/integrations/quickbooks/__tests__/sync-utils.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/integrations/quickbooks/token-manager.ts",
+   "predicate": "tested_by",
+   "target": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
+   "file_path": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
+   "predicate": "imports",
+   "target": "src/test/supabase-admin-mock.ts",
+   "file_path": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
+   "predicate": "imports",
+   "target": "src/lib/supabase/server.ts",
+   "file_path": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
+   "predicate": "imports",
+   "target": "src/integrations/quickbooks/token-manager.ts",
+   "file_path": "src/integrations/quickbooks/__tests__/token-manager.test.ts",
    "extractor": "ast"
   },
   {
