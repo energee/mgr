@@ -34,7 +34,6 @@ export type QueuedResponse = FakeResponse | { rejectWith: unknown };
 const CHAIN_METHODS = [
   "select",
   "eq",
-  "neq",
   "in",
   "gt",
   "gte",

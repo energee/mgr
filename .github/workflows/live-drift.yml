@@ -69,15 +69,20 @@ jobs:
             echo "::warning::SUPABASE_DB_URL secret is not configured; skipping live-drift check (non-schedule run)."
             exit 0
           fi
-          # Distinguish real drift (exit 1 from the script) from infra failure
+          # Distinguish real drift (exit 1 = catalog drift, exit 4 =
+          # committed-but-unapplied migrations, #812) from infra failure
           # (missing secret above, psql connection errors = exit 2) so the
           # issue upsert below only fires on genuine drift.
           if bash scripts/check-live-drift.sh; then
             echo "drift=false" >> "$GITHUB_OUTPUT"
           else
             rc=$?
-            if [ "$rc" -eq 1 ]; then
+            if [ "$rc" -eq 1 ] || [ "$rc" -eq 4 ]; then
               echo "drift=true" >> "$GITHUB_OUTPUT"
+            fi
+            # kind defaults to catalog in the consumer (${KIND:-catalog}).
+            if [ "$rc" -eq 4 ]; then
+              echo "kind=unapplied" >> "$GITHUB_OUTPUT"
             fi
             exit "$rc"
           fi
@@ -94,9 +99,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          KIND: ${{ steps.drift.outputs.kind }}
         run: |
           set -euo pipefail
-          title="Live DB drift detected (snapshot vs live catalog)"
+          # Exit 4 means committed-but-unapplied migrations with a CLEAN
+          # catalog (#812) — the issue must say so, not claim catalog drift.
+          if [ "$KIND" = "unapplied" ]; then
+            title="Committed migrations not applied to live"
+            body="The scheduled live-drift watchdog found committed migrations in \`supabase/migrations/\` that are not applied to the live database (the catalog itself matches the snapshot): ${RUN_URL}
+
+          Apply them with \`scripts/db-push.sh\`. Maintained by \`.github/workflows/live-drift.yml\`; closed automatically on the next clean run."
+          else
+            title="Live DB drift detected (snapshot vs live catalog)"
+            body="The scheduled live-drift watchdog found the live database catalog out of sync with \`supabase/live-catalog.snapshot.txt\`: ${RUN_URL}
+
+          See the run log for the exact missing/changed objects. Maintained by \`.github/workflows/live-drift.yml\`; closed automatically on the next clean run."
+          fi
           gh label create live-drift --repo "$REPO" \
             --color D93F0B --description "Live database drifted from committed snapshot" \
             2>/dev/null || true
@@ -104,12 +122,10 @@ jobs:
             --json number --jq '.[0].number // empty')"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$REPO" \
-              --body "Drift still present on the latest scheduled check: ${RUN_URL}"
+              --body "Still failing on the latest scheduled check (${KIND:-catalog}): ${RUN_URL}"
           else
             gh issue create --repo "$REPO" --title "$title" --label live-drift \
-              --body "The scheduled live-drift watchdog found the live database catalog out of sync with \`supabase/live-catalog.snapshot.txt\`: ${RUN_URL}
-
-          See the run log for the exact missing/changed objects. Maintained by \`.github/workflows/live-drift.yml\`; closed automatically on the next clean run."
+              --body "$body"
           fi
 
       # A watchdog that can only report "drift" has no way to say "I am blind".

@@ -98,9 +98,10 @@ export async function POST(req: Request): Promise<Response> {
     log.error({ type, logId: log_id, error: result.error }, "Slack notification failed");
   }
 
-  // Update log entry
+  // Update log entry — this table is the only operator-facing record of Slack
+  // delivery outcomes, so a failed status write must at least leave a log trail (#841).
   if (log_id) {
-    await admin
+    const { data: updated, error: logErr } = await admin
       .from("slack_notification_log")
       .update({
         status: result.ok ? "sent" : "failed",
@@ -108,7 +109,18 @@ export async function POST(req: Request): Promise<Response> {
         sent_at: result.ok ? new Date().toISOString() : null,
         channel: slackSettings.channel_overrides[type] ?? slackSettings.default_channel ?? null,
       })
-      .eq("id", log_id);
+      .eq("id", log_id)
+      .select("id");
+    if (logErr) {
+      log.error(
+        { err: logErr.message, logId: log_id },
+        "Failed to update slack_notification_log status"
+      );
+    } else if (!updated || updated.length === 0) {
+      // Zero rows matched is not a PostgREST error — without this check a
+      // missing/invisible log row would still leave no trail.
+      log.error({ logId: log_id }, "slack_notification_log row not found for status update");
+    }
   }
 
   return NextResponse.json({ ok: result.ok, error: result.error });
