@@ -446,15 +446,20 @@ describe("upsertRows error logging (via syncEntity('beer_styles'))", () => {
 // 00288 replay fixes
 // ---------------------------------------------------------------------------
 
-describe("syncBatches status preservation (via syncEntity)", () => {
-  it("keeps the existing PG status for a batch the live app has moved on", async () => {
-    // currentVessel set → transformBatch derives "fermenting", but PG already
-    // says "completed" and the server-side state machine allows no way back.
+// Status preservation is a DB-side property since 00297: the RPCs'
+// ON CONFLICT update omits `status`, so existing rows keep their live value
+// with no app-side read-modify-write TOCTOU window (#855; previously fd60d58
+// for batches, #839 for vessels). App tests therefore pin the RPC name+args
+// contract — rows go through the RPC untouched (Mongo status included, which
+// the DB uses only on first insert), never through a direct table upsert.
+
+describe("syncBatches status-preserving RPC (via syncEntity)", () => {
+  it("routes rows through sync_upsert_batches instead of a direct upsert", async () => {
     const BATCH_OID = new ObjectId("abababababababababababab");
     const batchUuid = objectIdToUuid(BATCH_OID.toString());
-    const { admin, writes } = makeAdminMock(
-      pgTables({ batches: { data: [{ id: batchUuid, status: "completed" }], error: null } }),
-      { onUnknownTable: "throw" }
+    const { admin, writes, rpcCalls } = makeAdminMock(
+      pgTables(),
+      { onUnknownTable: "throw", rpc: { data: 1, error: null } }
     );
     mockedCreateAdminClient.mockResolvedValue(admin as never);
     mockedGetMongoDb.mockResolvedValue(
@@ -466,28 +471,29 @@ describe("syncBatches status preservation (via syncEntity)", () => {
       })
     );
 
-    await syncEntity("batches");
+    const result = await syncEntity("batches");
 
-    const upsert = writes.find((w) => w.table === "batches" && w.op === "upsert");
-    expect(upsert).toBeDefined();
-    const rows = upsert!.row as Array<{ id: string; status: string }>;
-    expect(rows.find((r) => r.id === batchUuid)?.status).toBe("completed");
+    const rpc = rpcCalls.filter((c) => c.fn === "sync_upsert_batches");
+    expect(rpc).toHaveLength(1);
+    const rows = (rpc[0]!.args as { p_rows: Array<Record<string, unknown>> }).p_rows;
+    expect(rows).toEqual([expect.objectContaining({
+      id: batchUuid,
+      name: "B1",
+      // The transformed Mongo status ships as-is — the DB ignores it for
+      // existing rows (ON CONFLICT omits status) and uses it on first insert.
+      status: "fermenting",
+    })]);
+    // The batches table must never see a direct client-side upsert.
+    expect(writes.filter((w) => w.table === "batches")).toHaveLength(0);
+    expect(result).toMatchObject({ entityType: "batches", synced: 1, failed: 0, errors: [] });
   });
 });
 
-describe("syncVessels status preservation (via syncEntity)", () => {
-  it("keeps the existing PG status for a vessel the live app occupies", async () => {
-    // Mongo's frozen snapshot says "ready_for_use", but PG says "in_use" —
-    // vessels has no transition trigger to reject the regression (#839), so
-    // the sync must preserve the live status itself.
-    const { admin, writes } = makeAdminMock(
-      pgTables({
-        vessels: {
-          data: [{ id: "pg-vessel-1", name: "FV1", status: "in_use" }],
-          error: null,
-        },
-      }),
-      { onUnknownTable: "throw" }
+describe("syncVessels status-preserving RPC (via syncEntity)", () => {
+  it("routes rows through sync_upsert_vessels instead of a direct upsert", async () => {
+    const { admin, writes, rpcCalls } = makeAdminMock(
+      pgTables(),
+      { onUnknownTable: "throw", rpc: { data: 2, error: null } }
     );
     mockedCreateAdminClient.mockResolvedValue(admin as never);
     mockedGetMongoDb.mockResolvedValue(
@@ -500,15 +506,53 @@ describe("syncVessels status preservation (via syncEntity)", () => {
       })
     );
 
-    await syncEntity("vessels");
+    const result = await syncEntity("vessels");
 
-    const upsert = writes.find((w) => w.table === "vessels" && w.op === "upsert");
-    expect(upsert).toBeDefined();
-    const rows = upsert!.row as Array<{ name: string; status: string }>;
-    // Known vessel: live PG status wins over the frozen Mongo snapshot.
-    expect(rows.find((r) => r.name === "FV1")?.status).toBe("in_use");
-    // New vessel: Mongo still decides the initial status.
-    expect(rows.find((r) => r.name === "FV2")?.status).toBe("dirty");
+    const rpc = rpcCalls.filter((c) => c.fn === "sync_upsert_vessels");
+    expect(rpc).toHaveLength(1);
+    const rows = (rpc[0]!.args as { p_rows: Array<Record<string, unknown>> }).p_rows;
+    expect(rows).toEqual([
+      expect.objectContaining({ name: "FV1", status: "ready_for_use" }),
+      expect.objectContaining({ name: "FV2", status: "dirty" }),
+    ]);
+    expect(writes.filter((w) => w.table === "vessels")).toHaveLength(0);
+    expect(result).toMatchObject({ entityType: "vessels", synced: 2, failed: 0, errors: [] });
+  });
+
+  it("falls back to row-by-row RPC calls when the whole-batch call fails", async () => {
+    // First call (both rows) fails; the retry isolates the bad row: FV1's
+    // single-row call fails again, FV2's succeeds — synced 1, failed 1,
+    // mirroring upsertRows' retry philosophy.
+    const responses = [
+      { data: null, error: { message: "invalid input value for enum vessel_status" } },
+      { data: null, error: { message: "invalid input value for enum vessel_status" } },
+      { data: 1, error: null },
+    ];
+    const { admin, rpcCalls } = makeAdminMock(
+      pgTables(),
+      { onUnknownTable: "throw", rpc: () => responses.shift()! }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+    mockedGetMongoDb.mockResolvedValue(
+      makeDb({
+        ...MONGO_COLLECTIONS,
+        vessels: [
+          { _id: new ObjectId("afafafafafafafafafafafaf"), name: "FV1", state: "bogus" },
+          { _id: new ObjectId("bcbcbcbcbcbcbcbcbcbcbcbc"), name: "FV2", state: "dirty" },
+        ],
+      })
+    );
+
+    const result = await syncEntity("vessels");
+
+    expect(rpcCalls.filter((c) => c.fn === "sync_upsert_vessels")).toHaveLength(3);
+    // Each retry call carries exactly one row.
+    const retryRows = rpcCalls.slice(1).map((c) => (c.args as { p_rows: unknown[] }).p_rows.length);
+    expect(retryRows).toEqual([1, 1]);
+    expect(result).toMatchObject({ entityType: "vessels", synced: 1, failed: 1 });
+    expect(result.errors).toEqual([
+      { mongoId: "FV1", error: "invalid input value for enum vessel_status" },
+    ]);
   });
 });
 

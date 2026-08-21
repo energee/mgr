@@ -303,25 +303,73 @@ async function selectRowsByKey<T>(
 
 
 /**
- * Overwrite each row's `status` with the live PG value for rows PG already
- * has, keyed by `keyColumn` — the frozen Mongo snapshot must not regress live
- * state on re-sync (fd60d58 for batches, #839 for vessels). Mongo still sets
- * status on first insert of a row PG has never seen.
+ * Upsert vessel/batch rows through a status-preserving RPC
+ * (`sync_upsert_vessels` / `sync_upsert_batches`, 00297): the DB-side
+ * ON CONFLICT update omits `status`, so an existing row's live status is
+ * never written — the frozen Mongo snapshot cannot regress live state on
+ * re-sync (fd60d58 for batches, #839 for vessels), and unlike the previous
+ * app-side read-modify-write there is no TOCTOU window for a live transition
+ * to be clobbered in (#855). Mongo still sets status on first insert of a
+ * row PG has never seen. The RPC dedups intra-payload conflict keys itself.
+ *
+ * If the whole-batch call fails, retry row-by-row (same philosophy and
+ * bail-out bounds as `upsertRowsIndividually`) so one bad row doesn't zero
+ * the sync and per-row errors are reported.
  */
-async function preserveExistingStatuses(
+async function upsertRowsStatusPreserving(
   admin: AdminClient,
-  table: string,
+  fn: string,
   rows: Array<Record<string, unknown>>,
   keyColumn: string
-): Promise<void> {
-  const existing = await selectRowsByKey<Record<string, string>>(
-    admin, table, `${keyColumn}, status`, rows.map((row) => row[keyColumn] as string), keyColumn
-  );
-  const statuses = new Map(existing.map((r) => [r[keyColumn], r.status]));
-  for (const row of rows) {
-    const current = statuses.get(row[keyColumn] as string);
-    if (current !== undefined) row.status = current;
+): Promise<{ synced: number; failed: number; errors: Array<{ mongoId: string; error: string }> }> {
+  if (rows.length === 0) return { synced: 0, failed: 0, errors: [] };
+
+  // PostgrestError extends Error, but unwrap can also surface plain
+  // `{ message }` shapes (and the test mock throws one) — same extraction
+  // as reconcileAggregate.
+  const messageOf = (error: unknown): string =>
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message: unknown }).message)
+      : String(error);
+
+  let chunkError: string;
+  try {
+    const data = await unwrap<number>(dynamicRpc(admin, fn, { p_rows: rows }));
+    return { synced: typeof data === "number" ? data : Number(data ?? 0), failed: 0, errors: [] };
+  } catch (error) {
+    chunkError = messageOf(error);
+    logger.error({ err: error, fn }, "Status-preserving upsert RPC failed, retrying row-by-row");
   }
+
+  let synced = 0;
+  let failed = 0;
+  let consecutiveFailures = 0;
+  const errors: Array<{ mongoId: string; error: string }> = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    if (synced === 0 && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      failed += rows.length - i;
+      errors.push({ mongoId: `chunk-aborted-after-${i}-consecutive-failures`, error: chunkError });
+      break;
+    }
+
+    const row = rows[i]!;
+    try {
+      await unwrap<number>(dynamicRpc(admin, fn, { p_rows: [row] }));
+      synced++;
+      consecutiveFailures = 0;
+    } catch (error) {
+      failed++;
+      consecutiveFailures++;
+      const mongoId = rowIdentifier(row, keyColumn);
+      if (errors.length < MAX_ROW_ERRORS_REPORTED) {
+        logger.error({ err: error, fn, mongoId }, "Status-preserving upsert RPC error (row retry)");
+        errors.push({ mongoId, error: messageOf(error) });
+      }
+    }
+  }
+
+  return { synced, failed, errors };
 }
 
 /** Call an aggregate reconciliation RPC and preserve phase/entity/operation context. */
@@ -567,10 +615,11 @@ async function syncVessels(): Promise<SyncResult> {
   // no transition trigger to reject the regression — a plain re-sync would
   // silently mark an in-use vessel "ready_for_use" while current_batch_id
   // (not in the transform's column set) stays stale (#839; same guard as
-  // syncBatches, fd60d58). Mongo still sets status on first insert.
-  await preserveExistingStatuses(admin, "vessels", rows, "name");
-
-  const result = await upsertRows("vessels", rows, "name");
+  // syncBatches, fd60d58). Preservation lives DB-side in sync_upsert_vessels
+  // (00297) — its ON CONFLICT update omits `status`, closing the TOCTOU race
+  // the old app-side read-modify-write had (#855). Mongo still sets status on
+  // first insert.
+  const result = await upsertRowsStatusPreserving(admin, "sync_upsert_vessels", rows, "name");
 
   await completeSyncLog(logId, result);
   return { entityType: "vessels", phase: 2, ...result };
@@ -784,10 +833,13 @@ async function syncBatches(): Promise<SyncResult> {
   // rejects regressions outright — a legacy Mongo doc still saying "fermenting"
   // against a PG batch that completed fails the whole upsert chunk
   // ("Invalid state transition: completed -> fermenting", 2026-08-12 sync).
-  // Mongo still sets status on first insert of a batch PG has never seen.
-  await preserveExistingStatuses(admin, "batches", rows as Array<Record<string, unknown>>, "id");
-
-  const result = await upsertRows("batches", rows, "id");
+  // Preservation lives DB-side in sync_upsert_batches (00297) — its
+  // ON CONFLICT update omits `status`, closing the TOCTOU race the old
+  // app-side read-modify-write had (fd60d58, #855). Mongo still sets status
+  // on first insert of a batch PG has never seen.
+  const result = await upsertRowsStatusPreserving(
+    admin, "sync_upsert_batches", rows as Array<Record<string, unknown>>, "id"
+  );
 
   await completeSyncLog(logId, result);
   return { entityType: "batches", phase: 3, ...result };
