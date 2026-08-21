@@ -23,12 +23,15 @@
  *   constant computeUnitFillVolumeBbl and the 00203 SQL use.
  * - Exactly-once per draft sale: every allocation row carries
  *   idempotency_key `square_draft_sale:<id>` (the 00215 pattern — one key may
- *   tag SEVERAL rows when a sale spans lots), and all rows for one sale are
- *   inserted in a SINGLE statement so a guard rejection lands none of them.
- *   square_draft_sales.reconciled_at (00243) marks the row done; a re-run
- *   skips keyed sales and repairs a missing reconciled_at stamp. Rows the
- *   refund webhook voided (voided_at, 00241) are excluded — a refunded pour
- *   must never become a TTB removal.
+ *   tag SEVERAL rows when a sale spans lots). The key check, the allocation
+ *   insert, and the square_draft_sales.reconciled_at stamp (00243) run as ONE
+ *   transaction in `reconcile_square_draft_sale_atomic` (00293), serialized
+ *   per sale by an advisory xact lock — so concurrent runs cannot
+ *   double-allocate (#834), a guard rejection lands none of the rows, and a
+ *   re-run repairs a missing stamp without re-inserting. Rows the refund
+ *   webhook voided (voided_at, 00241) are excluded at read time AND
+ *   re-checked inside the transaction — a refunded pour must never become a
+ *   TTB removal.
  * - Per-row failures (guard_allocation_availability rejection, missing
  *   volume_oz, insufficient keg availability) are surfaced in the response and
  *   the draft_reconcile square_sync_log row; the batch continues — one bad row
@@ -45,7 +48,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { logSyncFailure } from "@/integrations/square/route-helpers";
 import type { SquareSyncType } from "@/integrations/square/types";
 import { computeUnitFillVolumeBbl, OZ_PER_BARREL } from "@/domain/consumption-planning";
-import { dynamicFrom } from "@/services/types";
+import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { logger } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/square/reconcile-draft-sales" });
@@ -204,38 +207,36 @@ export const POST = withPermission("integrations:manage", async (_request, { use
     const failures: Failure[] = [];
     const now = new Date().toISOString();
 
-    // tx-ok: crash-safe by idempotency rather than one transaction. All
-    // allocations for a sale land in a SINGLE insert statement keyed
-    // `square_draft_sale:<id>`; a crash before the reconciled_at stamp leaves a
-    // keyed-but-unstamped sale that the next run repairs (re-stamp, never
-    // re-allocate), and the sync-log write is deliberately non-fatal.
-    // Residual: exactly-once is app-enforced only — the idempotency index is
-    // non-unique (00215, one key tags several rows), so two CONCURRENT runs
-    // can both pass the alreadyKeyed read and double-allocate when stock
-    // covers 2× the draw. Manual integrations:manage route, low traffic;
-    // closing it means an advisory lock or a 00257-style RPC (see #822).
-    const markReconciled = async (saleId: string) => {
-      const { error } = await dynamicFrom(admin, "square_draft_sales")
-        .update({ reconciled_at: now })
-        .eq("id", saleId);
-      return error as { message: string } | null;
+    // tx-ok: check-key + allocation insert + reconciled_at stamp are one
+    // transaction in reconcile_square_draft_sale_atomic (00293), serialized
+    // per sale by an advisory xact lock — concurrent runs cannot
+    // double-allocate (#834). The only writes outside it are the deliberately
+    // non-fatal square_sync_log summary below.
+    const reconcileAtomic = async (saleId: string, rows: unknown[]) => {
+      const { data, error } = await dynamicRpc(admin, "reconcile_square_draft_sale_atomic", {
+        p_sale_id: saleId,
+        p_rows: rows,
+        p_reconciled_at: now,
+      });
+      if (error) return { outcome: null, error: error.message };
+      return { outcome: data as "inserted" | "already_keyed" | "voided", error: null };
     };
 
     for (const sale of sales) {
       const key = keyFor(sale.id);
 
-      // Already allocated (idempotent re-run, or a crash before the stamp):
-      // never re-insert; repair the missing reconciled_at stamp instead.
+      // Already allocated (idempotent re-run, or a crash before 00293's
+      // atomic stamp existed): the RPC re-stamps without re-inserting.
       if (alreadyKeyed.has(key)) {
-        const markError = await markReconciled(sale.id);
-        if (markError) {
+        const { outcome, error } = await reconcileAtomic(sale.id, []);
+        if (error) {
           failures.push({
             draftSaleId: sale.id,
-            error: `Already allocated but reconciled_at re-stamp failed: ${markError.message} — re-run to repair`,
+            error: `Already allocated but reconciled_at re-stamp failed: ${error} — re-run to repair`,
           });
           continue;
         }
-        alreadyReconciled++;
+        if (outcome === "already_keyed") alreadyReconciled++;
         continue;
       }
 
@@ -275,47 +276,43 @@ export const POST = withPermission("integrations:manage", async (_request, { use
         continue;
       }
 
-      // ONE insert statement for the whole sale: PostgREST executes it as a
-      // single statement, so a guard_allocation_availability rejection on any
-      // row lands NONE of them — the idempotency key stays unclaimed and the
-      // failure is retryable.
-      const inserts = draws.map((d) => ({
-        source_type: "finished_good",
+      // The whole sale lands (or not) in ONE transaction: the RPC claims the
+      // key, inserts every row, and stamps reconciled_at together, so a
+      // guard_allocation_availability rejection on any row lands NONE of
+      // them — the key stays unclaimed and the failure is retryable. The RPC
+      // derives the idempotency key from the sale id itself.
+      const rows = draws.map((d) => ({
         source_id: d.lot.id,
-        destination_type: "taproom_sale",
-        destination_id: null,
         quantity: d.kegs,
         volume_bbl: d.bbl,
-        reason_code: "other",
-        status: "completed",
         // The SALE time, not the reconcile time — TTB removals must land in
         // the period the beer actually left (same choice as the webhook's
         // packaged path using event.created_at).
         completed_at: sale.sold_at,
         notes: `Square draft sale reconciliation (order ${sale.square_order_id})`,
-        idempotency_key: key,
       }));
-      const { error: insertError } = await dynamicFrom(admin, "allocations").insert(inserts);
-      if (insertError) {
+      const { outcome, error: rpcError } = await reconcileAtomic(sale.id, rows);
+      if (rpcError) {
         // Most commonly guard_allocation_availability (00212) rejecting a
         // concurrent-consumption race; surfaced per row, batch continues.
-        failures.push({ draftSaleId: sale.id, error: insertError.message });
+        failures.push({ draftSaleId: sale.id, error: rpcError });
+        continue;
+      }
+
+      if (outcome === "already_keyed") {
+        // A concurrent run won the per-sale lock and allocated first; its
+        // rows are the truth and ours were discarded inside the transaction.
+        alreadyReconciled++;
+        continue;
+      }
+      if (outcome === "voided") {
+        // Refund webhook voided the sale after our read; nothing was written.
+        log.info({ draftSaleId: sale.id }, "Draft sale voided mid-run; skipped");
         continue;
       }
 
       // Commit the in-memory decrements only after the DB accepted the draw.
       for (const d of draws) d.lot.availableKegs -= d.kegs;
-
-      const markError = await markReconciled(sale.id);
-      if (markError) {
-        // Allocations ARE recorded; the key protects the re-run, which will
-        // take the repair path above instead of double-allocating.
-        failures.push({
-          draftSaleId: sale.id,
-          error: `Allocations recorded but reconciled_at stamp failed: ${markError.message} — re-run to repair`,
-        });
-        continue;
-      }
 
       reconciled++;
       totalVolumeBbl += saleBbl;
