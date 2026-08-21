@@ -4,6 +4,15 @@ When writing SQL migrations, follow every rule below. Full rationale in
 [`docs/spec/architecture.md`](../spec/architecture.md) (DEC-SEC-001 through
 DEC-SEC-003).
 
+## The RLS model in one paragraph
+
+MGR is **single-tenant**: there is no `org_id`/tenancy column anywhere. RLS is
+**role-based**, enforced through `user_has_permission()` (since migration
+00092) against roles cached on `user_profiles`. Do not conflate "no
+multi-tenancy" with "no RLS" — every policied table still needs RLS enabled,
+and new tables get permission-checked policies, not `USING (true)` (documented
+exceptions carry a `check-permissive-rls: skip` comment).
+
 ## Views: use `security_invoker = true`
 
 ```sql
