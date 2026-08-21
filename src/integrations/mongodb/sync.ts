@@ -274,20 +274,23 @@ async function upsertRows(
 }
 
 /**
- * Chunked `.in("id", …)` select. Unbounded selects silently truncate at
- * PostgREST's 1000-row response cap; chunking by the ids we actually need
+ * Chunked `.in(keyColumn, …)` select. Unbounded selects silently truncate at
+ * PostgREST's 1000-row response cap; chunking by the keys we actually need
  * keeps reads complete and bounded. Chunks run in parallel.
  */
-async function selectRowsByIds<T>(
+async function selectRowsByKey<T>(
   admin: AdminClient,
   table: string,
   columns: string,
-  ids: string[]
+  keys: string[],
+  keyColumn: string = "id"
 ): Promise<T[]> {
   const CHUNK = 200;
   const results = await Promise.all(
-    Array.from({ length: Math.ceil(ids.length / CHUNK) }, (_, i) =>
-      dynamicFrom(admin, table).select(columns).in("id", ids.slice(i * CHUNK, (i + 1) * CHUNK))
+    Array.from({ length: Math.ceil(keys.length / CHUNK) }, (_, i) =>
+      dynamicFrom(admin, table)
+        .select(columns)
+        .in(keyColumn, keys.slice(i * CHUNK, (i + 1) * CHUNK))
     )
   );
   const rows: T[] = [];
@@ -296,6 +299,29 @@ async function selectRowsByIds<T>(
     rows.push(...((result.data ?? []) as T[]));
   }
   return rows;
+}
+
+
+/**
+ * Overwrite each row's `status` with the live PG value for rows PG already
+ * has, keyed by `keyColumn` — the frozen Mongo snapshot must not regress live
+ * state on re-sync (fd60d58 for batches, #839 for vessels). Mongo still sets
+ * status on first insert of a row PG has never seen.
+ */
+async function preserveExistingStatuses(
+  admin: AdminClient,
+  table: string,
+  rows: Array<Record<string, unknown>>,
+  keyColumn: string
+): Promise<void> {
+  const existing = await selectRowsByKey<Record<string, string>>(
+    admin, table, `${keyColumn}, status`, rows.map((row) => row[keyColumn] as string), keyColumn
+  );
+  const statuses = new Map(existing.map((r) => [r[keyColumn], r.status]));
+  for (const row of rows) {
+    const current = statuses.get(row[keyColumn] as string);
+    if (current !== undefined) row.status = current;
+  }
 }
 
 /** Call an aggregate reconciliation RPC and preserve phase/entity/operation context. */
@@ -531,9 +557,19 @@ async function syncBrands(): Promise<SyncResult> {
 async function syncVessels(): Promise<SyncResult> {
   const logId = await createSyncLog("vessels", 2);
   const db = await requireMongoDb();
+  const admin = await createAdminClient();
 
   const docs = await db.collection<MongoVessel>("vessels").find().toArray();
   const rows = docs.map(transformVessel);
+
+  // For vessels PG already knows, keep the live PG status: the frozen Mongo
+  // snapshot says nothing about current occupancy, and unlike batches there is
+  // no transition trigger to reject the regression — a plain re-sync would
+  // silently mark an in-use vessel "ready_for_use" while current_batch_id
+  // (not in the transform's column set) stays stale (#839; same guard as
+  // syncBatches, fd60d58). Mongo still sets status on first insert.
+  await preserveExistingStatuses(admin, "vessels", rows, "name");
+
   const result = await upsertRows("vessels", rows, "name");
 
   await completeSyncLog(logId, result);
@@ -749,14 +785,7 @@ async function syncBatches(): Promise<SyncResult> {
   // against a PG batch that completed fails the whole upsert chunk
   // ("Invalid state transition: completed -> fermenting", 2026-08-12 sync).
   // Mongo still sets status on first insert of a batch PG has never seen.
-  const existingBatches = await selectRowsByIds<{ id: string; status: string }>(
-    admin, "batches", "id, status", rows.map((row) => row.id as string)
-  );
-  const existingStatuses = new Map(existingBatches.map((b) => [b.id, b.status]));
-  for (const row of rows) {
-    const current = existingStatuses.get(row.id as string);
-    if (current !== undefined) (row as Record<string, unknown>).status = current;
-  }
+  await preserveExistingStatuses(admin, "batches", rows as Array<Record<string, unknown>>, "id");
 
   const result = await upsertRows("batches", rows, "id");
 
@@ -946,14 +975,14 @@ async function syncPackagingSessions(): Promise<SyncResult> {
   )];
   const [mongoRecipeDocs, pgBatchRows] = await Promise.all([
     db.collection<MongoRecipe>("recipes").find().toArray(),
-    selectRowsByIds<{ id: string; recipe_id: string | null }>(
+    selectRowsByKey<{ id: string; recipe_id: string | null }>(
       admin, "batches", "id, recipe_id", referencedPgBatchIds
     ),
   ]);
   const mongoRecipeIdToBeer = new Map(
     mongoRecipeDocs.filter((r) => r.beer).map((r) => [r._id.toString(), r.beer!.toString()])
   );
-  const pgRecipeRows = await selectRowsByIds<{ id: string; brand_id: string | null }>(
+  const pgRecipeRows = await selectRowsByKey<{ id: string; brand_id: string | null }>(
     admin, "recipes", "id, brand_id",
     [...new Set(pgBatchRows.map((b) => b.recipe_id).filter((id): id is string => !!id))]
   );
