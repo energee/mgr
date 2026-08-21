@@ -9,7 +9,7 @@ In-app notification records.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| user_id | UUID | FK to auth.users (NULL for brewery-wide) |
+| user_id | UUID | FK to auth.users ON DELETE CASCADE (00295) |
 | type | TEXT | Notification type (see types below) |
 | title | TEXT | Notification title |
 | message | TEXT | Notification message |
@@ -27,7 +27,7 @@ User preferences for notification channels per type.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| user_id | UUID | FK to auth.users |
+| user_id | UUID | FK to auth.users ON DELETE CASCADE (00295) |
 | preferences | JSONB | Channel preferences per type |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
