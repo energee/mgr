@@ -111,6 +111,7 @@ FUNC|reconcile_mongodb_brew_aggregate(p_mongo_id text, p_brew_log jsonb, p_batch
 FUNC|reconcile_mongodb_packaging_aggregate(p_mongo_id text, p_session jsonb, p_lines jsonb)|9ad48f0b34e5c14124a0a8808ade6979
 FUNC|reconcile_mongodb_recipe_aggregate(p_mongo_id text, p_recipe jsonb, p_malts jsonb, p_hops jsonb, p_yeasts jsonb)|09cc6e4a6d1526343a66c53d3b641c78
 FUNC|reconcile_mongodb_transfers(p_rows jsonb)|34b12e3d71f087b0960961c53d448924
+FUNC|reconcile_square_draft_sale_atomic(p_sale_id uuid, p_rows jsonb, p_reconciled_at timestamp with time zone)|0ed3f5bc72ef396b283b632db2cae224
 FUNC|record_keg_transaction(p_transaction_type keg_transaction_type, p_selling_format_id uuid, p_quantity integer, p_from_state keg_state, p_to_state keg_state, p_from_location_id uuid, p_to_location_id uuid, p_order_id uuid, p_customer_id uuid, p_packaging_session_id uuid, p_batch_id uuid, p_finished_good_id uuid, p_notes text, p_created_by_name text, p_from_bin_id uuid, p_to_bin_id uuid)|83aebf35de59859e5065793c60bfe3ee
 FUNC|reject_order_change_request(p_order_id uuid, p_change_request_id uuid, p_reason text)|8afd65c0b568089395cb8fa92919a2fe
 FUNC|reject_yeast_pitch_event_mutation()|41d07498e88b0ec1a0a64b5002bca6ab
