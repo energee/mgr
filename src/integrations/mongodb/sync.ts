@@ -103,6 +103,11 @@ async function completeSyncLog(
 // Generic upsert helper
 // =============================================================================
 
+/** Parse a PostgREST `onConflict` spec ("id" or "a,b") into its column names. */
+function parseConflictColumns(onConflict: string): string[] {
+  return onConflict.split(",").map((c) => c.trim());
+}
+
 /**
  * Drop rows that share an onConflict key with an earlier row in the same array
  * (last one wins). A single upsert() call maps to one INSERT ... ON CONFLICT
@@ -118,11 +123,6 @@ async function completeSyncLog(
  * to collide on, so it passes through untouched rather than being folded in
  * with — or letting its absence exempt — other rows that do have the key.
  */
-/** Parse a PostgREST `onConflict` spec ("id" or "a,b") into its column names. */
-function parseConflictColumns(onConflict: string): string[] {
-  return onConflict.split(",").map((c) => c.trim());
-}
-
 function dedupeByConflictKey(
   rows: Record<string, unknown>[],
   onConflict: string,
@@ -200,9 +200,9 @@ async function upsertRowsIndividually(
     if (synced === 0 && consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
       const remaining = rows.length - i;
       failed += remaining;
-      if (errors.length < MAX_ROW_ERRORS_REPORTED) {
-        errors.push({ mongoId: `chunk-aborted-after-${i}-consecutive-failures`, error: chunkError });
-      }
+      // Always recorded, even when row errors already filled the cap — the
+      // abort is the most important error in the chunk.
+      errors.push({ mongoId: `chunk-aborted-after-${i}-consecutive-failures`, error: chunkError });
       break;
     }
 
@@ -884,7 +884,7 @@ async function syncBatchReadings(): Promise<SyncResult> {
   const combined = {
     synced: reconciled.synced,
     failed: reconciled.failed + errors.length,
-    errors: [...reconciled.errors, ...errors.slice(0, 10)],
+    errors: [...reconciled.errors, ...errors.slice(0, MAX_ROW_ERRORS_REPORTED)],
   };
 
   await completeSyncLog(logId, combined);
@@ -1141,7 +1141,7 @@ async function syncPackagingSessions(): Promise<SyncResult> {
 
   const combined = mergeResults(...results);
   combined.failed += lineErrors.length;
-  combined.errors.push(...lineErrors.slice(0, 10).map((error) => ({
+  combined.errors.push(...lineErrors.slice(0, MAX_ROW_ERRORS_REPORTED).map((error) => ({
     ...error,
     error: `phase=4 entity=packaging_sessions operation=resolve-line: ${error.error}`,
   })));
