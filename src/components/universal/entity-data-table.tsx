@@ -788,8 +788,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
       ...(hasBulkActions ? { rowSelection } : {}),
     },
     onSortingChange: setSorting,
-    // Persists page-size changes and resets pageIndex on size change
-    // (usePersistedPagination)
     onPaginationChange,
     ...(hasBulkActions
       ? { onRowSelectionChange: setRowSelection, enableRowSelection: true }

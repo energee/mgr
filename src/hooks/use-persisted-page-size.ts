@@ -89,10 +89,9 @@ export function usePersistedPageSize(
  * empty page under server pagination).
  */
 export function usePersistedPagination(defaultSize?: number, tableKey?: string) {
-  const { pageSize, setPageSize } = usePersistedPageSize(
-    defaultSize ?? DEFAULT_PAGE_SIZE,
-    tableKey,
-  );
+  // `undefined` falls through to usePersistedPageSize's own parameter
+  // default — that layer is the single owner of DEFAULT_PAGE_SIZE.
+  const { pageSize, setPageSize } = usePersistedPageSize(defaultSize, tableKey);
   const [pageIndex, setPageIndex] = useState(0);
 
   const pagination = useMemo<PaginationState>(
