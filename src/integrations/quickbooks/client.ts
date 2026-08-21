@@ -50,12 +50,25 @@ async function refreshAccessToken(): Promise<string> {
       const data = await response.json();
       const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
 
-      await saveTokens({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token || tokens.refreshToken,
-        realmId: tokens.realmId,
-        expiresAt,
-      });
+      const { saved } = await saveTokens(
+        {
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token || tokens.refreshToken,
+          realmId: tokens.realmId,
+          expiresAt,
+        },
+        // CAS against the refresh token this refresh consumed (#840): if a
+        // concurrent refresh on another instance already rotated it, keep the
+        // winner's pair instead of overwriting last-write-wins.
+        { expectedRefreshToken: tokens.refreshToken }
+      );
+
+      if (!saved) {
+        // Lost the persist race — use the winner's stored access token; this
+        // instance's pair may be invalidated by Intuit's rotation.
+        const current = await getTokens();
+        if (current) return current.accessToken;
+      }
 
       return data.access_token;
     } finally {

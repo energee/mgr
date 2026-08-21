@@ -61,23 +61,64 @@ export async function getClientCredentials(): Promise<{ clientId: string; client
   return { clientId, clientSecret };
 }
 
-export async function saveTokens(tokens: {
-  accessToken: string;
-  refreshToken: string;
-  realmId: string;
-  expiresAt: string;
-}): Promise<void> {
+/**
+ * Persist a QBO token set.
+ *
+ * `expectedRefreshToken` (the refresh path) adds an optimistic lock (#840):
+ * the in-process single-flight guard in client.ts only dedups refreshes within
+ * one serverless instance, so two instances can both refresh against Intuit
+ * and race to persist. The refresh-token row is written with a compare-and-
+ * swap against the token this refresh consumed; if it no longer matches, a
+ * concurrent refresh already persisted a newer pair and this write is
+ * discarded (`saved: false`) instead of clobbering it last-write-wins.
+ * Omitting `expectedRefreshToken` (the OAuth connect path) writes
+ * unconditionally.
+ */
+export async function saveTokens(
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    realmId: string;
+    expiresAt: string;
+  },
+  opts?: { expectedRefreshToken?: string }
+): Promise<{ saved: boolean }> {
   const admin = await createAdminClient();
+  const isRefresh = opts?.expectedRefreshToken !== undefined;
+
+  if (isRefresh) {
+    // tx-ok: the CAS below and the 3-row upsert after it are two PostgREST
+    // requests, deliberately ordered so every crash window self-heals: the
+    // refresh token (the one-shot credential) commits first, so a crash
+    // before the upsert leaves an old-but-consistent access/expiry pair whose
+    // next refresh reads the already-persisted new refresh token. A CAS miss
+    // writes nothing.
+    //
+    // `value` is JSONB and supabase-js stores these tokens as JSON strings,
+    // so the filter must compare against the JSON-encoded literal — a raw
+    // token is not valid JSON and PostgREST would reject the cast (22P02).
+    const { data, error } = await admin
+      .from("system_settings")
+      .update({ value: tokens.refreshToken })
+      .eq("key", SETTINGS_KEYS.refreshToken)
+      .eq("value", JSON.stringify(opts!.expectedRefreshToken))
+      .select("key");
+    if (error) throw new Error(`Failed to save QBO tokens: ${error.message}`);
+    if (!data || data.length === 0) return { saved: false };
+  }
+
   const rows = [
     { key: SETTINGS_KEYS.accessToken, value: tokens.accessToken },
-    { key: SETTINGS_KEYS.refreshToken, value: tokens.refreshToken },
     { key: SETTINGS_KEYS.realmId, value: tokens.realmId },
     { key: SETTINGS_KEYS.expiresAt, value: tokens.expiresAt },
+    // Refresh path: the CAS above already wrote the refresh-token row.
+    ...(isRefresh ? [] : [{ key: SETTINGS_KEYS.refreshToken, value: tokens.refreshToken }]),
   ];
   const { error } = await admin
     .from("system_settings")
     .upsert(rows, { onConflict: "key" });
   if (error) throw new Error(`Failed to save QBO tokens: ${error.message}`);
+  return { saved: true };
 }
 
 export async function clearTokens(): Promise<void> {
