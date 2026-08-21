@@ -124,6 +124,18 @@ BEGIN
   END IF;
 END $$;
 
+-- RLS-exception markers (00198 pattern): the rls-coverage integration test
+-- requires every permissive policy to carry a COMMENT ON POLICY starting with
+-- 'RLS-EXCEPTION:'. Comments live outside pg_policies, so the drift watchdog
+-- is unaffected. Safe unconditionally — the DO block above guarantees the
+-- policies exist.
+COMMENT ON POLICY "Authenticated users can read email log" ON public.email_notification_log IS
+  'RLS-EXCEPTION: email delivery log readable by any authenticated staff user; rows carry no secrets (recipient/subject/status only).';
+COMMENT ON POLICY "System can insert email log" ON public.email_notification_log IS
+  'RLS-EXCEPTION: rows are written only by SECURITY DEFINER functions in the notify_all_users pipeline, which bypass RLS regardless; policy kept byte-exact with live capture.';
+COMMENT ON POLICY "System can update email log" ON public.email_notification_log IS
+  'RLS-EXCEPTION: status updates come only from SECURITY DEFINER functions in the notify_all_users pipeline, which bypass RLS regardless; policy kept byte-exact with live capture.';
+
 -- Schema registry entry (AGENTS.md: required for every table). DO NOTHING so
 -- a row already present on live is preserved untouched.
 INSERT INTO public._schema_registry (table_name, description, domain, relationships)
