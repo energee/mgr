@@ -41,23 +41,16 @@ parsed="$(jq -r '(.cwd // ""), (.tool_input.command // "")' <<<"$input")"
 cwd="${parsed%%$'\n'*}"
 cmd="${parsed#*$'\n'}"
 
-# Drop heredoc bodies: everything between `<<TERM` (any quoting, optional -)
-# and the line that is exactly TERM is data, not a command to gate on.
-stripped="$(awk '
-  skip { if ($0 == term) skip = 0; next }
-  {
-    print
-    if (match($0, /<<-?[ \t]*['\''"]?[A-Za-z_][A-Za-z0-9_]*/)) {
-      term = substr($0, RSTART, RLENGTH)
-      sub(/^<<-?[ \t]*['\''"]?/, "", term)
-      skip = 1
-    }
-  }
+# Drop quoted data before matching, in one multiline-aware pass: heredoc
+# bodies (everything between `<<TERM`, any quoting, and the TERM line), then
+# single- and double-quoted spans — including quotes spanning lines, so a
+# multi-line `git commit -m "..."` whose message mentions the phrase is data
+# too. A real invocation survives: its own tokens are never quoted.
+stripped="$(perl -0777 -pe '
+  s/<<-?[ \t]*['\''"]?(\w+)['\''"]?.*?^\1$//gms;
+  s/'\''[^'\'']*'\''//gs;
+  s/"(\\.|[^"\\])*"//gs;
 ' <<<"$cmd")"
-
-# Then drop single/double-quoted spans (per line): `echo "gh pr create"` is
-# data too. A real invocation survives — its own tokens are never quoted.
-stripped="$(sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g' <<<"$stripped")"
 
 grep -qE '(^|[;&|] *)gh +pr +create' <<<"$stripped" || exit 0
 

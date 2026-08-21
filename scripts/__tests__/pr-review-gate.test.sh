@@ -63,6 +63,15 @@ out=$(run_gate check "$REPO" "git status")
 out=$(run_gate check "$REPO" 'echo "how to: gh pr create --fill"')
 [ -z "$out" ] || fail "quoted gh pr create tripped the gate"
 
+# 6c. A MULTI-LINE quoted string (commit message) is data too.
+multiline_cmd=$(printf '%s\n' \
+  'git commit -m "docs: explain the pre-PR gate' \
+  'run /simplify first, then' \
+  'gh pr create --fill' \
+  'to open the PR"')
+out=$(run_gate check "$REPO" "$multiline_cmd")
+[ -z "$out" ] || fail "multi-line quoted gh pr create tripped the gate"
+
 # 7. A real `gh pr create` after a heredoc still gates.
 gated_cmd=$(printf '%s\n' "$heredoc_cmd" 'gh pr create --fill')
 out=$(run_gate check "$REPO" "$gated_cmd")
