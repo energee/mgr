@@ -139,3 +139,24 @@ chain by 00199.
 | app_url | TEXT | Base URL used to build action links in the email body |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | updated_at | TIMESTAMPTZ | Updated timestamp |
+
+---
+
+## `email_notification_log`
+
+Delivery log for the `notify_all_users` → `send-email` Edge Function pipeline
+(writers in 00190; table captured into the chain by 00296 — it was previously
+live-only). One row per attempted email. Pruned nightly by the
+`prune-log-tables` pg_cron job (90-day retention, 00296).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| user_id | UUID | Recipient user |
+| notification_type | TEXT | Mirrors the notification type that triggered the email |
+| recipient_email | TEXT | Address the email was sent to |
+| subject | TEXT | Email subject line |
+| status | TEXT | pending, sent, failed, or skipped |
+| error_message | TEXT | Failure/skip detail |
+| sent_at | TIMESTAMPTZ | When delivery succeeded |
+| created_at | TIMESTAMPTZ | Created timestamp |

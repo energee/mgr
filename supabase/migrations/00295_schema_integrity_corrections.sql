@@ -2,10 +2,11 @@
 -- Schema audit 2026-08-21 (docs/plans/2026-08-21-schema-audit.md, M3–M6):
 -- registry correction + missing FKs + missing CHECK constraints.
 --
--- All constraints follow the 00192 pattern: guarded ADD CONSTRAINT (safe on
--- replay and if applied out-of-band), NOT VALID (no table scan under the
--- brief ACCESS EXCLUSIVE lock), then immediate VALIDATE (SHARE UPDATE
--- EXCLUSIVE only — concurrent writes not blocked).
+-- All constraints follow the 00192 house pattern: guarded ADD CONSTRAINT
+-- (safe on replay and if applied out-of-band), NOT VALID, then immediate
+-- VALIDATE. Note the CLI applies the whole file in one transaction, so the
+-- ADD CONSTRAINT's ACCESS EXCLUSIVE lock is held until commit either way;
+-- these tables are small enough that the lock lasts milliseconds.
 
 -- =============================================================================
 -- 1. M4 — _schema_registry: batches.key_fields advertised columns that no

@@ -62,20 +62,18 @@ BEGIN
 END $$;
 
 DO $$
-DECLARE
-  _has_values BOOLEAN;
 BEGIN
-  -- Dynamic SQL so this block still parses/plans on environments where the
-  -- column is already gone (AND does not short-circuit at plan time).
+  -- PL/pgSQL plans statements lazily at first execution, so the inner query
+  -- is never planned on environments where the column is already gone.
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'batches'
       AND column_name = 'recipe_variant_id'
   ) THEN
-    EXECUTE 'SELECT EXISTS (SELECT 1 FROM public.batches WHERE recipe_variant_id IS NOT NULL LIMIT 1)'
-      INTO STRICT _has_values;
-    IF _has_values THEN
+    IF EXISTS (
+      SELECT 1 FROM public.batches WHERE recipe_variant_id IS NOT NULL LIMIT 1
+    ) THEN
       RAISE EXCEPTION
         'batches.recipe_variant_id has non-NULL values — export before dropping (schema audit 2026-08-21)';
     END IF;

@@ -5,14 +5,135 @@
 -- entity_revisions grew unbounded.
 --
 -- One retention function covers the log family:
---   90 days:  square_sync_log, qbo_sync_log, mongodb_sync_log,
---             slack_notification_log, email_notification_log
---   365 days: entity_revisions (full before/after JSONB per write — the
---             longer window keeps a year of audit trail)
+--   p_log_days (default 90):       square_sync_log, qbo_sync_log,
+--                                  mongodb_sync_log, slack_notification_log,
+--                                  email_notification_log
+--   p_revision_days (default 365): entity_revisions (full before/after JSONB
+--                                  per write — the longer window keeps a year
+--                                  of audit trail)
 -- plus a schedule for the existing cleanup_old_notifications(90).
 --
 -- Patterns: pg_cron guards from 00272/00281 (extension may be absent in CI
 -- replays / local Postgres); service-role lock from 00247.
+
+-- =============================================================================
+-- 0. Capture email_notification_log into the chain (live↔chain drift, audit H6
+--    class — same capture remedy as 00199/00285)
+-- =============================================================================
+-- The table exists on live (00190's SECURITY DEFINER email writers INSERT and
+-- UPDATE it) but no migration ever created it, so a from-scratch replay
+-- shipped a broken email pipeline — and this migration's retention DELETE
+-- would have needed a permanent runtime existence check. Captured here so the
+-- DELETE below can be static like the other five tables.
+--
+-- Shape is from src/types/supabase.ts (generated from live). Policy bodies
+-- are byte-exact against live: supabase/live-catalog.snapshot.txt stores
+-- md5(qual || '~' || with_check) per policy, and the hashes below compute
+-- directly:
+--   "Authenticated users can read email log" ec053f581ef5aa2dba3dff1f99a6b444
+--       = md5('true~')      -> FOR SELECT TO authenticated USING (true)
+--   "System can insert email log"            a452132919de0eeb842df6c4e1d34ac4
+--       = md5('~true')      -> FOR INSERT WITH CHECK (true)
+--   "System can update email log"            8a32db1846a8702d3d2030fce42c09d4
+--       = md5('true~true')  -> FOR UPDATE USING (true) WITH CHECK (true)
+--   current_user_enabled                     ee25f986535267ddf4e1e2b6b68f44f7
+--       = the 00255 restrictive-gate loop form
+-- Policies are created only when absent, so live's policy md5s are untouched
+-- and the drift watchdog stays quiet. The permissive `true` bodies are kept
+-- byte-exact deliberately: the only writers are SECURITY DEFINER functions
+-- (which bypass RLS anyway) and rows carry no secrets — tightening live RLS
+-- here would be a separate, deliberate change, not a capture.
+CREATE TABLE IF NOT EXISTS public.email_notification_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  notification_type TEXT NOT NULL,
+  recipient_email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  error_message TEXT,
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.email_notification_log IS
+  'Delivery log for the notify_all_users -> send-email Edge Function pipeline (00190). One row per attempted email; status: pending/sent/failed/skipped.';
+
+ALTER TABLE public.email_notification_log ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'email_notification_log'
+      AND policyname = 'Authenticated users can read email log'
+  ) THEN
+    EXECUTE $pol$
+      -- check-permissive-rls: skip byte-exact live capture (see header); delivery log holds no secrets
+      CREATE POLICY "Authenticated users can read email log"
+        ON public.email_notification_log
+        FOR SELECT TO authenticated
+        USING (true)
+    $pol$;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'email_notification_log'
+      AND policyname = 'System can insert email log'
+  ) THEN
+    EXECUTE $pol$
+      -- check-permissive-rls: skip byte-exact live capture (see header); writers are SECURITY DEFINER and bypass RLS regardless
+      CREATE POLICY "System can insert email log"
+        ON public.email_notification_log
+        FOR INSERT
+        WITH CHECK (true)
+    $pol$;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'email_notification_log'
+      AND policyname = 'System can update email log'
+  ) THEN
+    EXECUTE $pol$
+      -- check-permissive-rls: skip byte-exact live capture (see header); writers are SECURITY DEFINER and bypass RLS regardless
+      CREATE POLICY "System can update email log"
+        ON public.email_notification_log
+        FOR UPDATE
+        USING (true)
+        WITH CHECK (true)
+    $pol$;
+  END IF;
+
+  -- Disabled-account gate (00255 pattern): every RLS-enabled public table
+  -- carries this restrictive policy.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'email_notification_log'
+      AND policyname = 'current_user_enabled'
+  ) THEN
+    EXECUTE $pol$
+      CREATE POLICY current_user_enabled
+        ON public.email_notification_log
+        AS RESTRICTIVE
+        FOR ALL
+        TO authenticated
+        USING ((SELECT current_user_is_enabled()))
+        WITH CHECK ((SELECT current_user_is_enabled()))
+    $pol$;
+  END IF;
+END $$;
+
+-- Schema registry entry (AGENTS.md: required for every table). DO NOTHING so
+-- a row already present on live is preserved untouched.
+INSERT INTO public._schema_registry (table_name, description, domain, relationships)
+VALUES (
+  'email_notification_log',
+  'Delivery log for the notify_all_users -> send-email pipeline; one row per attempted email with status and error detail.',
+  'system',
+  '[{"type":"belongsTo","target":"auth.users","fk":"user_id"}]'
+)
+ON CONFLICT (table_name) DO NOTHING;
 
 -- =============================================================================
 -- 1. Retention function
@@ -22,9 +143,12 @@
 -- pg_cron job runs as the job owner (postgres) and is unaffected.
 -- Bulk retention DELETE across six log tables whose RLS deliberately blocks
 -- app-role deletes; EXECUTE is REVOKEd from PUBLIC/anon/authenticated and
--- granted only to service_role; no arguments, returns only deleted counts.
+-- granted only to service_role; returns only deleted counts.
 -- security-definer: justified — service-role-locked retention sweep over RLS-protected log tables; returns counts only
-CREATE OR REPLACE FUNCTION public.prune_log_tables()
+CREATE OR REPLACE FUNCTION public.prune_log_tables(
+  p_log_days INT DEFAULT 90,
+  p_revision_days INT DEFAULT 365
+)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -34,35 +158,35 @@ DECLARE
   v_counts JSONB := '{}'::jsonb;
   v_deleted BIGINT;
 BEGIN
-  DELETE FROM square_sync_log WHERE created_at < now() - INTERVAL '90 days';
+  DELETE FROM square_sync_log
+  WHERE created_at < now() - make_interval(days => p_log_days);
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
   v_counts := v_counts || jsonb_build_object('square_sync_log', v_deleted);
 
-  DELETE FROM qbo_sync_log WHERE created_at < now() - INTERVAL '90 days';
+  DELETE FROM qbo_sync_log
+  WHERE created_at < now() - make_interval(days => p_log_days);
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
   v_counts := v_counts || jsonb_build_object('qbo_sync_log', v_deleted);
 
   -- mongodb_sync_log has no created_at (00165); started_at is its insert time.
-  DELETE FROM mongodb_sync_log WHERE started_at < now() - INTERVAL '90 days';
+  DELETE FROM mongodb_sync_log
+  WHERE started_at < now() - make_interval(days => p_log_days);
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
   v_counts := v_counts || jsonb_build_object('mongodb_sync_log', v_deleted);
 
-  DELETE FROM slack_notification_log WHERE created_at < now() - INTERVAL '90 days';
+  DELETE FROM slack_notification_log
+  WHERE created_at < now() - make_interval(days => p_log_days);
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
   v_counts := v_counts || jsonb_build_object('slack_notification_log', v_deleted);
 
-  -- email_notification_log exists on live but has no CREATE TABLE in the
-  -- migration chain (known live↔chain drift; 00190 captured only its
-  -- writers). Dynamic SQL + existence guard keeps this function runnable on
-  -- fresh local replays where the table is absent.
-  IF to_regclass('public.email_notification_log') IS NOT NULL THEN
-    EXECUTE 'DELETE FROM public.email_notification_log WHERE created_at < now() - INTERVAL ''90 days''';
-    GET DIAGNOSTICS v_deleted = ROW_COUNT;
-    v_counts := v_counts || jsonb_build_object('email_notification_log', v_deleted);
-  END IF;
+  DELETE FROM email_notification_log
+  WHERE created_at < now() - make_interval(days => p_log_days);
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  v_counts := v_counts || jsonb_build_object('email_notification_log', v_deleted);
 
   -- entity_revisions: changed_at is the revision timestamp (00019).
-  DELETE FROM entity_revisions WHERE changed_at < now() - INTERVAL '365 days';
+  DELETE FROM entity_revisions
+  WHERE changed_at < now() - make_interval(days => p_revision_days);
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
   v_counts := v_counts || jsonb_build_object('entity_revisions', v_deleted);
 
@@ -70,13 +194,13 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.prune_log_tables() IS
-  'Nightly log retention (00296): deletes sync/notification log rows older than 90 days and entity_revisions older than 365 days. Returns per-table deleted counts. Scheduled via pg_cron (prune-log-tables); service-role locked.';
+COMMENT ON FUNCTION public.prune_log_tables(INT, INT) IS
+  'Nightly log retention (00296): deletes sync/notification log rows older than p_log_days (default 90) and entity_revisions older than p_revision_days (default 365). Returns per-table deleted counts. Scheduled via pg_cron (prune-log-tables); service-role locked. Retune by rescheduling the cron job with explicit arguments — no migration needed.';
 
 -- 00247 pattern: nothing app-facing may call this; pg_cron runs it as the
 -- function owner, service_role keeps a manual escape hatch.
-REVOKE ALL ON FUNCTION public.prune_log_tables() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.prune_log_tables() TO service_role;
+REVOKE ALL ON FUNCTION public.prune_log_tables(INT, INT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.prune_log_tables(INT, INT) TO service_role;
 
 -- =============================================================================
 -- 2. Schedules
@@ -125,21 +249,12 @@ $job$;
 -- =============================================================================
 -- PL/pgSQL plans statements on first execution, so a body referencing a
 -- missing column would create fine and then fail on every scheduled run.
--- Execute both scheduled functions inside a subtransaction that is rolled
--- back by a deliberate RAISE — proves the plans without persisting deletes
--- at migration time. (prune_log_tables has one data-independent branch per
--- table; the email_notification_log branch only plans where that live-only
--- table exists, which is exactly where the job will run it.)
+-- Both function bodies are straight-line (no data-dependent branches), so a
+-- bare call plans every statement — no probe-rollback scaffolding needed.
+-- Side effect: the initial backlog prune runs at apply time, which is exactly
+-- the work the job would otherwise do on its first 05:10 run.
 DO $$
 BEGIN
-  BEGIN
-    PERFORM public.prune_log_tables();
-    PERFORM public.cleanup_old_notifications(90);
-    RAISE EXCEPTION 'PLAN_PROBE_ROLLBACK';
-  EXCEPTION
-    WHEN raise_exception THEN
-      IF SQLERRM <> 'PLAN_PROBE_ROLLBACK' THEN
-        RAISE;
-      END IF;
-  END;
+  PERFORM public.prune_log_tables();
+  PERFORM public.cleanup_old_notifications(90);
 END $$;
