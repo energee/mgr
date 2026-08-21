@@ -18,7 +18,10 @@
 -- CHECK lines exist for the same reason (#865): orders.status lost its CHECK
 -- constraint on live out-of-band (found only by a full manual schema audit,
 -- healed by 00295). Hashing pg_get_constraintdef makes both an out-of-band
--- DROP and an edit register as a missing snapshot line → FAIL.
+-- DROP and an edit register as a missing snapshot line → FAIL. CHECK-only is
+-- a deliberate scope choice, not an oversight: FK/UNIQUE/PK/EXCLUSION drops
+-- were considered and deferred — they'd add ~500 partially index-duplicating
+-- lines, and covering them later is an additive new prefix (no format break).
 --
 -- Extension-owned functions (pg_depend deptype 'e') are excluded so installing/
 -- upgrading an extension doesn't register as drift. Ordered by C collation so
