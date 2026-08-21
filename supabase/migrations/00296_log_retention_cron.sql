@@ -202,6 +202,24 @@ COMMENT ON FUNCTION public.prune_log_tables(INT, INT) IS
 REVOKE ALL ON FUNCTION public.prune_log_tables(INT, INT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.prune_log_tables(INT, INT) TO service_role;
 
+-- Retention-scan indexes. Three of the pruned tables had no usable timestamp
+-- index (square_sync_log's only time index leads with sync_type; 00060
+-- dropped idx_entity_revisions_changed_at as then-unused; mongodb_sync_log
+-- and the just-captured email_notification_log never had one). BRIN on an
+-- append-only timestamp column costs a few KB and near-zero write overhead,
+-- and turns the nightly range DELETE from a full seq scan of the largest
+-- tables (entity_revisions holds full before/after JSONB per write) into a
+-- block-range lookup. qbo_sync_log and slack_notification_log already have
+-- usable btree created_at indexes.
+CREATE INDEX IF NOT EXISTS idx_entity_revisions_changed_at_brin
+  ON public.entity_revisions USING brin (changed_at);
+CREATE INDEX IF NOT EXISTS idx_square_sync_log_created_at_brin
+  ON public.square_sync_log USING brin (created_at);
+CREATE INDEX IF NOT EXISTS idx_mongodb_sync_log_started_at_brin
+  ON public.mongodb_sync_log USING brin (started_at);
+CREATE INDEX IF NOT EXISTS idx_email_notification_log_created_at_brin
+  ON public.email_notification_log USING brin (created_at);
+
 -- =============================================================================
 -- 2. Schedules
 -- =============================================================================
@@ -251,10 +269,13 @@ $job$;
 -- missing column would create fine and then fail on every scheduled run.
 -- Both function bodies are straight-line (no data-dependent branches), so a
 -- bare call plans every statement — no probe-rollback scaffolding needed.
--- Side effect: the initial backlog prune runs at apply time, which is exactly
--- the work the job would otherwise do on its first 05:10 run.
+-- The probe calls with ~100-year windows: every DELETE is planned and
+-- executed but matches ~0 rows, so the apply generates no WAL burst and
+-- holds no long row locks inside the migration transaction. The real
+-- backlog prune happens on the first 05:10 cron run, off-hours, served by
+-- the BRIN indexes above.
 DO $$
 BEGIN
-  PERFORM public.prune_log_tables();
-  PERFORM public.cleanup_old_notifications(90);
+  PERFORM public.prune_log_tables(36500, 36500);
+  PERFORM public.cleanup_old_notifications(36500);
 END $$;

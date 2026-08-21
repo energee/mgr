@@ -80,15 +80,11 @@ BEGIN
   END IF;
 END $$;
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM public.order_items WHERE package_id IS NOT NULL LIMIT 1
-  ) THEN
-    RAISE EXCEPTION
-      'order_items.package_id has non-NULL values referencing packages — export before dropping (schema audit 2026-08-21)';
-  END IF;
-END $$;
+-- No separate guard needed for order_items.package_id: its FK targets
+-- packages, and the section-0 guard above has already proven packages empty —
+-- so a non-NULL package_id cannot exist without having violated that FK.
+-- The column itself is untouched here (its drop is deferred to the M1
+-- column-drop batch); only the FK is dropped below.
 
 -- =============================================================================
 -- 1. recipe_variants family (H1)

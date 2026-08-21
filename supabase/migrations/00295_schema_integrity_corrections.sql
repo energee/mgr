@@ -4,9 +4,11 @@
 --
 -- All constraints follow the 00192 house pattern: guarded ADD CONSTRAINT
 -- (safe on replay and if applied out-of-band), NOT VALID, then immediate
--- VALIDATE. Note the CLI applies the whole file in one transaction, so the
--- ADD CONSTRAINT's ACCESS EXCLUSIVE lock is held until commit either way;
--- these tables are small enough that the lock lasts milliseconds.
+-- VALIDATE. The CLI applies the whole file in one transaction, so the
+-- ADD CONSTRAINT's ACCESS EXCLUSIVE lock is held until commit — the VALIDATE
+-- scans run under that lock. To keep that window short on live, notifications
+-- (never pruned before 00296) is shrunk via cleanup_old_notifications(90)
+-- below, before the anti-join DELETE and VALIDATE scan it.
 
 -- =============================================================================
 -- 1. M4 — _schema_registry: batches.key_fields advertised columns that no
@@ -27,6 +29,11 @@ WHERE table_name = 'batches';
 --    Orphans (rows for already-deleted users — exactly what ON DELETE CASCADE
 --    would have removed) are deleted before VALIDATE so it cannot fail.
 -- =============================================================================
+-- Shrink the never-pruned notifications backlog first (expired + old-read
+-- rows), so the anti-join DELETE and the VALIDATE below scan a small table
+-- instead of the full historical backlog while holding the file's locks.
+SELECT public.cleanup_old_notifications(90);
+
 DELETE FROM notifications n
 WHERE NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id = n.user_id);
 
