@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
 const STORAGE_PREFIX = "mgr:table-page-size";
-const DEFAULT_PAGE_SIZE = 25;
 
 /**
  * localStorage key for a given table. When `tableKey` is provided the

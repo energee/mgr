@@ -22,6 +22,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { DataTableFilterList } from "@/components/data-table/data-table-filter-list";
 import { DataTableSortList } from "@/components/data-table/data-table-sort-list";
 import type { Table as TanstackTable } from "@tanstack/react-table";
+import type { ExtendedColumnFilter } from "@/types/data-table";
 
 /**
  * Mobile entry point for advanced filters + sorting (audit 10.3). The desktop
@@ -33,9 +34,12 @@ import type { Table as TanstackTable } from "@tanstack/react-table";
 export function MobileFilterSheet<TData>({
   table,
   activeFilterCount,
+  defaultFilters,
 }: {
   table: TanstackTable<TData>;
   activeFilterCount: number;
+  /** Passed through to DataTableFilterList — see its prop doc. */
+  defaultFilters?: ExtendedColumnFilter<TData>[];
 }) {
   return (
     <Sheet>
@@ -66,7 +70,7 @@ export function MobileFilterSheet<TData>({
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col items-start gap-3 px-4 pb-6">
-          <DataTableFilterList table={table} />
+          <DataTableFilterList table={table} defaultFilters={defaultFilters} />
           <DataTableSortList table={table} />
         </div>
       </SheetContent>

@@ -2,26 +2,13 @@
  * App Loading Boundary
  *
  * Shown while route segments within the authenticated app are loading.
- * Uses a minimal skeleton to reduce layout shift.
+ * Renders the shared ListSkeleton (most app routes are list pages); routes
+ * with a different shape (dashboards, details) override with their own
+ * loading.tsx. No padding wrapper — ChatLayout already pads page content.
  */
 
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton } from "@/components/ui/skeletons";
 
 export default function AppLoading() {
-  return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-9 w-24" />
-      </div>
-      <div className="grid gap-4">
-        <Skeleton className="h-10 w-full" />
-        <div className="space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" style={{ animationDelay: `${i * 75}ms` }} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  return <ListSkeleton />;
 }

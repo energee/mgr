@@ -98,6 +98,14 @@ export type EntityCore<T = Record<string, unknown>> = {
     relation: { entity: string; displayField: string };
   }[];
 
+  /**
+   * Quick filter tabs above the toolbar (presets that set URL filters on
+   * click). Pure data — lives in core (not presentation) so a server
+   * component's list prefetch can apply the `isDefault` preset and produce
+   * the same first-render query key as the client (sitewide loading pattern).
+   */
+  quickFilters?: QuickFilterDef[];
+
   /** Searchable fields (for quick search) */
   searchableFields?: (keyof T & string)[];
 
@@ -138,9 +146,6 @@ export type EntityPresentation<T = Record<string, unknown>> = {
 
   /** Available filters for list view */
   listFilters?: EntityFilterDef[];
-
-  /** Quick filter tabs above the toolbar (presets that set URL filters on click) */
-  quickFilters?: QuickFilterDef[];
 
   /** Unified sections for combined detail/edit view. */
   sections?: UnifiedSectionDef<T>[];
@@ -383,7 +388,12 @@ export type QuickFilterDef = {
   /** Whether this tab is selected by default */
   isDefault?: boolean;
 
-  /** Override default sort when this tab is active */
+  /**
+   * Override default sort when this tab is active. On a preset that is also
+   * `isDefault`, this becomes the no-`?sort=` default for the whole list
+   * (mirrored into the server prefetch) — it applies even after the user
+   * switches filters away from the preset, until they sort explicitly.
+   */
   sort?: { column: string; direction: "asc" | "desc" };
 }
 

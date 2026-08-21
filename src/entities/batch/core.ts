@@ -91,6 +91,31 @@ export const batchCore: EntityCoreInput<Batch> = {
   defaultSort: { column: "planned_start_date", direction: "desc" },
   searchableFields: ["batch_code", "name"],
 
+  // In core (not presentation) so the server list prefetch applies the
+  // default "Active" preset and matches the client's first-render query key.
+  quickFilters: [
+    {
+      label: "Active",
+      filters: [
+        { column: "status", values: ["fermenting", "conditioning", "packaging"] },
+      ],
+      isDefault: true,
+    },
+    {
+      label: "Planned",
+      filters: [
+        { column: "status", values: ["planned"] },
+      ],
+      sort: { column: "planned_start_date", direction: "asc" },
+    },
+    {
+      label: "Completed",
+      filters: [
+        { column: "status", values: ["completed", "cancelled", "archived"] },
+      ],
+    },
+  ],
+
   detailHeader: {
     title: "batch_code",
     subtitle: "name",

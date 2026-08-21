@@ -10,15 +10,21 @@
  */
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** Table/list loading shape: an optional toolbar row plus `rows` × `columns`. */
+/**
+ * Table/list loading shape: an optional toolbar row plus `rows` × `columns`.
+ * `bordered: false` drops the outer border for hosts that already draw one
+ * (e.g. a relation table inside a Card).
+ */
 export function ListSkeleton({
-  rows = 8,
+  rows = 10,
   columns = 5,
   toolbar = true,
+  bordered = true,
 }: {
   rows?: number;
   columns?: number;
   toolbar?: boolean;
+  bordered?: boolean;
 }) {
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -28,21 +34,84 @@ export function ListSkeleton({
           <Skeleton className="h-9 w-24" />
         </div>
       )}
-      <div className="rounded-lg border">
+      <div className={bordered ? "rounded-lg border" : undefined}>
         <div className="divide-y">
-          {Array.from({ length: rows }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 p-3">
-              {Array.from({ length: columns }).map((_, j) => (
-                <Skeleton
-                  key={j}
-                  className="h-4 flex-1"
-                  style={{ animationDelay: `${i * 60}ms` }}
-                />
-              ))}
-            </div>
-          ))}
+          {Array.from({ length: rows }).map((_, i) => {
+            // One style object per row, shared by its cells
+            const stagger = { animationDelay: `${i * 60}ms` };
+            return (
+              <div key={i} className="flex items-center gap-4 p-3">
+                {Array.from({ length: columns }).map((_, j) => (
+                  <Skeleton key={j} className="h-4 flex-1" style={stagger} />
+                ))}
+              </div>
+            );
+          })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Stat-tile + chart-box block shared by every dashboard's trends section —
+ * the dashboards' Suspense fallbacks and the /dashboard route fallback all
+ * render THIS, so the shapes can't drift apart. `tiles` picks the stat grid
+ * (2 or 3 columns); `charts: 1` renders a single full-width chart box.
+ */
+export function DashboardTrendsSkeleton({
+  tiles = 3,
+  charts = 2,
+}: {
+  tiles?: 2 | 3;
+  charts?: 1 | 2;
+}) {
+  return (
+    <>
+      <div className={tiles === 2 ? "grid gap-4 sm:grid-cols-2" : "grid gap-4 sm:grid-cols-3"}>
+        {Array.from({ length: tiles }).map((_, i) => (
+          <Skeleton key={i} className="h-[88px] rounded-lg" />
+        ))}
+      </div>
+      {charts === 1 ? (
+        <Skeleton className="h-[248px] rounded-lg" />
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          {Array.from({ length: charts }).map((_, i) => (
+            <Skeleton key={i} className="h-[248px] rounded-lg" />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Dashboard loading shape: title row, two-column section grid, and the shared
+ * trends block — mirrors the /dashboard* card-grid layout (heights match the
+ * pages' own section skeletons so the route fallback → page swap doesn't
+ * jump). `tiles`/`charts` pass through to DashboardTrendsSkeleton so a
+ * segment with a different trends shape (inventory: 2 tiles, 1 chart) can
+ * match its page from its own loading.tsx.
+ */
+export function DashboardSkeleton({
+  tiles,
+  charts,
+}: {
+  tiles?: 2 | 3;
+  charts?: 1 | 2;
+} = {}) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-5 w-40" />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Skeleton className="h-64 rounded-lg lg:col-span-3" />
+        <Skeleton className="h-64 rounded-lg lg:col-span-2" />
+      </div>
+      <DashboardTrendsSkeleton tiles={tiles} charts={charts} />
     </div>
   );
 }

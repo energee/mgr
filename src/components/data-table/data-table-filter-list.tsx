@@ -64,12 +64,22 @@ const THROTTLE_MS = 50;
 const FILTER_SHORTCUT_KEY = "f";
 const REMOVE_FILTER_SHORTCUTS = ["backspace", "delete"];
 
+const EMPTY_FILTERS: never[] = [];
+
 type DataTableFilterListProps<TData> = React.ComponentProps<typeof PopoverContent> & {
   table: Table<TData>;
+  /**
+   * Default value for the `?filters` URL state. MUST match the parser default
+   * the owning table uses (entity-data-table passes its default quick-filter
+   * preset) — nuqs applies defaults per hook, so a mismatch would make this
+   * panel disagree with the table about the active filters on a clean URL.
+   */
+  defaultFilters?: ExtendedColumnFilter<TData>[];
 }
 
 export function DataTableFilterList<TData>({
   table,
+  defaultFilters = EMPTY_FILTERS,
   ...props
 }: DataTableFilterListProps<TData>) {
   const id = React.useId();
@@ -87,7 +97,7 @@ export function DataTableFilterList<TData>({
   const [filters, setFilters] = useQueryState(
     "filters",
     getFiltersStateParser<TData>(columns.map((field) => field.id))
-      .withDefault([])
+      .withDefault(defaultFilters)
       .withOptions({
         clearOnDefault: true,
         shallow: true,

@@ -1,5 +1,12 @@
 # Sitewide loading pattern — server prefetch + hydration
 
+> **Status 2026-08-21:** stalled at Phase 0 and re-audited — see
+> [`2026-08-21-loading-pattern-audit.md`](2026-08-21-loading-pattern-audit.md).
+> Skeletons are now unified on the kit, the temporary batches `loading.tsx`
+> null-hack is reverted, and prefetch keys include default quick filters.
+> Phases 1–3 (full prefetch rollout) are deliberately NOT planned; server
+> prefetch stays a per-page opt-in.
+
 ## Problem
 
 Loading UI is owned in two places, so client data pages flash **two skeletons**:
