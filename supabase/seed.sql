@@ -30,14 +30,10 @@
 --
 -- MAINTENANCE NOTE (issue #581): this file is written against the schema the
 -- migration chain in supabase/migrations/ produces, because that is what
--- `make db-local` replays. It is therefore NOT valid against the hosted
--- database, which dropped these out-of-band (the known chain/live drift):
---   * packages.package_type_id  — NOT NULL in the chain (00001), so it must be
---     supplied here; gone on live, where selling_format_id is NOT NULL instead.
---   * package_types             — superseded by containers + selling_formats
---     (created in 00112, re-stated in 00199), but never dropped by the chain,
---     and still the target of the packages.package_type_id FK on a fresh
---     replay.
+-- `make db-local` replays. The old packages / package_types chain-vs-live
+-- drift is resolved: 00294 dropped `packages` from the chain (it was dead on
+-- live too), so this file no longer seeds packages or the retired
+-- package_types rows that existed only to satisfy its FK.
 -- Columns that are merely nullable-in-chain and absent-on-live are simply
 -- omitted, so those statements stay valid against both shapes. The one that
 -- matters is batches.fermenter: the chain still creates it (00001) and never
@@ -183,7 +179,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Selling Formats (sellable groupings of a container)
 -- =============================================================================
 -- The single-unit formats keep the original seed's quantity semantics: a
--- packages/order_items quantity counts individual cans or kegs. The
+-- order_items quantity counts individual cans or kegs. The
 -- 'Case of 24' formats preserve the units_per_case = 24 that the retired
 -- package_types rows recorded.
 -- Layer geometry (units_per_layer / default_layers) is left NULL, so the
@@ -202,47 +198,6 @@ VALUES
   ('00000000-0000-0000-000a-000000000004', '00000000-0000-0000-0009-000000000002', 'Case of 24', 24, 20),
   ('00000000-0000-0000-000a-000000000005', '00000000-0000-0000-0009-000000000003', 'Single Keg', 1, 10),
   ('00000000-0000-0000-000a-000000000006', '00000000-0000-0000-0009-000000000004', 'Single Keg', 1, 10)
-ON CONFLICT (id) DO NOTHING;
-
--- =============================================================================
--- Package Types (RETIRED — chain-replay only)
--- =============================================================================
--- Superseded by containers + selling_formats above; do not build anything new
--- against this table. It is seeded only because a fresh replay of the migration
--- chain still has packages.package_type_id as NOT NULL REFERENCES
--- package_types(id) (00001), and the hosted database dropped both out-of-band.
--- inner_pack_size / inner_packs_per_case stay NULL so
--- chk_package_units_consistency (00010) is satisfied.
-
-INSERT INTO package_types (id, name, container_type, volume_oz, units_per_case)
-VALUES
-  ('00000000-0000-0000-0003-000000000001', '16oz Can', 'can', 16.0, 24),
-  ('00000000-0000-0000-0003-000000000002', '12oz Can', 'can', 12.0, 24),
-  ('00000000-0000-0000-0003-000000000003', 'Half Barrel Keg', 'keg', 1984.0, 1),
-  ('00000000-0000-0000-0003-000000000004', 'Sixth Barrel Keg', 'keg', 661.0, 1)
-ON CONFLICT (id) DO NOTHING;
-
--- =============================================================================
--- Packages (packaged products from completed batch)
--- =============================================================================
-
--- selling_format_id is what the app reads (00159). package_type_id is only
--- supplied because it is still NOT NULL on a fresh chain replay — see the
--- maintenance note at the top of this file. Both point at the same physical
--- container, so the row is consistent whichever column a reader uses.
--- quantity counts individual units, matching the 'Single Can'/'Single Keg'
--- selling formats.
-
-INSERT INTO packages (id, batch_id, package_type_id, selling_format_id, quantity, packaged_date, best_by_date, lot_code)
-VALUES
-  ('00000000-0000-0000-0004-000000000001',
-   '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0003-000000000001',
-   '00000000-0000-0000-000a-000000000001',
-   240, '2024-12-20', '2025-03-20', 'HD-2024001-A'),
-  ('00000000-0000-0000-0004-000000000002',
-   '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0003-000000000003',
-   '00000000-0000-0000-000a-000000000005',
-   4, '2024-12-20', '2025-03-20', 'HD-2024001-K')
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
