@@ -80,11 +80,13 @@ BEGIN
   END IF;
 END $$;
 
--- No separate guard needed for order_items.package_id: its FK targets
--- packages, and the section-0 guard above has already proven packages empty —
--- so a non-NULL package_id cannot exist without having violated that FK.
--- The column itself is untouched here (its drop is deferred to the M1
--- column-drop batch); only the FK is dropped below.
+-- No separate guard needed for order_items.package_id here: this migration
+-- leaves the column and its data untouched — only the FK to packages is
+-- dropped below, and the packages DROP itself is behind the section-0
+-- emptiness guard. If the FK is intact, non-NULL values cannot exist
+-- (packages is empty); if it was dropped out-of-band on live, orphaned
+-- values may survive — the deferred M1 column-drop batch MUST re-check
+-- with its own live-NULL gate rather than treating all-NULL as proven.
 
 -- =============================================================================
 -- 1. recipe_variants family (H1)

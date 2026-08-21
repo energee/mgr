@@ -169,8 +169,11 @@ BEGIN
   v_counts := v_counts || jsonb_build_object('qbo_sync_log', v_deleted);
 
   -- mongodb_sync_log has no created_at (00165); started_at is its insert time.
+  -- started_at is nullable (DEFAULT NOW(), no NOT NULL) — a NULL row is
+  -- undateable junk, so the sweep removes it rather than keeping it forever.
   DELETE FROM mongodb_sync_log
-  WHERE started_at < now() - make_interval(days => p_log_days);
+  WHERE started_at < now() - make_interval(days => p_log_days)
+     OR started_at IS NULL;
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
   v_counts := v_counts || jsonb_build_object('mongodb_sync_log', v_deleted);
 
