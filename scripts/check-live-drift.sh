@@ -78,6 +78,10 @@
 #
 # Requires: psql (postgresql-client). Read-only: issues SELECTs against
 # pg_catalog only. $SUPABASE_DB_URL should point at a read-only role.
+#
+# The exit-code contract (0 clean/WARN, 1 drift, 2 usage, 4 unapplied-
+# migrations-only) is pinned by scripts/__tests__/check-live-drift.test.sh,
+# run by `make check-agent-config`.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

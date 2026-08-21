@@ -1,0 +1,1 @@
+- **2026-08-21 (drift exit-code contract test).** Pinned check-live-drift.sh's 0/1/2/4 exit contract (#812 seam: exit 4 = unapplied-migrations-only with a clean catalog) in `scripts/__tests__/check-live-drift.test.sh` — runs the real script against a fixture tree and stubbed psql; wired into `make check-agent-config` (#855).
