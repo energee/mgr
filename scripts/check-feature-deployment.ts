@@ -56,8 +56,9 @@
  *     on live (#697; those three have since been dropped from the chain by
  *     00289_drop_orphaned_projection_rpcs.sql, so the discrepancy is closed —
  *     the check that found it is not).
- *   - The snapshot records tables, functions, triggers, policies and RLS
- *     state — NOT views, columns or data. A migration that only adds a column
+ *   - The snapshot records tables, functions, triggers, policies, RLS
+ *     state and CHECK constraints (#865) — NOT views, columns or data. A
+ *     migration that only adds a column
  *     or creates a view therefore has nothing this script can look for; such a
  *     record is accepted and reported in the summary as "not verifiable from
  *     the snapshot", so its coverage is visible rather than assumed.
@@ -181,10 +182,12 @@ function freeText(feature: FeatureEntry): string {
 }
 
 /**
- * Tables, functions and triggers a migration creates — the object kinds the
- * live-catalog snapshot records. Views, columns, indexes, types and data are
- * deliberately not extracted: the snapshot does not carry them, so claiming to
- * check them would be theatre.
+ * Tables, functions and triggers a migration creates — the object kinds this
+ * script can reliably extract from migration SQL. Views, columns, indexes,
+ * types and data are deliberately not extracted: the snapshot does not carry
+ * them, so claiming to check them would be theatre. CHECK constraints are in
+ * the snapshot (#865) but not extracted either — they mostly live inline in
+ * CREATE TABLE bodies, where regex extraction would be the same theatre.
  */
 export function createdCatalogObjects(sql: string): CatalogObject[] {
   const stripped = sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");

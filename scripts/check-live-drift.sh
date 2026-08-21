@@ -31,11 +31,12 @@
 #
 # WARN-level additions are split into two classes so behavior-altering objects
 # can't hide in a generic warning:
-#   * BEHAVIOR-ALTERING — TRIG| (new triggers), POLICY| (new RLS policies) and
-#     RLS|<table>|false|* (a new table with row security DISABLED — a security
-#     smell in this RLS-heavy schema) get their own loud callout. An RLS flip
-#     on an existing table never reaches this path: its old flag line goes
-#     missing, which is the FAIL branch above.
+#   * BEHAVIOR-ALTERING — TRIG| (new triggers), POLICY| (new RLS policies),
+#     CHECK| (new CHECK constraints — they silently start rejecting writes,
+#     #865) and RLS|<table>|false|* (a new table with row security DISABLED —
+#     a security smell in this RLS-heavy schema) get their own loud callout.
+#     An RLS flip on an existing table never reaches this path: its old flag
+#     line goes missing, which is the FAIL branch above.
 #   * Other additions — new functions/tables/RLS-enabled flag lines, listed
 #     separately.
 # All WARN-level drift is also appended to $GITHUB_STEP_SUMMARY (when set) so
@@ -58,8 +59,10 @@
 # What it compares (see scripts/live-catalog.sql): every public function
 # (name + identity args + body hash), every non-internal trigger (name + table
 # + definition hash), every base table, every RLS policy (table + name + cmd +
-# permissive + roles + qual/with_check hash), and per-table row-security
-# flags. A body-hash change catches an out-of-band CREATE OR REPLACE (e.g. a
+# permissive + roles + qual/with_check hash), per-table row-security
+# flags, and every CHECK constraint (table + name + definition hash, #865 —
+# orders.status lost its CHECK on live out-of-band and nothing noticed).
+# A body-hash change catches an out-of-band CREATE OR REPLACE (e.g. a
 # racy generate_lot_number swapped in), not just adds/drops. A changed object
 # appears on both sides of the delta (old line missing, new line added); the
 # missing side fails the run.
@@ -195,14 +198,14 @@ fi
 # Additions only (WARN). Split behavior-altering classes out so they can't
 # hide in a generic warning nobody reads: triggers, policies, and new tables
 # whose row security is disabled (RLS|<table>|false|*).
-hot_re='^(TRIG|POLICY)\||^RLS\|[^|]*\|false\|'
+hot_re='^(TRIG|POLICY|CHECK)\||^RLS\|[^|]*\|false\|'
 hot="$(printf '%s\n' "$added" | grep -E "$hot_re" || true)"
 benign="$(printf '%s\n' "$added" | grep -vE "$hot_re" || true)"
 
 if [[ -n "$hot" ]]; then
-  echo "::warning::BEHAVIOR-ALTERING live-only additions: new triggers / RLS policies / RLS-disabled tables exist on live that the snapshot does not expect. Verify each maps to an in-flight migration."
+  echo "::warning::BEHAVIOR-ALTERING live-only additions: new triggers / RLS policies / CHECK constraints / RLS-disabled tables exist on live that the snapshot does not expect. Verify each maps to an in-flight migration."
   echo ""
-  echo "Behavior-altering additions (TRIG/POLICY/RLS-disabled):"
+  echo "Behavior-altering additions (TRIG/POLICY/CHECK/RLS-disabled):"
   printf '%s\n' "$hot" | sed 's/^/  > /'
   echo ""
 fi
@@ -225,7 +228,7 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     echo "## Live-drift: WARN (additions only — nothing expected is missing)"
     if [[ -n "$hot" ]]; then
       echo ""
-      echo "### Behavior-altering additions (triggers / RLS policies / RLS-disabled tables)"
+      echo "### Behavior-altering additions (triggers / RLS policies / CHECK constraints / RLS-disabled tables)"
       echo ""
       echo '```'
       printf '%s\n' "$hot"

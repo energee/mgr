@@ -8,11 +8,20 @@
 --   TABLE|<name>
 --   POLICY|<table>|<policy>|<cmd>|<permissive>|<roles, csv sorted>|<md5 of qual~with_check>
 --   RLS|<table>|<row_security true/false>|<force_row_security true/false>
+--   CHECK|<table>|<constraint>|<md5 of pg_get_constraintdef>
 --
 -- POLICY and RLS lines exist so an out-of-band DROP POLICY / ALTER POLICY /
 -- DISABLE ROW LEVEL SECURITY registers as drift (a missing snapshot line →
 -- FAIL) — this schema is RLS-heavy and those were previously invisible to
 -- the watchdog. qual/with_check are hashed the same way function bodies are.
+--
+-- CHECK lines exist for the same reason (#865): orders.status lost its CHECK
+-- constraint on live out-of-band (found only by a full manual schema audit,
+-- healed by 00295). Hashing pg_get_constraintdef makes both an out-of-band
+-- DROP and an edit register as a missing snapshot line → FAIL. CHECK-only is
+-- a deliberate scope choice, not an oversight: FK/UNIQUE/PK/EXCLUSION drops
+-- were considered and deferred — they'd add ~500 partially index-duplicating
+-- lines, and covering them later is an additive new prefix (no format break).
 --
 -- Extension-owned functions (pg_depend deptype 'e') are excluded so installing/
 -- upgrading an extension doesn't register as drift. Ordered by C collation so
@@ -53,5 +62,11 @@ SELECT line FROM (
   FROM pg_class c
   JOIN pg_namespace n ON n.oid = c.relnamespace
   WHERE n.nspname = 'public' AND c.relkind = 'r'
+  UNION ALL
+  SELECT 'CHECK|' || c.relname || '|' || con.conname || '|' || md5(pg_get_constraintdef(con.oid))
+  FROM pg_constraint con
+  JOIN pg_class c ON c.oid = con.conrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND c.relkind = 'r' AND con.contype = 'c'
 ) cat
 ORDER BY line COLLATE "C";
