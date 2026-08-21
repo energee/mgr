@@ -77,11 +77,11 @@ jobs:
             echo "drift=false" >> "$GITHUB_OUTPUT"
           else
             rc=$?
-            if [ "$rc" -eq 1 ]; then
+            if [ "$rc" -eq 1 ] || [ "$rc" -eq 4 ]; then
               echo "drift=true" >> "$GITHUB_OUTPUT"
-              echo "kind=catalog" >> "$GITHUB_OUTPUT"
-            elif [ "$rc" -eq 4 ]; then
-              echo "drift=true" >> "$GITHUB_OUTPUT"
+            fi
+            # kind defaults to catalog in the consumer (${KIND:-catalog}).
+            if [ "$rc" -eq 4 ]; then
               echo "kind=unapplied" >> "$GITHUB_OUTPUT"
             fi
             exit "$rc"
