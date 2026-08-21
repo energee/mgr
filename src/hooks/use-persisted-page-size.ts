@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import type { PaginationState } from "@tanstack/react-table";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
 const STORAGE_PREFIX = "mgr:table-page-size";
@@ -53,11 +54,11 @@ export function usePersistedPageSize(
   const [pageSize, setPageSizeState] = useState(defaultSize);
 
   useEffect(() => {
-    const stored = getStoredPageSize(defaultSize, tableKey);
-    if (stored !== defaultSize) {
-      setPageSizeState(stored);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time read on mount, mirroring usePrefillHydration
+    // Unconditional write: when tableKey changes in place, the previous
+    // table's size must not leak into a table with no stored preference
+    // (setState with the current value is a no-op render-wise).
+    setPageSizeState(getStoredPageSize(defaultSize, tableKey));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read on mount and key change, mirroring usePrefillHydration
   }, [tableKey]);
 
   // Setter that also persists to localStorage
@@ -72,4 +73,50 @@ export function usePersistedPageSize(
   );
 
   return { pageSize, setPageSize };
+}
+
+/**
+ * Table pagination state whose pageSize is the persisted preference — the
+ * single source of truth. `pagination` is DERIVED from the hook's pageSize
+ * plus local pageIndex state, so the stored size is restored after mount by
+ * construction (issue #859: entity-data-table previously copied the hook's
+ * first-render value — always the default — into its own useState and never
+ * synced back, so the preference persisted but was never restored on reload).
+ *
+ * `onPaginationChange` is a TanStack Table onPaginationChange handler: page
+ * moves update pageIndex; size changes persist via setPageSize and snap back
+ * to the first page (a stale pageIndex into a longer page would render an
+ * empty page under server pagination).
+ */
+export function usePersistedPagination(defaultSize?: number, tableKey?: string) {
+  // `undefined` falls through to usePersistedPageSize's own parameter
+  // default — that layer is the single owner of DEFAULT_PAGE_SIZE.
+  const { pageSize, setPageSize } = usePersistedPageSize(defaultSize, tableKey);
+  const [pageIndex, setPageIndex] = useState(0);
+
+  const pagination = useMemo<PaginationState>(
+    () => ({ pageIndex, pageSize }),
+    [pageIndex, pageSize],
+  );
+
+  const onPaginationChange = useCallback(
+    (updater: PaginationState | ((old: PaginationState) => PaginationState)) => {
+      // Compute `next` from the render-captured pagination. Safe because
+      // every producer (page flip, size select) is a discrete single-call
+      // event that React flushes before the next can fire — not because the
+      // useMemo would protect against same-batch updates.
+      const next = typeof updater === "function" ? updater(pagination) : updater;
+      if (next.pageSize !== pagination.pageSize) {
+        setPageSize(next.pageSize);
+        setPageIndex(0);
+      } else {
+        setPageIndex(next.pageIndex);
+      }
+    },
+    [pagination, setPageSize],
+  );
+
+  const resetPageIndex = useCallback(() => setPageIndex(0), []);
+
+  return { pagination, onPaginationChange, resetPageIndex };
 }

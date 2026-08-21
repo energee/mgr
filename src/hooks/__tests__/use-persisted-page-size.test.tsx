@@ -14,7 +14,8 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { act } from "react";
-import { usePersistedPageSize } from "@/hooks/use-persisted-page-size";
+import type { PaginationState } from "@tanstack/react-table";
+import { usePersistedPageSize, usePersistedPagination } from "@/hooks/use-persisted-page-size";
 import { setupRenderHarness } from "@/test/react-harness";
 
 const STORAGE_KEY = "mgr:table-page-size";
@@ -73,6 +74,64 @@ describe("usePersistedPageSize", () => {
 
     act(() => setters[setters.length - 1](50));
     expect(localStorage.getItem(STORAGE_KEY)).toBe("50");
+  });
+
+  it("restores the stored size into pagination state after mount (#859)", () => {
+    localStorage.setItem(`${STORAGE_KEY}:orders`, "50");
+
+    const log: Array<{ pageIndex: number; pageSize: number }> = [];
+    function PaginationProbe() {
+      const { pagination } = usePersistedPagination(undefined, "orders");
+      log.push(pagination);
+      return null;
+    }
+    harness.render(<PaginationProbe />);
+
+    // The regression: pagination sampled the hook only in a one-shot useState
+    // initializer, whose first-render value is always the default, so the
+    // stored 50 was never applied and every reload reset to 25.
+    expect(log[log.length - 1]).toEqual({ pageIndex: 0, pageSize: 50 });
+  });
+
+  it("routes page-size changes through persistence and resets pageIndex (#859)", () => {
+    const log: Array<{ pageIndex: number; pageSize: number }> = [];
+    const handlers: Array<
+      (u: PaginationState | ((old: PaginationState) => PaginationState)) => void
+    > = [];
+    function ChangeProbe() {
+      const { pagination, onPaginationChange } = usePersistedPagination(undefined, "orders");
+      log.push(pagination);
+      handlers.push(onPaginationChange);
+      return null;
+    }
+    harness.render(<ChangeProbe />);
+
+    // Page forward, then change the size: size change persists and snaps back
+    // to the first page (a stale pageIndex would show an empty page).
+    act(() => handlers[handlers.length - 1]((p) => ({ ...p, pageIndex: 3 })));
+    expect(log[log.length - 1]).toEqual({ pageIndex: 3, pageSize: 25 });
+
+    act(() => handlers[handlers.length - 1]((p) => ({ ...p, pageSize: 100 })));
+    expect(log[log.length - 1]).toEqual({ pageIndex: 0, pageSize: 100 });
+    expect(localStorage.getItem(`${STORAGE_KEY}:orders`)).toBe("100");
+  });
+
+  it("resets to the default when tableKey changes to a table with no stored size", () => {
+    localStorage.setItem(`${STORAGE_KEY}:orders`, "50");
+
+    const log: number[] = [];
+    function KeySwapProbe({ tableKey }: { tableKey: string }) {
+      const { pageSize } = usePersistedPageSize(25, tableKey);
+      log.push(pageSize);
+      return null;
+    }
+    harness.render(<KeySwapProbe tableKey="orders" />);
+    expect(log[log.length - 1]).toBe(50);
+
+    // Swap the key in place: the previous table's 50 must not leak into a
+    // table that has no stored preference.
+    harness.rerender(<KeySwapProbe tableKey="batches" />);
+    expect(log[log.length - 1]).toBe(25);
   });
 
   it("persists per table key, independently of the global key", () => {
