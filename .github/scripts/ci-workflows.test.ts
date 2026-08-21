@@ -550,21 +550,6 @@ describe("GitHub Actions performance contracts", () => {
     expect(progressWorkflow).not.toContain("[skip ci]");
     expect(progressWorkflow).toContain("--auto");
 
-    // #844: a PR authored (or later synchronized) with `secrets.GITHUB_TOKEN`
-    // triggers no workflows, so the required contexts never report and --auto
-    // waits forever (bot PRs #836/#837). The job must mint an app installation
-    // token and use it for BOTH the branch push (checkout token) and the
-    // gh pr create/merge step; `secrets.GITHUB_TOKEN` may appear only as the
-    // explicit fallback for when the app secrets are not configured.
-    expect(progressWorkflow).toContain("actions/create-github-app-token@");
-    expect(progressWorkflow).toContain(
-      "token: ${{ steps.bot-token.outputs.token || github.token }}",
-    );
-    expect(progressWorkflow).toContain(
-      "GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}",
-    );
-    expect(progressWorkflow).not.toContain("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
-
     // enablePullRequestAutoMerge races the PR's own checks starting up and
     // intermittently answers "unstable status" (~1/3 of runs, e.g. run
     // 31555267032, which left bot PR #805 stranded open) — the merge must be
@@ -589,14 +574,44 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).not.toContain("[skip ci]");
     // Deterministic only: the refresh job must never invoke the LLM pass.
     expect(workflow).not.toContain("--llm");
-    // #844: same credential contract as progress.yml — app token for push and
-    // PR, GITHUB_TOKEN only as explicit fallback.
-    expect(workflow).toContain("actions/create-github-app-token@");
-    expect(workflow).toContain("token: ${{ steps.bot-token.outputs.token || github.token }}");
-    expect(workflow).toContain(
-      "GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}",
+  });
+
+  // #844: a PR authored (or later synchronized) with `secrets.GITHUB_TOKEN`
+  // triggers no workflows, so the four required contexts never report and
+  // `gh pr merge --auto` waits forever (bot PRs #836/#837 stranded that way).
+  // This is a RULE over every workflow, not an enumeration of the two lanes
+  // that already broke: any workflow that auto-merges a PR it opened must mint
+  // an app installation token and use it for BOTH the branch push (checkout
+  // token) and the gh pr create/merge step. `secrets.GITHUB_TOKEN` may appear
+  // only as the explicit fallback for when the app secrets are not
+  // configured. The `gh pr merge` + `--auto` pair is the discriminator: the
+  // generative loops name `gh pr merge` only inside "NEVER merge" prompt
+  // prohibitions and never pass --auto (a human is their gate), so a new
+  // copy-pasted auto-merge lane is caught here without an exemption list.
+  it("authors every auto-merged bot PR with the app installation token, not GITHUB_TOKEN", () => {
+    const autoMergeLanes = workflows.filter(
+      (path) => read(path).includes("gh pr merge") && read(path).includes("--auto"),
     );
-    expect(workflow).not.toContain("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
+
+    // Anti-vacuity: the two known lanes must be selected by the discriminator.
+    expect(autoMergeLanes).toEqual(
+      expect.arrayContaining([
+        ".github/workflows/progress.yml",
+        ".github/workflows/codegraph-refresh.yml",
+      ]),
+    );
+
+    for (const path of autoMergeLanes) {
+      const workflow = read(path);
+      expect(workflow, path).toContain("actions/create-github-app-token@");
+      expect(workflow, path).toContain(
+        "token: ${{ steps.bot-token.outputs.token || github.token }}",
+      );
+      expect(workflow, path).toContain(
+        "GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}",
+      );
+      expect(workflow, path).not.toContain("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
+    }
   });
 
   // The doctor ratchet runs inside the required Static Checks job: it must
