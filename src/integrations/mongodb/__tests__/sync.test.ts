@@ -381,6 +381,43 @@ describe("syncBatches status preservation (via syncEntity)", () => {
   });
 });
 
+describe("syncVessels status preservation (via syncEntity)", () => {
+  it("keeps the existing PG status for a vessel the live app occupies", async () => {
+    // Mongo's frozen snapshot says "ready_for_use", but PG says "in_use" —
+    // vessels has no transition trigger to reject the regression (#839), so
+    // the sync must preserve the live status itself.
+    const { admin, writes } = makeAdminMock(
+      pgTables({
+        vessels: {
+          data: [{ id: "pg-vessel-1", name: "FV1", status: "in_use" }],
+          error: null,
+        },
+      }),
+      { onUnknownTable: "throw" }
+    );
+    mockedCreateAdminClient.mockResolvedValue(admin as never);
+    mockedGetMongoDb.mockResolvedValue(
+      makeDb({
+        ...MONGO_COLLECTIONS,
+        vessels: [
+          { _id: new ObjectId("afafafafafafafafafafafaf"), name: "FV1", state: "ready_for_use" },
+          { _id: new ObjectId("bcbcbcbcbcbcbcbcbcbcbcbc"), name: "FV2", state: "dirty" },
+        ],
+      })
+    );
+
+    await syncEntity("vessels");
+
+    const upsert = writes.find((w) => w.table === "vessels" && w.op === "upsert");
+    expect(upsert).toBeDefined();
+    const rows = upsert!.row as Array<{ name: string; status: string }>;
+    // Known vessel: live PG status wins over the frozen Mongo snapshot.
+    expect(rows.find((r) => r.name === "FV1")?.status).toBe("in_use");
+    // New vessel: Mongo still decides the initial status.
+    expect(rows.find((r) => r.name === "FV2")?.status).toBe("dirty");
+  });
+});
+
 describe("syncTransfers historical replay (via syncEntity)", () => {
   it("routes rows through reconcile_mongodb_transfers instead of a direct upsert", async () => {
     const VESSEL_OID = new ObjectId("adadadadadadadadadadadad");

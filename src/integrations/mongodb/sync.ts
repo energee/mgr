@@ -197,20 +197,23 @@ async function upsertRows(
 }
 
 /**
- * Chunked `.in("id", …)` select. Unbounded selects silently truncate at
- * PostgREST's 1000-row response cap; chunking by the ids we actually need
+ * Chunked `.in(keyColumn, …)` select. Unbounded selects silently truncate at
+ * PostgREST's 1000-row response cap; chunking by the keys we actually need
  * keeps reads complete and bounded. Chunks run in parallel.
  */
 async function selectRowsByIds<T>(
   admin: AdminClient,
   table: string,
   columns: string,
-  ids: string[]
+  ids: string[],
+  keyColumn: string = "id"
 ): Promise<T[]> {
   const CHUNK = 200;
   const results = await Promise.all(
     Array.from({ length: Math.ceil(ids.length / CHUNK) }, (_, i) =>
-      dynamicFrom(admin, table).select(columns).in("id", ids.slice(i * CHUNK, (i + 1) * CHUNK))
+      dynamicFrom(admin, table)
+        .select(columns)
+        .in(keyColumn, ids.slice(i * CHUNK, (i + 1) * CHUNK))
     )
   );
   const rows: T[] = [];
@@ -454,9 +457,26 @@ async function syncBrands(): Promise<SyncResult> {
 async function syncVessels(): Promise<SyncResult> {
   const logId = await createSyncLog("vessels", 2);
   const db = await requireMongoDb();
+  const admin = await createAdminClient();
 
   const docs = await db.collection<MongoVessel>("vessels").find().toArray();
   const rows = docs.map(transformVessel);
+
+  // For vessels PG already knows, keep the live PG status: the frozen Mongo
+  // snapshot says nothing about current occupancy, and unlike batches there is
+  // no transition trigger to reject the regression — a plain re-sync would
+  // silently mark an in-use vessel "ready_for_use" while current_batch_id
+  // (not in the transform's column set) stays stale (#839; same guard as
+  // syncBatches, fd60d58). Mongo still sets status on first insert.
+  const existingVessels = await selectRowsByIds<{ name: string; status: string }>(
+    admin, "vessels", "name, status", rows.map((row) => row.name), "name"
+  );
+  const existingStatuses = new Map(existingVessels.map((v) => [v.name, v.status]));
+  for (const row of rows) {
+    const current = existingStatuses.get(row.name);
+    if (current !== undefined) row.status = current;
+  }
+
   const result = await upsertRows("vessels", rows, "name");
 
   await completeSyncLog(logId, result);
