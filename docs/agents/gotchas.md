@@ -161,6 +161,31 @@ worked around, so the entry goes with it per the rule above (b).
 `z.infer` types keep symbols alive in ways static analysis misses. AGENTS.md
 hard constraint 17: verify before deleting anything they flag.
 
+**`gh pr list --search` / `gh issue list --search` return empty under the
+Actions `GITHUB_TOKEN`.** GitHub's search API silently returns nothing for
+that token. Use a plain list and filter locally with a regex on titles — see
+`.github/scripts/sentry-harness.ts` (this bit PR #331).
+
+**Never copy whole files from another checkout into a worktree.** A file
+copied from local main into an `origin/main`-based worktree can smuggle
+unrelated local changes into the PR (bit PR #521). Diff the destination
+against `origin/main` before committing anything you copied.
+
+**Library API gotchas** — current major versions differ from what agents
+often assume:
+
+- AI SDK (`ai` package): the property is `maxOutputTokens`, not `maxTokens`;
+  `streamText` limits tool rounds with `stopWhen: stepCountIs(N)`;
+  `convertToModelMessages` converts UI messages to model format.
+- Supabase query builder `.then()` returns `PromiseLike`, not `Promise` —
+  collect as `PromiseLike<T>[]` for `Promise.all`.
+- Zod v4: `z.coerce` makes input types `unknown`, breaking `zodResolver`
+  inference — use the wrapper in `src/lib/form-resolver.ts`; `ZodError.errors`
+  is renamed `.issues`.
+- Recharts v3: Tooltip/Legend `payload` moved to `DefaultTooltipContent` /
+  `DefaultLegendContent` component props; `DataKey<any>` can be a function —
+  use `String(item.dataKey)` for React keys.
+
 ## Agent sandboxes
 
 Harness-environment failures, not repo bugs — but they read like repo bugs.
@@ -173,6 +198,15 @@ command with the sandbox disabled rather than debugging the script.
 allow-list argument list exceeds `ARG_MAX` and every sandboxed command fails
 with E2BIG. Prune with `make worktree-doctor` / `scripts/agent-worktree`;
 bypass per-command in the meantime.
+
+**Sandboxed writes to repo files can silently vanish.** The sandbox can hand a
+shell a self-consistent write overlay: the sandboxed process sees its own
+edits while the real tree never changes. Before committing, confirm with an
+**unsandboxed** `git status` that the edits actually landed.
+
+**The Supabase pooler host is blocked by the sandbox network allow-list.**
+`scripts/db-push.sh` and anything dialing `*.pooler.supabase.com` needs the
+sandbox bypassed for that command.
 
 **The pre-PR review gate cannot be satisfied in the same command it guards
 (#786).** The gate is a `PreToolUse` hook on `Bash` in `.claude/settings.json`.

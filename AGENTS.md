@@ -189,7 +189,7 @@ Litmus test for a new file: does it know what a "batch" is? → `src/domain/`. D
 9. **MUST** derive status colors, labels, and state arrays from entity `stateMachine` config (DEC-007).
 10. **MUST NOT** join or select from `auth.users` in views.
 11. **MUST NOT** use `""` as a Select option value (DEC-008). Use `"_none"` for clear-selection.
-12. **MUST NOT** add `Co-Authored-By` lines to commits.
+12. **MUST NOT** add `Co-Authored-By` lines to commits, nor AI-attribution footers ("Generated with Claude Code" or similar) to commits, PR bodies, or issues.
 13. **MUST NOT** commit migrations on `main` — only in the correct worktree/branch.
 14. **MUST** run tests with `bun run test` (vitest) — `bun test` is Bun's own runner and is not the suite.
 15. **MUST** keep one entity per directory: `src/entities/<name>/` (`core.ts` + `presentation.tsx` + `index.ts`), registered in `src/entities/index.ts`.
