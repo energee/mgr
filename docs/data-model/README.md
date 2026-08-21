@@ -51,7 +51,6 @@ Production Domain
 │   └── recipe_sugars (recipe_id) → sugars
 │   └── recipe_spices (recipe_id) → spices
 │   └── recipe_fruits (recipe_id) → fruits
-│   └── recipe_collaborators (recipe_id)
 │   └── recipe_additions (recipe_id)
 │   └── batches (recipe_id)
 │   └── brew_logs (recipe_id)
