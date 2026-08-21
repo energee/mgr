@@ -8,6 +8,7 @@ CHECK|allocations|chk_allocation_status_valid|215803913714d95cdbb57b034354d6bd
 CHECK|allocations|chk_allocation_volume_nonnegative|3c3931c632f4c2b1243177053310e46d
 CHECK|batch_additions|batch_additions_addition_type_check|8182c441d75e7e5014b89aaa2d4ff93b
 CHECK|batch_additions|batch_additions_amount_check|ff7f8fc527686422d3a0e8676a5dee99
+CHECK|batch_blends|batch_blends_no_self_blend|8d94d5603a72c8bb7d946e6a589ddd20
 CHECK|batch_blends|batch_blends_volume_bbl_check|647ea6631fe5c965628c0fe0e1a78df1
 CHECK|batches|batches_status_check|1b610e46cb4a1aea350e49f3d2275738
 CHECK|beer_order_brand_mappings|beer_order_brand_mappings_distributor_tier_check|e83218647fdb6acabdb5e159a38f2052
@@ -49,10 +50,6 @@ CHECK|pick_list_items|pick_list_items_quantity_requested_check|b63e0fb770c140fd9
 CHECK|pick_lists|pick_lists_status_check|4613833e304b32e336560abf20f3790b
 CHECK|purchase_orders|purchase_orders_status_check|0604bb16f3e6b1148c720045922a9a02
 CHECK|recipe_hops|chk_recipe_hops_timing|00135bda3d9565d1550f7f7f4c02db07
-CHECK|recipe_variant_adjuncts|recipe_variant_adjuncts_amount_check|ff7f8fc527686422d3a0e8676a5dee99
-CHECK|recipe_variant_fruits|recipe_variant_fruits_amount_check|ff7f8fc527686422d3a0e8676a5dee99
-CHECK|recipe_variant_hops|recipe_variant_hops_weight_oz_check|2d28b19d5444baa75fed50e21452589a
-CHECK|recipe_variant_spices|recipe_variant_spices_amount_check|ff7f8fc527686422d3a0e8676a5dee99
 CHECK|recipes|chk_recipe_status|76763c7835ea0d3c3e3981ab61991a58
 CHECK|selling_format_materials|selling_format_materials_quantity_per_unit_check|f56a374163d7114c3627916e5bf987d6
 CHECK|selling_formats|selling_formats_default_layers_check|07b81922c5e69e7b1ccede441a45b185
@@ -185,6 +182,7 @@ FUNC|packaging_session_before_update()|8e932b9407940972b16c9fdb03585c8a
 FUNC|pitch_yeast_atomic(p_request_id uuid, p_pitch_id uuid, p_batch_id uuid, p_quantity_lbs numeric, p_viability_at_pitch numeric, p_notes text)|2a61f76c4ff12d61e20aa13d173405af
 FUNC|place_finished_good_in_bin()|ae4e858d41ca7ed39e5daddbbf841d65
 FUNC|prevent_completed_allocation_delete()|06dc744313b05d0b23d94d3c4047139e
+FUNC|prune_log_tables(p_log_days integer, p_revision_days integer)|e2b53b5521bcade1c6c6edf731caae93
 FUNC|recalculate_order_materials(p_order_id uuid)|197a6535581756c461f310b5c3887014
 FUNC|recalculate_order_materials_after_item_write()|6ecbbe9188c14eb3778e637360d9be77
 FUNC|receive_purchase_order_items(p_po_id uuid, p_entries jsonb)|78ed40ddf566d2e1c7383e322503a6b8
@@ -393,9 +391,6 @@ POLICY|orders|orders_customer_insert|INSERT|PERMISSIVE|authenticated|b4f989edb17
 POLICY|orders|orders_customer_lock|UPDATE|PERMISSIVE|authenticated|19c6ed6e84e68f4cff26cff618742c19
 POLICY|orders|orders_select|SELECT|PERMISSIVE|public|bee6ccd5eada277be3aee938c0adb84d
 POLICY|orders|orders_write|ALL|PERMISSIVE|public|8e6502e92b12f3d9859b9119602e23b8
-POLICY|packages|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|packages|packages_select|SELECT|PERMISSIVE|public|d0859d1f7b1c73de9d3d3a4af0c7bc07
-POLICY|packages|packages_write|ALL|PERMISSIVE|public|9050fff222f990b2c5e45b976caf7c40
 POLICY|packaging_sessions|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
 POLICY|packaging_sessions|packaging_sessions_select|SELECT|PERMISSIVE|public|d0859d1f7b1c73de9d3d3a4af0c7bc07
 POLICY|packaging_sessions|packaging_sessions_write|ALL|PERMISSIVE|public|9050fff222f990b2c5e45b976caf7c40
@@ -411,9 +406,6 @@ POLICY|po_line_items|po_line_items_write|ALL|PERMISSIVE|public|13b47dc0e1fa12b21
 POLICY|po_receives|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
 POLICY|po_receives|po_receives_select|SELECT|PERMISSIVE|public|4476c088646ca0a48af120c865c16ce7
 POLICY|po_receives|po_receives_write|ALL|PERMISSIVE|public|13b47dc0e1fa12b21c5e3db9e737d343
-POLICY|pricing_channel_formats|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|pricing_channel_formats|pricing_channel_formats_select|SELECT|PERMISSIVE|public|5671938a1b1a7c1e43879b39d522a092
-POLICY|pricing_channel_formats|pricing_channel_formats_write|ALL|PERMISSIVE|public|3b67933a6fe143ae954dcc4438a69590
 POLICY|pricing_history|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
 POLICY|pricing_history|pricing_history_select|SELECT|PERMISSIVE|public|5671938a1b1a7c1e43879b39d522a092
 POLICY|pricing_history|pricing_history_write|ALL|PERMISSIVE|public|3b67933a6fe143ae954dcc4438a69590
@@ -441,9 +433,6 @@ POLICY|recipe_additions|recipe_additions_write|ALL|PERMISSIVE|public|a0b382c2d10
 POLICY|recipe_adjuncts|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
 POLICY|recipe_adjuncts|recipe_adjuncts_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
 POLICY|recipe_adjuncts|recipe_adjuncts_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
-POLICY|recipe_collaborators|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|recipe_collaborators|recipe_collaborators_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
-POLICY|recipe_collaborators|recipe_collaborators_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
 POLICY|recipe_fruits|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
 POLICY|recipe_fruits|recipe_fruits_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
 POLICY|recipe_fruits|recipe_fruits_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
@@ -459,21 +448,6 @@ POLICY|recipe_spices|recipe_spices_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed
 POLICY|recipe_sugars|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
 POLICY|recipe_sugars|recipe_sugars_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
 POLICY|recipe_sugars|recipe_sugars_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
-POLICY|recipe_variant_adjuncts|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|recipe_variant_adjuncts|recipe_variant_adjuncts_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
-POLICY|recipe_variant_adjuncts|recipe_variant_adjuncts_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
-POLICY|recipe_variant_fruits|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|recipe_variant_fruits|recipe_variant_fruits_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
-POLICY|recipe_variant_fruits|recipe_variant_fruits_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
-POLICY|recipe_variant_hops|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|recipe_variant_hops|recipe_variant_hops_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
-POLICY|recipe_variant_hops|recipe_variant_hops_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
-POLICY|recipe_variant_spices|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|recipe_variant_spices|recipe_variant_spices_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
-POLICY|recipe_variant_spices|recipe_variant_spices_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
-POLICY|recipe_variants|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|recipe_variants|recipe_variants_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
-POLICY|recipe_variants|recipe_variants_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
 POLICY|recipe_yeasts|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
 POLICY|recipe_yeasts|recipe_yeasts_select|SELECT|PERMISSIVE|public|73dc3ff3e2b569a4a48429bc5789b2b5
 POLICY|recipe_yeasts|recipe_yeasts_write|ALL|PERMISSIVE|public|a0b382c2d1066eaed72fae62f74b6418
@@ -540,9 +514,6 @@ POLICY|user_profiles|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986
 POLICY|user_profiles|user_profiles_insert_admin|INSERT|PERMISSIVE|public|e9665e7810abf305f7f8b0f8ce699eb9
 POLICY|user_profiles|user_profiles_select|SELECT|PERMISSIVE|public|5671938a1b1a7c1e43879b39d522a092
 POLICY|user_profiles|user_profiles_update|UPDATE|PERMISSIVE|public|2e6bc05d5d60ee29550d1745d2d889ac
-POLICY|vessel_cleanings|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
-POLICY|vessel_cleanings|vessel_cleanings_select|SELECT|PERMISSIVE|public|3d8ae6590ffdb44623d7703d400a15fd
-POLICY|vessel_cleanings|vessel_cleanings_write|ALL|PERMISSIVE|public|09815fb937c44b41e9e9b7c76e05c3b6
 POLICY|vessel_transfers|current_user_enabled|ALL|RESTRICTIVE|authenticated|ee25f986535267ddf4e1e2b6b68f44f7
 POLICY|vessel_transfers|vessel_transfers_select|SELECT|PERMISSIVE|public|3d8ae6590ffdb44623d7703d400a15fd
 POLICY|vessel_transfers|vessel_transfers_write|ALL|PERMISSIVE|public|09815fb937c44b41e9e9b7c76e05c3b6
@@ -615,13 +586,11 @@ RLS|order_change_requests|true|false
 RLS|order_items|true|false
 RLS|order_materials|true|false
 RLS|orders|true|false
-RLS|packages|true|false
 RLS|packaging_sessions|true|false
 RLS|pick_list_items|true|false
 RLS|pick_lists|true|false
 RLS|po_line_items|true|false
 RLS|po_receives|true|false
-RLS|pricing_channel_formats|true|false
 RLS|pricing_history|true|false
 RLS|pricing_tier_prices|true|false
 RLS|pricing_tiers|true|false
@@ -631,17 +600,11 @@ RLS|qbo_sync_log|true|false
 RLS|qbo_sync_mappings|true|false
 RLS|recipe_additions|true|false
 RLS|recipe_adjuncts|true|false
-RLS|recipe_collaborators|true|false
 RLS|recipe_fruits|true|false
 RLS|recipe_hops|true|false
 RLS|recipe_malts|true|false
 RLS|recipe_spices|true|false
 RLS|recipe_sugars|true|false
-RLS|recipe_variant_adjuncts|true|false
-RLS|recipe_variant_fruits|true|false
-RLS|recipe_variant_hops|true|false
-RLS|recipe_variant_spices|true|false
-RLS|recipe_variants|true|false
 RLS|recipe_yeasts|true|false
 RLS|recipes|true|false
 RLS|sales_channels|true|false
@@ -663,7 +626,6 @@ RLS|system_settings|true|false
 RLS|transfer_lines|true|false
 RLS|user_preferences|true|false
 RLS|user_profiles|true|false
-RLS|vessel_cleanings|true|false
 RLS|vessel_transfers|true|false
 RLS|vessels|true|false
 RLS|water_profiles|true|false
@@ -724,13 +686,11 @@ TABLE|order_change_requests
 TABLE|order_items
 TABLE|order_materials
 TABLE|orders
-TABLE|packages
 TABLE|packaging_sessions
 TABLE|pick_list_items
 TABLE|pick_lists
 TABLE|po_line_items
 TABLE|po_receives
-TABLE|pricing_channel_formats
 TABLE|pricing_history
 TABLE|pricing_tier_prices
 TABLE|pricing_tiers
@@ -740,17 +700,11 @@ TABLE|qbo_sync_log
 TABLE|qbo_sync_mappings
 TABLE|recipe_additions
 TABLE|recipe_adjuncts
-TABLE|recipe_collaborators
 TABLE|recipe_fruits
 TABLE|recipe_hops
 TABLE|recipe_malts
 TABLE|recipe_spices
 TABLE|recipe_sugars
-TABLE|recipe_variant_adjuncts
-TABLE|recipe_variant_fruits
-TABLE|recipe_variant_hops
-TABLE|recipe_variant_spices
-TABLE|recipe_variants
 TABLE|recipe_yeasts
 TABLE|recipes
 TABLE|sales_channels
@@ -772,7 +726,6 @@ TABLE|system_settings
 TABLE|transfer_lines
 TABLE|user_preferences
 TABLE|user_profiles
-TABLE|vessel_cleanings
 TABLE|vessel_transfers
 TABLE|vessels
 TABLE|water_profiles
