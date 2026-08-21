@@ -1,9 +1,9 @@
 {
- "commit": "87fb9274768b5d376560488186c7382272e17dc8",
- "built_at": "2026-08-21T23:00:14.599Z",
+ "commit": "cd9a4d9d618b815df25fc0f4d78881c8225beff1",
+ "built_at": "2026-08-21T23:07:10.080Z",
  "inputs": {
-  "count": 1384,
-  "digest": "1a45818f8ee36b8f"
+  "count": 1387,
+  "digest": "f5ee75fb8de28896"
  },
  "nodes": [
   {
@@ -7317,8 +7317,8 @@
   {
    "name": "batches_with_brew_info",
    "type": "VIEW",
-   "description": "Postgres view 'batches_with_brew_info', last defined in 00204_fix_actual_og_plato_to_sg.sql. Views are absent from the live snapshot, so this is chain-only.",
-   "file_path": "supabase/migrations/00204_fix_actual_og_plato_to_sg.sql",
+   "description": "Postgres view 'batches_with_brew_info', last defined in 00294_drop_dead_schema_objects.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
    "aliases": [],
    "extractor": "sql",
    "db_source": "chain",
@@ -8950,8 +8950,8 @@
   {
    "name": "batches_with_blend_info",
    "type": "VIEW",
-   "description": "Postgres view 'batches_with_blend_info', last defined in 00236_restore_missing_live_relations.sql. Views are absent from the live snapshot, so this is chain-only.",
-   "file_path": "supabase/migrations/00236_restore_missing_live_relations.sql",
+   "description": "Postgres view 'batches_with_blend_info', last defined in 00294_drop_dead_schema_objects.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
    "aliases": [],
    "extractor": "sql",
    "db_source": "chain",
@@ -11596,6 +11596,30 @@
    "type": "MIGRATION",
    "description": "Migration 00293_reconcile_draft_sale_atomic.sql.",
    "file_path": "supabase/migrations/00293_reconcile_draft_sale_atomic.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "00294_drop_dead_schema_objects.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00294_drop_dead_schema_objects.sql.",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "00295_schema_integrity_corrections.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00295_schema_integrity_corrections.sql.",
+   "file_path": "supabase/migrations/00295_schema_integrity_corrections.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "00296_log_retention_cron.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00296_log_retention_cron.sql.",
+   "file_path": "supabase/migrations/00296_log_retention_cron.sql",
    "aliases": [],
    "extractor": "sql"
   },
@@ -53757,6 +53781,97 @@
    "extractor": "sql"
   },
   {
+   "source": "00294_drop_dead_schema_objects.sql",
+   "predicate": "creates",
+   "target": "batches_with_brew_info",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_brew_info",
+   "predicate": "derives_from",
+   "target": "brew_log_batches",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_brew_info",
+   "predicate": "derives_from",
+   "target": "brew_logs",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_brew_info",
+   "predicate": "derives_from",
+   "target": "vessels",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_brew_info",
+   "predicate": "derives_from",
+   "target": "batches",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00294_drop_dead_schema_objects.sql",
+   "predicate": "creates",
+   "target": "batches_with_blend_info",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "batch_blends",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "batches_with_brew_info",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "recipes",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "recipes_with_estimates",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "batches",
+   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00296_log_retention_cron.sql",
+   "predicate": "creates",
+   "target": "email_notification_log",
+   "file_path": "supabase/migrations/00296_log_retention_cron.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00296_log_retention_cron.sql",
+   "predicate": "creates",
+   "target": "email_notification_log.Authenticated users can read email log",
+   "file_path": "supabase/migrations/00296_log_retention_cron.sql",
+   "extractor": "sql"
+  },
+  {
    "source": "src/lib/sentry-config.ts",
    "predicate": "defines",
    "target": "src/lib/sentry-config.ts#sentryBaseConfig",
@@ -57785,13 +57900,6 @@
    "source": "src/app/api/chat/tools.ts",
    "predicate": "reads_from",
    "target": "batch_logs",
-   "file_path": "src/app/api/chat/tools.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/app/api/chat/tools.ts",
-   "predicate": "reads_from",
-   "target": "vessel_cleanings",
    "file_path": "src/app/api/chat/tools.ts",
    "extractor": "ast"
   },
