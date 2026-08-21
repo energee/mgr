@@ -44,12 +44,11 @@ import { useRouter } from "next/navigation";
 import type {
   ColumnDef,
   SortingState,
-  PaginationState,
   RowSelectionState,
   VisibilityState,
 } from "@tanstack/react-table";
 import { useReactTable, getCoreRowModel } from "@tanstack/react-table";
-import { usePersistedPageSize } from "@/hooks/use-persisted-page-size";
+import { usePersistedPagination } from "@/hooks/use-persisted-page-size";
 import { useQuery, useQueryClient, keepPreviousData, type QueryKey } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
 import { parseAsStringEnum } from "nuqs";
@@ -460,13 +459,15 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // Multi-record delete confirmation (EntityBulkDeleteDialog) visibility
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
-  // Persisted page size (per-entity defaultPageSize overrides the global default)
-  const { pageSize: persistedPageSize, setPageSize: setPersistedPageSize } =
-    usePersistedPageSize(defaultPageSize, entity.table);
-  const [pagination, setPagination] = useState<PaginationState>(() => ({
-    pageIndex: 0,
-    pageSize: defaultPageSize ?? persistedPageSize,
-  }));
+  // Pagination whose pageSize is the persisted per-table preference (per-entity
+  // defaultPageSize overrides the global default until the user picks a size).
+  // First render always uses the default (server prefetch key parity — see
+  // defaultListParams); the stored size is applied by the hook's mount effect
+  // and the resulting refetch is covered by placeholderData, not a skeleton.
+  const { pagination, onPaginationChange, resetPageIndex } = usePersistedPagination(
+    defaultPageSize,
+    entity.table,
+  );
   // Number of server pages accumulated by the mobile card list's "Load more"
   const [mobilePages, setMobilePages] = useState(1);
 
@@ -475,7 +476,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
     setDebouncedSearch("");
     setRowSelection({});
     setMobilePages(1);
-    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
+    resetPageIndex();
   }, [entity.name]);
 
   // ---------------------------------------------------------------------------
@@ -615,7 +616,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   useEffect(() => {
     setRowSelection({});
     setMobilePages(1);
-    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
+    resetPageIndex();
   }, [filterResetKey]);
 
   // ---------------------------------------------------------------------------
@@ -774,21 +775,6 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Table instance
   // ---------------------------------------------------------------------------
-  // Handle pagination changes, persisting page size when it changes
-  const handlePaginationChange = useCallback(
-    (updater: PaginationState | ((old: PaginationState) => PaginationState)) => {
-      setPagination((prev) => {
-        const next = typeof updater === "function" ? updater(prev) : updater;
-        // Persist page size if it changed
-        if (next.pageSize !== prev.pageSize) {
-          setPersistedPageSize(next.pageSize);
-        }
-        return next;
-      });
-    },
-    [setPersistedPageSize]
-  );
-
   const table = useReactTable({
     data: rows,
     columns,
@@ -802,7 +788,9 @@ export function EntityDataTable<T = Record<string, unknown>>({
       ...(hasBulkActions ? { rowSelection } : {}),
     },
     onSortingChange: setSorting,
-    onPaginationChange: handlePaginationChange,
+    // Persists page-size changes and resets pageIndex on size change
+    // (usePersistedPagination)
+    onPaginationChange,
     ...(hasBulkActions
       ? { onRowSelectionChange: setRowSelection, enableRowSelection: true }
       : {}),

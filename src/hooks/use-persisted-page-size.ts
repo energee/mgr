@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import type { PaginationState } from "@tanstack/react-table";
 import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
 const STORAGE_PREFIX = "mgr:table-page-size";
@@ -72,4 +73,49 @@ export function usePersistedPageSize(
   );
 
   return { pageSize, setPageSize };
+}
+
+/**
+ * Table pagination state whose pageSize is the persisted preference — the
+ * single source of truth. `pagination` is DERIVED from the hook's pageSize
+ * plus local pageIndex state, so the stored size is restored after mount by
+ * construction (issue #859: entity-data-table previously copied the hook's
+ * first-render value — always the default — into its own useState and never
+ * synced back, so the preference persisted but was never restored on reload).
+ *
+ * `onPaginationChange` is a TanStack Table onPaginationChange handler: page
+ * moves update pageIndex; size changes persist via setPageSize and snap back
+ * to the first page (a stale pageIndex into a longer page would render an
+ * empty page under server pagination).
+ */
+export function usePersistedPagination(defaultSize?: number, tableKey?: string) {
+  const { pageSize, setPageSize } = usePersistedPageSize(
+    defaultSize ?? DEFAULT_PAGE_SIZE,
+    tableKey,
+  );
+  const [pageIndex, setPageIndex] = useState(0);
+
+  const pagination = useMemo<PaginationState>(
+    () => ({ pageIndex, pageSize }),
+    [pageIndex, pageSize],
+  );
+
+  const onPaginationChange = useCallback(
+    (updater: PaginationState | ((old: PaginationState) => PaginationState)) => {
+      // Compute `next` from the values the caller saw. pagination is stable
+      // between renders (useMemo), so reading it here is not stale.
+      const next = typeof updater === "function" ? updater(pagination) : updater;
+      if (next.pageSize !== pagination.pageSize) {
+        setPageSize(next.pageSize);
+        setPageIndex(0);
+      } else {
+        setPageIndex(next.pageIndex);
+      }
+    },
+    [pagination, setPageSize],
+  );
+
+  const resetPageIndex = useCallback(() => setPageIndex(0), []);
+
+  return { pagination, onPaginationChange, resetPageIndex };
 }
