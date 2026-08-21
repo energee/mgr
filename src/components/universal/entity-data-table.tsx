@@ -66,6 +66,7 @@ import {
   configColumnIds,
   buildSelectList,
   listQueryOptions,
+  quickFilterColumnFilters,
   type ResolvedListParams,
 } from "@/components/universal/list-query-options";
 import { getFiltersStateParser, getSortingStateParser } from "@/lib/parsers";
@@ -106,12 +107,6 @@ import {
   Kanban as KanbanIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-} from "@/components/ui/table";
 
 // =============================================================================
 // Types
@@ -531,9 +526,26 @@ export function EntityDataTable<T = Record<string, unknown>>({
     [columns]
   );
 
+  // The entity's default quick filter preset (if any) is the filters parser's
+  // DEFAULT VALUE: with no `?filters=` in the URL the preset simply IS the
+  // filter state — one source of truth, and the first-render query key is
+  // identical to the defaultListParams server-prefetch key, so hydrated data
+  // is used as-is. The default view keeps a clean URL; picking "All" writes
+  // an explicit `?filters=[]` (≠ default, so the param persists and the
+  // choice is shareable and back-nav stable). An earlier design applied the
+  // preset via a mount-time setUrlFilters, which raced hydration and was
+  // reverted by nuqs — the page always landed unfiltered with a wasted
+  // refetch (2026-08-21 loading audit).
+  const defaultQuickFilterFilters = useMemo<ExtendedColumnFilter<T>[]>(() => {
+    const preset = entity.quickFilters?.find((qf) => qf.isDefault);
+    return preset ? quickFilterColumnFilters<T>(preset) : [];
+  }, [entity.quickFilters]);
+
   const [urlFilters, setUrlFilters] = useQueryState(
     "filters",
-    getFiltersStateParser<T>(filterableColumnIds).withDefault([])
+    getFiltersStateParser<T>(filterableColumnIds).withDefault(
+      defaultQuickFilterFilters
+    )
   );
 
   const [joinOperator] = useQueryState(
@@ -561,10 +573,20 @@ export function EntityDataTable<T = Record<string, unknown>>({
     [columns]
   );
 
+  // Sort default mirrors the filters default: a default quick filter preset
+  // with a `sort` override supplies the no-`?sort=` value, so the first
+  // render matches defaultListParams' server ORDER BY on both paths.
+  const initialSorting = useMemo<SortingState>(() => {
+    const preset = entity.quickFilters?.find((qf) => qf.isDefault);
+    return preset?.sort
+      ? [{ id: preset.sort.column, desc: preset.sort.direction === "desc" }]
+      : defaultSorting;
+  }, [entity.quickFilters, defaultSorting]);
+
   const [urlSorting, setUrlSorting] = useQueryState(
     "sort",
     getSortingStateParser<T>(sortableColumnIds).withDefault(
-      defaultSorting as ExtendedColumnSort<T>[]
+      initialSorting as ExtendedColumnSort<T>[]
     )
   );
   const sorting: SortingState = urlSorting;
@@ -601,49 +623,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   const quickFilters = entity.quickFilters;
 
-  // Default quick filter, applied as a STATE-level fallback — never written to
-  // the URL at mount. (The previous mount-time setUrlFilters raced hydration:
-  // nuqs applied it optimistically, then reverted to [], so the page always
-  // landed unfiltered with a wasted refetch — 2026-08-21 loading audit.)
-  // While the URL carries no filters and the user hasn't touched the tabs or
-  // filter list, the preset is the effective filter set: the first-render
-  // query key equals both the steady-state key and the server-prefetch key
-  // from defaultListParams, so hydrated data is used as-is. The default view
-  // keeps a clean URL; explicit tab choices still write `?filters=`.
-  const [defaultQuickFilterDismissed, setDefaultQuickFilterDismissed] =
-    useState(false);
-  // Once URL filters have been observed, a later empty urlFilters means the
-  // user cleared them (filter-list reset) — no fallback then either.
-  const hasSeenUrlFilters = useRef(false);
-  if (urlFilters.length > 0) hasSeenUrlFilters.current = true;
-  const defaultQuickFilterFilters = useMemo<ExtendedColumnFilter<T>[] | null>(() => {
-    const preset = quickFilters?.find((qf) => qf.isDefault);
-    if (!preset) return null;
-    // filterId is excluded from the query key and this array never reaches the
-    // filter-list UI, so stable ids are fine here.
-    return preset.filters.map((f, i) => ({
-      id: f.column,
-      value: f.values,
-      variant: "multiSelect",
-      operator: "inArray",
-      filterId: `default-${i}`,
-    })) as ExtendedColumnFilter<T>[];
-  }, [quickFilters]);
-  const effectiveUrlFilters: ExtendedColumnFilter<T>[] =
-    !defaultQuickFilterDismissed &&
-    !hasSeenUrlFilters.current &&
-    urlFilters.length === 0 &&
-    defaultQuickFilterFilters
-      ? defaultQuickFilterFilters
-      : (urlFilters as ExtendedColumnFilter<T>[]);
-
-  // Derive active quick filter tab from the effective filters (so the default
-  // tab is highlighted from the first paint, not after the effect runs)
+  // Derive active quick filter tab from current URL filters (the parser
+  // default means the isDefault tab is highlighted from the first paint)
   const activeQuickFilter = useMemo(() => {
     if (!quickFilters) return undefined;
     return quickFilters.find((qf) =>
       qf.filters.every((preset) => {
-        const match = effectiveUrlFilters.find(
+        const match = urlFilters.find(
           (f) => f.id === preset.column && f.operator === "inArray"
         );
         if (!match) return false;
@@ -654,17 +640,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
         );
       })
     );
-  }, [quickFilters, effectiveUrlFilters]);
+  }, [quickFilters, urlFilters]);
 
   const activeTabValue = activeQuickFilter?.label ?? "_all";
 
   const handleQuickFilterChange = useCallback(
     (tabValue: string) => {
       if (!quickFilters) return;
-
-      // Any explicit tab interaction dismisses the default-preset fallback —
-      // from here on the URL (possibly empty = "All") is the whole truth.
-      setDefaultQuickFilterDismissed(true);
 
       // "All" tab — remove quick filter columns from URL filters
       if (tabValue === "_all") {
@@ -686,13 +668,9 @@ export function EntityDataTable<T = Record<string, unknown>>({
       const preserved = urlFilters.filter(
         (f) => !quickColumns.has(f.id as string)
       );
-      const newFilters = qf.filters.map((preset) => ({
-        id: preset.column,
-        value: preset.values,
-        variant: "multiSelect",
-        operator: "inArray",
-        filterId: generateId({ length: 8 }),
-      }));
+      const newFilters = quickFilterColumnFilters<T>(qf, () =>
+        generateId({ length: 8 })
+      );
       setUrlFilters([...preserved, ...newFilters] as ExtendedColumnFilter<T>[]);
 
       // Apply sort override if defined, otherwise revert to default. The
@@ -759,7 +737,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const resolvedParams = useMemo<ResolvedListParams<T>>(
     () => ({
       fetchTable,
-      urlFilters: effectiveUrlFilters,
+      urlFilters: urlFilters as ExtendedColumnFilter<T>[],
       joinOperator,
       search: debouncedSearch || undefined,
       mode: fetchMode,
@@ -768,7 +746,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       order: orderSpec,
       select: selectList,
     }),
-    [fetchTable, effectiveUrlFilters, joinOperator, debouncedSearch, fetchMode, rangeFrom, rangeTo, orderSpec, selectList]
+    [fetchTable, urlFilters, joinOperator, debouncedSearch, fetchMode, rangeFrom, rangeTo, orderSpec, selectList]
   );
 
   const { queryKey: listQueryKey, queryFn: listQueryFn } = listQueryOptions(
@@ -1099,11 +1077,10 @@ export function EntityDataTable<T = Record<string, unknown>>({
         )}
 
         {isLoading ? (
-          // Kit skeleton sized to the incoming page so the table doesn't grow
-          // when data lands (the old private 5-row skeleton was half the
-          // height of a default page).
+          // Kit skeleton, capped at the fold: matching a 100-row page size
+          // would mount ~1k animated nodes nobody scrolls to during a fetch.
           <ListSkeleton
-            rows={pagination.pageSize}
+            rows={Math.min(pagination.pageSize, 10)}
             columns={entity.listColumns.length + 1}
             toolbar={false}
           />

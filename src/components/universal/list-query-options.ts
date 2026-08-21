@@ -22,8 +22,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { entityKeys } from "@/lib/query-keys";
 import { dynamicFrom } from "@/services/types";
-import type { EntityConfig, EntityColumnDef } from "@/types/entity";
+import type { EntityConfig, EntityColumnDef, QuickFilterDef } from "@/types/entity";
 import { entityRegistry } from "@/types/entity";
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 import type { ExtendedColumnFilter } from "@/types/data-table";
 
 /**
@@ -263,24 +264,44 @@ export function listQueryOptions<T>(
 }
 
 /**
+ * Map a quick-filter preset to the `ExtendedColumnFilter[]` shape the table
+ * uses. THE single definition of that mapping — the server prefetch
+ * (defaultListParams) and the client's filters-parser default and tab clicks
+ * (entity-data-table.tsx) all call it, which is what keeps the prefetch key
+ * byte-identical to the client's first-render key. `makeFilterId` varies per
+ * caller; filterId (and variant) are excluded from the query key.
+ */
+export function quickFilterColumnFilters<T>(
+  preset: QuickFilterDef,
+  makeFilterId: (index: number) => string = (i) => `default-${i}`
+): ExtendedColumnFilter<T>[] {
+  return preset.filters.map((f, i) => ({
+    id: f.column,
+    value: f.values,
+    variant: "multiSelect",
+    operator: "inArray",
+    filterId: makeFilterId(i),
+  })) as ExtendedColumnFilter<T>[];
+}
+
+/**
  * Resolved params for the INITIAL paged render — the state the client
  * reproduces on first mount (default quick filter if the entity declares one,
  * no search, page 0, default sort, default page size). A server component
  * prefetches with these so its key exactly matches the client's first-render
- * key (see effectiveUrlFilters in entity-data-table.tsx).
+ * key (the filters parser default in entity-data-table.tsx).
  *
  * `hasOnAction` mirrors whether the page passes an `onAction` prop (forces a
- * `*` projection, see buildSelectList). `pageSize` defaults to the app-wide
- * default — the client's first-render value from usePersistedPageSize, whose
- * DEFAULT_PAGE_SIZE can't be imported here (that module is "use client");
- * list-query-prefetch-key.test.ts guards the literal against drift. The old
- * literal 10 silently missed the client's 25 on every prefetch.
+ * `*` projection, see buildSelectList). `pageSize` defaults to the shared
+ * DEFAULT_PAGE_SIZE — the client's first-render value from
+ * usePersistedPageSize. (An earlier literal 10 silently missed the client's
+ * 25 on every prefetch.)
  */
 export function defaultListParams<T>(
   entity: ListQueryEntity<T>,
   {
     hasOnAction = false,
-    pageSize = 25,
+    pageSize = DEFAULT_PAGE_SIZE,
     select,
   }: {
     hasOnAction?: boolean;
@@ -294,34 +315,29 @@ export function defaultListParams<T>(
     select?: string;
   } = {}
 ): ResolvedListParams<T> {
-  // Server ORDER BY: entity default sort + unique `id` tiebreaker (matches the
-  // client's orderSpec for the no-explicit-sort first render).
+  const defaultPreset = entity.quickFilters?.find((qf) => qf.isDefault);
+
+  // Server ORDER BY mirrors the client's first render: the default preset's
+  // sort override when it declares one, else the entity default sort — plus a
+  // unique `id` tiebreaker (matches the client's orderSpec / sort-parser
+  // default).
+  const firstSort = defaultPreset?.sort ?? entity.defaultSort;
   const order: { column: string; ascending: boolean }[] = [];
-  if (entity.defaultSort) {
+  if (firstSort) {
     order.push({
-      column: entity.defaultSort.column,
-      ascending: entity.defaultSort.direction === "asc",
+      column: firstSort.column,
+      ascending: firstSort.direction === "asc",
     });
   }
   if (!order.some((o) => o.column === "id")) {
     order.push({ column: "id", ascending: true });
   }
 
-  // Mirror the client's first-render filters: an entity with a default quick
-  // filter fetches with that preset applied from the first frame (see
-  // effectiveUrlFilters in entity-data-table.tsx). filterId/variant are
-  // excluded from the query key, so their values only satisfy the type.
-  // ponytail: a default preset's `sort` override is ignored here (the client
-  // applies it post-mount) — no entity declares isDefault + sort today; mirror
-  // it into `order` if one ever does.
-  const defaultPreset = entity.quickFilters?.find((qf) => qf.isDefault);
-  const urlFilters = (defaultPreset?.filters ?? []).map((f, i) => ({
-    id: f.column,
-    value: f.values,
-    variant: "multiSelect",
-    operator: "inArray",
-    filterId: `default-${i}`,
-  })) as ExtendedColumnFilter<T>[];
+  // Mirror the client's first-render filters (the filters parser default in
+  // entity-data-table.tsx) via the shared mapping helper.
+  const urlFilters = defaultPreset
+    ? quickFilterColumnFilters<T>(defaultPreset)
+    : [];
 
   return {
     fetchTable: entity.viewTable || entity.table,

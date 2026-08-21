@@ -10,5 +10,5 @@
 import { ListSkeleton } from "@/components/ui/skeletons";
 
 export default function AppLoading() {
-  return <ListSkeleton rows={25} />;
+  return <ListSkeleton />;
 }

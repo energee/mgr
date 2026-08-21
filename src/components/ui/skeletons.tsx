@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
  * (e.g. a relation table inside a Card).
  */
 export function ListSkeleton({
-  rows = 8,
+  rows = 10,
   columns = 5,
   toolbar = true,
   bordered = true,
@@ -36,17 +36,17 @@ export function ListSkeleton({
       )}
       <div className={bordered ? "rounded-lg border" : undefined}>
         <div className="divide-y">
-          {Array.from({ length: rows }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 p-3">
-              {Array.from({ length: columns }).map((_, j) => (
-                <Skeleton
-                  key={j}
-                  className="h-4 flex-1"
-                  style={{ animationDelay: `${i * 60}ms` }}
-                />
-              ))}
-            </div>
-          ))}
+          {Array.from({ length: rows }).map((_, i) => {
+            // One style object per row, shared by its cells
+            const stagger = { animationDelay: `${i * 60}ms` };
+            return (
+              <div key={i} className="flex items-center gap-4 p-3">
+                {Array.from({ length: columns }).map((_, j) => (
+                  <Skeleton key={j} className="h-4 flex-1" style={stagger} />
+                ))}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -54,8 +54,41 @@ export function ListSkeleton({
 }
 
 /**
- * Dashboard loading shape: title row, two-column section grid, stat tiles, and
- * chart boxes — mirrors the /dashboard* card-grid layout (heights match the
+ * Stat-tile + chart-box block shared by every dashboard's trends section —
+ * the dashboards' Suspense fallbacks and the /dashboard route fallback all
+ * render THIS, so the shapes can't drift apart. `tiles` picks the stat grid
+ * (2 or 3 columns); `charts: 1` renders a single full-width chart box.
+ */
+export function DashboardTrendsSkeleton({
+  tiles = 3,
+  charts = 2,
+}: {
+  tiles?: 2 | 3;
+  charts?: 1 | 2;
+}) {
+  return (
+    <>
+      <div className={tiles === 2 ? "grid gap-4 sm:grid-cols-2" : "grid gap-4 sm:grid-cols-3"}>
+        {Array.from({ length: tiles }).map((_, i) => (
+          <Skeleton key={i} className="h-[88px] rounded-lg" />
+        ))}
+      </div>
+      {charts === 1 ? (
+        <Skeleton className="h-[248px] rounded-lg" />
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          {Array.from({ length: charts }).map((_, i) => (
+            <Skeleton key={i} className="h-[248px] rounded-lg" />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Dashboard loading shape: title row, two-column section grid, and the shared
+ * trends block — mirrors the /dashboard* card-grid layout (heights match the
  * pages' own section skeletons so the route fallback → page swap doesn't jump).
  */
 export function DashboardSkeleton() {
@@ -69,16 +102,7 @@ export function DashboardSkeleton() {
         <Skeleton className="h-64 rounded-lg lg:col-span-3" />
         <Skeleton className="h-64 rounded-lg lg:col-span-2" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-[88px] rounded-lg" />
-        ))}
-      </div>
-      <div className="grid gap-6 md:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Skeleton key={i} className="h-[248px] rounded-lg" />
-        ))}
-      </div>
+      <DashboardTrendsSkeleton />
     </div>
   );
 }

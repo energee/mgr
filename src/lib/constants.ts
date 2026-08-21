@@ -26,6 +26,17 @@ export const CACHE_DURATIONS = {
 } as const;
 
 // =============================================================================
+// Tables
+// =============================================================================
+
+/**
+ * Default table page size. Lives here (server-safe module) so the client
+ * pagination hook, the server list prefetch (defaultListParams), and route
+ * loading skeletons all share one value.
+ */
+export const DEFAULT_PAGE_SIZE = 25;
+
+// =============================================================================
 // Polling Intervals (in milliseconds)
 // =============================================================================
 

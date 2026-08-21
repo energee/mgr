@@ -25,6 +25,7 @@ import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
 import { inventoryService, type ExpiringLot } from "@/services/inventory-service";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardTrendsSkeleton } from "@/components/ui/skeletons";
 import { log } from "@/lib/client-logger";
 import { unwrap } from "@/lib/supabase/query-helpers";
 
@@ -292,17 +293,10 @@ export default function InventoryDashboardPage() {
 // Inventory Trends (Suspense child — uses useSearchParams via usePeriod)
 // =============================================================================
 
+// Shared with the /dashboard route fallback (DashboardSkeleton) so the
+// route-level and section-level loading shapes can't drift apart.
 function InventoryTrendsSkeleton() {
-  return (
-    <>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Skeleton key={i} className="h-[88px] rounded-lg" />
-        ))}
-      </div>
-      <Skeleton className="h-[248px] rounded-lg" />
-    </>
-  );
+  return <DashboardTrendsSkeleton tiles={2} charts={1} />;
 }
 
 function InventoryTrends() {

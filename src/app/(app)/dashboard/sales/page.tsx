@@ -22,6 +22,7 @@ import type { StatItem } from "@/components/dashboard";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc } from "@/services/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardTrendsSkeleton } from "@/components/ui/skeletons";
 import { formatCurrency as formatCurrencyBase } from "@/lib/format";
 import { log } from "@/lib/client-logger";
 import { unwrap } from "@/lib/supabase/query-helpers";
@@ -413,21 +414,10 @@ export default function SalesDashboardPage() {
 // Sales Trends (Suspense child — uses useSearchParams via usePeriod)
 // =============================================================================
 
+// Shared with the /dashboard route fallback (DashboardSkeleton) so the
+// route-level and section-level loading shapes can't drift apart.
 function SalesTrendsSkeleton() {
-  return (
-    <>
-      <div className="grid gap-4 sm:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-[88px] rounded-lg" />
-        ))}
-      </div>
-      <div className="grid gap-6 md:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Skeleton key={i} className="h-[248px] rounded-lg" />
-        ))}
-      </div>
-    </>
-  );
+  return <DashboardTrendsSkeleton />;
 }
 
 function SalesTrends() {

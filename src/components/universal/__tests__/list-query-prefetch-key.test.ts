@@ -2,11 +2,12 @@
  * Server prefetch ↔ client first-render key parity for list queries.
  *
  * The sitewide loading pattern only works when the key a server component
- * prefetches (defaultListParams → listQueryKey) is byte-identical to the key
- * the client computes on first render. The batches page regressed on this for
- * a month: the prefetch fetched the unfiltered first page while the client's
- * default "Active" quick filter immediately swapped the key, discarding the
- * prefetched payload on every default visit (2026-08-21 loading audit).
+ * prefetches (defaultListParams → listQueryKey) is identical to the key the
+ * client computes on first render. The batches page regressed on this for a
+ * month: the prefetch fetched the unfiltered first page while the client's
+ * default "Active" quick filter swapped the key, discarding the prefetched
+ * payload on every default visit (2026-08-21 loading audit). Both sides now
+ * consume quickFilterColumnFilters + the entity core, which these tests pin.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,10 +16,12 @@ import { describe, expect, it, vi } from "vitest";
 // throws under vitest. Mock the leaf (repo test idiom).
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({}) }));
 
-import { defaultListParams, listQueryKey } from "../list-query-options";
-import type { ExtendedColumnFilter } from "@/types/data-table";
+import {
+  defaultListParams,
+  listQueryKey,
+  quickFilterColumnFilters,
+} from "../list-query-options";
 import { batchCore } from "@/entities/batch/core";
-import { DEFAULT_PAGE_SIZE } from "@/hooks/use-persisted-page-size";
 
 describe("defaultListParams prefetch key parity", () => {
   it("applies the entity's default quick filter to the prefetch params", () => {
@@ -32,18 +35,12 @@ describe("defaultListParams prefetch key parity", () => {
     ]);
   });
 
-  it("produces the same query key as the client's first render (filterId/variant excluded)", () => {
+  it("produces the same query key regardless of filterId (excluded from the key)", () => {
     const params = defaultListParams(batchCore, { hasOnAction: true });
-    // Mirror the client's effectiveUrlFilters mapping (entity-data-table.tsx)
-    // with deliberately different filterIds — the key must not depend on them.
+    // The client's tab-click path generates random filterIds; the parser
+    // default uses stable ones. The key must not depend on them.
     const preset = batchCore.quickFilters!.find((qf) => qf.isDefault)!;
-    const clientFilters = preset.filters.map((f, i) => ({
-      id: f.column,
-      value: f.values,
-      variant: "multiSelect",
-      operator: "inArray",
-      filterId: `client-${i}`,
-    })) as ExtendedColumnFilter<Record<string, unknown>>[];
+    const clientFilters = quickFilterColumnFilters(preset, (i) => `client-${i}`);
 
     expect(listQueryKey({ ...params, urlFilters: clientFilters })).toEqual(
       listQueryKey(params)
@@ -55,11 +52,19 @@ describe("defaultListParams prefetch key parity", () => {
     expect(params.urlFilters).toEqual([]);
   });
 
-  it("prefetches the client's default page size (drift guard)", () => {
-    // defaultListParams can't import DEFAULT_PAGE_SIZE (a "use client"
-    // module); its literal fell out of sync once (10 vs 25), silently missing
-    // the hydration key on every prefetch.
-    const params = defaultListParams({ table: "brands" });
-    expect(params.to).toBe(DEFAULT_PAGE_SIZE - 1);
+  it("mirrors a default preset's sort override into the server ORDER BY", () => {
+    const params = defaultListParams({
+      table: "things",
+      defaultSort: { column: "created_at", direction: "desc" },
+      quickFilters: [
+        {
+          label: "Open",
+          filters: [{ column: "status", values: ["open"] }],
+          isDefault: true,
+          sort: { column: "due_date", direction: "asc" },
+        },
+      ],
+    });
+    expect(params.order[0]).toEqual({ column: "due_date", ascending: true });
   });
 });

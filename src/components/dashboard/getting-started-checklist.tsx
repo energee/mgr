@@ -15,12 +15,13 @@
  * Step definitions live in checklist-steps.ts (pure, unit-tested).
  */
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { CheckCircle2, Circle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { onboardingKeys } from "@/lib/query-keys";
+import { usePersistedFlag } from "@/hooks/use-persisted-flag";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardSection } from "./dashboard-section";
 import {
@@ -31,10 +32,6 @@ import {
 
 /** Remembers across visits whether the checklist rendered last time. */
 const VISIBLE_KEY = "mgr-onboarding-checklist-visible";
-
-// The value only changes via our own setItem below, so no store notifications
-// are needed — useSyncExternalStore still re-reads per render.
-const emptySubscribe = () => () => {};
 
 /** Onboarding checklist shown when the brewery has minimal data. Hides once all steps are complete. */
 export function GettingStartedChecklist() {
@@ -72,25 +69,14 @@ export function GettingStartedChecklist() {
   // time: established breweries (checklist hidden) keep rendering nothing,
   // while onboarding users get a placeholder instead of the whole dashboard
   // shifting down when the counts resolve (2026-08-21 loading audit).
-  // useSyncExternalStore, not a useState initializer: the first client render
-  // must match the SSR HTML (server snapshot false — no localStorage there).
-  const wasVisible = useSyncExternalStore(
-    emptySubscribe,
-    () => localStorage.getItem(VISIBLE_KEY) === "1",
-    () => false,
-  );
+  const [wasVisible, setWasVisible] = usePersistedFlag(VISIBLE_KEY);
 
-  const groups = counts ? buildChecklistGroups(counts) : null;
-  const { completed, total } = groups
-    ? checklistProgress(groups)
-    : { completed: 0, total: 0 };
-  // Hidden when all steps are complete
-  const visible = groups !== null && completed < total;
-  const resolved = groups !== null;
-
+  // Remember for the next visit's loading state
   useEffect(() => {
-    if (resolved) localStorage.setItem(VISIBLE_KEY, visible ? "1" : "0");
-  }, [resolved, visible]);
+    if (!counts) return;
+    const { completed, total } = checklistProgress(buildChecklistGroups(counts));
+    setWasVisible(completed < total);
+  }, [counts, setWasVisible]);
 
   if (isLoading || !counts) {
     if (!wasVisible) return null;
@@ -112,9 +98,11 @@ export function GettingStartedChecklist() {
     );
   }
 
-  // `!groups` is unreachable here (counts is set) but narrows the type for
-  // the map below.
-  if (!groups || !visible) return null;
+  const groups = buildChecklistGroups(counts);
+  const { completed, total } = checklistProgress(groups);
+
+  // Hide when all steps are complete
+  if (completed === total) return null;
 
   return (
     <DashboardSection title="Getting Started">
