@@ -765,6 +765,7 @@ describe("GitHub Actions performance contracts", () => {
       expect.arrayContaining([
         ".github/workflows/bug-patrol.yml",
         ".github/workflows/claude.yml",
+        ".github/workflows/docs-dream.yml",
         ".github/workflows/feedback-distill.yml",
         ".github/workflows/health-audit.yml",
         ".github/workflows/quality-regrade.yml",
@@ -829,6 +830,7 @@ describe("GitHub Actions performance contracts", () => {
     expect(inventory.sort()).toEqual([
       `.github/workflows/bug-patrol.yml (job: patrol): contents, pull-requests + ${app}`,
       `.github/workflows/claude.yml (job: claude): contents, issues, pull-requests + ${app}`,
+      `.github/workflows/docs-dream.yml (job: dream): contents, pull-requests + ${app}`,
       `.github/workflows/feedback-distill.yml (job: distill): contents, pull-requests + ${app}`,
       `.github/workflows/quality-regrade.yml (job: regrade): contents, pull-requests + ${app}`,
     ]);
@@ -1283,6 +1285,20 @@ describe("GitHub Actions performance contracts", () => {
   // otherwise prose-only. See `unscopedGhApiGrants` for the rule.
   it("never grants unscoped gh api in any workflow's --allowedTools", () => {
     expect(workflows.flatMap((path) => unscopedGhApiGrants(path, read(path)))).toEqual([]);
+  });
+
+  // The docs-dream sweep reconciles the docs themselves: it must see the
+  // deterministic link report, cap its edits, stay docs-only, and leave the
+  // machine-checked tracker and generated history alone.
+  it("feeds the deterministic link report and a docs-only mandate into the dream sweep", () => {
+    const workflow = read(".github/workflows/docs-dream.yml");
+
+    expect(workflow).toContain("check-doc-links.ts");
+    expect(workflow).toContain("doc-link-report.md");
+    expect(workflow).toContain("Ambiguous");
+    expect(workflow).toContain("NEVER touch docs/feature_list.json");
+    expect(workflow).toContain("quiet-run.md");
+    expect(workflow).toContain("label: docs-dream");
   });
 
   // The weekly distillation is the loop that gardens the other loops: it must
