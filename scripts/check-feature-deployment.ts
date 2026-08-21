@@ -56,8 +56,8 @@
  *     on live (#697; those three have since been dropped from the chain by
  *     00289_drop_orphaned_projection_rpcs.sql, so the discrepancy is closed —
  *     the check that found it is not).
- *   - The snapshot records tables, functions, triggers, policies and RLS
- *     state — NOT views, columns or data. A migration that only adds a column
+ *   - The snapshot records tables, functions, triggers, policies, RLS
+ *     state and CHECK constraints (#865) — NOT views, columns or data. A migration that only adds a column
  *     or creates a view therefore has nothing this script can look for; such a
  *     record is accepted and reported in the summary as "not verifiable from
  *     the snapshot", so its coverage is visible rather than assumed.

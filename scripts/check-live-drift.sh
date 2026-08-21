@@ -36,8 +36,8 @@
 #     smell in this RLS-heavy schema) get their own loud callout. An RLS flip
 #     on an existing table never reaches this path: its old flag line goes
 #     missing, which is the FAIL branch above.
-#   * Other additions — new functions/tables/RLS-enabled flag lines, listed
-#     separately.
+#   * Other additions — new functions/tables/CHECK constraints/RLS-enabled
+#     flag lines, listed separately.
 # All WARN-level drift is also appended to $GITHUB_STEP_SUMMARY (when set) so
 # it is visible on the run page without opening logs.
 #
@@ -58,8 +58,9 @@
 # What it compares (see scripts/live-catalog.sql): every public function
 # (name + identity args + body hash), every non-internal trigger (name + table
 # + definition hash), every base table, every RLS policy (table + name + cmd +
-# permissive + roles + qual/with_check hash), and per-table row-security
-# flags. A body-hash change catches an out-of-band CREATE OR REPLACE (e.g. a
+# permissive + roles + qual/with_check hash), per-table row-security
+# flags, and every CHECK constraint (table + name + definition hash, #865 —
+# orders.status lost its CHECK on live out-of-band and nothing noticed). A body-hash change catches an out-of-band CREATE OR REPLACE (e.g. a
 # racy generate_lot_number swapped in), not just adds/drops. A changed object
 # appears on both sides of the delta (old line missing, new line added); the
 # missing side fails the run.
@@ -233,7 +234,7 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     fi
     if [[ -n "$benign" ]]; then
       echo ""
-      echo "### Other additions (functions / tables / RLS-enabled flag lines)"
+      echo "### Other additions (functions / tables / CHECK constraints / RLS-enabled flag lines)"
       echo ""
       echo '```'
       printf '%s\n' "$benign"
