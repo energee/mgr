@@ -105,6 +105,17 @@ space via a localStorage-remembered placeholder. Item 8 residue: the remaining
 inline blocks were re-checked and are content-shaped (dashboard sections,
 dialogs, portal rows) — deliberately NOT converted to generic kit shapes.
 
+A /simplify + /code-review pass then hardened the design: the default quick
+filter moved into the nuqs filters-parser default (single source of truth;
+"All" = shareable `?filters=[]`), the preset→filter mapping and
+DEFAULT_PAGE_SIZE each live in exactly one place, DataTableFilterList /
+MobileFilterSheet share the table's parser default (they disagreed on clean
+URLs), the checklist ignores query errors, prefetches are skipped when the
+URL carries explicit filters/sort, and the dashboard fallbacks match each
+segment's real trends shape. Known follow-up: persisted page-size
+restoration has been dead code since before this work (tracked in a GitHub
+issue).
+
 ## Recommendation
 
 Do **not** resume the full server-prefetch rollout (Phases 1–3) as a prerequisite —

@@ -23,22 +23,32 @@ import {
 import { batchCore } from "@/entities/batch/core";
 import { BatchesClient } from "./batches-client";
 
-export default async function BatchesPage() {
-  const supabase = await createClient();
+export default async function BatchesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
   const queryClient = getServerQueryClient();
 
   // batches-client passes `onAction`, forcing a `*` projection (hasOnAction) —
   // must match the client's first-render key exactly, which includes the
   // default "Active" quick filter (defaultListParams applies it from
-  // batchCore.quickFilters). prefetchQuery never rejects, so an auth/RLS miss
+  // batchCore.quickFilters). That key only matches on the DEFAULT view, so a
+  // URL carrying explicit `?filters=`/`?sort=` (e.g. the All tab's
+  // `?filters=[]`) skips the prefetch instead of blocking TTFB on a query the
+  // client would discard. prefetchQuery never rejects, so an auth/RLS miss
   // just leaves the client to fetch normally.
-  await queryClient.prefetchQuery(
-    listQueryOptions(
-      supabase,
-      batchCore,
-      defaultListParams(batchCore, { hasOnAction: true })
-    )
-  );
+  if (params.filters === undefined && params.sort === undefined) {
+    const supabase = await createClient();
+    await queryClient.prefetchQuery(
+      listQueryOptions(
+        supabase,
+        batchCore,
+        defaultListParams(batchCore, { hasOnAction: true })
+      )
+    );
+  }
 
   return (
     <HydrateQuery client={queryClient}>

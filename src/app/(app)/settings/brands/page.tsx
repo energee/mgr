@@ -21,17 +21,27 @@ import {
 import { brandCore } from "@/entities/brand/core";
 import { BrandsClient } from "./brands-client";
 
-export default async function BrandsPage() {
-  const supabase = await createClient();
+export default async function BrandsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
   const queryClient = getServerQueryClient();
 
-  await queryClient.prefetchQuery(
-    listQueryOptions(
-      supabase,
-      brandCore,
-      defaultListParams(brandCore, { select: "*" })
-    )
-  );
+  // The prefetch key only matches the client's DEFAULT view — skip it when
+  // the URL carries explicit `?filters=`/`?sort=` rather than block TTFB on a
+  // query the client would discard (key mismatch).
+  if (params.filters === undefined && params.sort === undefined) {
+    const supabase = await createClient();
+    await queryClient.prefetchQuery(
+      listQueryOptions(
+        supabase,
+        brandCore,
+        defaultListParams(brandCore, { select: "*" })
+      )
+    );
+  }
 
   return (
     <HydrateQuery client={queryClient}>

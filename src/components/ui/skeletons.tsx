@@ -89,9 +89,18 @@ export function DashboardTrendsSkeleton({
 /**
  * Dashboard loading shape: title row, two-column section grid, and the shared
  * trends block — mirrors the /dashboard* card-grid layout (heights match the
- * pages' own section skeletons so the route fallback → page swap doesn't jump).
+ * pages' own section skeletons so the route fallback → page swap doesn't
+ * jump). `tiles`/`charts` pass through to DashboardTrendsSkeleton so a
+ * segment with a different trends shape (inventory: 2 tiles, 1 chart) can
+ * match its page from its own loading.tsx.
  */
-export function DashboardSkeleton() {
+export function DashboardSkeleton({
+  tiles,
+  charts,
+}: {
+  tiles?: 2 | 3;
+  charts?: 1 | 2;
+} = {}) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -102,7 +111,7 @@ export function DashboardSkeleton() {
         <Skeleton className="h-64 rounded-lg lg:col-span-3" />
         <Skeleton className="h-64 rounded-lg lg:col-span-2" />
       </div>
-      <DashboardTrendsSkeleton />
+      <DashboardTrendsSkeleton tiles={tiles} charts={charts} />
     </div>
   );
 }

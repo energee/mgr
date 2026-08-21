@@ -388,7 +388,12 @@ export type QuickFilterDef = {
   /** Whether this tab is selected by default */
   isDefault?: boolean;
 
-  /** Override default sort when this tab is active */
+  /**
+   * Override default sort when this tab is active. On a preset that is also
+   * `isDefault`, this becomes the no-`?sort=` default for the whole list
+   * (mirrored into the server prefetch) — it applies even after the user
+   * switches filters away from the preset, until they sort explicitly.
+   */
   sort?: { column: string; direction: "asc" | "desc" };
 }
 

@@ -1081,7 +1081,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
           // would mount ~1k animated nodes nobody scrolls to during a fetch.
           <ListSkeleton
             rows={Math.min(pagination.pageSize, 10)}
-            columns={entity.listColumns.length + 1}
+            columns={entity.listColumns.length + (hasBulkActions ? 2 : 1)}
             toolbar={false}
           />
         ) : isBoardView ? (
@@ -1117,6 +1117,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
               <MobileFilterSheet
                 table={table}
                 activeFilterCount={urlFilters.length}
+                defaultFilters={defaultQuickFilterFilters}
               />
             </div>
             <EntityMobileCardList
@@ -1240,7 +1241,10 @@ export function EntityDataTable<T = Record<string, unknown>>({
                     onDebouncedChange={setDebouncedSearch}
                   />
                 )}
-              <DataTableFilterList table={table} />
+              <DataTableFilterList
+                table={table}
+                defaultFilters={defaultQuickFilterFilters}
+              />
               <DataTableSortList table={table} />
             </DataTableAdvancedToolbar>
           </DataTable>

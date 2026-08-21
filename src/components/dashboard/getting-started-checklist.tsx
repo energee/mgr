@@ -37,7 +37,7 @@ const VISIBLE_KEY = "mgr-onboarding-checklist-visible";
 export function GettingStartedChecklist() {
   const supabase = createClient();
 
-  const { data: counts, isLoading } = useQuery({
+  const { data: counts, isLoading, isError } = useQuery({
     queryKey: onboardingKeys.counts(),
     queryFn: async (): Promise<OnboardingCounts> => {
       const [locations, recipes, batches, brands, containers, sellingFormats, pricingTiers, customers] =
@@ -77,6 +77,10 @@ export function GettingStartedChecklist() {
     const { completed, total } = checklistProgress(buildChecklistGroups(counts));
     setWasVisible(completed < total);
   }, [counts, setWasVisible]);
+
+  // A failed counts query renders nothing (matching the old behavior) — the
+  // placeholder below is only for loading, never a permanent error state.
+  if (isError) return null;
 
   if (isLoading || !counts) {
     if (!wasVisible) return null;

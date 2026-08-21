@@ -24,7 +24,6 @@ import { StatusBadge } from "@/components/universal/status-badge";
 import { CACHE_DURATIONS, POLLING_INTERVALS } from "@/lib/constants";
 import { dynamicFrom, dynamicRpc, formatServiceError } from "@/services/types";
 import { inventoryService, type ExpiringLot } from "@/services/inventory-service";
-import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardTrendsSkeleton } from "@/components/ui/skeletons";
 import { log } from "@/lib/client-logger";
 import { unwrap } from "@/lib/supabase/query-helpers";
