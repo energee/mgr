@@ -97,7 +97,7 @@ import { DataTableSortList } from "@/components/data-table/data-table-sort-list"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton } from "@/components/ui/skeletons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search,
@@ -601,12 +601,49 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   const quickFilters = entity.quickFilters;
 
-  // Derive active quick filter tab from current URL filters
+  // Default quick filter, applied as a STATE-level fallback — never written to
+  // the URL at mount. (The previous mount-time setUrlFilters raced hydration:
+  // nuqs applied it optimistically, then reverted to [], so the page always
+  // landed unfiltered with a wasted refetch — 2026-08-21 loading audit.)
+  // While the URL carries no filters and the user hasn't touched the tabs or
+  // filter list, the preset is the effective filter set: the first-render
+  // query key equals both the steady-state key and the server-prefetch key
+  // from defaultListParams, so hydrated data is used as-is. The default view
+  // keeps a clean URL; explicit tab choices still write `?filters=`.
+  const [defaultQuickFilterDismissed, setDefaultQuickFilterDismissed] =
+    useState(false);
+  // Once URL filters have been observed, a later empty urlFilters means the
+  // user cleared them (filter-list reset) — no fallback then either.
+  const hasSeenUrlFilters = useRef(false);
+  if (urlFilters.length > 0) hasSeenUrlFilters.current = true;
+  const defaultQuickFilterFilters = useMemo<ExtendedColumnFilter<T>[] | null>(() => {
+    const preset = quickFilters?.find((qf) => qf.isDefault);
+    if (!preset) return null;
+    // filterId is excluded from the query key and this array never reaches the
+    // filter-list UI, so stable ids are fine here.
+    return preset.filters.map((f, i) => ({
+      id: f.column,
+      value: f.values,
+      variant: "multiSelect",
+      operator: "inArray",
+      filterId: `default-${i}`,
+    })) as ExtendedColumnFilter<T>[];
+  }, [quickFilters]);
+  const effectiveUrlFilters: ExtendedColumnFilter<T>[] =
+    !defaultQuickFilterDismissed &&
+    !hasSeenUrlFilters.current &&
+    urlFilters.length === 0 &&
+    defaultQuickFilterFilters
+      ? defaultQuickFilterFilters
+      : (urlFilters as ExtendedColumnFilter<T>[]);
+
+  // Derive active quick filter tab from the effective filters (so the default
+  // tab is highlighted from the first paint, not after the effect runs)
   const activeQuickFilter = useMemo(() => {
     if (!quickFilters) return undefined;
     return quickFilters.find((qf) =>
       qf.filters.every((preset) => {
-        const match = urlFilters.find(
+        const match = effectiveUrlFilters.find(
           (f) => f.id === preset.column && f.operator === "inArray"
         );
         if (!match) return false;
@@ -617,50 +654,17 @@ export function EntityDataTable<T = Record<string, unknown>>({
         );
       })
     );
-  }, [quickFilters, urlFilters]);
+  }, [quickFilters, effectiveUrlFilters]);
 
   const activeTabValue = activeQuickFilter?.label ?? "_all";
-
-  // Apply default quick filter on initial load (when no filters are set)
-  const hasAppliedDefault = useRef(false);
-  useEffect(() => {
-    if (!quickFilters || hasAppliedDefault.current) return;
-    hasAppliedDefault.current = true;
-
-    // Only apply default if no URL filters exist at all
-    if (urlFilters.length > 0) return;
-
-    const defaultFilter = quickFilters.find((qf) => qf.isDefault);
-    if (defaultFilter) {
-      setUrlFilters(
-        defaultFilter.filters.map((preset) => ({
-          id: preset.column,
-          value: preset.values,
-          variant: "multiSelect",
-          operator: "inArray",
-          filterId: generateId({ length: 8 }),
-        })) as ExtendedColumnFilter<T>[]
-      );
-      // Only apply the default quick filter's sort override if the user
-      // hasn't arrived with an explicit sort (i.e. no `?sort=` in the URL,
-      // so urlSorting still equals the entity default). A bookmarked or
-      // shared sort wins over the quick-filter preset.
-      const hasExplicitSort =
-        sorting.length !== defaultSorting.length ||
-        sorting.some(
-          (s, i) =>
-            s.id !== defaultSorting[i]?.id || s.desc !== defaultSorting[i]?.desc
-        );
-      if (defaultFilter.sort && !hasExplicitSort) {
-        setSorting([{ id: defaultFilter.sort.column, desc: defaultFilter.sort.direction === "desc" }]);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits urlFilters/sorting to avoid re-running after the default is applied; hasAppliedDefault guard ensures single execution
-  }, [quickFilters]);
 
   const handleQuickFilterChange = useCallback(
     (tabValue: string) => {
       if (!quickFilters) return;
+
+      // Any explicit tab interaction dismisses the default-preset fallback —
+      // from here on the URL (possibly empty = "All") is the whole truth.
+      setDefaultQuickFilterDismissed(true);
 
       // "All" tab — remove quick filter columns from URL filters
       if (tabValue === "_all") {
@@ -755,7 +759,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
   const resolvedParams = useMemo<ResolvedListParams<T>>(
     () => ({
       fetchTable,
-      urlFilters: urlFilters as ExtendedColumnFilter<T>[],
+      urlFilters: effectiveUrlFilters,
       joinOperator,
       search: debouncedSearch || undefined,
       mode: fetchMode,
@@ -764,7 +768,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
       order: orderSpec,
       select: selectList,
     }),
-    [fetchTable, urlFilters, joinOperator, debouncedSearch, fetchMode, rangeFrom, rangeTo, orderSpec, selectList]
+    [fetchTable, effectiveUrlFilters, joinOperator, debouncedSearch, fetchMode, rangeFrom, rangeTo, orderSpec, selectList]
   );
 
   const { queryKey: listQueryKey, queryFn: listQueryFn } = listQueryOptions(
@@ -1095,7 +1099,14 @@ export function EntityDataTable<T = Record<string, unknown>>({
         )}
 
         {isLoading ? (
-          <LoadingSkeleton columnCount={entity.listColumns.length + 1} />
+          // Kit skeleton sized to the incoming page so the table doesn't grow
+          // when data lands (the old private 5-row skeleton was half the
+          // height of a default page).
+          <ListSkeleton
+            rows={pagination.pageSize}
+            columns={entity.listColumns.length + 1}
+            toolbar={false}
+          />
         ) : isBoardView ? (
           <>
             <EntityKanban
@@ -1431,30 +1442,6 @@ function ListSearchInput({
           <Kbd>/</Kbd>
         </div>
       )}
-    </div>
-  );
-}
-
-// =============================================================================
-// Loading Skeleton
-// =============================================================================
-
-function LoadingSkeleton({ columnCount }: { columnCount: number }) {
-  return (
-    <div className="border rounded-lg">
-      <Table>
-        <TableBody>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <TableRow key={i}>
-              {Array.from({ length: columnCount }).map((_, j) => (
-                <TableCell key={j}>
-                  <Skeleton className="h-4 w-full" style={{ animationDelay: `${i * 75}ms` }} />
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
     </div>
   );
 }

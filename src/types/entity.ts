@@ -98,6 +98,14 @@ export type EntityCore<T = Record<string, unknown>> = {
     relation: { entity: string; displayField: string };
   }[];
 
+  /**
+   * Quick filter tabs above the toolbar (presets that set URL filters on
+   * click). Pure data — lives in core (not presentation) so a server
+   * component's list prefetch can apply the `isDefault` preset and produce
+   * the same first-render query key as the client (sitewide loading pattern).
+   */
+  quickFilters?: QuickFilterDef[];
+
   /** Searchable fields (for quick search) */
   searchableFields?: (keyof T & string)[];
 
@@ -138,9 +146,6 @@ export type EntityPresentation<T = Record<string, unknown>> = {
 
   /** Available filters for list view */
   listFilters?: EntityFilterDef[];
-
-  /** Quick filter tabs above the toolbar (presets that set URL filters on click) */
-  quickFilters?: QuickFilterDef[];
 
   /** Unified sections for combined detail/edit view. */
   sections?: UnifiedSectionDef<T>[];

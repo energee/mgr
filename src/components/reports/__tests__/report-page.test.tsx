@@ -206,7 +206,8 @@ describe("ReportTableState", () => {
     );
     expect(el.textContent).not.toContain("No rows");
     expect(el.textContent).not.toContain("content");
-    expect(el.querySelectorAll("[data-slot=skeleton]").length).toBe(5);
+    // Kit ListSkeleton: 5 default rows × 5 default columns
+    expect(el.querySelectorAll("[data-slot=skeleton]").length).toBe(25);
   });
 
   it("prefers the empty state over content", () => {
@@ -234,7 +235,8 @@ describe("ReportTableState", () => {
         <p>content</p>
       </ReportTableState>
     );
-    expect(el.querySelectorAll("[data-slot=skeleton]").length).toBe(3);
+    // 3 requested rows × 5 default kit columns
+    expect(el.querySelectorAll("[data-slot=skeleton]").length).toBe(15);
   });
 });
 

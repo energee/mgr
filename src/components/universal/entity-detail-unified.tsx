@@ -97,7 +97,7 @@ import { ConflictDialog, useConflictDialog } from "@/components/ui/conflict-dial
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DetailSkeleton } from "@/components/ui/skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/universal/status-badge";
 import {
@@ -1232,7 +1232,7 @@ function EntityDetailUnifiedInner<T = Record<string, unknown>>({
     }
 
     if (isLoading) {
-      return <EntityDetailSkeleton />;
+      return <DetailSkeleton />;
     }
 
     if (!data) {
@@ -2081,37 +2081,6 @@ function InlineFieldSection<T>({
         {section.title}
       </h3>
       {fieldGrid}
-    </div>
-  );
-}
-
-// =============================================================================
-// Loading Skeleton
-// =============================================================================
-
-function EntityDetailSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-16" />
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-48" />
-      </div>
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-12 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="col-span-6">
-                <Skeleton className="h-4 w-24 mb-2" />
-                <Skeleton className="h-5 w-32" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

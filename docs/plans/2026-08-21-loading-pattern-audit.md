@@ -91,6 +91,20 @@ That chain — not any single skeleton — is the jank.
 Net if 1–7 land: ≈ −120 lines immediately, one skeleton vocabulary, and both
 reported pages fixed. Item 8 is the long tail (−1k+ lines over time).
 
+## Status — implemented 2026-08-21 (same branch)
+
+Items 1–7 landed in one pass on `chore/loading-bloat-audit`:
+private `LoadingSkeleton`/`EntityDetailSkeleton`/relation-table/report-table
+blocks now render the kit; app-level `loading.tsx` renders `ListSkeleton`;
+`dashboard/loading.tsx` added (kit `DashboardSkeleton`); batches `loading.tsx`
+null-hack reverted; brands `loading.tsx` is a Server Component; `quickFilters`
+moved to entity core and `defaultListParams` + first-render
+`effectiveUrlFilters` make the batches prefetch key match the client
+(regression test: `list-query-prefetch-key.test.ts`); checklist reserves its
+space via a localStorage-remembered placeholder. Item 8 residue: the remaining
+inline blocks were re-checked and are content-shaped (dashboard sections,
+dialogs, portal rows) — deliberately NOT converted to generic kit shapes.
+
 ## Recommendation
 
 Do **not** resume the full server-prefetch rollout (Phases 1–3) as a prerequisite —

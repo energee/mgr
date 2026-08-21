@@ -20,7 +20,7 @@ import { entityRegistry } from "@/entities";
 import { resolveEntityBasePath, type EntityRelationDef } from "@/types/entity";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton } from "@/components/ui/skeletons";
 import {
   Table,
   TableBody,
@@ -143,11 +143,13 @@ export function RelationTable({
             Failed to load {relatedEntity.displayNamePlural.toLowerCase()}
           </p>
         ) : isLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
+          // Borderless: the surrounding Card already draws the frame.
+          <ListSkeleton
+            rows={3}
+            columns={columns.length}
+            toolbar={false}
+            bordered={false}
+          />
         ) : !items || items.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
             No {relatedEntity.displayNamePlural.toLowerCase()} yet

@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ListSkeleton } from "@/components/ui/skeletons";
 import {
   Table,
   TableBody,
@@ -359,13 +360,8 @@ export function ReportTableState({
   children: React.ReactNode;
 }) {
   if (loading) {
-    return (
-      <div className="space-y-2">
-        {[...Array(skeletonRows)].map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
-        ))}
-      </div>
-    );
+    // Kit shape (borderless — report tables render inside their own frame)
+    return <ListSkeleton rows={skeletonRows} toolbar={false} bordered={false} />;
   }
   if (isEmpty) {
     return (

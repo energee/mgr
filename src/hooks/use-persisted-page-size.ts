@@ -3,7 +3,13 @@
 import { useState, useCallback, useEffect } from "react";
 
 const STORAGE_PREFIX = "mgr:table-page-size";
-const DEFAULT_PAGE_SIZE = 25;
+/**
+ * App-wide default table page size. Mirrored as a literal in
+ * `defaultListParams` (list-query-options.ts) because this is a "use client"
+ * module a server component can't import — `list-query-prefetch-key.test.ts`
+ * guards the two against drifting.
+ */
+export const DEFAULT_PAGE_SIZE = 25;
 
 /**
  * localStorage key for a given table. When `tableKey` is provided the

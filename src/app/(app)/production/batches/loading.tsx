@@ -1,13 +1,14 @@
 /**
- * Batches route loading boundary — intentionally renders nothing.
- *
- * The batches list is a client page whose table (EntityList → entity-data-table)
- * already renders its own skeleton while React Query fetches. Without this file,
- * the app-level `src/app/(app)/loading.tsx` skeleton also shows during segment
- * streaming, so a cold-cache visit flashed TWO different skeletons back to back.
- * Overriding the parent boundary here with an empty fallback leaves only the
- * table's own skeleton.
+ * Route-level loading skeleton for /production/batches (sitewide loading
+ * pattern). Shows during the server prefetch in page.tsx; the hydrated client
+ * renders with the list already in cache, so no second skeleton flashes.
+ * rows/columns mirror the table's first page (default page size 25; 5 list
+ * columns + actions). Counts are hardcoded so this stays a Server Component —
+ * importing the assembled batchEntity (a client module) would pull
+ * presentation JSX into the loading chunk just to read two lengths.
  */
-export default function BatchesLoading() {
-  return null;
+import { ListSkeleton } from "@/components/ui/skeletons";
+
+export default function Loading() {
+  return <ListSkeleton rows={25} columns={6} />;
 }

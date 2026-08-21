@@ -28,8 +28,10 @@ export default async function BatchesPage() {
   const queryClient = getServerQueryClient();
 
   // batches-client passes `onAction`, forcing a `*` projection (hasOnAction) —
-  // must match the client's first-render key exactly. prefetchQuery never
-  // rejects, so an auth/RLS miss just leaves the client to fetch normally.
+  // must match the client's first-render key exactly, which includes the
+  // default "Active" quick filter (defaultListParams applies it from
+  // batchCore.quickFilters). prefetchQuery never rejects, so an auth/RLS miss
+  // just leaves the client to fetch normally.
   await queryClient.prefetchQuery(
     listQueryOptions(
       supabase,

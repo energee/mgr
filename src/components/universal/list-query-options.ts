@@ -264,20 +264,23 @@ export function listQueryOptions<T>(
 
 /**
  * Resolved params for the INITIAL paged render — the state the client
- * reproduces on first mount (no filters, no search, page 0, default sort,
- * default page size). A server component prefetches with these so its key
- * exactly matches the client's first-render key.
+ * reproduces on first mount (default quick filter if the entity declares one,
+ * no search, page 0, default sort, default page size). A server component
+ * prefetches with these so its key exactly matches the client's first-render
+ * key (see effectiveUrlFilters in entity-data-table.tsx).
  *
  * `hasOnAction` mirrors whether the page passes an `onAction` prop (forces a
  * `*` projection, see buildSelectList). `pageSize` defaults to the app-wide
- * default (10, from usePersistedPageSize) which is also the client's first
- * pre-hydration render value.
+ * default — the client's first-render value from usePersistedPageSize, whose
+ * DEFAULT_PAGE_SIZE can't be imported here (that module is "use client");
+ * list-query-prefetch-key.test.ts guards the literal against drift. The old
+ * literal 10 silently missed the client's 25 on every prefetch.
  */
 export function defaultListParams<T>(
   entity: ListQueryEntity<T>,
   {
     hasOnAction = false,
-    pageSize = 10,
+    pageSize = 25,
     select,
   }: {
     hasOnAction?: boolean;
@@ -304,9 +307,25 @@ export function defaultListParams<T>(
     order.push({ column: "id", ascending: true });
   }
 
+  // Mirror the client's first-render filters: an entity with a default quick
+  // filter fetches with that preset applied from the first frame (see
+  // effectiveUrlFilters in entity-data-table.tsx). filterId/variant are
+  // excluded from the query key, so their values only satisfy the type.
+  // ponytail: a default preset's `sort` override is ignored here (the client
+  // applies it post-mount) — no entity declares isDefault + sort today; mirror
+  // it into `order` if one ever does.
+  const defaultPreset = entity.quickFilters?.find((qf) => qf.isDefault);
+  const urlFilters = (defaultPreset?.filters ?? []).map((f, i) => ({
+    id: f.column,
+    value: f.values,
+    variant: "multiSelect",
+    operator: "inArray",
+    filterId: `default-${i}`,
+  })) as ExtendedColumnFilter<T>[];
+
   return {
     fetchTable: entity.viewTable || entity.table,
-    urlFilters: [],
+    urlFilters,
     joinOperator: "and",
     search: undefined,
     mode: "paged",

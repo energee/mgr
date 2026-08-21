@@ -10,15 +10,21 @@
  */
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** Table/list loading shape: an optional toolbar row plus `rows` × `columns`. */
+/**
+ * Table/list loading shape: an optional toolbar row plus `rows` × `columns`.
+ * `bordered: false` drops the outer border for hosts that already draw one
+ * (e.g. a relation table inside a Card).
+ */
 export function ListSkeleton({
   rows = 8,
   columns = 5,
   toolbar = true,
+  bordered = true,
 }: {
   rows?: number;
   columns?: number;
   toolbar?: boolean;
+  bordered?: boolean;
 }) {
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -28,7 +34,7 @@ export function ListSkeleton({
           <Skeleton className="h-9 w-24" />
         </div>
       )}
-      <div className="rounded-lg border">
+      <div className={bordered ? "rounded-lg border" : undefined}>
         <div className="divide-y">
           {Array.from({ length: rows }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 p-3">
@@ -42,6 +48,36 @@ export function ListSkeleton({
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Dashboard loading shape: title row, two-column section grid, stat tiles, and
+ * chart boxes — mirrors the /dashboard* card-grid layout (heights match the
+ * pages' own section skeletons so the route fallback → page swap doesn't jump).
+ */
+export function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-5 w-40" />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Skeleton className="h-64 rounded-lg lg:col-span-3" />
+        <Skeleton className="h-64 rounded-lg lg:col-span-2" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-[88px] rounded-lg" />
+        ))}
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-[248px] rounded-lg" />
+        ))}
       </div>
     </div>
   );
