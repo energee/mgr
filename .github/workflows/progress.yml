@@ -23,15 +23,36 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      BOT_APP_ID: ${{ secrets.MGR_AUTOMATION_APP_ID }}
     steps:
+      # #844: a PR authored with `secrets.GITHUB_TOKEN` triggers no workflows,
+      # so the required checks (#713) never report and `gh pr merge --auto`
+      # waits forever (bot PRs #836/#837 stranded that way). Author the branch
+      # push AND the PR with an app installation token instead — both matter,
+      # because a later `synchronize` push with GITHUB_TOKEN would also not
+      # start checks. Falls back to GITHUB_TOKEN (with the #844 breakage and a
+      # loud warning) until the operator installs the app and adds the
+      # MGR_AUTOMATION_APP_ID / MGR_AUTOMATION_APP_PRIVATE_KEY secrets.
+      - name: Mint bot app token
+        id: bot-token
+        if: env.BOT_APP_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.MGR_AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.MGR_AUTOMATION_APP_PRIVATE_KEY }}
+      - name: Warn on GITHUB_TOKEN fallback
+        if: env.BOT_APP_ID == ''
+        run: echo "::warning::MGR_AUTOMATION_APP_ID secret not set — falling back to GITHUB_TOKEN; the bot PR will strand BLOCKED with no checks (#844)"
       - uses: actions/checkout@v7
         with:
           ref: main
+          token: ${{ steps.bot-token.outputs.token || github.token }}
       - name: Rebuild PROGRESS.md
         run: bash scripts/build-progress.sh
       - name: Commit and merge if changed
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if git diff --quiet PROGRESS.md; then
@@ -48,15 +69,9 @@ jobs:
           # bot PR must let them run (they pass — nothing depends on
           # PROGRESS.md) rather than suppressing them. Since 2026-08-12 (#713)
           # they ARE required status checks on `main`, so `--auto` genuinely
-          # waits on them now.
-          #
-          # KNOWN BREAKAGE, not fixed here (#844): this job authors its PR with
-          # `secrets.GITHUB_TOKEN`, and a GITHUB_TOKEN-authored PR triggers no
-          # workflows at all — so the required contexts never report and the PR
-          # is BLOCKED with nothing red to fix, leaving `--auto` waiting
-          # forever. That is exactly how bot PR #836 stranded (2026-08-18 ->
-          # 2026-08-20). Until this job holds an app or PAT credential, its PRs
-          # need a human close/reopen to make the checks start.
+          # waits on them now. The app token minted above (#844) is what lets
+          # those checks start at all on this bot's PRs; on the GITHUB_TOKEN
+          # fallback they never do, and the PR needs a human close/reopen.
           git commit -m "docs(progress): rebuild PROGRESS.md"
 
           remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"

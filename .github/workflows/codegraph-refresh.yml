@@ -36,10 +36,28 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      BOT_APP_ID: ${{ secrets.MGR_AUTOMATION_APP_ID }}
     steps:
+      # #844: same as progress.yml — a GITHUB_TOKEN-authored PR triggers no
+      # workflows, so the required checks never report and auto-merge waits
+      # forever (bot PR #837). Push and open the PR with an app installation
+      # token; fall back to GITHUB_TOKEN (still #844-broken) until the
+      # operator adds the MGR_AUTOMATION_APP_* secrets.
+      - name: Mint bot app token
+        id: bot-token
+        if: env.BOT_APP_ID != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.MGR_AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.MGR_AUTOMATION_APP_PRIVATE_KEY }}
+      - name: Warn on GITHUB_TOKEN fallback
+        if: env.BOT_APP_ID == ''
+        run: echo "::warning::MGR_AUTOMATION_APP_ID secret not set — falling back to GITHUB_TOKEN; the bot PR will strand BLOCKED with no checks (#844)"
       - uses: actions/checkout@v7
         with:
           ref: main
+          token: ${{ steps.bot-token.outputs.token || github.token }}
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -50,7 +68,7 @@ jobs:
         run: bun tools/codegraph/build.ts
       - name: Commit and merge if changed
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if git diff --quiet tools/codegraph/graph.json; then

@@ -547,11 +547,23 @@ describe("GitHub Actions performance contracts", () => {
     // Check compatibility: the bot PR must run the PR checks ([skip ci] would
     // suppress them) and wait for them via --auto. Since #713 the four
     // contexts ARE required on `main` (ruleset 11725742), so --auto does wait.
-    // The remaining hole is #844: the bot PR is authored with
-    // `secrets.GITHUB_TOKEN`, which triggers no workflows, so the required
-    // contexts never report and --auto waits on checks that will never start.
     expect(progressWorkflow).not.toContain("[skip ci]");
     expect(progressWorkflow).toContain("--auto");
+
+    // #844: a PR authored (or later synchronized) with `secrets.GITHUB_TOKEN`
+    // triggers no workflows, so the required contexts never report and --auto
+    // waits forever (bot PRs #836/#837). The job must mint an app installation
+    // token and use it for BOTH the branch push (checkout token) and the
+    // gh pr create/merge step; `secrets.GITHUB_TOKEN` may appear only as the
+    // explicit fallback for when the app secrets are not configured.
+    expect(progressWorkflow).toContain("actions/create-github-app-token@");
+    expect(progressWorkflow).toContain(
+      "token: ${{ steps.bot-token.outputs.token || github.token }}",
+    );
+    expect(progressWorkflow).toContain(
+      "GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}",
+    );
+    expect(progressWorkflow).not.toContain("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
 
     // enablePullRequestAutoMerge races the PR's own checks starting up and
     // intermittently answers "unstable status" (~1/3 of runs, e.g. run
@@ -577,6 +589,14 @@ describe("GitHub Actions performance contracts", () => {
     expect(workflow).not.toContain("[skip ci]");
     // Deterministic only: the refresh job must never invoke the LLM pass.
     expect(workflow).not.toContain("--llm");
+    // #844: same credential contract as progress.yml — app token for push and
+    // PR, GITHUB_TOKEN only as explicit fallback.
+    expect(workflow).toContain("actions/create-github-app-token@");
+    expect(workflow).toContain("token: ${{ steps.bot-token.outputs.token || github.token }}");
+    expect(workflow).toContain(
+      "GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}",
+    );
+    expect(workflow).not.toContain("GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
   });
 
   // The doctor ratchet runs inside the required Static Checks job: it must
