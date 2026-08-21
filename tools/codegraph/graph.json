@@ -1,9 +1,9 @@
 {
- "commit": "19e714d7b3d4f4b2c5d1ef784ab7bd9b48bda4d5",
- "built_at": "2026-08-21T15:09:12.521Z",
+ "commit": "a2bb1cb0eea4aa475068b505c00517bbd0ee5eda",
+ "built_at": "2026-08-21T19:28:47.438Z",
  "inputs": {
-  "count": 1380,
-  "digest": "a466d2b7c1fb7456"
+  "count": 1384,
+  "digest": "91f40126c1b3eb08"
  },
  "nodes": [
   {
@@ -18558,6 +18558,16 @@
    "extractor": "ast"
   },
   {
+   "name": "src/lib/constants.ts#DEFAULT_PAGE_SIZE",
+   "type": "FUNCTION",
+   "description": "Exported function 'DEFAULT_PAGE_SIZE' in src/lib/constants.ts.",
+   "file_path": "src/lib/constants.ts",
+   "aliases": [
+    "DEFAULT_PAGE_SIZE"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/lib/constants.ts#POLLING_INTERVALS",
    "type": "FUNCTION",
    "description": "Exported function 'POLLING_INTERVALS' in src/lib/constants.ts.",
@@ -18590,6 +18600,24 @@
    "file_path": "src/components/dashboard/batch-activity-heatmap.tsx",
    "aliases": [
     "BatchActivityHeatmap"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/hooks/use-persisted-flag.ts",
+   "type": "MODULE",
+   "description": "Source module at src/hooks/use-persisted-flag.ts.",
+   "file_path": "src/hooks/use-persisted-flag.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/hooks/use-persisted-flag.ts#usePersistedFlag",
+   "type": "FUNCTION",
+   "description": "Exported function 'usePersistedFlag' in src/hooks/use-persisted-flag.ts.",
+   "file_path": "src/hooks/use-persisted-flag.ts",
+   "aliases": [
+    "usePersistedFlag"
    ],
    "extractor": "ast"
   },
@@ -21946,6 +21974,16 @@
    "extractor": "ast"
   },
   {
+   "name": "src/components/universal/list-query-options.ts#quickFilterColumnFilters",
+   "type": "FUNCTION",
+   "description": "Exported function 'quickFilterColumnFilters' in src/components/universal/list-query-options.ts.",
+   "file_path": "src/components/universal/list-query-options.ts",
+   "aliases": [
+    "quickFilterColumnFilters"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/components/universal/list-query-options.ts#defaultListParams",
    "type": "FUNCTION",
    "description": "Exported function 'defaultListParams' in src/components/universal/list-query-options.ts.",
@@ -24254,6 +24292,54 @@
    "extractor": "ast"
   },
   {
+   "name": "src/components/ui/skeletons.tsx",
+   "type": "MODULE",
+   "description": "Source module at src/components/ui/skeletons.tsx.",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/ui/skeletons.tsx#ListSkeleton",
+   "type": "COMPONENT",
+   "description": "React component 'ListSkeleton' in src/components/ui/skeletons.tsx.",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "aliases": [
+    "ListSkeleton"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/ui/skeletons.tsx#DashboardTrendsSkeleton",
+   "type": "COMPONENT",
+   "description": "React component 'DashboardTrendsSkeleton' in src/components/ui/skeletons.tsx.",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "aliases": [
+    "DashboardTrendsSkeleton"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/ui/skeletons.tsx#DashboardSkeleton",
+   "type": "COMPONENT",
+   "description": "React component 'DashboardSkeleton' in src/components/ui/skeletons.tsx.",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "aliases": [
+    "DashboardSkeleton"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/ui/skeletons.tsx#DetailSkeleton",
+   "type": "COMPONENT",
+   "description": "React component 'DetailSkeleton' in src/components/ui/skeletons.tsx.",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "aliases": [
+    "DetailSkeleton"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/components/ui/tabs.tsx",
    "type": "MODULE",
    "description": "Source module at src/components/ui/tabs.tsx.",
@@ -24814,6 +24900,14 @@
    "type": "TEST",
    "description": "TEST at src/components/universal/__tests__/empty-optional-select-resolver.test.ts.",
    "file_path": "src/components/universal/__tests__/empty-optional-select-resolver.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/universal/__tests__/list-query-prefetch-key.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/components/universal/__tests__/list-query-prefetch-key.test.ts.",
+   "file_path": "src/components/universal/__tests__/list-query-prefetch-key.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -28017,6 +28111,24 @@
    "extractor": "ast"
   },
   {
+   "name": "src/app/(app)/dashboard/loading.tsx",
+   "type": "MODULE",
+   "description": "Source module at src/app/(app)/dashboard/loading.tsx.",
+   "file_path": "src/app/(app)/dashboard/loading.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/app/(app)/dashboard/loading.tsx#Loading",
+   "type": "COMPONENT",
+   "description": "React component 'Loading' in src/app/(app)/dashboard/loading.tsx.",
+   "file_path": "src/app/(app)/dashboard/loading.tsx",
+   "aliases": [
+    "Loading"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/components/ui/progress.tsx",
    "type": "MODULE",
    "description": "Source module at src/components/ui/progress.tsx.",
@@ -28103,6 +28215,24 @@
    "file_path": "src/app/(app)/dashboard/inventory/layout.tsx",
    "aliases": [
     "Layout"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/app/(app)/dashboard/inventory/loading.tsx",
+   "type": "MODULE",
+   "description": "Source module at src/app/(app)/dashboard/inventory/loading.tsx.",
+   "file_path": "src/app/(app)/dashboard/inventory/loading.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/app/(app)/dashboard/inventory/loading.tsx#Loading",
+   "type": "COMPONENT",
+   "description": "React component 'Loading' in src/app/(app)/dashboard/inventory/loading.tsx.",
+   "file_path": "src/app/(app)/dashboard/inventory/loading.tsx",
+   "aliases": [
+    "Loading"
    ],
    "extractor": "ast"
   },
@@ -29539,12 +29669,12 @@
    "extractor": "ast"
   },
   {
-   "name": "src/app/(app)/production/batches/loading.tsx#BatchesLoading",
+   "name": "src/app/(app)/production/batches/loading.tsx#Loading",
    "type": "COMPONENT",
-   "description": "React component 'BatchesLoading' in src/app/(app)/production/batches/loading.tsx.",
+   "description": "React component 'Loading' in src/app/(app)/production/batches/loading.tsx.",
    "file_path": "src/app/(app)/production/batches/loading.tsx",
    "aliases": [
-    "BatchesLoading"
+    "Loading"
    ],
    "extractor": "ast"
   },
@@ -29808,34 +29938,6 @@
    "description": "React Query key 'batchKeys.brewLogLinks' from src/lib/query-keys.ts.",
    "file_path": "src/lib/query-keys.ts",
    "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/components/ui/skeletons.tsx",
-   "type": "MODULE",
-   "description": "Source module at src/components/ui/skeletons.tsx.",
-   "file_path": "src/components/ui/skeletons.tsx",
-   "aliases": [],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/components/ui/skeletons.tsx#ListSkeleton",
-   "type": "COMPONENT",
-   "description": "React component 'ListSkeleton' in src/components/ui/skeletons.tsx.",
-   "file_path": "src/components/ui/skeletons.tsx",
-   "aliases": [
-    "ListSkeleton"
-   ],
-   "extractor": "ast"
-  },
-  {
-   "name": "src/components/ui/skeletons.tsx#DetailSkeleton",
-   "type": "COMPONENT",
-   "description": "React component 'DetailSkeleton' in src/components/ui/skeletons.tsx.",
-   "file_path": "src/components/ui/skeletons.tsx",
-   "aliases": [
-    "DetailSkeleton"
-   ],
    "extractor": "ast"
   },
   {
@@ -61914,6 +62016,13 @@
   {
    "source": "src/lib/constants.ts",
    "predicate": "defines",
+   "target": "src/lib/constants.ts#DEFAULT_PAGE_SIZE",
+   "file_path": "src/lib/constants.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/constants.ts",
+   "predicate": "defines",
    "target": "src/lib/constants.ts#POLLING_INTERVALS",
    "file_path": "src/lib/constants.ts",
    "extractor": "ast"
@@ -61996,6 +62105,13 @@
    "extractor": "ast"
   },
   {
+   "source": "src/hooks/use-persisted-flag.ts",
+   "predicate": "defines",
+   "target": "src/hooks/use-persisted-flag.ts#usePersistedFlag",
+   "file_path": "src/hooks/use-persisted-flag.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/components/dashboard/getting-started-checklist.tsx",
    "predicate": "imports",
    "target": "src/lib/supabase/client.ts",
@@ -62006,6 +62122,20 @@
    "source": "src/components/dashboard/getting-started-checklist.tsx",
    "predicate": "imports",
    "target": "src/lib/query-keys.ts",
+   "file_path": "src/components/dashboard/getting-started-checklist.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/dashboard/getting-started-checklist.tsx",
+   "predicate": "imports",
+   "target": "src/hooks/use-persisted-flag.ts",
+   "file_path": "src/components/dashboard/getting-started-checklist.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/dashboard/getting-started-checklist.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/skeleton.tsx",
    "file_path": "src/components/dashboard/getting-started-checklist.tsx",
    "extractor": "ast"
   },
@@ -67402,6 +67532,13 @@
   {
    "source": "src/components/universal/list-query-options.ts",
    "predicate": "imports",
+   "target": "src/lib/constants.ts",
+   "file_path": "src/components/universal/list-query-options.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/list-query-options.ts",
+   "predicate": "imports",
    "target": "src/types/data-table.ts",
    "file_path": "src/components/universal/list-query-options.ts",
    "extractor": "ast"
@@ -67451,8 +67588,22 @@
   {
    "source": "src/components/universal/list-query-options.ts",
    "predicate": "defines",
+   "target": "src/components/universal/list-query-options.ts#quickFilterColumnFilters",
+   "file_path": "src/components/universal/list-query-options.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/list-query-options.ts",
+   "predicate": "defines",
    "target": "src/components/universal/list-query-options.ts#defaultListParams",
    "file_path": "src/components/universal/list-query-options.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/hooks/use-persisted-page-size.ts",
+   "predicate": "imports",
+   "target": "src/lib/constants.ts",
+   "file_path": "src/hooks/use-persisted-page-size.ts",
    "extractor": "ast"
   },
   {
@@ -72084,6 +72235,13 @@
   },
   {
    "source": "src/components/universal/entity-mobile-filter-sheet.tsx",
+   "predicate": "imports",
+   "target": "src/types/data-table.ts",
+   "file_path": "src/components/universal/entity-mobile-filter-sheet.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/entity-mobile-filter-sheet.tsx",
    "predicate": "defines",
    "target": "src/components/universal/entity-mobile-filter-sheet.tsx#MobileFilterSheet",
    "file_path": "src/components/universal/entity-mobile-filter-sheet.tsx",
@@ -72178,6 +72336,41 @@
    "predicate": "imports",
    "target": "src/lib/utils.ts",
    "file_path": "src/components/ui/kbd.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/skeletons.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/skeleton.tsx",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/skeletons.tsx",
+   "predicate": "defines",
+   "target": "src/components/ui/skeletons.tsx#ListSkeleton",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/skeletons.tsx",
+   "predicate": "defines",
+   "target": "src/components/ui/skeletons.tsx#DashboardTrendsSkeleton",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/skeletons.tsx",
+   "predicate": "defines",
+   "target": "src/components/ui/skeletons.tsx#DashboardSkeleton",
+   "file_path": "src/components/ui/skeletons.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/ui/skeletons.tsx",
+   "predicate": "defines",
+   "target": "src/components/ui/skeletons.tsx#DetailSkeleton",
+   "file_path": "src/components/ui/skeletons.tsx",
    "extractor": "ast"
   },
   {
@@ -72414,7 +72607,7 @@
   {
    "source": "src/components/universal/entity-data-table.tsx",
    "predicate": "imports",
-   "target": "src/components/ui/skeleton.tsx",
+   "target": "src/components/ui/skeletons.tsx",
    "file_path": "src/components/universal/entity-data-table.tsx",
    "extractor": "ast"
   },
@@ -72429,13 +72622,6 @@
    "source": "src/components/universal/entity-data-table.tsx",
    "predicate": "imports",
    "target": "src/lib/utils.ts",
-   "file_path": "src/components/universal/entity-data-table.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/universal/entity-data-table.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/table.tsx",
    "file_path": "src/components/universal/entity-data-table.tsx",
    "extractor": "ast"
   },
@@ -73065,7 +73251,7 @@
   {
    "source": "src/components/universal/entity-relation-table.tsx",
    "predicate": "imports",
-   "target": "src/components/ui/skeleton.tsx",
+   "target": "src/components/ui/skeletons.tsx",
    "file_path": "src/components/universal/entity-relation-table.tsx",
    "extractor": "ast"
   },
@@ -73296,7 +73482,7 @@
   {
    "source": "src/components/universal/entity-detail-unified.tsx",
    "predicate": "imports",
-   "target": "src/components/ui/skeleton.tsx",
+   "target": "src/components/ui/skeletons.tsx",
    "file_path": "src/components/universal/entity-detail-unified.tsx",
    "extractor": "ast"
   },
@@ -73522,6 +73708,20 @@
    "predicate": "imports",
    "target": "src/lib/schemas/recipe.ts",
    "file_path": "src/components/universal/__tests__/empty-optional-select-resolver.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/__tests__/list-query-prefetch-key.test.ts",
+   "predicate": "imports",
+   "target": "src/components/universal/list-query-options.ts",
+   "file_path": "src/components/universal/__tests__/list-query-prefetch-key.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/__tests__/list-query-prefetch-key.test.ts",
+   "predicate": "imports",
+   "target": "src/entities/batch/core.ts",
+   "file_path": "src/components/universal/__tests__/list-query-prefetch-key.test.ts",
    "extractor": "ast"
   },
   {
@@ -77993,7 +78193,7 @@
   {
    "source": "src/app/(app)/loading.tsx",
    "predicate": "imports",
-   "target": "src/components/ui/skeleton.tsx",
+   "target": "src/components/ui/skeletons.tsx",
    "file_path": "src/app/(app)/loading.tsx",
    "extractor": "ast"
   },
@@ -78058,6 +78258,20 @@
    "predicate": "defines",
    "target": "src/app/(app)/dashboard/layout.tsx#Layout",
    "file_path": "src/app/(app)/dashboard/layout.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/(app)/dashboard/loading.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/skeletons.tsx",
+   "file_path": "src/app/(app)/dashboard/loading.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/(app)/dashboard/loading.tsx",
+   "predicate": "defines",
+   "target": "src/app/(app)/dashboard/loading.tsx#Loading",
+   "file_path": "src/app/(app)/dashboard/loading.tsx",
    "extractor": "ast"
   },
   {
@@ -78134,6 +78348,13 @@
    "source": "src/app/(app)/dashboard/page.tsx",
    "predicate": "imports",
    "target": "src/components/ui/skeleton.tsx",
+   "file_path": "src/app/(app)/dashboard/page.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/(app)/dashboard/page.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/skeletons.tsx",
    "file_path": "src/app/(app)/dashboard/page.tsx",
    "extractor": "ast"
   },
@@ -78247,6 +78468,20 @@
    "predicate": "defines",
    "target": "src/app/(app)/dashboard/inventory/layout.tsx#Layout",
    "file_path": "src/app/(app)/dashboard/inventory/layout.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/(app)/dashboard/inventory/loading.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/skeletons.tsx",
+   "file_path": "src/app/(app)/dashboard/inventory/loading.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/(app)/dashboard/inventory/loading.tsx",
+   "predicate": "defines",
+   "target": "src/app/(app)/dashboard/inventory/loading.tsx#Loading",
+   "file_path": "src/app/(app)/dashboard/inventory/loading.tsx",
    "extractor": "ast"
   },
   {
@@ -78420,7 +78655,7 @@
   {
    "source": "src/app/(app)/dashboard/inventory/page.tsx",
    "predicate": "imports",
-   "target": "src/components/ui/skeleton.tsx",
+   "target": "src/components/ui/skeletons.tsx",
    "file_path": "src/app/(app)/dashboard/inventory/page.tsx",
    "extractor": "ast"
   },
@@ -78519,6 +78754,13 @@
    "source": "src/app/(app)/dashboard/sales/page.tsx",
    "predicate": "imports",
    "target": "src/components/ui/skeleton.tsx",
+   "file_path": "src/app/(app)/dashboard/sales/page.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/(app)/dashboard/sales/page.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/skeletons.tsx",
    "file_path": "src/app/(app)/dashboard/sales/page.tsx",
    "extractor": "ast"
   },
@@ -81100,8 +81342,15 @@
   },
   {
    "source": "src/app/(app)/production/batches/loading.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/skeletons.tsx",
+   "file_path": "src/app/(app)/production/batches/loading.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/app/(app)/production/batches/loading.tsx",
    "predicate": "defines",
-   "target": "src/app/(app)/production/batches/loading.tsx#BatchesLoading",
+   "target": "src/app/(app)/production/batches/loading.tsx#Loading",
    "file_path": "src/app/(app)/production/batches/loading.tsx",
    "extractor": "ast"
   },
@@ -82055,27 +82304,6 @@
    "predicate": "invalidates",
    "target": "batchKeys.brewLogs",
    "file_path": "src/app/(app)/production/batches/[id]/batch-detail-client.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/skeletons.tsx",
-   "predicate": "imports",
-   "target": "src/components/ui/skeleton.tsx",
-   "file_path": "src/components/ui/skeletons.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/skeletons.tsx",
-   "predicate": "defines",
-   "target": "src/components/ui/skeletons.tsx#ListSkeleton",
-   "file_path": "src/components/ui/skeletons.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/components/ui/skeletons.tsx",
-   "predicate": "defines",
-   "target": "src/components/ui/skeletons.tsx#DetailSkeleton",
-   "file_path": "src/components/ui/skeletons.tsx",
    "extractor": "ast"
   },
   {
@@ -86988,6 +87216,13 @@
   {
    "source": "src/components/reports/report-page.tsx",
    "predicate": "imports",
+   "target": "src/components/ui/skeletons.tsx",
+   "file_path": "src/components/reports/report-page.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/reports/report-page.tsx",
+   "predicate": "imports",
    "target": "src/components/ui/table.tsx",
    "file_path": "src/components/reports/report-page.tsx",
    "extractor": "ast"
@@ -89047,13 +89282,6 @@
    "source": "src/app/(app)/settings/brands/loading.tsx",
    "predicate": "imports",
    "target": "src/components/ui/skeletons.tsx",
-   "file_path": "src/app/(app)/settings/brands/loading.tsx",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/app/(app)/settings/brands/loading.tsx",
-   "predicate": "imports",
-   "target": "src/entities/brand/index.ts",
    "file_path": "src/app/(app)/settings/brands/loading.tsx",
    "extractor": "ast"
   },
@@ -94120,6 +94348,13 @@
   },
   {
    "source": "src/components/universal/__tests__/field-input-number.test.tsx",
+   "predicate": "verifies",
+   "target": "F113",
+   "file_path": "docs/feature_list.json",
+   "extractor": "tracker"
+  },
+  {
+   "source": "src/components/universal/__tests__/list-query-prefetch-key.test.ts",
    "predicate": "verifies",
    "target": "F113",
    "file_path": "docs/feature_list.json",
