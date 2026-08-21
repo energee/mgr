@@ -117,42 +117,49 @@ Each subagent burns context (its own + a slice of yours via the report). Two heu
 
 The harness exists to make agents reliable, not to make every task multi-agent. Solo work is the default.
 
-## Dispatched agents cannot run the quality gates
+## Dispatched agents and the quality gates
 
-**Measured 2026-08-12 across six parallel nodes, then confirmed by direct probe.** A
-dispatched expert agent does **not** get `Task`, `Agent`, or `Skill`. It therefore cannot
-dispatch `refactor-reviewer` / `transaction-safety-reviewer`, and cannot invoke
-`/simplify` or `/code-review`. Every one of the six agents reported this independently;
-four of them compensated by reading `.claude/agents/refactor-reviewer.md` and working its
+**Measured 2026-08-12 across six parallel nodes.** With an explicit `tools:` allowlist, a
+dispatched expert agent did **not** get subagent-spawning or slash-command capability. It
+could not dispatch `refactor-reviewer` / `transaction-safety-reviewer`, and could not invoke
+`/simplify` or `/code-review`. Every one of the six agents reported this independently; four
+of them compensated by reading `.claude/agents/refactor-reviewer.md` and working its
 checklist by hand, and said plainly that the resulting verdict was self-assessed rather
-than an independent gate.
+than an independent gate. A probe that same day found the declared list wasn't even being
+honoured as written: `entity-architect` declared six tools (`Read, Grep, Glob, Bash, Edit,
+Write`) but reported only four available (`Read, Bash, Edit, Write` — `Grep`/`Glob` absent).
 
-**So: the orchestrator runs the gates, not the node.** When you fan out behaviour-preserving
-work, plan for a second pass in which the dispatching session runs `refactor-reviewer`
-against each branch. Do not write "run `/simplify`, then `/code-review --fix`, then
-`refactor-reviewer`" into a subagent brief and treat the node as gated — it cannot comply,
-and a brief that demands the impossible invites a fabricated "gates passed".
+**Re-probed 2026-08-18 in a fresh, independently-triggered session (this issue's own
+response run), after switching the six write-agent files to `tools: "*"`.** A dispatched
+`entity-architect` now reports the full tool set, including subagent-spawning and skill
+invocation — on this harness build the tools are named `Agent` (not `Task`) and `Skill`. A
+dispatched `refactor-reviewer`, whose file still declares the explicit restricted list
+`Read, Grep, Glob, Bash`, reports **exactly** that set and nothing more — no `Edit`/`Write`,
+no `Agent`, no `Skill`, no `ToolSearch`. So, confirmed on this build:
+
+- `tools: "*"` grants the full tool set, including subagent-spawning and skill invocation.
+- An explicit `tools:` list is honoured as a hard cap — no more, no less than named.
+- The earlier "four of six honoured" result was specific to the old explicit-list form, not
+  to dispatch in general; it has not reproduced since the move to `"*"`.
+
+**This does not fully retire the central-pass rule.** The tool name changed between the two
+measurements (`Task` → `Agent`), which means the underlying harness build likely changed too
+— so a write-agent node being able to self-dispatch a gate today is not a guarantee it can on
+every future build or every trigger path (interactive session vs. Action-triggered run, etc.).
+Treat node self-gating as now *available* to lean on in a brief, but keep planning an
+orchestrator second pass for anything you can't afford to have silently regress if a future
+build narrows the grant again. Read-only gate agents (`refactor-reviewer`,
+`transaction-safety-reviewer`) intentionally keep the explicit restricted list — a gate that
+can edit, or that can spawn a writer, is not a gate — so they will never get `Agent`/`Skill`,
+by design, regardless of what write-agents get.
 
 This is not academic. Run centrally on the 2026-08-12 wave, those gates caught: a stale
 cross-reference pointing at the exact seam an extraction argued must not drift; a type
 narrowed from `string | null` to `string` behind an `as unknown` cast, which would have
 stopped the compiler demanding a null guard from the next caller; a service docblock
 claiming script-portability while importing `@sentry/nextjs`; and two progress receipts
-with wrong test counts. None of it was caught by the authoring agent's own review.
-
-### What the `tools:` frontmatter actually does — unresolved
-
-The six write-agent files carried `tools: Read, Grep, Glob, Bash, Edit, Write`, which looks
-like the cause. It is not obviously so. A probe dispatch of `entity-architect` reported its
-actual available set as **`Read, Bash, Edit, Write`** — four tools, narrower than the six the
-frontmatter declared, with `Grep` and `Glob` absent. So the declared list is not simply
-being honoured.
-
-The files now read `tools: "*"`, which is at least not misleading, but **this is unverified**:
-the same probe showed the change had no effect within the session that made it, consistent
-with agent definitions being resolved at session start. Whether a fresh session picks it up
-is untested. Until someone confirms it, assume dispatched agents cannot gate their own work
-and plan the central pass. Tracked in #803.
+with wrong test counts. None of it was caught by the authoring agent's own review. Tracked
+in #803.
 
 ## Harness notes (optional)
 
