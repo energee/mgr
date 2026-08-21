@@ -141,7 +141,6 @@ All tools are defined in `src/app/api/chat/tools.ts` and bound to the authentica
 | `getProductionSchedule` | Batches scheduled within a date range with recipe and volume | `startDate`, `endDate` |
 | `getIngredientInventory` | Raw ingredient levels with lot quantities and expiration | `category?: string` |
 | `getBatchLogs` | Event log for a batch: readings, status changes, notes (chronological) | `batchId: UUID` |
-| `getVesselCleanings` | Cleaning history: type, chemicals, duration, dates (most recent 20) | `vesselId: UUID` |
 | `getBatchTransfers` | Transfer history: vessels, volumes, dates | `batchId: UUID` |
 | `getRecipeCost` | COGS breakdown for a recipe | `recipeId: UUID` |
 | `getLotExpiration` | Ingredient lots expiring within N days with available quantities | `daysAhead?: number` |

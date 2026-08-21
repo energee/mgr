@@ -135,13 +135,6 @@ export const batchCore: EntityCoreInput<Batch> = {
       showInDetail: true,
     },
     {
-      name: "recipe_variant",
-      entity: "recipe_variant",
-      type: "belongsTo",
-      foreignKey: "recipe_variant_id",
-      showInDetail: false,
-    },
-    {
       name: "brew_logs",
       entity: "brew_log",
       type: "hasManyThrough",

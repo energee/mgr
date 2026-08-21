@@ -249,7 +249,6 @@ const TOOL_TITLES: Record<string, string> = {
   getProductionSchedule: "Production Schedule",
   getIngredientInventory: "Ingredient Inventory",
   getBatchLogs: "Batch Logs",
-  getVesselCleanings: "Vessel Cleanings",
   getBatchTransfers: "Batch Transfers",
   getRecipeCost: "Recipe Cost",
   getLotExpiration: "Lot Expiration",

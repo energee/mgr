@@ -38,7 +38,6 @@ export const batchSchema = z.object({
   // layer and the batch state machine own WHICH state is allowed when.
   status: z.enum(batchStates).default("planned"),
   recipe_id: z.string().uuid().nullable().optional(),
-  recipe_variant_id: z.string().uuid().nullable().optional(),
   planned_start_date: z.string().nullable().optional(),
   volume_bbl: z.coerce.number().nullable().optional(),
   actual_fg: z.coerce.number().nullable().optional(),

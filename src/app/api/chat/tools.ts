@@ -465,25 +465,6 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
         ),
     }),
 
-    getVesselCleanings: tool({
-      description:
-        "Get cleaning history for a vessel: cleaning type (CIP, caustic, acid, sanitize), chemicals used, duration, and dates.",
-      inputSchema: z.object({
-        vesselId: z.string().uuid().describe("The vessel UUID"),
-      }),
-      execute: async ({ vesselId }) =>
-        query(
-          supabase
-            .from("vessel_cleanings")
-            .select(
-              "id, cleaning_type, from_status, to_status, duration_min, chemicals_used, notes, created_at"
-            )
-            .eq("vessel_id", vesselId)
-            .order("created_at", { ascending: false })
-            .limit(20),
-        ),
-    }),
-
     getBatchTransfers: tool({
       description:
         "Get the transfer history for a batch: which vessels it moved between, volumes, and dates.",
