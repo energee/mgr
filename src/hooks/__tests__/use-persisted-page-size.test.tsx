@@ -116,6 +116,24 @@ describe("usePersistedPageSize", () => {
     expect(localStorage.getItem(`${STORAGE_KEY}:orders`)).toBe("100");
   });
 
+  it("resets to the default when tableKey changes to a table with no stored size", () => {
+    localStorage.setItem(`${STORAGE_KEY}:orders`, "50");
+
+    const log: number[] = [];
+    function KeySwapProbe({ tableKey }: { tableKey: string }) {
+      const { pageSize } = usePersistedPageSize(25, tableKey);
+      log.push(pageSize);
+      return null;
+    }
+    harness.render(<KeySwapProbe tableKey="orders" />);
+    expect(log[log.length - 1]).toBe(50);
+
+    // Swap the key in place: the previous table's 50 must not leak into a
+    // table that has no stored preference.
+    harness.rerender(<KeySwapProbe tableKey="batches" />);
+    expect(log[log.length - 1]).toBe(25);
+  });
+
   it("persists per table key, independently of the global key", () => {
     localStorage.setItem(`${STORAGE_KEY}:orders`, "50");
 

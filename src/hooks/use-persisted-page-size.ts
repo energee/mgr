@@ -54,11 +54,11 @@ export function usePersistedPageSize(
   const [pageSize, setPageSizeState] = useState(defaultSize);
 
   useEffect(() => {
-    const stored = getStoredPageSize(defaultSize, tableKey);
-    if (stored !== defaultSize) {
-      setPageSizeState(stored);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time read on mount, mirroring usePrefillHydration
+    // Unconditional write: when tableKey changes in place, the previous
+    // table's size must not leak into a table with no stored preference
+    // (setState with the current value is a no-op render-wise).
+    setPageSizeState(getStoredPageSize(defaultSize, tableKey));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read on mount and key change, mirroring usePrefillHydration
   }, [tableKey]);
 
   // Setter that also persists to localStorage
@@ -101,8 +101,10 @@ export function usePersistedPagination(defaultSize?: number, tableKey?: string) 
 
   const onPaginationChange = useCallback(
     (updater: PaginationState | ((old: PaginationState) => PaginationState)) => {
-      // Compute `next` from the values the caller saw. pagination is stable
-      // between renders (useMemo), so reading it here is not stale.
+      // Compute `next` from the render-captured pagination. Safe because
+      // every producer (page flip, size select) is a discrete single-call
+      // event that React flushes before the next can fire — not because the
+      // useMemo would protect against same-batch updates.
       const next = typeof updater === "function" ? updater(pagination) : updater;
       if (next.pageSize !== pagination.pageSize) {
         setPageSize(next.pageSize);
