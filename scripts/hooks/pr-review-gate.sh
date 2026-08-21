@@ -18,13 +18,28 @@ set -euo pipefail
 
 mode="${1:?usage: pr-review-gate.sh check|consume}"
 
+# CI runs (claude.yml etc.) are exempt, as before. Drain stdin so the
+# payload writer never sees SIGPIPE.
+if [[ "$mode" == "check" && -n "${GITHUB_ACTIONS:-}" ]]; then
+  cat > /dev/null
+  exit 0
+fi
+
 input="$(cat)"
 
-# CI runs (claude.yml etc.) are exempt, as before.
-if [[ "$mode" == "check" && -n "${GITHUB_ACTIONS:-}" ]]; then exit 0; fi
+# Fast path: this hook fires on EVERY Bash tool call (pre and post). A cheap
+# builtin glob over the raw payload bails before spawning jq/awk/sed/grep for
+# the vast majority of commands; a false positive here only means the full
+# parse below runs.
+case "$input" in
+  *gh*pr*create*) ;;
+  *) exit 0 ;;
+esac
 
-cmd="$(jq -r '.tool_input.command // ""' <<<"$input")"
-cwd="$(jq -r '.cwd // ""' <<<"$input")"
+# One jq call for both fields: first line is cwd, the rest is the command.
+parsed="$(jq -r '(.cwd // ""), (.tool_input.command // "")' <<<"$input")"
+cwd="${parsed%%$'\n'*}"
+cmd="${parsed#*$'\n'}"
 
 # Drop heredoc bodies: everything between `<<TERM` (any quoting, optional -)
 # and the line that is exactly TERM is data, not a command to gate on.
