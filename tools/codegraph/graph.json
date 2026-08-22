@@ -1,9 +1,9 @@
 {
- "commit": "54b695e271454c91b7f18d0b4cb8fc1664ef7e2c",
- "built_at": "2026-08-22T03:15:23.528Z",
+ "commit": "054943dec5f1c4ea27e96056681b142d94872446",
+ "built_at": "2026-08-22T03:29:19.796Z",
  "inputs": {
-  "count": 1394,
-  "digest": "d572539a1c2b5960"
+  "count": 1401,
+  "digest": "3a5b99ae2d5dab66"
  },
  "nodes": [
   {
@@ -11682,6 +11682,14 @@
    "extractor": "ast"
   },
   {
+   "name": "src/__tests__/integration/bin-inventory-clamp.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/bin-inventory-clamp.test.ts.",
+   "file_path": "src/__tests__/integration/bin-inventory-clamp.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
    "name": "src/__tests__/integration/customer-role-scoping.test.ts",
    "type": "TEST",
    "description": "TEST at src/__tests__/integration/customer-role-scoping.test.ts.",
@@ -11726,6 +11734,14 @@
    "type": "TEST",
    "description": "TEST at src/__tests__/integration/inventory-guards.test.ts.",
    "file_path": "src/__tests__/integration/inventory-guards.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/keg-netting.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/keg-netting.test.ts.",
+   "file_path": "src/__tests__/integration/keg-netting.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -11816,6 +11832,42 @@
    "type": "TEST",
    "description": "TEST at src/__tests__/integration/qbo-save-tokens-atomic.test.ts.",
    "file_path": "src/__tests__/integration/qbo-save-tokens-atomic.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/_helpers/packaging-fixture.ts.",
+   "file_path": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/_helpers/packaging-fixture.ts#seedPackagingSession",
+   "type": "FUNCTION",
+   "description": "Exported function 'seedPackagingSession' in src/__tests__/integration/_helpers/packaging-fixture.ts.",
+   "file_path": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "aliases": [
+    "seedPackagingSession"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/_helpers/packaging-fixture.ts#completePackagingSession",
+   "type": "FUNCTION",
+   "description": "Exported function 'completePackagingSession' in src/__tests__/integration/_helpers/packaging-fixture.ts.",
+   "file_path": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "aliases": [
+    "completePackagingSession"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/revise-packaging-session.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/revise-packaging-session.test.ts.",
+   "file_path": "src/__tests__/integration/revise-packaging-session.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -23844,6 +23896,16 @@
    "extractor": "ast"
   },
   {
+   "name": "src/components/universal/bulk-status-action-bar.tsx#commonBulkTransitions",
+   "type": "FUNCTION",
+   "description": "Exported function 'commonBulkTransitions' in src/components/universal/bulk-status-action-bar.tsx.",
+   "file_path": "src/components/universal/bulk-status-action-bar.tsx",
+   "aliases": [
+    "commonBulkTransitions"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/components/universal/bulk-status-action-bar.tsx#BulkStatusActionBar",
    "type": "COMPONENT",
    "description": "React component 'BulkStatusActionBar' in src/components/universal/bulk-status-action-bar.tsx.",
@@ -23886,6 +23948,24 @@
    "file_path": "src/hooks/use-keyboard-shortcuts.ts",
    "aliases": [
     "useKeyboardShortcuts"
+   ],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/universal/entity-empty-state.tsx",
+   "type": "MODULE",
+   "description": "Source module at src/components/universal/entity-empty-state.tsx.",
+   "file_path": "src/components/universal/entity-empty-state.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/universal/entity-empty-state.tsx#EntityEmptyState",
+   "type": "COMPONENT",
+   "description": "React component 'EntityEmptyState' in src/components/universal/entity-empty-state.tsx.",
+   "file_path": "src/components/universal/entity-empty-state.tsx",
+   "aliases": [
+    "EntityEmptyState"
    ],
    "extractor": "ast"
   },
@@ -24176,6 +24256,14 @@
    "type": "TEST",
    "description": "TEST at src/components/universal/__tests__/bulk-selection.test.ts.",
    "file_path": "src/components/universal/__tests__/bulk-selection.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/universal/__tests__/common-bulk-transitions.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/components/universal/__tests__/common-bulk-transitions.test.ts.",
+   "file_path": "src/components/universal/__tests__/common-bulk-transitions.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -35019,6 +35107,14 @@
    "type": "TEST",
    "description": "TEST at src/components/universal/__tests__/bulk-status-action-bar.test.tsx.",
    "file_path": "src/components/universal/__tests__/bulk-status-action-bar.test.tsx",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/components/universal/__tests__/entity-empty-state.test.tsx",
+   "type": "TEST",
+   "description": "TEST at src/components/universal/__tests__/entity-empty-state.test.tsx.",
+   "file_path": "src/components/universal/__tests__/entity-empty-state.test.tsx",
    "aliases": [],
    "extractor": "ast"
   },
@@ -53692,6 +53788,13 @@
    "extractor": "ast"
   },
   {
+   "source": "src/__tests__/integration/bin-inventory-clamp.test.ts",
+   "predicate": "imports",
+   "target": "src/__tests__/integration/_helpers/role-client.ts",
+   "file_path": "src/__tests__/integration/bin-inventory-clamp.test.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/__tests__/integration/customer-role-scoping.test.ts",
    "predicate": "imports",
    "target": "src/__tests__/integration/_helpers/role-client.ts",
@@ -53717,6 +53820,13 @@
    "predicate": "imports",
    "target": "src/__tests__/integration/_helpers/role-client.ts",
    "file_path": "src/__tests__/integration/inventory-guard-concurrency.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/__tests__/integration/keg-netting.test.ts",
+   "predicate": "imports",
+   "target": "src/__tests__/integration/_helpers/role-client.ts",
+   "file_path": "src/__tests__/integration/keg-netting.test.ts",
    "extractor": "ast"
   },
   {
@@ -53780,6 +53890,41 @@
    "predicate": "imports",
    "target": "src/__tests__/integration/_helpers/role-client.ts",
    "file_path": "src/__tests__/integration/qbo-save-tokens-atomic.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "predicate": "defines",
+   "target": "src/__tests__/integration/_helpers/packaging-fixture.ts#seedPackagingSession",
+   "file_path": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "predicate": "defines",
+   "target": "src/__tests__/integration/_helpers/packaging-fixture.ts#completePackagingSession",
+   "file_path": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/domain/packaging/revise-packaging-session.tsx",
+   "predicate": "tested_by",
+   "target": "src/__tests__/integration/revise-packaging-session.test.ts",
+   "file_path": "src/__tests__/integration/revise-packaging-session.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/__tests__/integration/revise-packaging-session.test.ts",
+   "predicate": "imports",
+   "target": "src/__tests__/integration/_helpers/role-client.ts",
+   "file_path": "src/__tests__/integration/revise-packaging-session.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/__tests__/integration/revise-packaging-session.test.ts",
+   "predicate": "imports",
+   "target": "src/__tests__/integration/_helpers/packaging-fixture.ts",
+   "file_path": "src/__tests__/integration/revise-packaging-session.test.ts",
    "extractor": "ast"
   },
   {
@@ -71579,6 +71724,13 @@
   {
    "source": "src/components/universal/bulk-status-action-bar.tsx",
    "predicate": "defines",
+   "target": "src/components/universal/bulk-status-action-bar.tsx#commonBulkTransitions",
+   "file_path": "src/components/universal/bulk-status-action-bar.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/bulk-status-action-bar.tsx",
+   "predicate": "defines",
    "target": "src/components/universal/bulk-status-action-bar.tsx#BulkStatusActionBar",
    "file_path": "src/components/universal/bulk-status-action-bar.tsx",
    "extractor": "ast"
@@ -71640,6 +71792,20 @@
    "extractor": "ast"
   },
   {
+   "source": "src/components/universal/entity-empty-state.tsx",
+   "predicate": "imports",
+   "target": "src/components/ui/button.tsx",
+   "file_path": "src/components/universal/entity-empty-state.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/entity-empty-state.tsx",
+   "predicate": "defines",
+   "target": "src/components/universal/entity-empty-state.tsx#EntityEmptyState",
+   "file_path": "src/components/universal/entity-empty-state.tsx",
+   "extractor": "ast"
+  },
+  {
    "source": "src/components/universal/entity-mobile-card-list.tsx",
    "predicate": "imports",
    "target": "src/types/entity.ts",
@@ -71692,6 +71858,13 @@
    "source": "src/components/universal/entity-mobile-card-list.tsx",
    "predicate": "imports",
    "target": "src/components/ui/dropdown-menu.tsx",
+   "file_path": "src/components/universal/entity-mobile-card-list.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/entity-mobile-card-list.tsx",
+   "predicate": "imports",
+   "target": "src/components/universal/entity-empty-state.tsx",
    "file_path": "src/components/universal/entity-mobile-card-list.tsx",
    "extractor": "ast"
   },
@@ -72391,6 +72564,13 @@
   {
    "source": "src/components/universal/entity-data-table.tsx",
    "predicate": "imports",
+   "target": "src/components/universal/entity-empty-state.tsx",
+   "file_path": "src/components/universal/entity-data-table.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/entity-data-table.tsx",
+   "predicate": "imports",
    "target": "src/lib/utils.ts",
    "file_path": "src/components/universal/entity-data-table.tsx",
    "extractor": "ast"
@@ -72442,6 +72622,20 @@
    "predicate": "imports",
    "target": "src/components/universal/entity-delete-dialog.tsx",
    "file_path": "src/components/universal/__tests__/bulk-selection.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/__tests__/common-bulk-transitions.test.ts",
+   "predicate": "imports",
+   "target": "src/types/entity.ts",
+   "file_path": "src/components/universal/__tests__/common-bulk-transitions.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/__tests__/common-bulk-transitions.test.ts",
+   "predicate": "imports",
+   "target": "src/components/universal/bulk-status-action-bar.tsx",
+   "file_path": "src/components/universal/__tests__/common-bulk-transitions.test.ts",
    "extractor": "ast"
   },
   {
@@ -93697,6 +93891,27 @@
    "extractor": "ast"
   },
   {
+   "source": "src/components/universal/entity-empty-state.tsx",
+   "predicate": "tested_by",
+   "target": "src/components/universal/__tests__/entity-empty-state.test.tsx",
+   "file_path": "src/components/universal/__tests__/entity-empty-state.test.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/__tests__/entity-empty-state.test.tsx",
+   "predicate": "imports",
+   "target": "src/test/react-harness.ts",
+   "file_path": "src/components/universal/__tests__/entity-empty-state.test.tsx",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/components/universal/__tests__/entity-empty-state.test.tsx",
+   "predicate": "imports",
+   "target": "src/components/universal/entity-empty-state.tsx",
+   "file_path": "src/components/universal/__tests__/entity-empty-state.test.tsx",
+   "extractor": "ast"
+  },
+  {
    "source": "src/components/universal/__tests__/field-input-number.test.tsx",
    "predicate": "imports",
    "target": "src/test/react-harness.ts",
@@ -94138,6 +94353,13 @@
    "extractor": "tracker"
   },
   {
+   "source": "src/components/universal/__tests__/common-bulk-transitions.test.ts",
+   "predicate": "verifies",
+   "target": "F113",
+   "file_path": "docs/feature_list.json",
+   "extractor": "tracker"
+  },
+  {
    "source": "src/components/universal/__tests__/detail-tab-deep-link.test.ts",
    "predicate": "verifies",
    "target": "F113",
@@ -94153,6 +94375,13 @@
   },
   {
    "source": "src/components/universal/__tests__/empty-optional-select-resolver.test.ts",
+   "predicate": "verifies",
+   "target": "F113",
+   "file_path": "docs/feature_list.json",
+   "extractor": "tracker"
+  },
+  {
+   "source": "src/components/universal/__tests__/entity-empty-state.test.tsx",
    "predicate": "verifies",
    "target": "F113",
    "file_path": "docs/feature_list.json",
