@@ -51,6 +51,44 @@ usage limit). So every item below is a HUNTER CANDIDATE, not yet confirmed.
 > Drag-kit deps stay: `@/components/ui/sortable` is still live via the sort list.
 > Still open after this session: 15, 21–24.
 
+> **STATUS 2026-08-21: universal-engine pass (items 15, 21–24).** See
+> `docs/progress/2026-08-21-ponytail-universal-cuts.md` and the branch
+> `refactor/ponytail-universal-cuts`. **Cut: 22 and 23** — both were rejected as
+> "stale" in the 2026-07-25 third pass, and that rejection was wrong: it looked
+> only *inside* `entity-data-table.tsx`, where each construct does appear once,
+> and missed that the second copy lives in a sibling file. The empty-state JSX
+> was byte-identical between `entity-data-table`'s `noResultsContent` and
+> `entity-mobile-card-list`, and is now one `EntityEmptyState`; the
+> bulk-transition intersection ran in `entity-data-table` *and*
+> `bulk-status-action-bar`, verified to compute the same thing, and is now one
+> exported `commonBulkTransitions`. Both gained focused tests; neither path had
+> any, which is how the copies drifted apart unnoticed in the first place.
+> **Already done: 15 and 21. Rejected: 24.**
+> - **15 — already done (2026-07-25 third pass), and the remaining pair must
+>   stay split.** `src/lib/utils.ts` is 15 lines (`cn`,
+>   `getCurrentDateTimeLocal`) and contains neither helper; no `escapeLike`
+>   exists anywhere in the tree. What remains is `escapeIlikePattern`
+>   (`src/lib/supabase/query-helpers.ts`, escapes `` [\%_*] ``) and
+>   `escapeLikePrefix` (`src/components/domain/order/reorder.ts`, escapes
+>   `` [\%_] ``). The `*` difference is deliberate and documented at both sites:
+>   escaping `*` makes a value fail CLOSED, which is right for an identity match
+>   but wrong for the reorder probe, where an empty result makes
+>   `nextDuplicateOrderNumber` hand back an order number that already exists.
+>   Merging the two would be a correctness bug.
+> - **21 — already done.** No `withEntityErrorBoundary` and no `onRetry` remain
+>   in `entity-error-boundary.tsx`; both went in the first pass (dfe0f667,
+>   #590). The item was stale, not actionable.
+> - **24 — rejected, confirming the 2026-07-25 rejection independently.** The
+>   two formatters are not equivalent.
+>   `formatCardFieldValue` and `formatValue` differ in four user-visible ways:
+>   `date` renders `"Jul 15, 2026"` vs `"7/15/2026"`; `datetime`
+>   `"Jul 15, 2026 2:14 PM"` vs `"7/15/2026, 2:14:00 PM"`; null/empty renders
+>   `"-"` vs `"—"`/`""`; and an unparseable date falls back to the raw string
+>   vs `"Invalid Date"`. Not theoretical — the `order` and `batch` kanban
+>   configs both use `format: "date"` (`order_date`, `requested_date`,
+>   `planned_start_date`), so the swap would restyle every kanban card date.
+>   Left in place: unifying it is a deliberate design change, not a dedup.
+
 **Next session: verify each candidate before cutting.** For each, ref-count with
 `rg` and check the registry (`src/entities/index.ts`, `src/entities/cores.ts`),
 entity presentation configs, `z.infer` usage, `Makefile`, `.github/workflows`,

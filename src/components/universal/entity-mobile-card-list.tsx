@@ -50,7 +50,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Inbox, ChevronDown, MoreVertical, Plus } from "lucide-react";
+import { ChevronDown, MoreVertical, Plus } from "lucide-react";
+import { EntityEmptyState } from "@/components/universal/entity-empty-state";
 import { cn } from "@/lib/utils";
 
 type EntityMobileCardListProps = {
@@ -175,50 +176,13 @@ export function EntityMobileCardList({
   // ---- Empty state ----
   if (data.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-8">
-        {hasActiveFilters ? (
-          <Search className="size-10 text-muted-foreground/30" />
-        ) : (
-          <Inbox className="size-10 text-muted-foreground/30" />
-        )}
-        <div className="text-muted-foreground text-center">
-          {hasActiveFilters ? (
-            <>
-              <p className="font-medium">
-                No matching {entity.displayNamePlural.toLowerCase()}
-              </p>
-              <p className="text-sm">
-                Try adjusting your search or filters
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="font-medium">
-                No {entity.displayNamePlural.toLowerCase()} yet
-              </p>
-              <p className="text-sm">
-                Get started by creating your first{" "}
-                {entity.displayName.toLowerCase()}
-              </p>
-            </>
-          )}
-        </div>
-        {showCreate && !hasActiveFilters && (
-          <>
-            {onCreateClick ? (
-              <Button size="sm" onClick={onCreateClick}>
-                Create {entity.displayName}
-              </Button>
-            ) : (
-              <Button size="sm" asChild>
-                <Link href={`${basePath}/new`}>
-                  Create {entity.displayName}
-                </Link>
-              </Button>
-            )}
-          </>
-        )}
-      </div>
+      <EntityEmptyState
+        entity={entity}
+        hasActiveFilters={hasActiveFilters}
+        showCreate={showCreate}
+        basePath={basePath}
+        onCreateClick={onCreateClick}
+      />
     );
   }
 

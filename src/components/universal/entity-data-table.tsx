@@ -75,7 +75,10 @@ import { EntityDeleteDialog, EntityBulkDeleteDialog } from "./entity-delete-dial
 import { getApplicableActions } from "@/lib/entity-actions";
 import { EntityActionConfirmDialog } from "./entity-action-confirm-dialog";
 import { EntityTransitionFieldsDialog } from "./entity-transition-fields-dialog";
-import { BulkStatusActionBar } from "./bulk-status-action-bar";
+import {
+  BulkStatusActionBar,
+  commonBulkTransitions,
+} from "./bulk-status-action-bar";
 import {
   buildDataTableColumns,
   buildSelectColumn,
@@ -101,10 +104,10 @@ import { ListSkeleton } from "@/components/ui/skeletons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search,
-  Inbox,
   LayoutList,
   Kanban as KanbanIcon,
 } from "lucide-react";
+import { EntityEmptyState } from "./entity-empty-state";
 import { cn } from "@/lib/utils";
 
 // =============================================================================
@@ -833,33 +836,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
     );
   }, [bulkDeleteAction, entity, selectedRows]);
 
-  // Check if selected rows have any common valid transitions
-  const hasValidBulkTransitions = useMemo(() => {
-    if (!entity.stateMachine || selectedRows.length === 0) return false;
-
-    const stateField = entity.stateMachine.stateField;
-    const transitions = entity.stateMachine.transitions;
-
-    // Get the set of current states for all selected rows
-    const currentStates = new Set(
-      selectedRows.map(
-        (row) => (row as Record<string, unknown>)[stateField] as string
-      )
-    );
-
-    // Find transitions valid for ALL selected items
-    let commonTargets: string[] | null = null;
-    for (const state of currentStates) {
-      const allowed = transitions[state] || [];
-      if (commonTargets === null) {
-        commonTargets = [...allowed];
-      } else {
-        commonTargets = commonTargets.filter((t) => allowed.includes(t));
-      }
-    }
-
-    return (commonTargets || []).length > 0;
-  }, [entity.stateMachine, selectedRows]);
+  // Whether the selection has any transition valid for every selected row.
+  // Uses the same helper BulkStatusActionBar renders its options from, so the
+  // bar is shown exactly when it has something to offer.
+  const hasValidBulkTransitions = useMemo(
+    () => commonBulkTransitions(entity, selectedRows).length > 0,
+    [entity, selectedRows]
+  );
 
   const handleBulkStatusChange = useCallback(
     async (targetStatus: string) => {
@@ -1168,51 +1151,13 @@ export function EntityDataTable<T = Record<string, unknown>>({
               ) : undefined
             }
             noResultsContent={
-              <div className="flex flex-col items-center justify-center gap-3 py-8">
-                {hasActiveFilters ? (
-                  <Search className="size-10 text-muted-foreground/30" />
-                ) : (
-                  <Inbox className="size-10 text-muted-foreground/30" />
-                )}
-                <div className="text-muted-foreground text-center">
-                  {hasActiveFilters ? (
-                    <>
-                      <p className="font-medium">
-                        No matching{" "}
-                        {entity.displayNamePlural.toLowerCase()}
-                      </p>
-                      <p className="text-sm">
-                        Try adjusting your search or filters
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-medium">
-                        No {entity.displayNamePlural.toLowerCase()} yet
-                      </p>
-                      <p className="text-sm">
-                        Get started by creating your first{" "}
-                        {entity.displayName.toLowerCase()}
-                      </p>
-                    </>
-                  )}
-                </div>
-                {showCreate && !hasActiveFilters && (
-                  <>
-                    {onCreateClick ? (
-                      <Button size="sm" onClick={onCreateClick}>
-                        Create {entity.displayName}
-                      </Button>
-                    ) : (
-                      <Button size="sm" asChild>
-                        <Link href={`${path}/new`}>
-                          Create {entity.displayName}
-                        </Link>
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+              <EntityEmptyState
+                entity={entity}
+                hasActiveFilters={!!hasActiveFilters}
+                showCreate={showCreate}
+                basePath={path}
+                onCreateClick={onCreateClick}
+              />
             }
           >
             <DataTableAdvancedToolbar>
