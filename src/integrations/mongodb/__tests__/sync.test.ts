@@ -450,7 +450,7 @@ describe("upsertRows error logging (via syncEntity('beer_styles'))", () => {
 // 00288 replay fixes
 // ---------------------------------------------------------------------------
 
-// Status preservation is a DB-side property since 00298: the RPCs'
+// Status preservation is a DB-side property since 00300: the RPCs'
 // ON CONFLICT update omits `status`, so existing rows keep their live value
 // with no app-side read-modify-write TOCTOU window (#855; previously fd60d58
 // for batches, #839 for vessels). App tests therefore pin the RPC name+args
@@ -595,7 +595,7 @@ describe("syncTransfers historical replay (via syncEntity)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Column-set coupling with 00298_sync_status_preserving_upserts.sql
+// Column-set coupling with 00300_sync_status_preserving_upserts.sql
 //
 // The RPCs' jsonb_to_recordset column lists are literal — a column the
 // transforms start emitting that isn't added to the migration is SILENTLY
@@ -603,21 +603,21 @@ describe("syncTransfers historical replay (via syncEntity)", () => {
 // moment a transform grows a column, forcing the migration edit.
 // ---------------------------------------------------------------------------
 
-describe("transform column sets mirrored in 00298", () => {
+describe("transform column sets mirrored in 00300", () => {
   // Parse the column lists out of the migration itself, so a transform column
   // added to this test but forgotten in the SQL still fails — a hand-copied
   // list here would go green while the RPC silently dropped the new column.
   const migrationSql = readFileSync(
     path.resolve(
       __dirname,
-      "../../../../supabase/migrations/00298_sync_status_preserving_upserts.sql"
+      "../../../../supabase/migrations/00300_sync_status_preserving_upserts.sql"
     ),
     "utf8"
   );
   function rpcColumns(fn: string): string[] {
     const body = migrationSql.split(`CREATE OR REPLACE FUNCTION ${fn}`)[1];
     const list = body?.match(/jsonb_to_recordset\(p_rows\) AS r\(([^)]*)\)/)?.[1];
-    if (!list) throw new Error(`recordset column list for ${fn} not found in 00298`);
+    if (!list) throw new Error(`recordset column list for ${fn} not found in 00300`);
     return list.split(",").map((c) => c.trim().split(/\s+/)[0]!);
   }
 
