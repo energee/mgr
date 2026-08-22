@@ -1,9 +1,9 @@
 {
- "commit": "c7c03c98614d573dee3f079a87b1ff57e257cf4c",
- "built_at": "2026-08-22T03:49:30.865Z",
+ "commit": "1465a7be2317dfd7fb82be9130c5d22cc611e33b",
+ "built_at": "2026-08-22T13:47:05.027Z",
  "inputs": {
-  "count": 1401,
-  "digest": "3a5b99ae2d5dab66"
+  "count": 1402,
+  "digest": "60339fda7f6bacdd"
  },
  "nodes": [
   {
@@ -11808,6 +11808,14 @@
    "type": "TEST",
    "description": "TEST at src/__tests__/integration/packaging-material-consumption.test.ts.",
    "file_path": "src/__tests__/integration/packaging-material-consumption.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/portal-cross-customer-rls.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/portal-cross-customer-rls.test.ts.",
+   "file_path": "src/__tests__/integration/portal-cross-customer-rls.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -53869,6 +53877,13 @@
    "predicate": "imports",
    "target": "src/test/whole-unit-parity-fixtures.ts",
    "file_path": "src/__tests__/integration/packaging-material-consumption.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/__tests__/integration/portal-cross-customer-rls.test.ts",
+   "predicate": "imports",
+   "target": "src/__tests__/integration/_helpers/role-client.ts",
+   "file_path": "src/__tests__/integration/portal-cross-customer-rls.test.ts",
    "extractor": "ast"
   },
   {
