@@ -672,5 +672,5 @@ Radix UI's Select component reserves empty string (`""`) for "no selection" stat
 ## Related Documents
 
 - [Decisions](./decisions.md) - Schema review decisions
-- [AI Integration](../AI.md) - AI assistance patterns
+- [AI Integration](./ai-integration.md) - AI assistance patterns
 - [Data Model](../data-model/) - Schema details

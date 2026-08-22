@@ -23,7 +23,6 @@ This directory contains the technical specification for MGR, a professional brew
 ## Related Documentation
 
 - **[Data Model](../data-model/)** - Database schema details (source of truth for tables)
-- **[Implementation Plan](../IMPLEMENTATION-PLAN.md)** - Phased task breakdown
 
 ## Document Conventions
 
