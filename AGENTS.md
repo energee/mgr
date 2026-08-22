@@ -29,7 +29,7 @@ Layered: static → unit → E2E. **No layer advances until the previous one is 
 | `make check` | 1+2 | **Required before every commit** — adds vitest + build |
 | `make check-all` | 1+2+3 | Before PR / merge — adds Playwright E2E |
 | `make verify-feature ID=F003` | per-feature | At any time (per [`docs/feature_list.json`](docs/feature_list.json)) |
-| `make check-db` | DB rules | Already part of `make check`; runs the SQL security checks alone |
+| `make check-db` | DB rules | Already part of `make check`; runs the migration-numbering and SQL security checks alone |
 | `make check-deploy-state` | tracker | Already part of `make check`; audits `migrations` / `deployment` in the feature tracker alone |
 
 Run `make help` to list every target.

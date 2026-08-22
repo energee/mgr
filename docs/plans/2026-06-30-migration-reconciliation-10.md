@@ -13,7 +13,7 @@ read or written by the replay gate.
 | Invariant | Meaning | State |
 |---|---|---|
 | **db-push-no-op** | every local `supabase/migrations/*.sql` version has a matching `supabase_migrations.schema_migrations` row | ⏳ **PENDING DEPLOYMENT** — this branch adds 00112 and 00254 and renumbers the duplicate 00252 to 00253 |
-| **recreatable-from-reset** | a fresh `supabase db reset` (apply all migrations from scratch) reproduces the intended schema | ✅ **DONE** — `make db-dry-run` replays the chain in real local Supabase and is a blocking PR job |
+| **recreatable-from-reset** | a fresh `supabase db reset` (apply all migrations from scratch) reproduces the intended schema | ✅ **DONE** — `make db-dry-run` replays the chain in real local Supabase (local only since 2026-08-21; the `Fresh Supabase Migration Replay` PR job was removed as duplicate signal — `E2E Tests` boots the same CLI) |
 
 These are independent. Push only checks *which versions are recorded*; reset actually *replays the DDL*.
 
@@ -48,9 +48,10 @@ lossless selling-format backfill.
 3. `00254_canonicalize_square_draft_sales.sql` backfills and removes the legacy
    `keg_type_id` column, replaces its dedup index, and proves a
    selling-format-only insert in a rolling-back verification block.
-4. `supabase/config.toml`, `scripts/migration-dry-run.sh`, and the
-   `Fresh Supabase Migration Replay` CI job make the real reset repeatable and
-   blocking. The plain-Postgres shim now supplies platform roles/functions
+4. `supabase/config.toml` and `scripts/migration-dry-run.sh` make the real
+   reset repeatable. It was also a blocking PR job at the time of writing;
+   that job was removed 2026-08-21 (see docs/agents/ci.md) — `E2E Tests` runs
+   the same `supabase start`. The plain-Postgres shim now supplies platform roles/functions
    only and can no longer hide missing application migrations.
 
 ### Verbatim-capture method (avoids paste corruption)
