@@ -64,6 +64,47 @@ type BulkStatusActionBarProps<T> = {
   bulkDeleteCount?: number;
 }
 
+/**
+ * Target states reachable from EVERY selected row — the intersection of each
+ * distinct current state's allowed transitions.
+ *
+ * Shared with entity-data-table, which gates the whole action bar on whether
+ * this is non-empty; keeping one implementation stops the bar from being shown
+ * for a selection that then renders "no common status transitions", or hidden
+ * for one that has them.
+ *
+ * Rows whose state field is absent contribute the state `undefined`, which no
+ * `transitions` map has a key for, so the intersection collapses to empty —
+ * the selection offers no bulk transition rather than an unvalidated one.
+ * Returns `[]` for an entity with no state machine or an empty selection.
+ */
+export function commonBulkTransitions<T>(
+  entity: EntityConfig<T>,
+  selectedRows: T[]
+): string[] {
+  if (!entity.stateMachine || selectedRows.length === 0) return [];
+
+  const stateField = entity.stateMachine.stateField;
+  const transitions = entity.stateMachine.transitions;
+
+  const currentStates = new Set(
+    selectedRows.map(
+      (row) => (row as Record<string, unknown>)[stateField] as string
+    )
+  );
+
+  let commonTargets: string[] | null = null;
+  for (const state of currentStates) {
+    const allowed = transitions[state] || [];
+    commonTargets =
+      commonTargets === null
+        ? [...allowed]
+        : commonTargets.filter((t) => allowed.includes(t));
+  }
+
+  return commonTargets ?? [];
+}
+
 export function BulkStatusActionBar<T>({
   entity,
   selectedRows,
@@ -77,34 +118,8 @@ export function BulkStatusActionBar<T>({
 
   // Compute valid bulk transitions for selected rows
   const bulkTransitionOptions = useMemo(() => {
-    if (!entity.stateMachine || selectedRows.length === 0) return [];
-
-    const stateField = entity.stateMachine.stateField;
-    const transitions = entity.stateMachine.transitions;
-
-    // Get the set of current states for all selected rows
-    const currentStates = new Set(
-      selectedRows.map(
-        (row) =>
-          (row as Record<string, unknown>)[stateField] as string
-      )
-    );
-
-    // Find transitions valid for ALL selected items
-    let commonTargets: string[] | null = null;
-    for (const state of currentStates) {
-      const allowed = transitions[state] || [];
-      if (commonTargets === null) {
-        commonTargets = [...allowed];
-      } else {
-        commonTargets = commonTargets.filter((t) =>
-          allowed.includes(t)
-        );
-      }
-    }
-
-    const requiresAction = entity.stateMachine.requiresAction;
-    return (commonTargets || []).map((state) => {
+    const requiresAction = entity.stateMachine?.requiresAction;
+    return commonBulkTransitions(entity, selectedRows).map((state) => {
       // Targets owned by a named action can't be bulk-applied — surface the
       // option disabled with a pointer to the per-record action instead.
       const requiredActionName = requiresAction?.[state];
