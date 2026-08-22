@@ -11,10 +11,10 @@
 -- IF EXISTS) because chain and live have drifted:
 --   - yeast_pitches.{batch_id, pitched_at, cell_count_billion} are CHAIN-ONLY
 --     (live dropped them out-of-band); guarded anyway for replay safety.
---   - recipes.boil_time_minutes is chain-only on paper (00001) but 00011
---     RENAMED it to boil_time_min, so it exists nowhere under the old name;
---     the IF EXISTS drop is a belt-and-suspenders no-op. boil_time_min itself
---     is ALIVE (recipe editor, MongoDB sync) and is NOT touched here.
+--   - recipes.boil_time_minutes (00001) needs no drop at all: 00011 RENAMED
+--     it to boil_time_min, so it exists nowhere under the old name — and
+--     boil_time_min itself is ALIVE (recipe editor, MongoDB sync) and is NOT
+--     touched here.
 --   - recipes.{ingredients, instructions} are DATA-BEARING on live (153/153
 --     rows non-NULL); their guard WILL fire on live until the operator
 --     exports and NULLs them (instructions in the RAISE message).
@@ -27,8 +27,7 @@
 --   yeast_pitches:  batch_id, pitched_at, cell_count_billion,
 --                   current_viability      (superseded by yeast_pitch_events, 00158)
 --   recipes:        ingredients, instructions (legacy JSONB),
---                   batch_size_gallons, style (TEXT next to style_id),
---                   boil_time_minutes (renamed away in 00011)
+--                   batch_size_gallons, style (TEXT next to style_id)
 --   order_items:    package_id             (vestigial schema-v1; FK already
 --                                           removed with packages in 00294)
 --   hops:           hsi, myrcene_percent, humulene_percent,
@@ -51,8 +50,9 @@
 --     around it (recreated verbatim from 00294).
 --   - recipes_with_cogs (00021)       — addition_cost was SUM(amount *
 --     additives.cost_per_unit); all cost_per_unit are NULL on live, so the
---     COALESCE always yielded 0. Column kept in the view as constant 0 for
---     shape compatibility.
+--     COALESCE always yielded 0. The column is removed outright — ref-count 0
+--     in src/ and in migration function bodies (get_sales_projection reads
+--     only total_cogs).
 --   - batch_additions_with_costs (00101) — same reasoning for the spices
 --     branch (amount * spices.cost_per_unit ≡ NULL → COALESCE 0).
 --   - order_items_with_details (00190) — loses the package_id passthrough.
@@ -78,106 +78,77 @@
 -- =============================================================================
 -- 0. Guards
 -- =============================================================================
-
--- 0a. All-NULL guard for every plainly-dead column.
+-- One loop over (table, column, meaningful-data predicate, custom message).
+-- predicate NULL → "column IS NOT NULL"; msg NULL → the generic "export
+-- before dropping" message. Each check is skipped when the column is already
+-- gone (live drift).
 DO $$
 DECLARE
-  _col RECORD;
+  _g RECORD;
   _has_data BOOLEAN;
 BEGIN
-  FOR _col IN
+  FOR _g IN
     SELECT * FROM (VALUES
-      ('yeast_pitches', 'batch_id'),
-      ('yeast_pitches', 'pitched_at'),
-      ('yeast_pitches', 'cell_count_billion'),
-      ('yeast_pitches', 'current_viability'),
-      ('recipes', 'batch_size_gallons'),
-      ('recipes', 'style'),
-      ('recipes', 'boil_time_minutes'),
-      ('order_items', 'package_id'),
-      ('hops', 'hsi'),
-      ('hops', 'myrcene_percent'),
-      ('hops', 'humulene_percent'),
-      ('hops', 'caryophyllene_percent'),
-      ('hops', 'farnesene_percent'),
-      ('hops', 'substitutes'),
-      ('malts', 'max_percentage'),
-      ('sugars', 'fermentability'),
-      ('fruits', 'sugar_content'),
-      ('spices', 'cost_per_unit'),
-      ('additives', 'cost_per_unit'),
-      ('recipe_yeasts', 'fermentation_temp_f')
-    ) AS t(tbl, col)
+      ('yeast_pitches', 'batch_id',           NULL, NULL),
+      ('yeast_pitches', 'pitched_at',         NULL, NULL),
+      ('yeast_pitches', 'cell_count_billion', NULL, NULL),
+      ('yeast_pitches', 'current_viability',  NULL, NULL),
+      -- recipes.ingredients / instructions are data-bearing on live; these
+      -- rows are EXPECTED to fire there until the operator archives the
+      -- legacy JSONB (runbook in the message). Fresh replays pass (empty).
+      ('recipes', 'ingredients',  NULL,
+       'recipes.ingredients still holds legacy JSONB data — export it first '
+       '(e.g. \copy (SELECT id, name, ingredients, instructions FROM recipes '
+       'WHERE ingredients IS NOT NULL OR instructions IS NOT NULL) TO recipes_legacy_jsonb.csv CSV HEADER), '
+       'archive the file, then UPDATE recipes SET ingredients = NULL, instructions = NULL '
+       'and re-run this migration (schema audit 2026-08-21, M1)'),
+      ('recipes', 'instructions', NULL,
+       'recipes.instructions still holds legacy JSONB data — export it first '
+       '(e.g. \copy (SELECT id, name, ingredients, instructions FROM recipes '
+       'WHERE ingredients IS NOT NULL OR instructions IS NOT NULL) TO recipes_legacy_jsonb.csv CSV HEADER), '
+       'archive the file, then UPDATE recipes SET ingredients = NULL, instructions = NULL '
+       'and re-run this migration (schema audit 2026-08-21, M1)'),
+      ('recipes', 'batch_size_gallons', NULL, NULL),
+      ('recipes', 'style',              NULL, NULL),
+      ('order_items', 'package_id',     NULL, NULL),
+      ('hops', 'hsi',                   NULL, NULL),
+      ('hops', 'myrcene_percent',       NULL, NULL),
+      ('hops', 'humulene_percent',      NULL, NULL),
+      ('hops', 'caryophyllene_percent', NULL, NULL),
+      ('hops', 'farnesene_percent',     NULL, NULL),
+      ('hops', 'substitutes',           NULL, NULL),
+      ('malts', 'max_percentage',       NULL, NULL),
+      ('sugars', 'fermentability',      NULL, NULL),
+      ('fruits', 'sugar_content',       NULL, NULL),
+      ('spices', 'cost_per_unit',       NULL, NULL),
+      ('additives', 'cost_per_unit',    NULL, NULL),
+      -- 0.75 is the literal column DEFAULT from 00016: on live every row
+      -- carries it (default noise, not data), so only a different value is
+      -- meaningful.
+      ('recipe_yeasts', 'pitch_rate',
+       'pitch_rate IS NOT NULL AND pitch_rate <> 0.75',
+       'recipe_yeasts.pitch_rate has values other than the 0.75 default — export before dropping (schema audit 2026-08-21, M1)'),
+      ('recipe_yeasts', 'fermentation_temp_f', NULL, NULL)
+    ) AS t(tbl, col, predicate, msg)
   LOOP
     IF EXISTS (
       SELECT 1 FROM information_schema.columns
       WHERE table_schema = 'public'
-        AND table_name = _col.tbl
-        AND column_name = _col.col
+        AND table_name = _g.tbl
+        AND column_name = _g.col
     ) THEN
       EXECUTE format(
-        'SELECT EXISTS (SELECT 1 FROM public.%I WHERE %I IS NOT NULL LIMIT 1)',
-        _col.tbl, _col.col
+        'SELECT EXISTS (SELECT 1 FROM public.%I WHERE %s LIMIT 1)',
+        _g.tbl, COALESCE(_g.predicate, format('%I IS NOT NULL', _g.col))
       ) INTO STRICT _has_data;
       IF _has_data THEN
-        RAISE EXCEPTION
-          '%.% has non-NULL values — export before dropping (schema audit 2026-08-21, M1)',
-          _col.tbl, _col.col;
+        RAISE EXCEPTION USING MESSAGE = COALESCE(
+          _g.msg,
+          format('%s.%s has non-NULL values — export before dropping (schema audit 2026-08-21, M1)',
+                 _g.tbl, _g.col));
       END IF;
     END IF;
   END LOOP;
-END $$;
-
--- 0b. recipes.ingredients / recipes.instructions — data-bearing on live.
---     This guard is EXPECTED to fire on live until the operator archives the
---     legacy JSONB; on a fresh chain replay the table is empty and it passes.
-DO $$
-DECLARE
-  _col TEXT;
-  _has_data BOOLEAN;
-BEGIN
-  FOREACH _col IN ARRAY ARRAY['ingredients', 'instructions'] LOOP
-    IF EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'recipes'
-        AND column_name = _col
-    ) THEN
-      EXECUTE format(
-        'SELECT EXISTS (SELECT 1 FROM public.recipes WHERE %I IS NOT NULL LIMIT 1)',
-        _col
-      ) INTO STRICT _has_data;
-      IF _has_data THEN
-        RAISE EXCEPTION USING MESSAGE = format(
-          'recipes.%s still holds legacy JSONB data — export it first '
-          '(e.g. \copy (SELECT id, name, ingredients, instructions FROM recipes '
-          'WHERE ingredients IS NOT NULL OR instructions IS NOT NULL) TO recipes_legacy_jsonb.csv CSV HEADER), '
-          'archive the file, then UPDATE recipes SET ingredients = NULL, instructions = NULL '
-          'and re-run this migration (schema audit 2026-08-21, M1)', _col);
-      END IF;
-    END IF;
-  END LOOP;
-END $$;
-
--- 0c. recipe_yeasts.pitch_rate — on live every row equals the DEFAULT 0.75
---     from 00016 (default noise, not data). Fire only on a real value.
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'recipe_yeasts'
-      AND column_name = 'pitch_rate'
-  ) THEN
-    IF EXISTS (
-      SELECT 1 FROM public.recipe_yeasts
-      WHERE pitch_rate IS NOT NULL AND pitch_rate <> 0.75
-      LIMIT 1
-    ) THEN
-      RAISE EXCEPTION
-        'recipe_yeasts.pitch_rate has values other than the 0.75 default — export before dropping (schema audit 2026-08-21, M1)';
-    END IF;
-  END IF;
 END $$;
 
 -- =============================================================================
@@ -207,8 +178,7 @@ ALTER TABLE recipes
   DROP COLUMN IF EXISTS ingredients,
   DROP COLUMN IF EXISTS instructions,
   DROP COLUMN IF EXISTS batch_size_gallons,
-  DROP COLUMN IF EXISTS style,
-  DROP COLUMN IF EXISTS boil_time_minutes;
+  DROP COLUMN IF EXISTS style;
 
 ALTER TABLE order_items
   DROP COLUMN IF EXISTS package_id;
@@ -420,10 +390,11 @@ LEFT JOIN blended_in bi ON bi.batch_id = b.id;
 
 COMMENT ON VIEW batches_with_blend_info IS 'Per-batch blend data: volume blended away, available volume, and weighted estimates from source batches blended in.';
 
--- ---- recipes_with_cogs (from 00021, addition_cost now constant 0) -----------
+-- ---- recipes_with_cogs (from 00021, minus addition_cost) --------------------
 -- additives.cost_per_unit was NULL on every live row, so the old
--- SUM(ra.amount * COALESCE(ad.cost_per_unit, 0)) always produced 0; the
--- column is kept as a constant for view-shape compatibility.
+-- SUM(ra.amount * COALESCE(ad.cost_per_unit, 0)) always produced 0. The
+-- column has no consumers (src/ ref-count 0; get_sales_projection reads only
+-- total_cogs), so it is removed rather than kept as a constant.
 CREATE VIEW recipes_with_cogs
 WITH (security_invoker = true)
 AS
@@ -464,7 +435,6 @@ recipe_totals AS (
     COALESCE(hc.hop_cost, 0) as hop_cost,
     COALESCE(y.cost_per_unit, 0) as yeast_cost,
     COALESCE(ac.adjunct_cost, 0) as adjunct_cost,
-    0::numeric as addition_cost,
     COALESCE(mc.total_grain_lbs, 0) as total_grain_lbs,
     COALESCE(hc.total_hop_oz, 0) as total_hop_oz
   FROM recipes r
@@ -483,11 +453,10 @@ SELECT
   ROUND(hop_cost::numeric, 2) as hop_cost,
   ROUND(yeast_cost::numeric, 2) as yeast_cost,
   ROUND(adjunct_cost::numeric, 2) as adjunct_cost,
-  ROUND(addition_cost::numeric, 2) as addition_cost,
-  ROUND((malt_cost + hop_cost + yeast_cost + adjunct_cost + addition_cost)::numeric, 2) as total_cogs,
+  ROUND((malt_cost + hop_cost + yeast_cost + adjunct_cost)::numeric, 2) as total_cogs,
   CASE
     WHEN COALESCE(batch_size_bbl, volume_bbl, 0) > 0 THEN
-      ROUND((malt_cost + hop_cost + yeast_cost + adjunct_cost + addition_cost)
+      ROUND((malt_cost + hop_cost + yeast_cost + adjunct_cost)
         / COALESCE(batch_size_bbl, volume_bbl)::numeric, 2)
     ELSE NULL
   END as cogs_per_bbl,
@@ -495,7 +464,7 @@ SELECT
   ROUND(total_hop_oz::numeric, 1) as total_hop_oz
 FROM recipe_totals;
 
-COMMENT ON VIEW recipes_with_cogs IS 'Recipe cost breakdown by ingredient category. addition_cost is constant 0 since 00297 (additives.cost_per_unit dropped — was never populated).';
+COMMENT ON VIEW recipes_with_cogs IS 'Recipe cost breakdown by ingredient category. addition_cost removed in 00297 (additives.cost_per_unit dropped — was never populated and had no consumers).';
 
 -- ---- batch_additions_with_costs (from 00101, minus the spices cost branch) --
 -- spices.cost_per_unit was NULL on every live row, so the spices branch
@@ -648,17 +617,21 @@ SET description = 'Beer recipes: targets and process parameters. Ingredients liv
     updated_at = NOW()
 WHERE table_name = 'recipes';
 
+-- Pure element removals below use the jsonb `-` idiom (array minus string
+-- element, or object minus key) instead of whole-value overwrites, so any
+-- out-of-band registry edits on live survive the apply.
+
 -- recipe_yeasts key_fields (00145) advertised the dropped pitch_rate.
 UPDATE _schema_registry
-SET key_fields = '["recipe_id", "yeast_id", "is_primary", "quantity"]'::jsonb,
+SET key_fields = key_fields - 'pitch_rate',
     updated_at = NOW()
 WHERE table_name = 'recipe_yeasts';
 
--- yeast_pitches (00035) advertised batch_id in both relationships and
--- key_fields (relationships here is a jsonb object keyed by related table).
+-- yeast_pitches (00035) advertised batch_id in both relationships (a jsonb
+-- object keyed by related table) and key_fields (an array).
 UPDATE _schema_registry
 SET relationships = relationships - 'batches',
-    key_fields = '["id", "strain_id", "source_type", "status", "generation"]'::jsonb,
+    key_fields = key_fields - 'batch_id',
     updated_at = NOW()
 WHERE table_name = 'yeast_pitches';
 
@@ -669,14 +642,14 @@ WHERE table_name = 'yeast_pitches_with_details';
 -- order_items relationships (00001) still advertised belongs_to: packages
 -- via the dropped package_id.
 UPDATE _schema_registry
-SET relationships = '["belongs_to: orders", "belongs_to: batches", "belongs_to: brands", "belongs_to: selling_formats"]'::jsonb,
+SET relationships = relationships - 'belongs_to: packages',
     updated_at = NOW()
 WHERE table_name = 'order_items';
 
 -- batches relationships (00005) still advertised has_many: packages — the
 -- table itself was dropped in 00294; corrected here.
 UPDATE _schema_registry
-SET relationships = '["belongs_to: recipes", "has_many: batch_logs", "has_many_through: brew_logs (via brew_log_batches)"]'::jsonb,
+SET relationships = relationships - 'has_many: packages',
     updated_at = NOW()
 WHERE table_name = 'batches';
 

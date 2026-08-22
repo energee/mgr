@@ -300,7 +300,6 @@ Detailed recipe cost breakdown by ingredient category. Use this view when you ne
 | hop_cost | DECIMAL(10,2) | Total hop cost |
 | yeast_cost | DECIMAL(10,2) | Yeast cost (from yeasts.cost_per_unit) |
 | adjunct_cost | DECIMAL(10,2) | Total adjunct cost |
-| addition_cost | DECIMAL(10,2) | Constant 0 since 00297 (additives.cost_per_unit dropped — was never populated); column kept for view-shape compatibility |
 | total_cogs | DECIMAL(10,2) | Sum of all ingredient costs |
 | cogs_per_bbl | DECIMAL(10,2) | Total COGS / batch_size_bbl (or volume_bbl) |
 | total_grain_lbs | DECIMAL(10,1) | Total grain weight for reference |
@@ -310,7 +309,7 @@ Detailed recipe cost breakdown by ingredient category. Use this view when you ne
 - Malt cost: `weight_lbs * malts.cost_per_lb`
 - Hop cost: Converts oz to lbs (`weight_oz / 16.0 * hops.cost_per_lb`)
 - Adjunct cost: `amount_lbs * adjuncts.cost_per_lb`
-- Addition cost: constant 0 (the `additives.cost_per_unit` column was dropped in 00297)
+- Addition cost: removed in 00297 (`additives.cost_per_unit` dropped — was never populated and had no consumers)
 - COGS per BBL: Uses `batch_size_bbl` if available, otherwise `volume_bbl`. Returns NULL if both are zero/null.
 - All costs default to 0 if ingredient has no cost data
 

@@ -14,8 +14,9 @@
 -- constraint cannot be NOT VALID — locations is a tiny table, so the index
 -- build under lock is negligible.
 --
--- All CHECKs use strict > 0 (audit wording: "positivity"). NULL passes a
--- CHECK, so nullable columns (e.g. session_line_items.planned_quantity /
+-- CHECKs use strict > 0 (audit wording: "positivity") except where 0 is a
+-- documented state (see the actual_quantity row). NULL passes a CHECK, so
+-- nullable columns (e.g. session_line_items.planned_quantity /
 -- .actual_quantity, nullable — INTEGER in 00010, NUMERIC since 00288) still
 -- admit NULL; only zero and negative values are rejected.
 --
@@ -29,151 +30,81 @@
 --   directions; nothing to add.
 
 -- =============================================================================
--- 1. Positivity CHECKs — production volumes
+-- 1. CHECK constraints — one loop over (table, constraint name, expression)
 -- =============================================================================
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'chk_vessel_transfers_volume_positive'
-      AND conrelid = 'vessel_transfers'::regclass
-  ) THEN
-    ALTER TABLE vessel_transfers
-      ADD CONSTRAINT chk_vessel_transfers_volume_positive
-      CHECK (volume_bbl > 0) NOT VALID;
-  END IF;
-END;
-$$;
-
-ALTER TABLE vessel_transfers VALIDATE CONSTRAINT chk_vessel_transfers_volume_positive;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'chk_brew_log_batches_volume_positive'
-      AND conrelid = 'brew_log_batches'::regclass
-  ) THEN
-    ALTER TABLE brew_log_batches
-      ADD CONSTRAINT chk_brew_log_batches_volume_positive
-      CHECK (volume_bbl > 0) NOT VALID;
-  END IF;
-END;
-$$;
-
-ALTER TABLE brew_log_batches VALIDATE CONSTRAINT chk_brew_log_batches_volume_positive;
-
--- =============================================================================
--- 2. Positivity CHECKs — packaging / purchasing / transfer quantities
--- =============================================================================
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'chk_session_line_items_planned_quantity_positive'
-      AND conrelid = 'session_line_items'::regclass
-  ) THEN
-    ALTER TABLE session_line_items
-      ADD CONSTRAINT chk_session_line_items_planned_quantity_positive
-      CHECK (planned_quantity > 0) NOT VALID;
-  END IF;
-END;
-$$;
-
-ALTER TABLE session_line_items VALIDATE CONSTRAINT chk_session_line_items_planned_quantity_positive;
-
--- actual_quantity admits 0, not just NULL: "planned but nothing produced" is
--- a real state — create_finished_goods_from_packaging (00232) explicitly
--- SKIPs zero-actual lines on session completion, and
--- packaging-completion-trigger.test.ts asserts that semantics. Only negative
--- actuals are invalid.
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'chk_session_line_items_actual_quantity_nonneg'
-      AND conrelid = 'session_line_items'::regclass
-  ) THEN
-    ALTER TABLE session_line_items
-      ADD CONSTRAINT chk_session_line_items_actual_quantity_nonneg
-      CHECK (actual_quantity >= 0) NOT VALID;
-  END IF;
-END;
-$$;
-
-ALTER TABLE session_line_items VALIDATE CONSTRAINT chk_session_line_items_actual_quantity_nonneg;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'chk_po_receives_quantity_positive'
-      AND conrelid = 'po_receives'::regclass
-  ) THEN
-    ALTER TABLE po_receives
-      ADD CONSTRAINT chk_po_receives_quantity_positive
-      CHECK (quantity > 0) NOT VALID;
-  END IF;
-END;
-$$;
-
-ALTER TABLE po_receives VALIDATE CONSTRAINT chk_po_receives_quantity_positive;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'chk_transfer_lines_quantity_positive'
-      AND conrelid = 'transfer_lines'::regclass
-  ) THEN
-    ALTER TABLE transfer_lines
-      ADD CONSTRAINT chk_transfer_lines_quantity_positive
-      CHECK (quantity > 0) NOT VALID;
-  END IF;
-END;
-$$;
-
-ALTER TABLE transfer_lines VALIDATE CONSTRAINT chk_transfer_lines_quantity_positive;
-
--- =============================================================================
--- 3. Positivity CHECKs — recipe ingredient junction amounts (00011 tables)
--- =============================================================================
--- Enumerated from 00011_catalog_and_recipe_junction.sql: recipe_malts /
--- recipe_adjuncts / recipe_sugars use weight_lbs, recipe_hops uses weight_oz,
--- recipe_spices / recipe_fruits / recipe_additions use amount.
--- (recipe_collaborators, also created there, was dropped in 00294.)
+-- Rows, in audit-bundle order:
+--   - Production volumes: vessel_transfers / brew_log_batches volume_bbl.
+--   - Packaging / purchasing / transfer quantities. actual_quantity admits
+--     0, not just NULL: "planned but nothing produced" is a real state —
+--     create_finished_goods_from_packaging (00232) explicitly SKIPs
+--     zero-actual lines on session completion, and
+--     packaging-completion-trigger.test.ts asserts that semantics. Only
+--     negative actuals are invalid.
+--   - Recipe ingredient junction amounts, enumerated from
+--     00011_catalog_and_recipe_junction.sql: recipe_malts / recipe_adjuncts /
+--     recipe_sugars use weight_lbs, recipe_hops uses weight_oz,
+--     recipe_spices / recipe_fruits / recipe_additions use amount.
+--     (recipe_collaborators, also created there, was dropped in 00294.)
+--   - batch_logs.log_type: 00001 documents status_change / measurement /
+--     note in a comment but never enforced it. Every writer (readings page,
+--     chat write route, MongoDB sync transformers, sync_batch_readings_atomic
+--     in 00258) emits 'measurement' today; the constraint allows exactly the
+--     three documented values so the other two remain usable without a
+--     migration.
 DO $$
 DECLARE
-  _t RECORD;
+  _c RECORD;
 BEGIN
-  FOR _t IN
+  FOR _c IN
     SELECT * FROM (VALUES
-      ('recipe_malts',     'weight_lbs', 'chk_recipe_malts_weight_positive'),
-      ('recipe_hops',      'weight_oz',  'chk_recipe_hops_weight_positive'),
-      ('recipe_adjuncts',  'weight_lbs', 'chk_recipe_adjuncts_weight_positive'),
-      ('recipe_sugars',    'weight_lbs', 'chk_recipe_sugars_weight_positive'),
-      ('recipe_spices',    'amount',     'chk_recipe_spices_amount_positive'),
-      ('recipe_fruits',    'amount',     'chk_recipe_fruits_amount_positive'),
-      ('recipe_additions', 'amount',     'chk_recipe_additions_amount_positive')
-    ) AS t(tbl, col, con)
+      ('vessel_transfers',   'chk_vessel_transfers_volume_positive',
+       'volume_bbl > 0'),
+      ('brew_log_batches',   'chk_brew_log_batches_volume_positive',
+       'volume_bbl > 0'),
+      ('session_line_items', 'chk_session_line_items_planned_quantity_positive',
+       'planned_quantity > 0'),
+      -- >= 0, not > 0: zero-actual lines are valid (00232 skip semantics).
+      ('session_line_items', 'chk_session_line_items_actual_quantity_nonneg',
+       'actual_quantity >= 0'),
+      ('po_receives',        'chk_po_receives_quantity_positive',
+       'quantity > 0'),
+      ('transfer_lines',     'chk_transfer_lines_quantity_positive',
+       'quantity > 0'),
+      ('recipe_malts',       'chk_recipe_malts_weight_positive',
+       'weight_lbs > 0'),
+      ('recipe_hops',        'chk_recipe_hops_weight_positive',
+       'weight_oz > 0'),
+      ('recipe_adjuncts',    'chk_recipe_adjuncts_weight_positive',
+       'weight_lbs > 0'),
+      ('recipe_sugars',      'chk_recipe_sugars_weight_positive',
+       'weight_lbs > 0'),
+      ('recipe_spices',      'chk_recipe_spices_amount_positive',
+       'amount > 0'),
+      ('recipe_fruits',      'chk_recipe_fruits_amount_positive',
+       'amount > 0'),
+      ('recipe_additions',   'chk_recipe_additions_amount_positive',
+       'amount > 0'),
+      ('batch_logs',         'chk_batch_logs_log_type',
+       'log_type IN (''status_change'', ''measurement'', ''note'')')
+    ) AS t(tbl, con, expr)
   LOOP
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint
-      WHERE conname = _t.con
-        AND conrelid = _t.tbl::regclass
+      WHERE conname = _c.con
+        AND conrelid = _c.tbl::regclass
     ) THEN
       EXECUTE format(
-        'ALTER TABLE %I ADD CONSTRAINT %I CHECK (%I > 0) NOT VALID',
-        _t.tbl, _t.con, _t.col
+        'ALTER TABLE %I ADD CONSTRAINT %I CHECK (%s) NOT VALID',
+        _c.tbl, _c.con, _c.expr
       );
     END IF;
-    EXECUTE format('ALTER TABLE %I VALIDATE CONSTRAINT %I', _t.tbl, _t.con);
+    EXECUTE format('ALTER TABLE %I VALIDATE CONSTRAINT %I', _c.tbl, _c.con);
   END LOOP;
 END;
 $$;
 
 -- =============================================================================
--- 4. locations — UNIQUE(name)
+-- 2. locations — UNIQUE(name)
 -- =============================================================================
 -- Live checked 2026-08-21: no duplicate names. UNIQUE cannot be added
 -- NOT VALID; locations is tiny, so the lock window is negligible.
@@ -189,27 +120,3 @@ BEGIN
   END IF;
 END;
 $$;
-
--- =============================================================================
--- 5. batch_logs.log_type — CHECK on the documented value set
--- =============================================================================
--- 00001 documents status_change / measurement / note in a comment but never
--- enforced it. Every writer (readings page, chat write route, MongoDB sync
--- transformers, sync_batch_readings_atomic in 00258) emits 'measurement'
--- today; the constraint allows exactly the three documented values so the
--- other two remain usable without a migration.
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'chk_batch_logs_log_type'
-      AND conrelid = 'batch_logs'::regclass
-  ) THEN
-    ALTER TABLE batch_logs
-      ADD CONSTRAINT chk_batch_logs_log_type
-      CHECK (log_type IN ('status_change', 'measurement', 'note')) NOT VALID;
-  END IF;
-END;
-$$;
-
-ALTER TABLE batch_logs VALIDATE CONSTRAINT chk_batch_logs_log_type;
