@@ -91,7 +91,7 @@ docs/
   plans/                 # Implementation plans
 
 supabase/
-  migrations/            # Numbered SQL migrations (00001–00266)
+  migrations/            # Numbered SQL migrations (00001–00300)
 ```
 
 ## Commands
