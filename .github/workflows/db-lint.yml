@@ -14,8 +14,11 @@ name: Database Security Lint
 # workflow runs unconditionally.
 #
 # Running it everywhere is affordable: measured on PR #790 (2026-08-12) this
-# workflow finishes in ~3m13s while `E2E Tests` in test.yml takes ~5m50s on
-# every PR regardless. db-lint is therefore never the critical path, and
+# workflow finished in ~3m13s while `E2E Tests` in test.yml takes ~5m50s on
+# every PR regardless. (That figure is PRE-removal wall clock for a two-job
+# workflow whose long pole was `supabase-reset`; the surviving `db-lint` job
+# is faster. Re-measure before citing it as current.) db-lint is therefore
+# never the critical path, and
 # Actions minutes are free on this public repo. That measurement is the whole
 # reason there is no shim here: an always-reporting gate job around a filtered
 # heavy lane was built first (+157 lines) and discarded in favour of deleting
@@ -29,8 +32,16 @@ name: Database Security Lint
 # context, and on PR #878 all it produced was a second red X for a failure
 # `E2E Tests` had already reported. The one thing it caught that the psql loop
 # cannot — a duplicate `NNNNN_` version prefix colliding in
-# supabase_migrations.schema_migrations — is now caught statically by
-# `make check-db`, before the push, and still by `e2e`'s CLI boot after it.
+# supabase_migrations.schema_migrations — is now also caught statically by
+# `make check-db` (scripts/check-migration-numbers.sh), and still by `e2e`'s
+# CLI boot.
+#
+# Note what neither the old job nor the new guard prevents: two in-flight PRs
+# each adding their own 00297 both pass, because neither tree contains the
+# other's file, and nothing here runs on push to `main`. The collision is only
+# visible on a tree holding both. Preventing that race needs branches required
+# to be up to date before merge (strict required status checks, or a merge
+# queue) — not enabled on this repository as of 2026-08-21.
 on:
   pull_request:
   workflow_dispatch:

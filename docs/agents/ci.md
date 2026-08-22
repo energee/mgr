@@ -540,7 +540,13 @@ rule type `required_status_checks`). The strings are the **job `name:` values**
   `supabase_migrations.schema_migrations` but is fine as raw SQL — moved to
   `make check-db`, which catches it before the push; `E2E Tests` still catches
   it after, since it boots the same CLI. `make db-dry-run` remains for local
-  use.
+  use. **What neither prevents:** two in-flight PRs each adding their own
+  `00297` both pass — neither tree contains the other's file, and no workflow
+  here runs on push to `main`. The collision only exists on a tree holding
+  both, so it surfaces once the second branch is brought up to date. Closing
+  the race outright needs branches required to be up to date before merge
+  (strict required status checks, or a merge queue); not enabled as of
+  2026-08-21.
 - `Shell Syntax and ShellCheck` (`shell-lint.yml`) is still path-filtered at
   `on:` (`scripts/**`) and therefore still ineligible. It was left that way on
   purpose: it lints one directory, its findings are cheap to notice as a red X,
