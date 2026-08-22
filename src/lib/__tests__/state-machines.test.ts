@@ -24,8 +24,9 @@ import { allocationEntity } from "@/entities/allocation";
 import { brewLogEntity } from "@/entities/brew-log";
 import { pickListEntity } from "@/entities/pick-list";
 import { recipeEntity } from "@/entities/recipe";
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import { deliveryEntity } from "@/entities/delivery";
+import { existsSync, readdirSync, readFileSync } from "fs";
+import { join, resolve } from "path";
 
 // =============================================================================
 // Test Helper
@@ -447,38 +448,74 @@ describe("State Machine Validation", () => {
 
   describe("SQL and TypeScript state machine sync", () => {
     /**
-     * Parses the get_state_transitions() SQL function to extract the JSONB
-     * transition maps for each table. Returns a map of table_name to transitions.
+     * `get_state_transitions()` is redefined by several migrations
+     * (`CREATE OR REPLACE`), so only the LAST definition in migration order is
+     * the one Postgres actually runs. Pinning this test to a single filename is
+     * how it silently rots: an earlier revision of this suite read
+     * `00143_server_side_state_machine.sql` and therefore kept passing while two
+     * later migrations replaced the function underneath it.
+     *
+     * Migration filenames are zero-padded (`00XXX_*.sql`), so a lexicographic
+     * sort is also the numeric apply order.
      */
-    function parseSqlTransitions(): Record<string, Record<string, string[]>> {
-      const sqlPath = resolve(
-        __dirname,
-        "../../../supabase/migrations/00143_server_side_state_machine.sql"
-      );
-      const sql = readFileSync(sqlPath, "utf-8");
+    const MIGRATIONS_DIR = resolve(__dirname, "../../../supabase/migrations");
 
-      // Extract the body of get_state_transitions between BEGIN and END
-      const fnMatch = sql.match(
-        /CREATE OR REPLACE FUNCTION get_state_transitions[\s\S]*?BEGIN([\s\S]*?)END;\s*\$\$/
-      );
-      if (!fnMatch) {
-        throw new Error("Could not find get_state_transitions function body in SQL");
-      }
-      const fnBody = fnMatch[1];
+    /** Matches every `CREATE OR REPLACE FUNCTION get_state_transitions ... END; $$` body. */
+    const FN_BODY_PATTERN =
+      /CREATE OR REPLACE FUNCTION get_state_transitions[\s\S]*?BEGIN([\s\S]*?)END;\s*\$\$/g;
 
-      // Match each WHEN clause: WHEN 'table_name' THEN '{...}'::JSONB
-      const whenPattern = /WHEN\s+'(\w+)'\s+THEN\s+'(\{[^}]*(?:\{[^}]*\}[^}]*)*\})'\s*::JSONB/g;
+    /** Matches each `WHEN 'table_name' THEN '{...}'::JSONB` arm of the CASE. */
+    const WHEN_PATTERN =
+      /WHEN\s+'(\w+)'\s+THEN\s+'(\{[^}]*(?:\{[^}]*\}[^}]*)*\})'\s*::JSONB/g;
+
+    type SqlDefinition = {
+      /** Migration file the winning definition came from. */
+      file: string;
+      /** table_name -> (state -> allowed target states). */
+      transitions: Record<string, Record<string, string[]>>;
+    };
+
+    /** Extracts the `WHEN ... THEN ...` transition maps out of one function body. */
+    function parseWhenClauses(fnBody: string): Record<string, Record<string, string[]>> {
       const result: Record<string, Record<string, string[]>> = {};
-
-      let match;
-      while ((match = whenPattern.exec(fnBody)) !== null) {
-        const tableName = match[1];
-        const jsonStr = match[2];
-        result[tableName] = JSON.parse(jsonStr);
+      for (const match of fnBody.matchAll(WHEN_PATTERN)) {
+        result[match[1]] = JSON.parse(match[2]);
       }
-
       return result;
     }
+
+    /**
+     * Scans every migration in apply order and returns the last (winning)
+     * definition of `get_state_transitions()`, plus every file that defines it.
+     */
+    function findWinningDefinition(): { winner: SqlDefinition; definingFiles: string[] } {
+      const files = readdirSync(MIGRATIONS_DIR)
+        .filter((f) => f.endsWith(".sql"))
+        .sort();
+
+      const definingFiles: string[] = [];
+      let winner: SqlDefinition | null = null;
+
+      for (const file of files) {
+        const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
+        const bodies = [...sql.matchAll(FN_BODY_PATTERN)];
+        if (bodies.length === 0) continue;
+
+        definingFiles.push(file);
+        // Last definition within the file wins too.
+        winner = { file, transitions: parseWhenClauses(bodies[bodies.length - 1][1]) };
+      }
+
+      if (!winner) {
+        throw new Error(
+          `No CREATE OR REPLACE FUNCTION get_state_transitions found in ${MIGRATIONS_DIR}`
+        );
+      }
+      return { winner, definingFiles };
+    }
+
+    const { winner, definingFiles } = findWinningDefinition();
+    const sqlTransitions = winner.transitions;
 
     /** Maps SQL table names to their TypeScript entity configs. */
     const tableToEntity: Record<string, { name: string; transitions: Record<string, string[]> }> = {
@@ -490,18 +527,117 @@ describe("State Machine Validation", () => {
       allocations: { name: "allocationEntity", transitions: allocationEntity.stateMachine!.transitions },
       pick_lists: { name: "pickListEntity", transitions: pickListEntity.stateMachine!.transitions },
       recipes: { name: "recipeEntity", transitions: recipeEntity.stateMachine!.transitions },
+      deliveries: { name: "deliveryEntity", transitions: deliveryEntity.stateMachine!.transitions },
     };
 
-    const sqlTransitions = parseSqlTransitions();
+    /**
+     * Stateful entities deliberately NOT enforced in the database: they have a
+     * `stateMachine` in TypeScript but no arm in `get_state_transitions()`.
+     * Listed explicitly so that adding a new stateful entity forces a conscious
+     * decision about server-side enforcement instead of silently defaulting to
+     * "client-only".
+     */
+    const TS_ONLY_STATEFUL_ENTITIES = [
+      "location-transfer",
+      "user-profile",
+      "vessel",
+      "yeast-pitch",
+    ];
 
-    it("SQL file contains transition maps for all expected tables", () => {
-      const expectedTables = Object.keys(tableToEntity);
-      for (const table of expectedTables) {
+    it("resolves the winning get_state_transitions() definition, not a stale one", () => {
+      // Guards the exact defect this suite used to have: reading the FIRST
+      // definition instead of the last one that actually applies.
+      expect(definingFiles.length).toBeGreaterThan(1);
+      expect(winner.file).toBe(definingFiles[definingFiles.length - 1]);
+      expect(Object.keys(sqlTransitions).length).toBeGreaterThan(0);
+    });
+
+    it("SQL contains transition maps for all expected tables", () => {
+      for (const table of Object.keys(tableToEntity)) {
         expect(
           sqlTransitions,
-          `SQL is missing transition map for table "${table}"`
+          `SQL (${winner.file}) is missing a transition map for table "${table}"`
         ).toHaveProperty(table);
       }
+    });
+
+    it("every table in SQL is mapped to a TypeScript entity", () => {
+      for (const table of Object.keys(sqlTransitions)) {
+        expect(
+          Object.keys(tableToEntity),
+          `SQL (${winner.file}) defines transitions for "${table}" but no TypeScript entity is mapped to it`
+        ).toContain(table);
+      }
+    });
+
+    it("every stateful entity is either DB-enforced or explicitly TS-only", () => {
+      const dbEnforced = Object.values(tableToEntity).map((e) => e.name);
+      const entitiesDir = resolve(__dirname, "../../entities");
+      const stateful = readdirSync(entitiesDir, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name)
+        .filter((name) => {
+          // Every entity directory carries a core.ts (AGENTS.md constraint 15);
+          // skip support dirs like __tests__ that don't.
+          const corePath = join(entitiesDir, name, "core.ts");
+          if (!existsSync(corePath)) return false;
+          return readFileSync(corePath, "utf-8").includes("stateMachine:");
+        });
+
+      for (const dir of stateful) {
+        // e.g. "purchase-order" -> "purchaseOrderEntity"
+        const entityName =
+          dir.replace(/-(\w)/g, (_, c: string) => c.toUpperCase()) + "Entity";
+        if (dbEnforced.includes(entityName)) continue;
+        expect(
+          TS_ONLY_STATEFUL_ENTITIES,
+          `Entity "${dir}" has a stateMachine but is neither mapped to a SQL table nor listed in TS_ONLY_STATEFUL_ENTITIES. Decide whether it needs server-side enforcement.`
+        ).toContain(dir);
+      }
+    });
+
+    type TransitionMap = Record<string, string[]>;
+
+    /**
+     * Returns a human-readable discrepancy for every state whose allowed target
+     * set differs between the SQL map and the TypeScript map. Empty array means
+     * the two sides agree exactly.
+     */
+    function diffTransitionMaps(sqlMap: TransitionMap, tsMap: TransitionMap): string[] {
+      const problems: string[] = [];
+      for (const state of new Set([...Object.keys(sqlMap), ...Object.keys(tsMap)])) {
+        const inSql = state in sqlMap;
+        const inTs = state in tsMap;
+        if (!inTs) {
+          problems.push(`state "${state}" exists in SQL but not in TypeScript`);
+          continue;
+        }
+        if (!inSql) {
+          problems.push(`state "${state}" exists in TypeScript but not in SQL`);
+          continue;
+        }
+        const sqlTargets = [...sqlMap[state]].sort();
+        const tsTargets = [...tsMap[state]].sort();
+        if (JSON.stringify(sqlTargets) !== JSON.stringify(tsTargets)) {
+          problems.push(
+            `state "${state}": SQL allows [${sqlTargets}] but TypeScript allows [${tsTargets}]`
+          );
+        }
+      }
+      return problems.sort();
+    }
+
+    it("diffTransitionMaps detects the kind of drift that caused the 'revised' outage", () => {
+      // Self-check: the comparison must actually have teeth. A state that exists
+      // on one side only, and a target list that differs, both have to surface.
+      const sql = { completed: ["revised"], revised: [], cancelled: [] };
+      const tsDropped = { completed: [], cancelled: [] };
+      expect(diffTransitionMaps(sql, tsDropped)).toEqual([
+        'state "completed": SQL allows [revised] but TypeScript allows []',
+        'state "revised" exists in SQL but not in TypeScript',
+      ]);
+      // …and an exact match must produce no noise.
+      expect(diffTransitionMaps(sql, { ...sql })).toEqual([]);
     });
 
     for (const [tableName, entity] of Object.entries(tableToEntity)) {
@@ -510,9 +646,21 @@ describe("State Machine Validation", () => {
         const tsMap = entity.transitions;
 
         if (!sqlMap) {
-          it.skip(`skipped -- no SQL transitions found for ${tableName}`, () => {});
+          it(`has a SQL transition map in ${winner.file}`, () => {
+            throw new Error(
+              `No SQL transitions found for "${tableName}" in ${winner.file}; ` +
+                `${entity.name} would be unenforced at the database level.`
+            );
+          });
           return;
         }
+
+        it("agrees with the TypeScript config on states and transitions", () => {
+          expect(
+            diffTransitionMaps(sqlMap, tsMap),
+            `${entity.name}.stateMachine.transitions drifted from ${winner.file} (table "${tableName}")`
+          ).toEqual([]);
+        });
 
         it("every SQL state exists in the TypeScript config", () => {
           const sqlStates = Object.keys(sqlMap);
