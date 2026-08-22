@@ -1063,6 +1063,37 @@ via pg_net to the `send-email` edge function.)
 database bucket or a managed cross-instance limiter such as Redis/Upstash when
 its traffic and retry semantics justify it.
 
+### DEC-SEC-009: Dev-Login Gate — Database-Target Opt-In, Not Caller Credentials
+**Status**: Implemented (PR #682); ratification recommended, pending owner sign-off on #679
+
+(Numbered 009 because `architecture.md` carries its own DEC-SEC-001–008 series;
+009 is the first ID unused in either file. Unifying the two series is tracked in
+`docs/plans/fable-punchlist-2026-08-21.md`.)
+
+`/api/auth/dev-login` mints an uncredentialed admin session, so its gate is the
+security boundary. The gate keys on **which database would be touched**, not on
+who is calling: a dev server (`NODE_ENV === "development"`) may mint a session
+against a loopback Supabase target silently, against a hosted target only with
+`DEV_LOGIN_ALLOW_REMOTE_DB=1` explicitly set, and never against an unresolvable
+("unknown") target. The `E2E_DEV_LOGIN=1` CI path requires loopback with no
+opt-out. Production builds are immune structurally: `next build` constant-folds
+`NODE_ENV`, compiling the whole dev branch — opt-in included — out of the
+artifact.
+
+**Rejected alternatives** (issue #679 options 3–4): binding the listening
+interface (#691) — `Host`/`x-forwarded-for` are spoofable behind proxies, weak
+guarantee for the care it needs; a `DEV_LOGIN_TOKEN` shared secret (#692) —
+taxes every local dev loop to defend against a caller who already holds the
+service-role key. Both are **declined**, not implemented; their issues closed
+without code. Revisit option 4 (shared secret) if outside developers join, dev
+servers are routinely tunneled, or a shared hosted dev project ever holds real
+data.
+
+**Note:** `DEV_LOGIN_ALLOW_REMOTE_DB=1` restores pre-#679 reach for condition
+(1) — a reachable dev server wired to a hosted project hands out admin to
+whoever can reach the port. Setting it is accepting that. The unconditional
+`roles: ["admin"]` upsert (#683) remains as-is; E2E specs depend on admin.
+
 ---
 
 ## Related Documents
