@@ -61,8 +61,9 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
   Diff `get_state_transitions()` against `src/lib/state-machines.ts` per entity — would have caught the 'revised' live outage.
 - [ ] **23. Behavioral upgrades for text-assertion suites** (TC-4, TC-5) — owner: `test-surgeon` + `data-layer-expert`
   One seeded TTB summary invocation; two-customer JWT RLS round-trip.
-- [ ] **24. Characterization for known-unfixed edges** (TC-3, TC-12) — owner: `test-surgeon`
+- [x] **24. Characterization for known-unfixed edges** (TC-3, TC-12) — owner: `test-surgeon` — see `docs/progress/2026-08-21-characterization-edges.md`
   Pin 00219 placement-skip / 00221 NULL-format exclusion semantics; pin `report-utils` planned+completed cost semantics.
+  Done as SQL-text + pure-function characterization (no DB): `src/lib/__tests__/bin-placement-sql.test.ts` (00219 keg skip, NULL-format-treated-as-non-keg, location-blind fallback, never-block/no-RAISE, no backfill, WHEN-less trigger), `src/lib/__tests__/sellable-inventory-sql.test.ts` (00221/00226 INNER-JOIN NULL-format exclusion, `<> 'keg'` guard, 00226 LEAST clamp, keg-branch asymmetry), and a "planned + completed cost semantics" block in `src/domain/__tests__/report-utils.test.ts` (both statuses summed, `status` neither selected nor returned, unpriced planned = $0). Every such assertion is labelled `KNOWN-IMPERFECT`. **Ceiling:** text assertions catch a migration edit, not a runtime regression that keeps the text — the behavioural half (an FG actually vanishing from the POS; a real planned+completed double count) still needs item 21's harness.
 
 ## P4 — Opportunistic / polish
 

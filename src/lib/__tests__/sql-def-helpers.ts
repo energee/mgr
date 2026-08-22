@@ -57,3 +57,22 @@ export function latestViewBody(viewName: string): string | null {
     ),
   );
 }
+
+/**
+ * Every migration whose text matches `re`, as `{ file, sql }` in apply order.
+ *
+ * Use this when a contract lives OUTSIDE a function/view body — a CREATE
+ * TRIGGER statement, a view's `WITH (...)` options, a COMMENT — or when a
+ * test needs to assert that only ONE migration defines something (so the
+ * test self-invalidates if a later migration supersedes it).
+ */
+export function migrationsMatching(
+  re: RegExp,
+): { file: string; sql: string }[] {
+  const hits: { file: string; sql: string }[] = [];
+  for (const f of migrationFiles()) {
+    const sql = readFileSync(resolve(MIGRATIONS_DIR, f), "utf-8");
+    if (re.test(sql)) hits.push({ file: f, sql });
+  }
+  return hits;
+}
