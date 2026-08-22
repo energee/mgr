@@ -14,11 +14,17 @@
 -- constraint cannot be NOT VALID — locations is a tiny table, so the index
 -- build under lock is negligible.
 --
--- CHECKs use strict > 0 (audit wording: "positivity") except where 0 is a
--- documented state (see the actual_quantity row). NULL passes a CHECK, so
--- nullable columns (e.g. session_line_items.planned_quantity /
--- .actual_quantity, nullable — INTEGER in 00010, NUMERIC since 00288) still
--- admit NULL; only zero and negative values are rejected.
+-- The audit wording was "positivity", but strict > 0 is applied ONLY where
+-- every writer was verified to reject 0 (po_receives.quantity,
+-- transfer_lines.quantity — UI-validated, no sync path writes them). The
+-- rest are >= 0, because 0 is a value real write paths produce today
+-- (per-row rationale on the tuples): the start-brew-day dialog's
+-- volume_bbl ?? 0, the packaging line editor's min=0 planned quantity, the
+-- 00232 zero-actual skip semantics, and the MongoDB re-sync, which writes
+-- legacy zero and rounds-to-zero values (weight*16 rounding for tiny hop
+-- amounts) — a single zero legacy value must not abort a whole re-sync
+-- aggregate. Non-negative still blocks the garbage the audit cared about.
+-- NULL passes a CHECK, so nullable columns still admit NULL.
 --
 -- Deliberately SKIPPED from the audit bundle (already satisfied in the chain
 -- and live — verified against supabase/live-catalog.snapshot.txt):
@@ -32,19 +38,17 @@
 -- =============================================================================
 -- 1. CHECK constraints — one loop over (table, constraint name, expression)
 -- =============================================================================
--- Rows, in audit-bundle order:
---   - Production volumes: vessel_transfers / brew_log_batches volume_bbl.
---   - Packaging / purchasing / transfer quantities. actual_quantity admits
---     0, not just NULL: "planned but nothing produced" is a real state —
---     create_finished_goods_from_packaging (00232) explicitly SKIPs
---     zero-actual lines on session completion, and
---     packaging-completion-trigger.test.ts asserts that semantics. Only
---     negative actuals are invalid.
---   - Recipe ingredient junction amounts, enumerated from
+-- Rows, in audit-bundle order. Constraint names say _nonneg where the
+-- predicate is >= 0 (00239's chk_bin_inventory_quantity_nonneg precedent)
+-- and _positive only where it is strictly > 0, so names stay truthful.
+--   - Recipe ingredient junction amounts are enumerated from
 --     00011_catalog_and_recipe_junction.sql: recipe_malts / recipe_adjuncts /
 --     recipe_sugars use weight_lbs, recipe_hops uses weight_oz,
 --     recipe_spices / recipe_fruits / recipe_additions use amount.
 --     (recipe_collaborators, also created there, was dropped in 00294.)
+--     All >= 0: MongoDB re-sync (src/integrations/mongodb/sync.ts) writes
+--     legacy zero weights, and its oz conversion Math.round(weight*16*100)/100
+--     rounds tiny hop amounts to 0.
 --   - batch_logs.log_type: 00001 documents status_change / measurement /
 --     note in a comment but never enforced it. Every writer (readings page,
 --     chat write route, MongoDB sync transformers, sync_batch_readings_atomic
@@ -57,33 +61,47 @@ DECLARE
 BEGIN
   FOR _c IN
     SELECT * FROM (VALUES
-      ('vessel_transfers',   'chk_vessel_transfers_volume_positive',
-       'volume_bbl > 0'),
-      ('brew_log_batches',   'chk_brew_log_batches_volume_positive',
-       'volume_bbl > 0'),
-      ('session_line_items', 'chk_session_line_items_planned_quantity_positive',
-       'planned_quantity > 0'),
-      -- >= 0, not > 0: zero-actual lines are valid (00232 skip semantics).
+      -- >= 0: MongoDB re-sync writes legacy zero transfer volumes
+      -- (src/integrations/mongodb/transformers.ts vessel-transfer rows).
+      ('vessel_transfers',   'chk_vessel_transfers_volume_nonneg',
+       'volume_bbl >= 0'),
+      -- >= 0: start-brew-day-dialog.tsx inserts volume_bbl ?? 0 when the
+      -- batch has no volume set, and that insert is not atomic with
+      -- brew_logs — a CHECK failure would strand an orphan brew_logs row.
+      ('brew_log_batches',   'chk_brew_log_batches_volume_nonneg',
+       'volume_bbl >= 0'),
+      -- >= 0: add-line-item-row.tsx renders min={0} and
+      -- use-session-line-items.ts passes it through (auto-suggestion can
+      -- compute 0); MongoDB re-sync also writes legacy zero planned
+      -- quantities. Symmetric with actual_quantity below.
+      ('session_line_items', 'chk_session_line_items_planned_quantity_nonneg',
+       'planned_quantity >= 0'),
+      -- >= 0: zero-actual lines are valid — create_finished_goods_from_
+      -- packaging (00232) explicitly SKIPs them on session completion, and
+      -- packaging-completion-trigger.test.ts asserts that semantics.
       ('session_line_items', 'chk_session_line_items_actual_quantity_nonneg',
        'actual_quantity >= 0'),
+      -- Strict > 0: UI paths validate positivity and no sync path writes
+      -- these two.
       ('po_receives',        'chk_po_receives_quantity_positive',
        'quantity > 0'),
       ('transfer_lines',     'chk_transfer_lines_quantity_positive',
        'quantity > 0'),
-      ('recipe_malts',       'chk_recipe_malts_weight_positive',
-       'weight_lbs > 0'),
-      ('recipe_hops',        'chk_recipe_hops_weight_positive',
-       'weight_oz > 0'),
-      ('recipe_adjuncts',    'chk_recipe_adjuncts_weight_positive',
-       'weight_lbs > 0'),
-      ('recipe_sugars',      'chk_recipe_sugars_weight_positive',
-       'weight_lbs > 0'),
-      ('recipe_spices',      'chk_recipe_spices_amount_positive',
-       'amount > 0'),
-      ('recipe_fruits',      'chk_recipe_fruits_amount_positive',
-       'amount > 0'),
-      ('recipe_additions',   'chk_recipe_additions_amount_positive',
-       'amount > 0'),
+      -- Junction amounts all >= 0 (MongoDB re-sync; see section comment).
+      ('recipe_malts',       'chk_recipe_malts_weight_nonneg',
+       'weight_lbs >= 0'),
+      ('recipe_hops',        'chk_recipe_hops_weight_nonneg',
+       'weight_oz >= 0'),
+      ('recipe_adjuncts',    'chk_recipe_adjuncts_weight_nonneg',
+       'weight_lbs >= 0'),
+      ('recipe_sugars',      'chk_recipe_sugars_weight_nonneg',
+       'weight_lbs >= 0'),
+      ('recipe_spices',      'chk_recipe_spices_amount_nonneg',
+       'amount >= 0'),
+      ('recipe_fruits',      'chk_recipe_fruits_amount_nonneg',
+       'amount >= 0'),
+      ('recipe_additions',   'chk_recipe_additions_amount_nonneg',
+       'amount >= 0'),
       ('batch_logs',         'chk_batch_logs_log_type',
        'log_type IN (''status_change'', ''measurement'', ''note'')')
     ) AS t(tbl, con, expr)

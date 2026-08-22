@@ -265,8 +265,10 @@ Junction table linking brew logs to batches with volume allocation. Per DEC-HP-0
 **Database Constraints:**
 ```sql
 UNIQUE(brew_log_id, batch_id)  -- A brew can only be linked to a batch once
-CHECK (volume_bbl > 0)         -- Volume must be positive
-                               -- (chk_brew_log_batches_volume_positive, 00298)
+CHECK (volume_bbl >= 0)        -- Volume cannot be negative; 0 is allowed —
+                               -- the start-brew-day dialog inserts 0 when
+                               -- the batch has no volume set
+                               -- (chk_brew_log_batches_volume_nonneg, 00298)
 ```
 
 **Application-Level Validation:**

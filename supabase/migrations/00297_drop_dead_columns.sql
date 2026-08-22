@@ -621,9 +621,13 @@ WHERE table_name = 'recipes';
 -- element, or object minus key) instead of whole-value overwrites, so any
 -- out-of-band registry edits on live survive the apply.
 
--- recipe_yeasts key_fields (00145) advertised the dropped pitch_rate.
+-- recipe_yeasts (00145) advertised the dropped pitch_rate in key_fields AND
+-- described the table as carrying "pitch rate, quantity, and fermentation
+-- temp" — both columns are dropped by this migration, so the description is
+-- rewritten (genuine value change, not a pure removal).
 UPDATE _schema_registry
 SET key_fields = key_fields - 'pitch_rate',
+    description = 'Recipe yeast additions. Links recipes to yeast catalog with quantity and primary-strain flag.',
     updated_at = NOW()
 WHERE table_name = 'recipe_yeasts';
 

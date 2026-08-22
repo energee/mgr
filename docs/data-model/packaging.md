@@ -120,7 +120,7 @@ Line items within a packaging session. Each line item represents one product (br
 | selling_format_id | UUID | FK to [selling_formats](#selling_formats) |
 | keg_owner_id | UUID | FK to keg_owners (nullable, for keg formats) |
 | batch_id | UUID | FK to [batches](./production.md#batches) — source batch for this line item |
-| planned_quantity | NUMERIC | Planned quantity (NUMERIC since 00288 — MongoDB-era sessions carry fractional quantities like 70.5 cases; CHECK > 0 since 00298, NULL allowed) |
+| planned_quantity | NUMERIC | Planned quantity (NUMERIC since 00288 — MongoDB-era sessions carry fractional quantities like 70.5 cases; CHECK >= 0 since 00298 — the line editor allows 0 and MongoDB re-sync writes legacy zeros; NULL allowed) |
 | actual_quantity | NUMERIC | Actual quantity (NUMERIC since 00288; CHECK >= 0 since 00298 — 0 is valid, the completion trigger skips zero-actual lines; NULL allowed) |
 | created_at | TIMESTAMPTZ | Created timestamp |
 

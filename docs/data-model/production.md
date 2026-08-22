@@ -154,7 +154,9 @@ Ingredients are stored in junction tables rather than JSONB arrays. This enables
 - Proper indexing for ingredient searches
 
 Every junction amount column (`weight_lbs` / `weight_oz` / `amount`) carries a
-`CHECK (... > 0)` constraint since migration 00298.
+`CHECK (... >= 0)` constraint since migration 00298 (`chk_recipe_*_nonneg`).
+Non-negative rather than strictly positive: MongoDB re-sync writes legacy
+zero weights, and its oz conversion rounds tiny hop amounts to 0.
 
 ### `recipe_malts`
 
@@ -553,7 +555,7 @@ Track batch movements between vessels.
 | batch_id | UUID | FK to batches |
 | from_vessel_id | UUID | FK to vessels (NULL if from kettle) |
 | to_vessel_id | UUID | FK to vessels |
-| volume_bbl | DECIMAL(8,2) | Volume transferred (CHECK > 0 since 00298) |
+| volume_bbl | DECIMAL(8,2) | Volume transferred (CHECK >= 0 since 00298 — MongoDB re-sync writes legacy zero volumes) |
 | transferred_at | TIMESTAMPTZ | Transfer timestamp |
 | transferred_by | UUID | FK to auth.users |
 | notes | TEXT | Notes (explain loss if any) |
