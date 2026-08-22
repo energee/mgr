@@ -97,6 +97,13 @@ export async function saveTokens(
   return { saved: data === true };
 }
 
+/**
+ * Deliberately NOT serialized against save_qbo_tokens_atomic's advisory lock:
+ * a disconnect racing a refresh leaves either no rows (delete won) or a fresh
+ * pair the upstream Intuit revoke has already killed (persist won) — both
+ * surface as a clean reconnect, and the refresh path's CAS treats a deleted
+ * refresh-token row as a miss (saved: false).
+ */
 export async function clearTokens(): Promise<void> {
   const admin = await createAdminClient();
   const { error } = await admin

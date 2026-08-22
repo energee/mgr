@@ -38,13 +38,13 @@ SECURITY INVOKER
 SET search_path = public
 AS $$
 BEGIN
-  IF p_access_token IS NULL OR p_refresh_token IS NULL
-     OR p_realm_id IS NULL OR p_expires_at IS NULL THEN
-    RAISE EXCEPTION 'all token fields are required' USING ERRCODE = '22023';
-  END IF;
-
+  -- No NULL guard: value is JSONB NOT NULL, so a NULL argument fails on the
+  -- column constraint; the only caller passes four typed strings.
+  --
   -- Serialize concurrent QBO token persists (single global token set, so a
-  -- single lock key). Held to end of transaction.
+  -- single lock key). Held to end of transaction. An advisory lock rather
+  -- than FOR UPDATE on the CAS row: both paths (refresh and connect) take it
+  -- first, so there is no connect-vs-refresh row-lock ordering to deadlock.
   PERFORM pg_advisory_xact_lock(hashtextextended('qbo_tokens', 0));
 
   IF p_expected_refresh_token IS NOT NULL AND NOT EXISTS (
@@ -74,3 +74,11 @@ REVOKE ALL ON FUNCTION save_qbo_tokens_atomic(TEXT, TEXT, TEXT, TEXT, TEXT)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION save_qbo_tokens_atomic(TEXT, TEXT, TEXT, TEXT, TEXT)
   TO service_role;
+
+-- Retire the superseded 00100 token RPCs: no app callers (audited in 00205),
+-- and save_qbo_tokens does the same four-row write with no lock and no CAS —
+-- leaving it in place invites the next `save_qbo_tokens` grep hit to silently
+-- reintroduce the #840 race.
+DROP FUNCTION IF EXISTS save_qbo_tokens(TEXT, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS clear_qbo_tokens();
+DROP FUNCTION IF EXISTS save_qbo_client_credentials(TEXT, TEXT);
