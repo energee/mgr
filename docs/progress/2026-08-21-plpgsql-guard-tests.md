@@ -122,17 +122,26 @@ tests then fail, the fix is incomplete.
   The local database was already running and fully migrated (274 migrations,
   role fixtures seeded), so no `make db-local` reset was performed — it is
   shared infrastructure and the reset is destructive.
-- **`make check`: RED, for a pre-existing reason unrelated to this branch.**
-  11 unit files / 22 tests fail with `Cannot find package 'pino' imported from
-  src/lib/logger.ts`. `pino@10.3.1` is declared in `package.json` and installed
-  in `node_modules`, and resolves fine from Node — it fails only under vitest.
-  This branch's diff is **four new untracked files, all under
-  `src/__tests__/integration/`, with zero tracked modifications**, and none of
-  the 11 failing files import anything added here, so the failure cannot
-  originate from this change. Not chased: out of scope, and `node_modules` is
-  shared with concurrently running sessions.
-  Lint and typecheck pass for the added files (the `interface` → `type`
-  convention was applied).
+- **`make check`: GREEN** (lint + typecheck + unit suite + check-db + check-wip +
+  check-deploy-state + build). Lint required the repo's `interface` → `type`
+  convention on the added files.
+
+  Worth recording, because the first diagnosis was wrong. `make check` initially
+  failed with 11 unit files / 22 tests erroring on `Cannot find package 'pino'
+  imported from src/lib/logger.ts`. `pino@10.3.1` was declared in `package.json`
+  and resolved fine from Node, and this branch touches no tracked source file, so
+  it was written up as pre-existing and unrelated to the change. **That was
+  wrong.** The worktree simply had an incomplete `node_modules` — a
+  fresh-worktree artifact, not a repository problem. `bun install` in the
+  worktree (1150 packages) fixed it and `make check` passed with no code change.
+
+  Two other sessions hit the identical 22-test / 11-file pino signature in
+  freshly created worktrees the same day, with the same fix. **Run `bun install`
+  in a new worktree before concluding anything about a pino resolution
+  failure**: the "declared, resolves from Node, fails only under vitest"
+  combination looks like a toolchain bug and is not one. "My diff cannot have
+  caused this" is evidence about the diff, not evidence that the environment is
+  sound.
 
 ## Not reached
 
