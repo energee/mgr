@@ -5,6 +5,13 @@
 # main ruleset rejects direct pushes, so the refreshed artifact lands through
 # an auto-merged bot PR. Deterministic passes only (~8s, offline); LLM edges
 # are carried over from the committed graph, never re-run here.
+#
+# The changed-check MUST ignore the volatile `commit`/`built_at` header, and
+# the trigger paths MUST exclude graph.json itself: every rebuild stamps the
+# new HEAD sha into the artifact, so comparing whole files turns each bot
+# merge into another "change" and the workflow merge-loops against itself
+# (~29 consecutive metadata-only commits on 2026-08-22). Consumers already
+# treat those fields as non-content (Omit<Graph, "commit" | "built_at">).
 name: Refresh codegraph
 
 on:
@@ -23,6 +30,8 @@ on:
       - "README.md"
       - "AGENTS.md"
       - "tools/codegraph/**"
+      # The artifact itself is not an input — see loop note above.
+      - "!tools/codegraph/graph.json"
 
 permissions:
   contents: write
@@ -71,8 +80,12 @@ jobs:
           GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if git diff --quiet tools/codegraph/graph.json; then
-            echo "graph.json already fresh"
+          # Compare bodies only — `commit`/`built_at` change on every rebuild
+          # and must not count as drift (see loop note in the header comment).
+          body() { jq -S 'del(.commit, .built_at)' "$1"; }
+          if diff -q <(body tools/codegraph/graph.json) \
+                     <(git show HEAD:tools/codegraph/graph.json | body /dev/stdin) >/dev/null; then
+            echo "graph.json body already fresh (metadata-only diff ignored)"
             exit 0
           fi
 
