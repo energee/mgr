@@ -38,6 +38,8 @@ import { logger } from "@/lib/logger";
 import { getMongoDb } from "../client";
 import { syncAll, syncEntity, syncPhase } from "../sync";
 import { objectIdToUuid } from "../id";
+import { transformVessel, transformBatch } from "../transformers";
+import type { MongoBatch, MongoVessel } from "../types";
 
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 const mockedGetMongoDb = vi.mocked(getMongoDb);
@@ -587,5 +589,52 @@ describe("syncTransfers historical replay (via syncEntity)", () => {
     expect((rpc[0]!.args as { p_rows: unknown[] }).p_rows).toHaveLength(1);
     // The live occupancy trigger must not see a direct client-side upsert.
     expect(writes.filter((w) => w.table === "vessel_transfers")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Column-set coupling with 00298_sync_status_preserving_upserts.sql
+//
+// The RPCs' jsonb_to_recordset column lists are literal — a column the
+// transforms start emitting that isn't added to the migration is SILENTLY
+// dropped (absent recordset columns just don't exist). These pins fail the
+// moment a transform grows a column, forcing the migration edit.
+// ---------------------------------------------------------------------------
+
+describe("transform column sets mirrored in 00298", () => {
+  it("transformVessel emits exactly the columns sync_upsert_vessels knows", () => {
+    const row = transformVessel({
+      _id: new ObjectId("afafafafafafafafafafafaf"),
+      name: "FV1",
+      type: "fermenter",
+      capacity: 30,
+      state: "dirty",
+    } as unknown as MongoVessel);
+
+    expect(Object.keys(row).sort()).toEqual(
+      ["capacity_bbl", "is_active", "name", "status", "vessel_type"]
+    );
+  });
+
+  it("transformBatch (plus syncBatches enrichment keys) stays within the columns sync_upsert_batches knows", () => {
+    const row = transformBatch({
+      _id: new ObjectId("abababababababababababab"),
+      name: "B1",
+      date: new Date("2025-01-01T00:00:00Z"),
+      notes: "n",
+    } as unknown as MongoBatch);
+
+    expect(Object.keys(row).sort()).toEqual(
+      ["batch_code", "id", "name", "notes", "planned_start_date", "status"]
+    );
+    // syncBatches conditionally adds these two; the RPC also knows them
+    // (COALESCE-guarded on conflict since the payload omits them when the
+    // recipe doesn't resolve).
+    const enrichmentKeys = ["recipe_id", "volume_bbl"];
+    const rpcColumns = [
+      "id", "batch_code", "name", "status", "planned_start_date", "notes",
+      ...enrichmentKeys,
+    ];
+    expect(rpcColumns).toEqual(expect.arrayContaining(Object.keys(row)));
   });
 });

@@ -16,10 +16,18 @@
 -- never written to at all — there is no window. Mongo still sets status on
 -- the first insert of a row PG has never seen.
 --
--- Duplicate conflict keys within one payload are deduplicated keeping the
--- LAST occurrence (mirroring the app's dedupeByConflictKey helper) because a
--- single INSERT ... ON CONFLICT DO UPDATE statement raises "cannot affect row
--- a second time" on intra-statement duplicates.
+-- Duplicate conflict keys within one payload are NOT handled here: the caller
+-- dedups app-side (dedupeByConflictKey in sync.ts, last occurrence wins —
+-- the one canonical last-wins rule, shared with the plain-upsert path). A
+-- duplicate that slips through fails the statement loudly ("ON CONFLICT DO
+-- UPDATE command cannot affect row a second time") — acceptable for the
+-- single service_role sync caller, and better than a second, subtly different
+-- dedup rule living in SQL.
+--
+-- The column lists below mirror the transform output shapes in
+-- src/integrations/mongodb/transformers.ts (transformVessel/transformBatch);
+-- a column added there must be added here or it is silently dropped —
+-- sync.test.ts pins both column sets against this file.
 
 -- ---------------------------------------------------------------------------
 -- Vessels: keyed by UNIQUE(name) (00006). vessel_type / status are enums, so
@@ -39,31 +47,20 @@ BEGIN
     RAISE EXCEPTION 'p_rows must be a JSON array' USING ERRCODE = '22023';
   END IF;
 
-  WITH src AS (
-    SELECT r.name, r.vessel_type, r.capacity_bbl, r.status, r.is_active, o.ord
-    FROM jsonb_array_elements(p_rows) WITH ORDINALITY AS o(elem, ord)
-    CROSS JOIN LATERAL jsonb_to_record(o.elem) AS r(
-      name TEXT,
-      vessel_type TEXT,
-      capacity_bbl NUMERIC,
-      status TEXT,
-      is_active BOOLEAN
-    )
-  ),
-  deduped AS (
-    -- Last occurrence wins, matching the app's dedupeByConflictKey.
-    SELECT DISTINCT ON (name) name, vessel_type, capacity_bbl, status, is_active
-    FROM src
-    ORDER BY name, ord DESC
-  )
   INSERT INTO vessels (name, vessel_type, capacity_bbl, status, is_active)
   SELECT
-    name,
-    vessel_type::vessel_type,
-    capacity_bbl,
-    status::vessel_status,
-    is_active
-  FROM deduped
+    r.name,
+    r.vessel_type::vessel_type,
+    r.capacity_bbl,
+    r.status::vessel_status,
+    r.is_active
+  FROM jsonb_to_recordset(p_rows) AS r(
+    name TEXT,
+    vessel_type TEXT,
+    capacity_bbl NUMERIC,
+    status TEXT,
+    is_active BOOLEAN
+  )
   ON CONFLICT (name) DO UPDATE SET
     vessel_type = EXCLUDED.vessel_type,
     capacity_bbl = EXCLUDED.capacity_bbl,
@@ -76,7 +73,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION sync_upsert_vessels(JSONB) IS
-  'MongoDB-sync vessel upsert that preserves live status durably: ON CONFLICT (name) updates every synced column EXCEPT status, so a concurrent live transition can never be clobbered by the frozen Mongo snapshot (#855, replaces the app-side TOCTOU read-modify-write from #839). Mongo still sets status on first insert. Dedups intra-payload duplicate names keeping the last occurrence. Returns rows written. SECURITY INVOKER and service_role-only.';
+  'MongoDB-sync vessel upsert that preserves live status durably: ON CONFLICT (name) updates every synced column EXCEPT status, so a concurrent live transition can never be clobbered by the frozen Mongo snapshot (#855, replaces the app-side TOCTOU read-modify-write from #839). Mongo still sets status on first insert. Caller dedups intra-payload duplicate names (last wins). Returns rows written. SECURITY INVOKER and service_role-only.';
 
 REVOKE ALL ON FUNCTION sync_upsert_vessels(JSONB)
   FROM PUBLIC, anon, authenticated;
@@ -104,40 +101,35 @@ BEGIN
     RAISE EXCEPTION 'p_rows must be a JSON array' USING ERRCODE = '22023';
   END IF;
 
-  WITH src AS (
-    SELECT r.id, r.batch_code, r.name, r.status, r.planned_start_date,
-           r.notes, r.recipe_id, r.volume_bbl, o.ord
-    FROM jsonb_array_elements(p_rows) WITH ORDINALITY AS o(elem, ord)
-    CROSS JOIN LATERAL jsonb_to_record(o.elem) AS r(
-      id UUID,
-      batch_code TEXT,
-      name TEXT,
-      status TEXT,
-      planned_start_date DATE,
-      notes TEXT,
-      recipe_id UUID,
-      volume_bbl NUMERIC
-    )
-  ),
-  deduped AS (
-    -- Last occurrence wins, matching the app's dedupeByConflictKey.
-    SELECT DISTINCT ON (id) id, batch_code, name, status, planned_start_date,
-           notes, recipe_id, volume_bbl
-    FROM src
-    ORDER BY id, ord DESC
-  )
   INSERT INTO batches (id, batch_code, name, status, planned_start_date,
                        notes, recipe_id, volume_bbl)
-  SELECT id, batch_code, name, status, planned_start_date,
-         notes, recipe_id, volume_bbl
-  FROM deduped
+  SELECT r.id, r.batch_code, r.name, r.status, r.planned_start_date,
+         r.notes, r.recipe_id, r.volume_bbl
+  FROM jsonb_to_recordset(p_rows) AS r(
+    id UUID,
+    batch_code TEXT,
+    name TEXT,
+    status TEXT,
+    planned_start_date DATE,
+    notes TEXT,
+    recipe_id UUID,
+    volume_bbl NUMERIC
+  )
   ON CONFLICT (id) DO UPDATE SET
     batch_code = EXCLUDED.batch_code,
     name = EXCLUDED.name,
     planned_start_date = EXCLUDED.planned_start_date,
     notes = EXCLUDED.notes,
-    recipe_id = EXCLUDED.recipe_id,
-    volume_bbl = EXCLUDED.volume_bbl;
+    -- syncBatches only adds recipe_id/volume_bbl keys when the Mongo recipe
+    -- resolves to a PG recipe; jsonb_to_recordset turns an ABSENT key into
+    -- NULL, and a bare `= EXCLUDED.recipe_id` would then clobber a live value
+    -- to NULL (the old PostgREST per-row upsert only wrote present columns).
+    -- The payload never sends an explicit JSON null for these keys, so
+    -- COALESCE keeps the existing value whenever the sync has nothing better
+    -- — matching origin/main behavior. Not expressible in the app-side unit
+    -- tests (mock DB), hence documented and enforced here.
+    recipe_id = COALESCE(EXCLUDED.recipe_id, batches.recipe_id),
+    volume_bbl = COALESCE(EXCLUDED.volume_bbl, batches.volume_bbl);
     -- status DELIBERATELY omitted: existing rows keep their live status, and
     -- the 00205/00256 batch state machine never sees a regression attempt.
 
@@ -147,7 +139,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION sync_upsert_batches(JSONB) IS
-  'MongoDB-sync batch upsert that preserves live status durably: ON CONFLICT (id) updates every synced column EXCEPT status, so a concurrent live transition can never be clobbered by the frozen Mongo snapshot (#855, replaces the app-side TOCTOU read-modify-write from fd60d58). Mongo still sets status on first insert. Dedups intra-payload duplicate ids keeping the last occurrence. Returns rows written. SECURITY INVOKER and service_role-only.';
+  'MongoDB-sync batch upsert that preserves live status durably: ON CONFLICT (id) updates every synced column EXCEPT status, so a concurrent live transition can never be clobbered by the frozen Mongo snapshot (#855, replaces the app-side TOCTOU read-modify-write from fd60d58). recipe_id/volume_bbl COALESCE to the existing value because the sync payload omits them when unresolved. Mongo still sets status on first insert. Caller dedups intra-payload duplicate ids (last wins). Returns rows written. SECURITY INVOKER and service_role-only.';
 
 REVOKE ALL ON FUNCTION sync_upsert_batches(JSONB)
   FROM PUBLIC, anon, authenticated;
