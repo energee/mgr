@@ -1,4 +1,4 @@
--- 00298_sync_status_preserving_upserts.sql
+-- 00300_sync_status_preserving_upserts.sql
 --
 -- DB-side status-preserving upserts for the MongoDB legacy sync (#855).
 --

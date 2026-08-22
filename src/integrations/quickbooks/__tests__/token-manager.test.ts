@@ -1,7 +1,7 @@
 /**
  * saveTokens persistence tests (#840, #855).
  *
- * Persistence is one `save_qbo_tokens_atomic` RPC (00297): all four
+ * Persistence is one `save_qbo_tokens_atomic` RPC (00299): all four
  * system_settings rows commit in a single transaction, and on the refresh
  * path the RPC compare-and-swaps DB-side against the refresh token this
  * refresh consumed — a concurrent refresh (another serverless instance)
