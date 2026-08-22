@@ -1,9 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "src/instrumentation.ts",
-    "src/instrumentation-client.ts",
-    "src/proxy.ts",
     "scripts/**/*.{ts,mts}",
     "e2e/**/*.ts",
     "supabase/functions/**/index.ts"
@@ -11,6 +8,5 @@
   "project": ["src/**/*.{ts,tsx}"],
   "ignore": ["src/types/supabase.ts"],
   "ignoreBinaries": ["supabase"],
-  "ignoreDependencies": ["tailwindcss", "tw-animate-css"],
-  "ignoreUnresolved": ["jsr:@supabase/.*"]
+  "ignoreDependencies": ["tailwindcss", "tw-animate-css", "jsr"]
 }

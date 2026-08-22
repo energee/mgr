@@ -133,3 +133,15 @@ autoharness owns the edit application.
 - **Workspace state is gitignored.** `.autoharness/`, `autoharness.project.md`,
   `autoharness.claude.md`, `autoharness.onboarding.json`. Regenerate the
   last three with `autoharness guide` if needed.
+- **`.autoharness/` grows ~3.3 GB per iteration (#943).** Each run serializes a
+  full recursive file manifest into its JSON records — unscoped to the
+  `editable_surfaces` in `.autoharness/settings.yaml` and not honoring
+  `.gitignore`, so it walks `.claude/`, `.pnpm-store/`, `.next/`, `.git/` and
+  `.autoharness/` itself, and each run snapshots the prior runs' records. A
+  single `iterations/iter_NNNN/summary.json` reached 829 MB (3.3 M `{path, size}`
+  pairs), stored ~4x per iteration; 31 iterations totalled **121 GB** before the
+  2026-08-22 cleanup. The bug is in the external `autoharness` CLI, not this
+  repo. Until it is fixed: run `du -sh .autoharness` after the first few
+  iterations and stop the campaign if one record exceeds a few MB. Note
+  `make clean` deliberately does **not** touch `.autoharness/` — it is live
+  campaign state, not a build artifact.
