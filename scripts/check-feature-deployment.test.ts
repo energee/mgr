@@ -23,6 +23,7 @@ import {
   catalogHas,
   createdCatalogObjects,
   LIVE_CATALOG_SNAPSHOT,
+  readRetiredObjects,
   UNAUDITED,
   type AuditContext,
   type FeatureEntry,
@@ -335,6 +336,63 @@ describe("auditFeatureDeployment — entries that must fail", () => {
     expect(violations[0]).not.toContain("cogs_by_period");
   });
 
+  // retired_objects: an anchor-created object a LATER migration deliberately
+  // dropped (00294-style dynamic SQL, invisible to static extraction).
+  const projectionEntry = {
+    id: "F132",
+    state: "passing",
+    migrations: ["00139_cogs_and_projection_rpcs.sql"],
+    deployment: {
+      state: "live",
+      observed_live_on: "2026-07-15",
+      verified_by: [LIVE_CATALOG_SNAPSHOT],
+    },
+  };
+  const retiredCtx = {
+    migrationFiles: [...Object.keys(MIGRATION_SQL), "00289_drop_orphaned_projection_rpcs.sql"],
+    retiredObjects: { project_revenue: "00289_drop_orphaned_projection_rpcs.sql" },
+  };
+
+  it("accepts a snapshot-absent object recorded as retired by a later migration", () => {
+    const result = auditFeatureDeployment([projectionEntry], { ...ctx, ...retiredCtx });
+    expect(result.violations).toEqual([]);
+    // cogs_by_period is still genuinely verified; the retired one is counted.
+    expect(result.stats.liveSnapshotVerified).toBe(1);
+    expect(result.stats.liveRetired).toBe(1);
+  });
+
+  it("does not count an anchor as verified when its every object is retired", () => {
+    const result = auditFeatureDeployment([projectionEntry], {
+      ...ctx,
+      liveCatalog: [],
+      migrationFiles: retiredCtx.migrationFiles,
+      retiredObjects: {
+        project_revenue: "00289_drop_orphaned_projection_rpcs.sql",
+        cogs_by_period: "00289_drop_orphaned_projection_rpcs.sql",
+      },
+    });
+    expect(result.violations).toEqual([]);
+    expect(result.stats.liveSnapshotVerified).toBe(0);
+    expect(result.stats.liveUnverifiable).toBe(1);
+    expect(result.stats.liveRetired).toBe(2);
+  });
+
+  it("still rejects when the retirement names a missing or earlier migration", () => {
+    // Migration not in the chain → the escape hatch must not apply.
+    expect(
+      audit(projectionEntry, {
+        retiredObjects: { project_revenue: "00299_not_in_chain.sql" },
+      }),
+    ).toHaveLength(1);
+    // Migration sorts BEFORE the anchor → a drop cannot precede the create.
+    expect(
+      audit(projectionEntry, {
+        migrationFiles: [...Object.keys(MIGRATION_SQL), "00100_too_early.sql"],
+        retiredObjects: { project_revenue: "00100_too_early.sql" },
+      }),
+    ).toHaveLength(1);
+  });
+
   it("rejects a pending record with no tracking issue", () => {
     const violations = audit({
       ...backed,
@@ -488,6 +546,8 @@ describe("the committed tracker", () => {
     liveCatalog: readFileSync(resolve(REPO_ROOT, LIVE_CATALOG_SNAPSHOT), "utf8").split("\n"),
     pathExists: (path) => existsSync(resolve(REPO_ROOT, path)),
     today: new Date().toISOString().slice(0, 10),
+    // Same reader main() uses, so this test exercises the real retirement map.
+    retiredObjects: readRetiredObjects(tracker.deployment_conventions),
   };
 
   it("satisfies the deployment contract", () => {
