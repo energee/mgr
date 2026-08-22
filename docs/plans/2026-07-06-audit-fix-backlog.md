@@ -5,12 +5,16 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
 
 ## P0 — Security (do first)
 
-- [ ] **1. Assign and enforce the `customer` role** (C1) — owner: `data-layer-expert`
+- [x] **1. Assign and enforce the `customer` role** (C1) — owner: `data-layer-expert` — **DONE (PR #341, migration 00201, merged 2026-07-07)**
   Migration: restore customer-email→role linking in `create_user_profile()` (lost in 00097); invite route sets `roles=['customer']`; backfill existing mis-roled portal users. Fix the `(app)/layout.tsx` redirect to not require exactly `['customer']`. Add a multi-user RLS round-trip test (customer JWT vs another customer's orders).
-- [ ] **2. Close self-registration** (C1/M16) — owner: `data-layer-expert`
+  Verified 2026-08-21: 00201 §1 restores the role assignment and §2 backfills `roles=['viewer']` rows matching a customer email; `src/app/api/customers/[id]/invite/route.ts:179` sets `roles: ["customer"]`; `src/app/(app)/layout.tsx` gates on `isPortalUser(roles)` rather than an exact-array match. The round-trip test was the one bullet still outstanding — added as `src/__tests__/integration/portal-cross-customer-rls.test.ts`.
+- [x] **2. Close self-registration** (C1/M16) — owner: `data-layer-expert` — **DONE in-repo (PR #341; staff path PR #368)** — *residual dashboard action, see below*
   DECIDED 2026-07-06: portal is invite-only, no signup. `shouldCreateUser: false` on portal OTP login; remove or invite-gate the public `/signup` page; **verify the hosted Supabase "allow new signups" toggle today** (not visible from repo).
-- [ ] **3. Scope order notifications** (H9) — owner: `data-layer-expert`
+  Verified 2026-08-21: `shouldCreateUser: false` on the portal OTP path (`portal-login-form.tsx:48`) and on the invite route (`invite/route.ts:288`); the staff login path was closed separately by #368; no `/signup` route exists anywhere under `src/app`.
+  **STILL OPEN — operator action, not code:** the hosted "allow new signups" toggle. It is not represented in `supabase/config.toml` and cannot be read or set from this repo, so no PR can close it. Flagged since 2026-07-06 and again on 2026-07-10 (see `2026-07-10-audit-fix-backlog.md` item 2). Tracked here until someone confirms it in the dashboard.
+- [x] **3. Scope order notifications** (H9) — owner: `data-layer-expert` — **DONE (PR #341, migration 00201 §3, merged 2026-07-07)**
   Replace `notify_all_users()` broadcast for order events with staff-only (or role-filtered) recipients; stop embedding customer identity in rows readable by other customers.
+  Verified 2026-08-21: 00201 §3 redefines `notify_all_users()` to iterate `user_profiles WHERE status = 'active' AND NOT ('customer' = ANY(roles))` instead of all `auth.users`; asserted by `src/__tests__/integration/customer-role-scoping.test.ts`.
 
 ## P1 — Compliance & data corruption (continuously wrong today)
 
