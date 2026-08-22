@@ -1,4 +1,4 @@
--- 00297_save_qbo_tokens_atomic.sql
+-- 00299_save_qbo_tokens_atomic.sql
 --
 -- Atomic persist for the QBO token set (#855, hardening PR #850's app-side
 -- optimistic lock).

@@ -65,7 +65,7 @@ export async function getClientCredentials(): Promise<{ clientId: string; client
 /**
  * Persist a QBO token set.
  *
- * One `save_qbo_tokens_atomic` RPC (00297): all four rows commit in a single
+ * One `save_qbo_tokens_atomic` RPC (00299): all four rows commit in a single
  * transaction, serialized by an advisory xact lock. `expectedRefreshToken`
  * (the refresh path) makes it a DB-side compare-and-swap (#840): the
  * in-process single-flight guard in client.ts only dedups refreshes within
@@ -98,7 +98,7 @@ export async function saveTokens(
 }
 
 /**
- * Deletes the four token rows via clear_qbo_tokens_atomic (00297), which
+ * Deletes the four token rows via clear_qbo_tokens_atomic (00299), which
  * takes the same advisory lock as the save RPC — an unserialized delete could
  * commit between the save's CAS check and its insert, resurrecting a token
  * pair Intuit has already revoked. Client credentials and environment

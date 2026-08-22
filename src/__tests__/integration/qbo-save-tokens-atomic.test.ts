@@ -1,5 +1,5 @@
 /**
- * Real-Postgres regressions for save_qbo_tokens_atomic (00297, #855).
+ * Real-Postgres regressions for save_qbo_tokens_atomic (00299, #855).
  *
  * The unit tests prove which RPC saveTokens calls; only Postgres can prove
  * the migration's central claims: the CAS compares jsonb-to-jsonb against
@@ -70,7 +70,7 @@ describe("save_qbo_tokens_atomic", () => {
 
   it("refresh path: CAS hit against a supabase-js-encoded stored value updates all four rows", async () => {
     await withTransaction(async (db) => {
-      // Seed the way PostgREST stored it pre-00297: a jsonb string literal.
+      // Seed the way PostgREST stored it pre-00299: a jsonb string literal.
       await db.query(
         `INSERT INTO system_settings (key, value) VALUES
            ('qbo_refresh_token', '"rt-old"'::jsonb),

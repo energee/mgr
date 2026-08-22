@@ -332,7 +332,7 @@ async function selectRowsByKey<T>(
 
 /**
  * Upsert vessel/batch rows through a status-preserving RPC
- * (`sync_upsert_vessels` / `sync_upsert_batches`, 00298): the DB-side
+ * (`sync_upsert_vessels` / `sync_upsert_batches`, 00300): the DB-side
  * ON CONFLICT update omits `status`, so an existing row's live status is
  * never written — the frozen Mongo snapshot cannot regress live state on
  * re-sync (fd60d58 for batches, #839 for vessels), and unlike the previous
@@ -633,7 +633,7 @@ async function syncVessels(): Promise<SyncResult> {
   // silently mark an in-use vessel "ready_for_use" while current_batch_id
   // (not in the transform's column set) stays stale (#839; same guard as
   // syncBatches, fd60d58). Preservation lives DB-side in sync_upsert_vessels
-  // (00298) — its ON CONFLICT update omits `status`, closing the TOCTOU race
+  // (00300) — its ON CONFLICT update omits `status`, closing the TOCTOU race
   // the old app-side read-modify-write had (#855). Mongo still sets status on
   // first insert.
   const result = await upsertRowsStatusPreserving(admin, "sync_upsert_vessels", rows, "name");
@@ -850,7 +850,7 @@ async function syncBatches(): Promise<SyncResult> {
   // rejects regressions outright — a legacy Mongo doc still saying "fermenting"
   // against a PG batch that completed fails the whole upsert chunk
   // ("Invalid state transition: completed -> fermenting", 2026-08-12 sync).
-  // Preservation lives DB-side in sync_upsert_batches (00298) — its
+  // Preservation lives DB-side in sync_upsert_batches (00300) — its
   // ON CONFLICT update omits `status`, closing the TOCTOU race the old
   // app-side read-modify-write had (fd60d58, #855). Mongo still sets status
   // on first insert of a batch PG has never seen.
