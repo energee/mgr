@@ -19,6 +19,38 @@ usage limit). So every item below is a HUNTER CANDIDATE, not yet confirmed.
 > for unit conversion). Also cut in the second pass: 8, 9, 16, 17, 20 and 31's
 > `filterable`. Still open: 15, 18, 19, 21–24.
 
+> **STATUS 2026-08-21: items 18, 19, 20 worked** (branch
+> `refactor/ponytail-datatable-cuts`, scope limited to
+> `src/components/data-table/`). See
+> `docs/progress/2026-08-21-ponytail-datatable-cuts.md`. Net −4 lines.
+>
+> - **18 — mostly stale, one cut.** `debounceMs`/`shallow` props,
+>   `TableMeta.queryKeys`, column-meta `placeholder`/`icon` and
+>   `Option.icon`/`count` were **already absent** (the second pass took them;
+>   `Option` is now just `{ label, value }`). The only survivor was the
+>   `disabled` prop on `DataTableSortList` — no call site passed it. **Cut.**
+>   `throttleMs: 50` in `data-table-filter-list.tsx` is **rejected**: nuqs'
+>   default throttle is not a constant — `getDefaultThrottle()` returns 120ms
+>   (Safari ≥17) or 320ms to stay under Safari's `history.replaceState` rate
+>   limit — so removing the pin changes behaviour on Safari. `shallow: true` is
+>   redundant only because `<NuqsAdapter>` sets no `defaultOptions`; left in
+>   place as intent documentation, not configurability.
+> - **19 — rejected, premise wrong.** There is no drag-to-reorder in the filter
+>   popover; `data-table-filter-list.tsx` has no `Sortable`, grip handle or drag
+>   overlay. The `Sortable`/`SortableOverlay`/`SortableItemHandle` usage is in
+>   `data-table-sort-list.tsx`, where row order **is** multi-column sort
+>   precedence — load-bearing semantics, not decoration. Nothing to cut.
+> - **20 — rejected.** The "reserved for future use" `table` prop is already
+>   gone (props are now plain `React.ComponentProps<"div">`). What remains is not
+>   a no-op wrapper: it supplies `role="toolbar"` + `aria-orientation="horizontal"`
+>   and the inner `flex-1 flex-wrap` track. It has one live consumer
+>   (`entity-data-table.tsx:1218`) and is referenced as a landmark in
+>   `entity-mobile-filter-sheet.tsx`. Inlining would also require editing
+>   `src/components/universal/`, which was out of scope this session.
+>
+> Drag-kit deps stay: `@/components/ui/sortable` is still live via the sort list.
+> Still open after this session: 15, 21–24.
+
 **Next session: verify each candidate before cutting.** For each, ref-count with
 `rg` and check the registry (`src/entities/index.ts`, `src/entities/cores.ts`),
 entity presentation configs, `z.infer` usage, `Makefile`, `.github/workflows`,
