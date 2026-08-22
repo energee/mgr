@@ -24,6 +24,15 @@
     "unaudited_backlog": {
       "count": 0,
       "tracking_issue": 696
+    },
+    "retired_objects": {
+      "_description": "Objects an anchor migration creates that a LATER migration deliberately dropped (object name -> dropping migration filename). check-feature-deployment.ts skips these when they are absent from the snapshot — needed because 00294 drops tables via dynamic SQL (invisible to static extraction) and because an anchor like 00285 creates both a live and a retired table, so no anchor re-shuffle could ever satisfy the gate. An entry only applies when the dropping migration exists in the chain and sorts after the anchor; each addition here is a visible, reviewable claim that the drop was intentional. (This _description value fails the reader's filename validation and is ignored by design.)",
+      "recipe_variants": "00294_drop_dead_schema_objects.sql",
+      "recipe_variant_hops": "00294_drop_dead_schema_objects.sql",
+      "recipe_variant_adjuncts": "00294_drop_dead_schema_objects.sql",
+      "recipe_variant_fruits": "00294_drop_dead_schema_objects.sql",
+      "recipe_variant_spices": "00294_drop_dead_schema_objects.sql",
+      "pricing_channel_formats": "00294_drop_dead_schema_objects.sql"
     }
   },
   "features": [
@@ -333,7 +342,7 @@
         "00085_variant_cost_views.sql"
       ],
       "evidence": "docs/plans/2026-02-05-recipe-batch-brewlog-cohesion{,-plan}.md",
-      "notes": null,
+      "notes": "Re-audited 2026-08-21: 00294 dropped the never-populated recipe_variants family (00083's tables, 00085's views) as dead schema — those objects are recorded in deployment_conventions.retired_objects. The shipped cohesion behavior rests on batch_additions (00084), which remains live.",
       "deployment": {
         "state": "live",
         "observed_live_on": "2026-07-16",
@@ -548,7 +557,7 @@
       "migrations": ["00285_capture_channel_formats.sql"],
       "deployment": { "state": "live", "observed_live_on": "2026-08-12", "verified_by": ["supabase/live-catalog.snapshot.txt", "#724"] },
       "evidence": "docs/plans/2026-02-19-per-channel-format-visibility-design.md",
-      "notes": "Anchored by the 00285 capture migration (#724), which brings the live-only channel_formats table — a #217 renumbering casualty the shipped UI reads and writes — into the chain. Flipped from \"pending\" to \"live\" on 2026-08-12: scripts/db-push.sh was run, 00285 is recorded in supabase_migrations.schema_migrations on live, and both channel_formats and pricing_channel_formats appear in the regenerated snapshot. Section 4's RLS tightening on the superseded pricing_channel_formats table is applied — the snapshot's former permissive \"Authenticated users can …\" policies were replaced by pricing_channel_formats_select/_write in the same refresh."
+      "notes": "Anchored by the 00285 capture migration (#724), which brings the live-only channel_formats table — a #217 renumbering casualty the shipped UI reads and writes — into the chain. Flipped from \"pending\" to \"live\" on 2026-08-12: scripts/db-push.sh was run, 00285 is recorded in supabase_migrations.schema_migrations on live, and both channel_formats and pricing_channel_formats appear in the regenerated snapshot. Section 4's RLS tightening on the superseded pricing_channel_formats table was applied at the time. Re-audited 2026-08-21: 00294 then retired pricing_channel_formats entirely (rows archived in docs/audits/exports/2026-08-21-pricing_channel_formats-rows.sql; recorded in deployment_conventions.retired_objects) — the feature's live schema is channel_formats, which 00285 also creates and which remains in the snapshot."
     },
     {
       "id": "F125",

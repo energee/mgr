@@ -62,10 +62,12 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
   REMAINS: concurrency coverage (advisory lock / `FOR UPDATE` contention); ship-writer idempotency + brand-scoped FIFO tiebreak (00234); the keg and BOM arms of `revise_packaging_session`; the 00232(b) stranded-outflow negative case.
 - [ ] **22. TS↔DB state-machine parity test** (TC-6, S effort) — owner: `test-surgeon`
   Diff `get_state_transitions()` against `src/lib/state-machines.ts` per entity — would have caught the 'revised' live outage.
+  Landed: the existing parity block was pinned to migration `00143`, two `CREATE OR REPLACE` generations stale; it now resolves the *winning* definition (`00205`) by scanning all migrations, adds `deliveries` coverage plus SQL→entity and stateful-entity-enforcement checks, and self-tests the comparison against a dropped `revised`. No real TS↔SQL mismatch found; 125→141 tests in the file.
 - [ ] **23. Behavioral upgrades for text-assertion suites** (TC-4, TC-5) — owner: `test-surgeon` + `data-layer-expert`
   One seeded TTB summary invocation; two-customer JWT RLS round-trip.
-- [ ] **24. Characterization for known-unfixed edges** (TC-3, TC-12) — owner: `test-surgeon`
+- [x] **24. Characterization for known-unfixed edges** (TC-3, TC-12) — owner: `test-surgeon` — see `docs/progress/2026-08-21-characterization-edges.md`
   Pin 00219 placement-skip / 00221 NULL-format exclusion semantics; pin `report-utils` planned+completed cost semantics.
+  Done as SQL-text + pure-function characterization (no DB): `src/lib/__tests__/bin-placement-sql.test.ts` (00219 keg skip, NULL-format-treated-as-non-keg, location-blind fallback, never-block/no-RAISE, no backfill, WHEN-less trigger), `src/lib/__tests__/sellable-inventory-sql.test.ts` (00221/00226 INNER-JOIN NULL-format exclusion, `<> 'keg'` guard, 00226 LEAST clamp, keg-branch asymmetry), and a "planned + completed cost semantics" block in `src/domain/__tests__/report-utils.test.ts` (both statuses summed, `status` neither selected nor returned, unpriced planned = $0). Every such assertion is labelled `KNOWN-IMPERFECT`. **Ceiling:** text assertions catch a migration edit, not a runtime regression that keeps the text — the behavioural half (an FG actually vanishing from the POS; a real planned+completed double count) still needs item 21's harness.
 
 ## P4 — Opportunistic / polish
 
