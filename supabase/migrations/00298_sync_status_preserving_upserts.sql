@@ -51,7 +51,15 @@ BEGIN
   SELECT
     r.name,
     r.vessel_type::vessel_type,
-    r.capacity_bbl,
+    -- A legacy Mongo doc with no capacity serializes without the key →
+    -- recordset NULL. capacity_bbl is NOT NULL, and Postgres checks that on
+    -- the CANDIDATE row before ON CONFLICT arbitration, so the fallback must
+    -- happen here at insert time (a COALESCE in DO UPDATE never runs) —
+    -- borrow the existing row's value via the join. A truly new vessel with
+    -- no capacity still fails the constraint, exactly as the old PostgREST
+    -- insert did; an existing one keeps its stored capacity, matching the old
+    -- per-row retry that only wrote present columns.
+    COALESCE(r.capacity_bbl, v.capacity_bbl),
     r.status::vessel_status,
     r.is_active
   FROM jsonb_to_recordset(p_rows) AS r(
@@ -61,6 +69,7 @@ BEGIN
     status TEXT,
     is_active BOOLEAN
   )
+  LEFT JOIN vessels v ON v.name = r.name
   ON CONFLICT (name) DO UPDATE SET
     vessel_type = EXCLUDED.vessel_type,
     capacity_bbl = EXCLUDED.capacity_bbl,

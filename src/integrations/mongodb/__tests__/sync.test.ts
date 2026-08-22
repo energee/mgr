@@ -13,6 +13,8 @@
  * collection stub. The logger is silenced.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ObjectId, type Db } from "mongodb";
 import { makeAdminMock, type TableData, type Write } from "@/test/supabase-admin-mock";
@@ -602,6 +604,23 @@ describe("syncTransfers historical replay (via syncEntity)", () => {
 // ---------------------------------------------------------------------------
 
 describe("transform column sets mirrored in 00298", () => {
+  // Parse the column lists out of the migration itself, so a transform column
+  // added to this test but forgotten in the SQL still fails — a hand-copied
+  // list here would go green while the RPC silently dropped the new column.
+  const migrationSql = readFileSync(
+    path.resolve(
+      __dirname,
+      "../../../../supabase/migrations/00298_sync_status_preserving_upserts.sql"
+    ),
+    "utf8"
+  );
+  function rpcColumns(fn: string): string[] {
+    const body = migrationSql.split(`CREATE OR REPLACE FUNCTION ${fn}`)[1];
+    const list = body?.match(/jsonb_to_recordset\(p_rows\) AS r\(([^)]*)\)/)?.[1];
+    if (!list) throw new Error(`recordset column list for ${fn} not found in 00298`);
+    return list.split(",").map((c) => c.trim().split(/\s+/)[0]!);
+  }
+
   it("transformVessel emits exactly the columns sync_upsert_vessels knows", () => {
     const row = transformVessel({
       _id: new ObjectId("afafafafafafafafafafafaf"),
@@ -611,12 +630,10 @@ describe("transform column sets mirrored in 00298", () => {
       state: "dirty",
     } as unknown as MongoVessel);
 
-    expect(Object.keys(row).sort()).toEqual(
-      ["capacity_bbl", "is_active", "name", "status", "vessel_type"]
-    );
+    expect(Object.keys(row).sort()).toEqual(rpcColumns("sync_upsert_vessels").sort());
   });
 
-  it("transformBatch (plus syncBatches enrichment keys) stays within the columns sync_upsert_batches knows", () => {
+  it("transformBatch plus syncBatches enrichment keys equals the columns sync_upsert_batches knows", () => {
     const row = transformBatch({
       _id: new ObjectId("abababababababababababab"),
       name: "B1",
@@ -624,17 +641,11 @@ describe("transform column sets mirrored in 00298", () => {
       notes: "n",
     } as unknown as MongoBatch);
 
-    expect(Object.keys(row).sort()).toEqual(
-      ["batch_code", "id", "name", "notes", "planned_start_date", "status"]
-    );
-    // syncBatches conditionally adds these two; the RPC also knows them
-    // (COALESCE-guarded on conflict since the payload omits them when the
-    // recipe doesn't resolve).
+    // syncBatches conditionally adds these two; the RPC COALESCE-guards them
+    // on conflict since the payload omits them when the recipe doesn't resolve.
     const enrichmentKeys = ["recipe_id", "volume_bbl"];
-    const rpcColumns = [
-      "id", "batch_code", "name", "status", "planned_start_date", "notes",
-      ...enrichmentKeys,
-    ];
-    expect(rpcColumns).toEqual(expect.arrayContaining(Object.keys(row)));
+    expect([...Object.keys(row), ...enrichmentKeys].sort()).toEqual(
+      rpcColumns("sync_upsert_batches").sort()
+    );
   });
 });
