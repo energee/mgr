@@ -4,7 +4,7 @@
 [![last commit](https://img.shields.io/github/last-commit/energee/mgr)](https://github.com/energee/mgr/commits/main)
 [![open issues](https://img.shields.io/github/issues/energee/mgr)](https://github.com/energee/mgr/issues)
 
-A full-stack operations management system covering production, inventory, purchasing, sales, and compliance reporting. Built with an AI-first, config-driven architecture.
+A full-stack brewery management system covering production, inventory, purchasing, sales, and TTB compliance reporting. Built with an AI-first, config-driven architecture.
 
 ## Tech Stack
 
@@ -36,19 +36,47 @@ make setup        # or: bun install
 
 # 2. Configure environment
 cp .env.example .env.local
-# Edit .env.local with your Supabase project URL, anon key, and service role key
+# Point NEXT_PUBLIC_SUPABASE_URL at your local stack (see below) or a hosted project
 
-# 3. Run database migrations
-supabase db push
+# 3. Zero-to-running local database
+make db-local     # reset + migrations + RLS role fixtures + demo data
 
-# 4. Generate TypeScript types from your database schema
-bun db:generate
-
-# 5. Start dev server (uses Turbopack)
+# 4. Start dev server (uses Turbopack)
 make dev          # or: bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+`make db-local` is what makes both the dev server and `bun run test:integration`
+work from a fresh clone — it runs `supabase start`, replays every migration,
+loads the RLS role fixtures, and applies `supabase/seed.sql` demo data. It is
+**destructive**: `supabase db reset` drops the local database (it never touches
+a remote one). Skip it only if you already have a seeded database. Run
+`bun db:generate:local` afterwards if the migrations changed the schema types.
+
+To work against a **hosted** Supabase project instead, apply migrations with
+`scripts/db-push.sh` (see [Deployment](#deployment)) and run `bun db:generate`
+to refresh the generated types.
+
+### Environment variables
+
+`.env.example` is the reference — copy it and read the comments. Only four
+variables are required:
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL (validated at import time in `src/lib/env.ts`) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-only key for privileged routes — never expose to the client |
+| `SUPABASE_PROJECT_ID` | yes | Used by `bun db:generate` |
+| `NEXT_PUBLIC_SITE_URL` | production | Canonical domain for invites and magic-link redirects; falls back to `NEXT_PUBLIC_APP_URL`, then `localhost:3000` |
+| `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | optional | Error tracking; auth token only for CI source-map upload |
+| `ANTHROPIC_API_KEY` | optional | AI chat — can also be set per-user or globally in `system_settings` |
+| `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `QBO_REDIRECT_URI` | optional | QuickBooks Online OAuth |
+| `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_URL` | optional | Square POS webhook ingestion |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | optional | Transactional email — set as **Supabase Edge Function secrets**, not Next.js env vars |
+| `LOG_LEVEL` | optional | `debug` \| `info` \| `warn` \| `error` |
+| `ENABLE_DEV_ENDPOINTS`, `DEV_LOGIN_ALLOW_REMOTE_DB` | dev only | Dev-login route; read the warning in `.env.example` before setting the second one |
 
 ## Project Structure
 
@@ -91,7 +119,9 @@ docs/
   plans/                 # Implementation plans
 
 supabase/
-  migrations/            # Numbered SQL migrations (00001–00300)
+  migrations/            # SQL migrations — `00XXX_description.sql` for
+                         # locally authored ones, `<timestamp>_*.sql` for
+                         # migrations pulled back from a live project
 ```
 
 ## Commands
@@ -103,8 +133,12 @@ supabase/
 | `make check` | Pre-commit gate: lint, typecheck, tests, DB rules, build |
 | `make check-all` | Full gate including Playwright E2E |
 | `bun run test` | Unit tests (Vitest — note: `bun test` is Bun's own runner, don't use it) |
+| `bun run test:integration` | Integration tests against the local DB (run `make db-local` first) |
+| `bun run test:coverage` | Unit tests with coverage |
 | `bun run test:watch` | Tests in watch mode |
 | `bun e2e` | Playwright end-to-end tests |
+| `make db-local` | Reset the local DB: migrations + RLS fixtures + demo data |
+| `make verify-feature ID=F003` | Verify one feature from `docs/feature_list.json` |
 | `bun db:generate` | Generate Supabase TypeScript types |
 | `bun analyze` | Bundle analysis |
 
@@ -164,6 +198,44 @@ export const orderEntity: EntityConfig<Order> = {
 | Compliance Reports | Built-in mapping of production data to regulatory reporting lines |
 | Customer Portal | External-facing portal where customers can view orders and submit change requests |
 
+## Testing
+
+Three layers, gated in order — no layer advances until the previous one is green:
+
+| Layer | Command | Covers |
+|-------|---------|--------|
+| 1 — static | `make check-fast` | ESLint + `tsc --noEmit` |
+| 2 — unit | `make check` | layer 1 + Vitest + DB rule checks + `next build`. **Required before every commit.** |
+| 3 — E2E | `make check-all` | layer 2 + Playwright |
+
+Integration tests (`bun run test:integration`) hit a real local Postgres and
+need `make db-local` first; they are not part of `make check`.
+
+## Deployment
+
+Deployed on Vercel. `vercel.json` delegates build-skipping to
+`scripts/vercel-ignore-build.sh`, so pushes that touch only docs don't trigger a
+build.
+
+Database migrations are **not** applied by the deploy. Push them explicitly:
+
+```bash
+SUPABASE_DB_URL='postgresql://...@db.<ref>.supabase.co:5432/postgres' \
+  bash scripts/db-push.sh
+```
+
+`scripts/db-push.sh` runs `supabase db push --include-all` and regenerates
+`supabase/live-catalog.snapshot.txt`, which the live-drift watchdog compares
+against. Commit the refreshed snapshot together with the migration. The script
+fails closed on pre-existing drift rather than silently re-baselining it.
+
+## Troubleshooting
+
+Start with [`docs/agents/gotchas.md`](docs/agents/gotchas.md) — it collects the
+failure modes that make no sense on first encounter (a stale PostgREST schema
+cache serving old enum values or columns, migration-number collisions,
+`bun test` vs `bun run test`). For stale build/type caches: `make clean`.
+
 ## Documentation
 
 - [`docs/spec/`](docs/spec/) — technical specification ([start here](docs/spec/README.md))
@@ -171,3 +243,18 @@ export const orderEntity: EntityConfig<Order> = {
 - [`docs/spec/architecture.md`](docs/spec/architecture.md) — architecture and security rules
 - [`docs/spec/decisions.md`](docs/spec/decisions.md) — schema decisions log
 - [`AGENTS.md`](AGENTS.md) — agent instructions, verification gate, and routing index for [`docs/agents/`](docs/agents/) topic docs
+
+## License
+
+Licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+    Copyright (C) 2026 Ted Slesinski
+
+    This program is free software: you can redistribute it and/or modify it
+    under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version. It is distributed WITHOUT ANY WARRANTY; see the
+    license for details.
+
+AGPL section 13 applies: if you run a modified version of this software as a
+network service, you must offer its source to the users of that service.
