@@ -66,7 +66,19 @@ check-agent-config: ## Validate shared agent skills, worktree tooling, and shell
 	@bash scripts/__tests__/pr-review-gate.test.sh
 	@bash scripts/__tests__/check-live-drift.test.sh
 
-check-db: ## DB rule checks (security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / schema_registry / data-model docs / permissive RLS)
+check-db: ## DB rule checks (migration numbering / security_invoker / RLS / auth.users / search_path / SECURITY DEFINER / schema_registry / data-model docs / permissive RLS)
+	@# Two migrations sharing a version prefix pass every SQL check and still
+	@# break `supabase db reset`: the CLI keys supabase_migrations.schema_migrations
+	@# on the prefix alone, so the second insert violates schema_migrations_pkey.
+	@# That is invisible until a Docker-backed replay runs in CI (#878, #920) —
+	@# catch it here in milliseconds instead.
+	@dupes=$$(ls supabase/migrations/*.sql | sed 's#.*/##; s/_.*//' | sort | uniq -d); \
+	if [ -n "$$dupes" ]; then \
+		echo "ERROR: duplicate migration version prefixes: $$dupes"; \
+		echo "  Each file in supabase/migrations/ must have a unique NNNNN_ prefix."; \
+		echo "  Renumber the newer file to (highest existing + 1)."; \
+		exit 1; \
+	fi
 	@bun run scripts/check-security-invoker.ts
 	@bun run scripts/check-rls.ts
 	@bun run scripts/check-auth-users-leak.ts
