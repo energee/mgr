@@ -12,8 +12,60 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      _backup_fulfill_past_orders: {
+        Row: {
+          backed_up_at: string
+          id: string
+          order_date: string | null
+          order_number: string
+          prior_status: string
+          prior_updated_at: string | null
+        }
+        Insert: {
+          backed_up_at?: string
+          id: string
+          order_date?: string | null
+          order_number: string
+          prior_status: string
+          prior_updated_at?: string | null
+        }
+        Update: {
+          backed_up_at?: string
+          id?: string
+          order_date?: string | null
+          order_number?: string
+          prior_status?: string
+          prior_updated_at?: string | null
+        }
+        Relationships: []
+      }
       _schema_registry: {
         Row: {
           ai_context: Json | null
@@ -143,6 +195,27 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_rate_limit_buckets: {
+        Row: {
+          request_count: number
+          updated_at: string
+          user_id: string
+          window_started_at: string
+        }
+        Insert: {
+          request_count?: number
+          updated_at?: string
+          user_id: string
+          window_started_at?: string
+        }
+        Update: {
+          request_count?: number
+          updated_at?: string
+          user_id?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       allocations: {
         Row: {
           approved_at: string | null
@@ -269,6 +342,13 @@ export type Database = {
             referencedRelation: "inventory_items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "allocations_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock_items"
+            referencedColumns: ["id"]
+          },
         ]
       }
       batch_additions: {
@@ -331,6 +411,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "batch_additions_batch_id_fkey"
@@ -412,6 +499,13 @@ export type Database = {
             foreignKeyName: "batch_blends_blend_batch_id_fkey"
             columns: ["blend_batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -449,6 +543,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "batch_blends_source_batch_id_fkey"
@@ -524,6 +625,13 @@ export type Database = {
             foreignKeyName: "batch_logs_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_logs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -571,7 +679,6 @@ export type Database = {
           notes: string | null
           planned_start_date: string | null
           recipe_id: string | null
-          recipe_variant_id: string | null
           status: string
           target_package_date: string | null
           updated_at: string | null
@@ -598,7 +705,6 @@ export type Database = {
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
-          recipe_variant_id?: string | null
           status?: string
           target_package_date?: string | null
           updated_at?: string | null
@@ -625,7 +731,6 @@ export type Database = {
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
-          recipe_variant_id?: string | null
           status?: string
           target_package_date?: string | null
           updated_at?: string | null
@@ -661,21 +766,155 @@ export type Database = {
             referencedRelation: "recipes_with_estimates"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      beer_order_brand_mappings: {
+        Row: {
+          brand_id: string
+          created_at: string
+          distributor_tier: number | null
+          source_key: string
+          source_label: string
+          updated_at: string
+        }
+        Insert: {
+          brand_id: string
+          created_at?: string
+          distributor_tier?: number | null
+          source_key: string
+          source_label: string
+          updated_at?: string
+        }
+        Update: {
+          brand_id?: string
+          created_at?: string
+          distributor_tier?: number | null
+          source_key?: string
+          source_label?: string
+          updated_at?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "batches_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
+            foreignKeyName: "beer_order_brand_mappings_brand_id_fkey"
+            columns: ["brand_id"]
             isOneToOne: false
-            referencedRelation: "recipe_variants"
+            referencedRelation: "brand_packaging_summary"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "beer_order_brand_mappings_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "batches_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
+            foreignKeyName: "beer_order_brand_mappings_brand_id_fkey"
+            columns: ["brand_id"]
             isOneToOne: false
-            referencedRelation: "recipe_variants_with_costs"
+            referencedRelation: "product_mix_by_brand"
+            referencedColumns: ["brand_id"]
+          },
+        ]
+      }
+      beer_order_customer_mappings: {
+        Row: {
+          created_at: string
+          customer_id: string
+          source_key: string
+          source_label: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          source_key: string
+          source_label: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          source_key?: string
+          source_label?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beer_order_customer_mappings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balance_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "beer_order_customer_mappings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "beer_order_customer_mappings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_revenue_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "beer_order_customer_mappings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beer_order_customer_mappings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_with_order_summary"
             referencedColumns: ["id"]
           },
         ]
+      }
+      beer_order_import_runs: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          created_by: string | null
+          error: string | null
+          file_sha256: string
+          filename: string
+          id: string
+          plan: Json
+          status: string
+          summary: Json
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          file_sha256: string
+          filename: string
+          id?: string
+          plan: Json
+          status?: string
+          summary: Json
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          file_sha256?: string
+          filename?: string
+          id?: string
+          plan?: Json
+          status?: string
+          summary?: Json
+        }
+        Relationships: []
       }
       beer_styles: {
         Row: {
@@ -939,6 +1178,7 @@ export type Database = {
           description: string | null
           hops: Json | null
           id: string
+          is_active: boolean
           name: string
           sku: string | null
           style_id: string | null
@@ -953,6 +1193,7 @@ export type Database = {
           description?: string | null
           hops?: Json | null
           id?: string
+          is_active?: boolean
           name: string
           sku?: string | null
           style_id?: string | null
@@ -967,6 +1208,7 @@ export type Database = {
           description?: string | null
           hops?: Json | null
           id?: string
+          is_active?: boolean
           name?: string
           sku?: string | null
           style_id?: string | null
@@ -1016,6 +1258,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "brew_log_batches_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "brew_log_batches_batch_id_fkey"
@@ -1140,6 +1389,13 @@ export type Database = {
             referencedRelation: "inventory_items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "brewery_shipping_defaults_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock_items"
+            referencedColumns: ["id"]
+          },
         ]
       }
       channel_formats: {
@@ -1178,6 +1434,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "channel_formats_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -1338,6 +1601,13 @@ export type Database = {
             foreignKeyName: "customer_pallet_configs_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "customer_pallet_configs_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -1367,6 +1637,63 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "selling_formats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_portal_users: {
+        Row: {
+          created_at: string
+          customer_id: string
+          revoked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          revoked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          revoked_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_portal_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balance_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_portal_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_portal_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_revenue_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "customer_portal_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_portal_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_with_order_summary"
             referencedColumns: ["id"]
           },
         ]
@@ -1442,6 +1769,13 @@ export type Database = {
             referencedRelation: "inventory_items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "customer_shipping_materials_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock_items"
+            referencedColumns: ["id"]
+          },
         ]
       }
       customers: {
@@ -1512,6 +1846,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      data_integrity_findings: {
+        Row: {
+          check_name: string
+          detail: string
+          detected_at: string
+          entity_id: string | null
+          entity_table: string
+          id: string
+          notified_at: string | null
+          resolved_at: string | null
+        }
+        Insert: {
+          check_name: string
+          detail: string
+          detected_at?: string
+          entity_id?: string | null
+          entity_table: string
+          id?: string
+          notified_at?: string | null
+          resolved_at?: string | null
+        }
+        Update: {
+          check_name?: string
+          detail?: string
+          detected_at?: string
+          entity_id?: string | null
+          entity_table?: string
+          id?: string
+          notified_at?: string | null
+          resolved_at?: string | null
+        }
+        Relationships: []
       }
       deliveries: {
         Row: {
@@ -1788,6 +2155,13 @@ export type Database = {
             foreignKeyName: "finished_goods_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -1845,6 +2219,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -2105,6 +2486,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_lots_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_lots_po_receive_id_fkey"
             columns: ["po_receive_id"]
             isOneToOne: false
@@ -2158,6 +2546,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_owner_deposits_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -2322,6 +2717,13 @@ export type Database = {
             foreignKeyName: "keg_transactions_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -2477,6 +2879,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -2900,6 +3309,199 @@ export type Database = {
         }
         Relationships: []
       }
+      order_change_request_items: {
+        Row: {
+          brand_id: string | null
+          change_request_id: string
+          change_type: string
+          id: string
+          order_item_id: string | null
+          original_quantity: number | null
+          quantity: number | null
+          selling_format_id: string | null
+        }
+        Insert: {
+          brand_id?: string | null
+          change_request_id: string
+          change_type: string
+          id?: string
+          order_item_id?: string | null
+          original_quantity?: number | null
+          quantity?: number | null
+          selling_format_id?: string | null
+        }
+        Update: {
+          brand_id?: string | null
+          change_request_id?: string
+          change_type?: string
+          id?: string
+          order_item_id?: string | null
+          original_quantity?: number | null
+          quantity?: number | null
+          selling_format_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_change_request_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brand_packaging_summary"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "product_mix_by_brand"
+            referencedColumns: ["brand_id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_change_request_id_fkey"
+            columns: ["change_request_id"]
+            isOneToOne: false
+            referencedRelation: "order_change_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items_with_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "brand_packaging_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_formats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_formats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_change_request_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "selling_formats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_change_requests: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          order_id: string
+          rejection_reason: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id: string
+          rejection_reason?: string | null
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+          rejection_reason?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_change_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_change_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_change_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_totals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           batch_id: string | null
@@ -2960,6 +3562,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "order_items_batch_id_fkey"
@@ -3039,13 +3648,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_items_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "packages"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "order_items_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
@@ -3057,6 +3659,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "order_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -3140,6 +3749,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_materials_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_materials_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -3189,7 +3805,7 @@ export type Database = {
           is_export?: boolean | null
           notes?: string | null
           order_date?: string
-          order_number: string
+          order_number?: string
           requested_date?: string | null
           scheduled_date?: string | null
           shipping_address?: Json | null
@@ -3262,134 +3878,6 @@ export type Database = {
             columns: ["delivery_id"]
             isOneToOne: false
             referencedRelation: "deliveries_with_summary"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      packages: {
-        Row: {
-          batch_id: string
-          best_by_date: string | null
-          created_at: string | null
-          id: string
-          lot_code: string | null
-          notes: string | null
-          packaged_date: string
-          quantity: number
-          selling_format_id: string
-        }
-        Insert: {
-          batch_id: string
-          best_by_date?: string | null
-          created_at?: string | null
-          id?: string
-          lot_code?: string | null
-          notes?: string | null
-          packaged_date: string
-          quantity: number
-          selling_format_id: string
-        }
-        Update: {
-          batch_id?: string
-          best_by_date?: string | null
-          created_at?: string | null
-          id?: string
-          lot_code?: string | null
-          notes?: string | null
-          packaged_date?: string
-          quantity?: number
-          selling_format_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "packages_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "packages_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "packages_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_brew_info"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "packages_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches_with_remaining_volume"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "packages_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "ttb_in_process_beer"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "packages_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "vessels_with_batch"
-            referencedColumns: ["batch_id"]
-          },
-          {
-            foreignKeyName: "packages_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "brand_packaging_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "packages_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "customer_keg_balances"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "packages_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_inventory_summary"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "packages_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "keg_turnover_metrics"
-            referencedColumns: ["selling_format_id"]
-          },
-          {
-            foreignKeyName: "packages_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "packaging_formats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "packages_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "pricing_formats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "packages_selling_format_id_fkey"
-            columns: ["selling_format_id"]
-            isOneToOne: false
-            referencedRelation: "selling_formats"
             referencedColumns: ["id"]
           },
         ]
@@ -3694,29 +4182,6 @@ export type Database = {
           },
         ]
       }
-      pricing_channel_formats: {
-        Row: {
-          format_id: string
-          sales_channel_id: string
-        }
-        Insert: {
-          format_id: string
-          sales_channel_id: string
-        }
-        Update: {
-          format_id?: string
-          sales_channel_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pricing_channel_formats_sales_channel_id_fkey"
-            columns: ["sales_channel_id"]
-            isOneToOne: false
-            referencedRelation: "sales_channels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pricing_history: {
         Row: {
           changed_at: string
@@ -3802,6 +4267,13 @@ export type Database = {
             columns: ["format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "pricing_tier_prices_format_id_fkey"
+            columns: ["format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -4181,56 +4653,6 @@ export type Database = {
           },
         ]
       }
-      recipe_collaborators: {
-        Row: {
-          created_at: string | null
-          id: string
-          recipe_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          recipe_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          recipe_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recipe_collaborators_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["recipe_id"]
-          },
-          {
-            foreignKeyName: "recipe_collaborators_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_collaborators_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_cogs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_collaborators_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_estimates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       recipe_fruits: {
         Row: {
           amount: number
@@ -4590,291 +5012,6 @@ export type Database = {
             columns: ["sugar_id"]
             isOneToOne: false
             referencedRelation: "sugars"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      recipe_variant_adjuncts: {
-        Row: {
-          adjunct_id: string
-          amount: number
-          created_at: string
-          id: string
-          position: number
-          recipe_variant_id: string
-          timing: string | null
-          unit: string
-        }
-        Insert: {
-          adjunct_id: string
-          amount: number
-          created_at?: string
-          id?: string
-          position?: number
-          recipe_variant_id: string
-          timing?: string | null
-          unit: string
-        }
-        Update: {
-          adjunct_id?: string
-          amount?: number
-          created_at?: string
-          id?: string
-          position?: number
-          recipe_variant_id?: string
-          timing?: string | null
-          unit?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recipe_variant_adjuncts_adjunct_id_fkey"
-            columns: ["adjunct_id"]
-            isOneToOne: false
-            referencedRelation: "adjuncts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variant_adjuncts_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variant_adjuncts_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants_with_costs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      recipe_variant_fruits: {
-        Row: {
-          amount: number
-          created_at: string
-          fruit_id: string
-          id: string
-          position: number
-          recipe_variant_id: string
-          timing: string | null
-          unit: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          fruit_id: string
-          id?: string
-          position?: number
-          recipe_variant_id: string
-          timing?: string | null
-          unit: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          fruit_id?: string
-          id?: string
-          position?: number
-          recipe_variant_id?: string
-          timing?: string | null
-          unit?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recipe_variant_fruits_fruit_id_fkey"
-            columns: ["fruit_id"]
-            isOneToOne: false
-            referencedRelation: "fruits"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variant_fruits_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variant_fruits_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants_with_costs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      recipe_variant_hops: {
-        Row: {
-          created_at: string
-          days: number | null
-          hop_id: string
-          id: string
-          position: number
-          recipe_variant_id: string
-          timing: string
-          weight_oz: number
-        }
-        Insert: {
-          created_at?: string
-          days?: number | null
-          hop_id: string
-          id?: string
-          position?: number
-          recipe_variant_id: string
-          timing?: string
-          weight_oz: number
-        }
-        Update: {
-          created_at?: string
-          days?: number | null
-          hop_id?: string
-          id?: string
-          position?: number
-          recipe_variant_id?: string
-          timing?: string
-          weight_oz?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recipe_variant_hops_hop_id_fkey"
-            columns: ["hop_id"]
-            isOneToOne: false
-            referencedRelation: "hops"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variant_hops_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variant_hops_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants_with_costs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      recipe_variant_spices: {
-        Row: {
-          amount: number
-          boil_time_min: number | null
-          created_at: string
-          id: string
-          position: number
-          recipe_variant_id: string
-          spice_id: string
-          timing: string | null
-          unit: string
-        }
-        Insert: {
-          amount: number
-          boil_time_min?: number | null
-          created_at?: string
-          id?: string
-          position?: number
-          recipe_variant_id: string
-          spice_id: string
-          timing?: string | null
-          unit: string
-        }
-        Update: {
-          amount?: number
-          boil_time_min?: number | null
-          created_at?: string
-          id?: string
-          position?: number
-          recipe_variant_id?: string
-          spice_id?: string
-          timing?: string | null
-          unit?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recipe_variant_spices_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variant_spices_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants_with_costs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variant_spices_spice_id_fkey"
-            columns: ["spice_id"]
-            isOneToOne: false
-            referencedRelation: "spices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      recipe_variants: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          planned_volume_bbl: number | null
-          position: number
-          recipe_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          planned_volume_bbl?: number | null
-          position?: number
-          recipe_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          planned_volume_bbl?: number | null
-          position?: number
-          recipe_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recipe_variants_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["recipe_id"]
-          },
-          {
-            foreignKeyName: "recipe_variants_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variants_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_cogs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variants_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_estimates"
             referencedColumns: ["id"]
           },
         ]
@@ -5240,6 +5377,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "selling_format_materials_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "selling_format_materials_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
@@ -5251,6 +5395,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "selling_format_materials_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -5393,6 +5544,13 @@ export type Database = {
             foreignKeyName: "session_line_items_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_line_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -5457,6 +5615,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "session_line_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -5640,6 +5805,7 @@ export type Database = {
           id: string
           last_synced_at: string | null
           object_type: string
+          pour_size_oz: number | null
           selling_format_id: string | null
           square_catalog_id: string
           square_version: number | null
@@ -5651,6 +5817,7 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           object_type: string
+          pour_size_oz?: number | null
           selling_format_id?: string | null
           square_catalog_id: string
           square_version?: number | null
@@ -5662,6 +5829,7 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           object_type?: string
+          pour_size_oz?: number | null
           selling_format_id?: string | null
           square_catalog_id?: string
           square_version?: number | null
@@ -5701,6 +5869,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "square_catalog_map_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -6281,6 +6456,9 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          account_status_operation: string | null
+          account_status_operation_id: string | null
+          account_status_operation_started_at: string | null
           avatar_url: string | null
           created_at: string
           display_name: string | null
@@ -6294,6 +6472,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_status_operation?: string | null
+          account_status_operation_id?: string | null
+          account_status_operation_started_at?: string | null
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -6307,6 +6488,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_status_operation?: string | null
+          account_status_operation_id?: string | null
+          account_status_operation_started_at?: string | null
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -6320,80 +6504,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      vessel_cleanings: {
-        Row: {
-          chemicals_used: Json | null
-          cleaned_at: string
-          cleaned_by: string | null
-          cleaned_by_name: string | null
-          cleaning_type: Database["public"]["Enums"]["cleaning_type"]
-          created_at: string | null
-          duration_min: number | null
-          from_status: Database["public"]["Enums"]["vessel_status"]
-          id: string
-          notes: string | null
-          to_status: Database["public"]["Enums"]["vessel_status"]
-          vessel_id: string
-        }
-        Insert: {
-          chemicals_used?: Json | null
-          cleaned_at?: string
-          cleaned_by?: string | null
-          cleaned_by_name?: string | null
-          cleaning_type: Database["public"]["Enums"]["cleaning_type"]
-          created_at?: string | null
-          duration_min?: number | null
-          from_status: Database["public"]["Enums"]["vessel_status"]
-          id?: string
-          notes?: string | null
-          to_status: Database["public"]["Enums"]["vessel_status"]
-          vessel_id: string
-        }
-        Update: {
-          chemicals_used?: Json | null
-          cleaned_at?: string
-          cleaned_by?: string | null
-          cleaned_by_name?: string | null
-          cleaning_type?: Database["public"]["Enums"]["cleaning_type"]
-          created_at?: string | null
-          duration_min?: number | null
-          from_status?: Database["public"]["Enums"]["vessel_status"]
-          id?: string
-          notes?: string | null
-          to_status?: Database["public"]["Enums"]["vessel_status"]
-          vessel_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "available_vessels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessel_batch_drift_check"
-            referencedColumns: ["vessel_id"]
-          },
-          {
-            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessels_with_batch"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       vessel_transfers: {
         Row: {
@@ -6449,6 +6559,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "vessel_transfers_batch_id_fkey"
@@ -6595,6 +6712,13 @@ export type Database = {
             foreignKeyName: "vessels_current_batch_id_fkey"
             columns: ["current_batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -6727,6 +6851,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "yeast_pitch_events_batch_id_fkey"
@@ -7015,6 +7146,13 @@ export type Database = {
             foreignKeyName: "vessels_current_batch_id_fkey"
             columns: ["current_batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -7084,6 +7222,13 @@ export type Database = {
             foreignKeyName: "batch_additions_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_additions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -7148,6 +7293,13 @@ export type Database = {
             foreignKeyName: "batch_blends_blend_batch_id_fkey"
             columns: ["blend_batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_blends_blend_batch_id_fkey"
+            columns: ["blend_batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -7185,6 +7337,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "batch_blends_source_batch_id_fkey"
+            columns: ["source_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "batch_blends_source_batch_id_fkey"
@@ -7256,6 +7415,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "yeast_pitch_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "yeast_pitch_events_batch_id_fkey"
@@ -7347,6 +7513,22 @@ export type Database = {
           },
         ]
       }
+      batches_with_blend_info: {
+        Row: {
+          available_volume_bbl: number | null
+          blend_source_count: number | null
+          blend_source_recipes: string[] | null
+          blended_abv: number | null
+          blended_fg: number | null
+          blended_ibu: number | null
+          blended_og: number | null
+          blended_srm: number | null
+          blended_volume_in_bbl: number | null
+          id: string | null
+          volume_blended_away_bbl: number | null
+        }
+        Relationships: []
+      }
       batches_with_brew_info: {
         Row: {
           actual_abv: number | null
@@ -7373,7 +7555,6 @@ export type Database = {
           notes: string | null
           planned_start_date: string | null
           recipe_id: string | null
-          recipe_variant_id: string | null
           status: string | null
           target_package_date: string | null
           updated_at: string | null
@@ -7406,7 +7587,6 @@ export type Database = {
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
-          recipe_variant_id?: string | null
           status?: string | null
           target_package_date?: string | null
           updated_at?: string | null
@@ -7439,7 +7619,6 @@ export type Database = {
           notes?: string | null
           planned_start_date?: string | null
           recipe_id?: string | null
-          recipe_variant_id?: string | null
           status?: string | null
           target_package_date?: string | null
           updated_at?: string | null
@@ -7474,20 +7653,6 @@ export type Database = {
             columns: ["recipe_id"]
             isOneToOne: false
             referencedRelation: "recipes_with_estimates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "batches_recipe_variant_id_fkey"
-            columns: ["recipe_variant_id"]
-            isOneToOne: false
-            referencedRelation: "recipe_variants_with_costs"
             referencedColumns: ["id"]
           },
         ]
@@ -7775,6 +7940,13 @@ export type Database = {
             foreignKeyName: "keg_transactions_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -7932,6 +8104,13 @@ export type Database = {
             foreignKeyName: "finished_goods_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -8010,6 +8189,13 @@ export type Database = {
             foreignKeyName: "finished_goods_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -8067,6 +8253,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -8157,6 +8350,13 @@ export type Database = {
             foreignKeyName: "finished_goods_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -8214,6 +8414,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "finished_goods_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -8286,6 +8493,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_lots_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_lots_po_receive_id_fkey"
             columns: ["po_receive_id"]
             isOneToOne: false
@@ -8324,6 +8538,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventory_lots_inventory_item_id_fkey"
+            columns: ["inventory_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_low_stock_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "inventory_lots_po_receive_id_fkey"
             columns: ["po_receive_id"]
             isOneToOne: false
@@ -8331,6 +8552,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inventory_low_stock_items: {
+        Row: {
+          category: string | null
+          current_qty: number | null
+          id: string | null
+          name: string | null
+          reorder_point: number | null
+          unit: string | null
+        }
+        Relationships: []
       }
       inventory_summary_by_category: {
         Row: {
@@ -8415,6 +8647,13 @@ export type Database = {
             foreignKeyName: "keg_transactions_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -8481,6 +8720,28 @@ export type Database = {
           },
         ]
       }
+      keg_fleet_summary: {
+        Row: {
+          active_kegs: number | null
+          cleaning_count: number | null
+          deposit_amount: number | null
+          deposits_outstanding: number | null
+          dirty_count: number | null
+          empty_count: number | null
+          filled_count: number | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
+          keg_type_name: string | null
+          maintenance_count: number | null
+          retired_count: number | null
+          selling_format_id: string | null
+          shipped_count: number | null
+          total_kegs: number | null
+          utilization_pct: number | null
+          volume_bbl: number | null
+        }
+        Relationships: []
+      }
       keg_inventory: {
         Row: {
           id: string | null
@@ -8523,6 +8784,291 @@ export type Database = {
           volume_bbl: number | null
         }
         Relationships: []
+      }
+      keg_transactions_with_details: {
+        Row: {
+          batch_code: string | null
+          batch_id: string | null
+          created_at: string | null
+          created_by_name: string | null
+          customer_id: string | null
+          customer_name: string | null
+          finished_good_brand: string | null
+          finished_good_id: string | null
+          finished_good_lot: string | null
+          finished_good_name: string | null
+          from_bin_id: string | null
+          from_location_id: string | null
+          from_location_name: string | null
+          from_state: Database["public"]["Enums"]["keg_state"] | null
+          id: string | null
+          keg_owner_code: string | null
+          keg_owner_id: string | null
+          keg_owner_name: string | null
+          keg_type_name: string | null
+          location_name: string | null
+          notes: string | null
+          order_id: string | null
+          order_number: string | null
+          packaging_session_id: string | null
+          quantity: number | null
+          selling_format_id: string | null
+          to_bin_id: string | null
+          to_location_id: string | null
+          to_location_name: string | null
+          to_state: Database["public"]["Enums"]["keg_state"] | null
+          transaction_type:
+            | Database["public"]["Enums"]["keg_transaction_type"]
+            | null
+          volume_bbl: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_in_production_by_brand"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_brew_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_remaining_volume"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "ttb_in_process_beer"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_with_batch"
+            referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balance_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_revenue_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_with_order_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_with_availability"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_with_ttb_class"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_keg_owner_id_fkey"
+            columns: ["keg_owner_id"]
+            isOneToOne: false
+            referencedRelation: "keg_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "order_list_details"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_totals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_packaging_session_id_fkey"
+            columns: ["packaging_session_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_packaging_session_id_fkey"
+            columns: ["packaging_session_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_sessions_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "brand_packaging_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_inventory_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_turnover_metrics"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "packaging_formats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_formats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "selling_formats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keg_transactions_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       keg_turnover_metrics: {
         Row: {
@@ -8761,6 +9307,13 @@ export type Database = {
             foreignKeyName: "order_items_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "order_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
             referencedRelation: "keg_inventory_summary"
             referencedColumns: ["selling_format_id"]
           },
@@ -8834,6 +9387,13 @@ export type Database = {
             foreignKeyName: "order_items_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -8901,13 +9461,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_items_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "packages"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "order_items_selling_format_id_fkey"
             columns: ["selling_format_id"]
             isOneToOne: false
@@ -8919,6 +9472,13 @@ export type Database = {
             columns: ["selling_format_id"]
             isOneToOne: false
             referencedRelation: "customer_keg_balances"
+            referencedColumns: ["selling_format_id"]
+          },
+          {
+            foreignKeyName: "order_items_selling_format_id_fkey"
+            columns: ["selling_format_id"]
+            isOneToOne: false
+            referencedRelation: "keg_fleet_summary"
             referencedColumns: ["selling_format_id"]
           },
           {
@@ -9165,7 +9725,22 @@ export type Database = {
           total_variance: number | null
           updated_at: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "packaging_sessions_default_bin_id_fkey"
+            columns: ["default_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packaging_sessions_default_bin_id_fkey"
+            columns: ["default_bin_id"]
+            isOneToOne: false
+            referencedRelation: "bins_with_summary"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pick_list_details: {
         Row: {
@@ -9307,55 +9882,6 @@ export type Database = {
         }
         Relationships: []
       }
-      recent_vessel_cleanings: {
-        Row: {
-          chemicals_used: Json | null
-          cleaned_at: string | null
-          cleaned_by: string | null
-          cleaned_by_email: string | null
-          cleaned_by_name: string | null
-          cleaning_type: Database["public"]["Enums"]["cleaning_type"] | null
-          created_at: string | null
-          duration_min: number | null
-          from_status: Database["public"]["Enums"]["vessel_status"] | null
-          id: string | null
-          notes: string | null
-          to_status: Database["public"]["Enums"]["vessel_status"] | null
-          vessel_id: string | null
-          vessel_name: string | null
-          vessel_type: Database["public"]["Enums"]["vessel_type"] | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "available_vessels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessel_batch_drift_check"
-            referencedColumns: ["vessel_id"]
-          },
-          {
-            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vessel_cleanings_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessels_with_batch"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       recipe_ingredients_normalized: {
         Row: {
           catalog_id: string | null
@@ -9366,52 +9892,6 @@ export type Database = {
           unit: string | null
         }
         Relationships: []
-      }
-      recipe_variants_with_costs: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          est_cost_per_bbl: number | null
-          est_total_cost: number | null
-          hot_side_cost_per_bbl: number | null
-          id: string | null
-          name: string | null
-          planned_volume_bbl: number | null
-          position: number | null
-          recipe_id: string | null
-          updated_at: string | null
-          variant_addition_cost: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recipe_variants_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "batches_in_production_by_brand"
-            referencedColumns: ["recipe_id"]
-          },
-          {
-            foreignKeyName: "recipe_variants_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variants_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_cogs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recipe_variants_recipe_id_fkey"
-            columns: ["recipe_id"]
-            isOneToOne: false
-            referencedRelation: "recipes_with_estimates"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       recipes_with_cogs: {
         Row: {
@@ -9708,6 +10188,13 @@ export type Database = {
             foreignKeyName: "vessels_current_batch_id_fkey"
             columns: ["stored_batch_id"]
             isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["stored_batch_id"]
+            isOneToOne: false
             referencedRelation: "batches_with_brew_info"
             referencedColumns: ["id"]
           },
@@ -9763,6 +10250,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessel_transfers_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "vessel_transfers_batch_id_fkey"
@@ -9883,6 +10377,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "batches_in_production_by_brand"
             referencedColumns: ["batch_id"]
+          },
+          {
+            foreignKeyName: "vessels_current_batch_id_fkey"
+            columns: ["current_batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches_with_blend_info"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "vessels_current_batch_id_fkey"
@@ -10034,10 +10535,23 @@ export type Database = {
       }
     }
     Functions: {
+      abort_user_account_status_operation: {
+        Args: { p_operation_id: string; p_user_id: string }
+        Returns: string
+      }
       analyze_batch_performance: { Args: { p_batch_id: string }; Returns: Json }
       analyze_recipe_style_compliance: {
         Args: { p_recipe_id: string }
         Returns: Json
+      }
+      apply_beer_order_import: { Args: { p_run_id: string }; Returns: Json }
+      apply_change_request: {
+        Args: {
+          p_approved_by: string
+          p_change_request_id: string
+          p_order_id: string
+        }
+        Returns: undefined
       }
       archive_batch: {
         Args: {
@@ -10047,6 +10561,13 @@ export type Database = {
           p_reason: string
         }
         Returns: Json
+      }
+      begin_user_account_status_operation: {
+        Args: { p_command: string; p_user_id: string }
+        Returns: {
+          operation_id: string
+          profile_status: string
+        }[]
       }
       calculate_ingredient_demand: {
         Args: {
@@ -10177,6 +10698,7 @@ export type Database = {
         }
         Returns: Json
       }
+      check_data_integrity: { Args: never; Returns: undefined }
       check_low_inventory: { Args: never; Returns: number }
       cleanup_old_notifications: {
         Args: { p_days_old?: number }
@@ -10203,6 +10725,22 @@ export type Database = {
           total_landed_cost: number
           volume_bbl: number
           yeast_cost: number
+        }[]
+      }
+      complete_user_account_status_operation: {
+        Args: { p_operation_id: string; p_user_id: string }
+        Returns: string
+      }
+      consume_ai_rate_limit: {
+        Args: {
+          p_max_requests?: number
+          p_user_id: string
+          p_window_seconds?: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          reset_at: string
         }[]
       }
       convert_to_lbs: {
@@ -10237,6 +10775,7 @@ export type Database = {
           new_quantity: number
         }[]
       }
+      current_user_is_enabled: { Args: never; Returns: boolean }
       debit_bin_inventory: {
         Args: { p_bin_id: string; p_finished_good_id: string; p_qty: number }
         Returns: {
@@ -10263,6 +10802,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      exact_material_qty: {
+        Args: { p_qpu: number; p_units: number }
+        Returns: number
       }
       generate_lot_number: { Args: { p_date: string }; Returns: string }
       generate_next_number: {
@@ -10317,6 +10860,16 @@ export type Database = {
           planned_count: number
         }[]
       }
+      get_portal_available_products: {
+        Args: never
+        Returns: {
+          available_quantity: number
+          brand_id: string
+          brand_name: string
+          selling_format_id: string
+          selling_format_name: string
+        }[]
+      }
       get_price_for_customer: {
         Args: {
           p_brand_id?: string
@@ -10342,6 +10895,23 @@ export type Database = {
         }[]
       }
       get_recipe_summary: { Args: { p_recipe_id: string }; Returns: Json }
+      get_revenue_by_month: {
+        Args: never
+        Returns: {
+          month: number
+          order_count: number
+          revenue: number
+          year: number
+        }[]
+      }
+      get_revenue_by_year: {
+        Args: never
+        Returns: {
+          order_count: number
+          revenue: number
+          year: number
+        }[]
+      }
       get_roles_for_permission: {
         Args: { p_permission: string }
         Returns: string[]
@@ -10491,9 +11061,33 @@ export type Database = {
         }
         Returns: number
       }
+      notify_data_integrity_findings: { Args: never; Returns: number }
+      order_change_has_fulfillment_artifacts: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
+      pitch_yeast_atomic: {
+        Args: {
+          p_batch_id: string
+          p_notes: string
+          p_pitch_id: string
+          p_quantity_lbs: number
+          p_request_id: string
+          p_viability_at_pitch: number
+        }
+        Returns: Json
+      }
+      prune_log_tables: {
+        Args: { p_log_days?: number; p_revision_days?: number }
+        Returns: Json
+      }
       recalculate_order_materials: {
         Args: { p_order_id: string }
         Returns: undefined
+      }
+      receive_purchase_order_items: {
+        Args: { p_entries: Json; p_po_id: string }
+        Returns: string
       }
       reconcile_mongodb_batch_reading_aggregate: {
         Args: { p_mongo_id: string; p_readings?: Json }
@@ -10517,25 +11111,10 @@ export type Database = {
         }
         Returns: number
       }
-      pitch_yeast_atomic: {
-        Args: {
-          p_batch_id: string
-          p_notes: string
-          p_pitch_id: string
-          p_quantity_lbs: number
-          p_request_id: string
-          p_viability_at_pitch: number
-        }
-        Returns: Json
-      }
-      replace_recipe_additions_atomic: {
-        Args: {
-          p_expected_version: number
-          p_items?: Json
-          p_recipe_id: string
-          p_scope: string
-        }
-        Returns: Json
+      reconcile_mongodb_transfers: { Args: { p_rows: Json }; Returns: number }
+      reconcile_square_draft_sale_atomic: {
+        Args: { p_reconciled_at: string; p_rows: Json; p_sale_id: string }
+        Returns: string
       }
       record_keg_transaction: {
         Args: {
@@ -10565,6 +11144,15 @@ export type Database = {
           p_reason: string
         }
         Returns: string
+      }
+      replace_recipe_additions_atomic: {
+        Args: {
+          p_expected_version: number
+          p_items?: Json
+          p_recipe_id: string
+          p_scope: string
+        }
+        Returns: Json
       }
       revise_packaging_session: {
         Args: { p_items: Json; p_reason?: string; p_session_id: string }
@@ -10601,6 +11189,16 @@ export type Database = {
         Args: { p_recipe_id: string }
         Returns: Json
       }
+      transition_entity_atomic: {
+        Args: {
+          p_extra_fields?: Json
+          p_from_state: string
+          p_id: string
+          p_table_name: string
+          p_to_state: string
+        }
+        Returns: Json
+      }
       update_last_active: { Args: never; Returns: undefined }
       user_has_brewery_access: {
         Args: { brewery_id: string }
@@ -10615,13 +11213,6 @@ export type Database = {
       }
     }
     Enums: {
-      cleaning_type:
-        | "cip"
-        | "caustic"
-        | "acid"
-        | "sanitize"
-        | "manual"
-        | "rinse"
       keg_state:
         | "empty"
         | "filled"
@@ -10780,9 +11371,11 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
-      cleaning_type: ["cip", "caustic", "acid", "sanitize", "manual", "rinse"],
       keg_state: [
         "empty",
         "filled",

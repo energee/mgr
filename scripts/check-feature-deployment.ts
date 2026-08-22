@@ -125,6 +125,16 @@ export type AuditContext = {
   pathExists: (repoRelativePath: string) => boolean;
   /** Today as `YYYY-MM-DD`; injected so the date checks are testable. */
   today: string;
+  /**
+   * Objects an anchor migration creates that a LATER migration deliberately
+   * dropped (object name → dropping migration filename), from
+   * `deployment_conventions.retired_objects`. Needed because a drop done via
+   * dynamic SQL (00294's DO-block loop) is invisible to static extraction, and
+   * an anchor that creates both a live and a retired object (00285) could
+   * otherwise never satisfy the gate. An entry only applies when the named
+   * dropping migration exists in the chain and sorts after the anchor.
+   */
+  retiredObjects?: Readonly<Record<string, string>>;
 };
 
 /** What the run covered — printed, so an empty audit cannot read as a full one. */
@@ -141,6 +151,8 @@ export type AuditStats = {
   liveSnapshotVerified: number;
   /** `live` records whose migrations create nothing the snapshot records. */
   liveUnverifiable: number;
+  /** Anchor-created objects skipped because a later migration retired them. */
+  liveRetired: number;
   pending: number;
 };
 
@@ -240,6 +252,7 @@ export function auditFeatureDeployment(
     live: 0,
     liveSnapshotVerified: 0,
     liveUnverifiable: 0,
+    liveRetired: 0,
     pending: 0,
   };
 
@@ -431,14 +444,26 @@ function auditLiveRecord(
   // declared migrations create.
   const missing: string[] = [];
   let looked = 0;
+  let retired = 0;
   for (const name of migrations) {
     if (!ctx.migrationFiles.includes(name)) continue; // already reported
     const objects = createdCatalogObjects(ctx.readMigration(name));
     looked += objects.length;
     for (const object of objects) {
-      if (!catalogHas(ctx.liveCatalog, object)) missing.push(`${name}: ${object.kind} ${object.name}`);
+      if (catalogHas(ctx.liveCatalog, object)) continue;
+      // A snapshot-absent object is not "missing" when the tracker records a
+      // LATER migration deliberately dropping it (retired_objects — see
+      // AuditContext). The dropping migration must be real and sort after the
+      // anchor, so a typo or a stale entry cannot silently bless real drift.
+      const droppedBy = ctx.retiredObjects?.[object.name];
+      if (droppedBy && ctx.migrationFiles.includes(droppedBy) && droppedBy > name) {
+        retired++;
+        continue;
+      }
+      missing.push(`${name}: ${object.kind} ${object.name}`);
     }
   }
+  stats.liveRetired += retired;
   if (missing.length > 0) {
     fail(
       `deployment.state "live" but ${missing.length} object(s) the declared migration(s) create ` +
@@ -446,8 +471,10 @@ function auditLiveRecord(
         "is not (fully) applied on live — record `pending` and open an issue — or a later " +
         "migration renamed or dropped the object and this entry's anchor needs re-auditing.",
     );
-  } else if (looked === 0) {
-    // A column-add / view-only / data-only migration. Nothing to look for.
+  } else if (looked - retired === 0) {
+    // A column-add / view-only / data-only migration — or one whose every
+    // object was later retired. Nothing left to look for; do not claim
+    // "verified" on the strength of retired objects alone.
     stats.liveUnverifiable++;
   } else {
     stats.liveSnapshotVerified++;
@@ -532,7 +559,9 @@ function summarize(stats: AuditStats, backlogIssue: string): string {
     `OK: ${stats.checked} feature entr${stats.checked === 1 ? "y" : "ies"} checked`,
     `    ${stats.migrationBacked} migration-backed — ${stats.live} live ` +
       `(${stats.liveSnapshotVerified} verified against ${LIVE_CATALOG_SNAPSHOT}, ` +
-      `${stats.liveUnverifiable} not verifiable from it), ${stats.pending} pending`,
+      `${stats.liveUnverifiable} not verifiable from it` +
+      (stats.liveRetired > 0 ? `, ${stats.liveRetired} retired object(s) skipped` : "") +
+      `), ${stats.pending} pending`,
     `    ${stats.noSchema} audited as needing no schema change`,
   ];
   if (stats.unaudited > 0) {
@@ -542,6 +571,26 @@ function summarize(stats: AuditStats, backlogIssue: string): string {
     );
   }
   return lines.join("\n");
+}
+
+/**
+ * `deployment_conventions.retired_objects`: object name → dropping migration
+ * filename. Anything not shaped exactly like that is dropped, so a malformed
+ * entry cannot silently widen the retirement escape hatch.
+ */
+export function readRetiredObjects(
+  conventions: Record<string, unknown> | undefined,
+): Record<string, string> {
+  const raw = conventions?.retired_objects;
+  const out: Record<string, string> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [name, droppedBy] of Object.entries(raw)) {
+      if (typeof droppedBy === "string" && /^\d{5}_[a-z0-9_]+\.sql$/.test(droppedBy)) {
+        out[name.toLowerCase()] = droppedBy;
+      }
+    }
+  }
+  return out;
 }
 
 function main(): void {
@@ -567,6 +616,7 @@ function main(): void {
     liveCatalog: readFileSync(new URL(LIVE_CATALOG_SNAPSHOT, repoRoot), "utf8").split("\n"),
     pathExists: (path) => isSafeRepoPath(path) && existsSync(new URL(path, repoRoot)),
     today: new Date().toISOString().slice(0, 10),
+    retiredObjects: readRetiredObjects(tracker.deployment_conventions),
   });
 
   // The backlog ratchet is a whole-tracker property; a scoped run sees one entry.
