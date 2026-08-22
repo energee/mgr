@@ -153,6 +153,9 @@ Ingredients are stored in junction tables rather than JSONB arrays. This enables
 - Database-level referential integrity
 - Proper indexing for ingredient searches
 
+Every junction amount column (`weight_lbs` / `weight_oz` / `amount`) carries a
+`CHECK (... > 0)` constraint since migration 00298.
+
 ### `recipe_malts`
 
 | Column | Type | Description |
@@ -297,7 +300,7 @@ Detailed recipe cost breakdown by ingredient category. Use this view when you ne
 | hop_cost | DECIMAL(10,2) | Total hop cost |
 | yeast_cost | DECIMAL(10,2) | Yeast cost (from yeasts.cost_per_unit) |
 | adjunct_cost | DECIMAL(10,2) | Total adjunct cost |
-| addition_cost | DECIMAL(10,2) | Total additive cost |
+| addition_cost | DECIMAL(10,2) | Constant 0 since 00297 (additives.cost_per_unit dropped — was never populated); column kept for view-shape compatibility |
 | total_cogs | DECIMAL(10,2) | Sum of all ingredient costs |
 | cogs_per_bbl | DECIMAL(10,2) | Total COGS / batch_size_bbl (or volume_bbl) |
 | total_grain_lbs | DECIMAL(10,1) | Total grain weight for reference |
@@ -307,7 +310,7 @@ Detailed recipe cost breakdown by ingredient category. Use this view when you ne
 - Malt cost: `weight_lbs * malts.cost_per_lb`
 - Hop cost: Converts oz to lbs (`weight_oz / 16.0 * hops.cost_per_lb`)
 - Adjunct cost: `amount_lbs * adjuncts.cost_per_lb`
-- Addition cost: `amount * additives.cost_per_unit` (units must match)
+- Addition cost: constant 0 (the `additives.cost_per_unit` column was dropped in 00297)
 - COGS per BBL: Uses `batch_size_bbl` if available, otherwise `volume_bbl`. Returns NULL if both are zero/null.
 - All costs default to 0 if ingredient has no cost data
 
@@ -331,7 +334,7 @@ Batch additions with estimated costs from catalog prices. Performs polymorphic c
 - hops: `cost_per_lb / 16.0` (converts to per-oz)
 - adjuncts: `cost_per_lb`
 - fruits: `cost_per_lb`
-- spices: `cost_per_unit`
+- spices: always 0 since 00297 (`spices.cost_per_unit` dropped — was never populated)
 - Returns 0 when no catalog link or no cost data
 
 ---
@@ -506,7 +509,7 @@ Audit log for batch events and measurements.
 |--------|------|-------------|
 | id | UUID | Primary key |
 | batch_id | UUID | FK to batches |
-| log_type | TEXT | Type: status_change, measurement, note, addition |
+| log_type | TEXT | Type: status_change, measurement, note (CHECK-enforced since 00298; only `measurement` is written today) |
 | data | JSONB | Event data |
 | created_at | TIMESTAMPTZ | Created timestamp |
 | created_by | UUID | FK to auth.users |
@@ -551,7 +554,7 @@ Track batch movements between vessels.
 | batch_id | UUID | FK to batches |
 | from_vessel_id | UUID | FK to vessels (NULL if from kettle) |
 | to_vessel_id | UUID | FK to vessels |
-| volume_bbl | DECIMAL(8,2) | Volume transferred |
+| volume_bbl | DECIMAL(8,2) | Volume transferred (CHECK > 0 since 00298) |
 | transferred_at | TIMESTAMPTZ | Transfer timestamp |
 | transferred_by | UUID | FK to auth.users |
 | notes | TEXT | Notes (explain loss if any) |
@@ -798,7 +801,6 @@ Yeast sources — purchases or harvests stored in brink vessels. Tracks lineage,
 | cell_count_thousand | DECIMAL(14,2) | Total cell count in thousands |
 | cell_density_thousand | DECIMAL(14,2) | Thousand cells per pound |
 | initial_viability | DECIMAL(5,2) | Viability at harvest/purchase (0-100) |
-| current_viability | DECIMAL(5,2) | Last measured viability |
 | volume_ml | DECIMAL(10,2) | Volume in mL (for liquid purchases) |
 | vessel_id | UUID | FK to vessels (the brink this lives in) |
 | location_id | UUID | FK to locations |
