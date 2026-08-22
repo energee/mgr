@@ -15,6 +15,8 @@ bash -n scripts/agent-worktree
 bash -n scripts/__tests__/agent-worktree.test.sh
 bash -n scripts/compare-migration-versions.sh
 bash -n scripts/__tests__/compare-migration-versions.test.sh
+bash -n scripts/check-live-drift.sh
+bash -n scripts/__tests__/check-live-drift.test.sh
 jq -e . .claude/settings.json >/dev/null
 
 skill_count=0

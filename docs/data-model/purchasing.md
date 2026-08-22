@@ -145,7 +145,7 @@ Partial receives against PO line items.
 |--------|------|-------------|
 | id | UUID | Primary key |
 | po_line_item_id | UUID | FK to po_line_items |
-| quantity | DECIMAL(10,4) | Quantity received |
+| quantity | DECIMAL(10,4) | Quantity received (CHECK > 0 since 00298) |
 | lot_number | TEXT | Lot number |
 | expiration_date | DATE | Expiration date |
 | received_date | DATE | Date received |
