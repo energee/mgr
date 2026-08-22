@@ -10,8 +10,9 @@
 
 import { afterAll, describe, expect, it } from "vitest";
 import { Pool, type PoolClient } from "pg";
+import { requireDatabaseUrl } from "./_helpers/role-client";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 4 });
+const pool = new Pool({ connectionString: requireDatabaseUrl(), max: 4 });
 
 afterAll(async () => {
   await pool.end();
