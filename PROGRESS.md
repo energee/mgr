@@ -19,6 +19,7 @@
 - **2026-08-21 (QBO refresh-token optimistic lock, #840).** saveTokens' refresh path now compare-and-swaps the qbo_refresh_token row against the token the refresh consumed; on mismatch (a concurrent refresh on another serverless instance already rotated it) the write is discarded and refreshAccessToken returns the winner's stored access token instead of clobbering last-write-wins. Connect path unchanged. Tests in src/integrations/quickbooks/__tests__/token-manager.test.ts.
 - **2026-08-21 (QBO token persist made atomic).** Replaced #850's app-side two-request CAS with `save_qbo_tokens_atomic` (00299, the 00257/00293 advisory-lock pattern): all four qbo_* system_settings rows commit in one transaction and the refresh-path compare-and-swap moves DB-side (`to_jsonb`), removing the supabase-js JSONB-encoding coupling and the torn CAS-miss window (#855).
 - **2026-08-21 (pre-PR review gate scripted, #786).** The inline gh-pr-create gate in `.claude/settings.json` moved to `scripts/hooks/pr-review-gate.sh` (check/consume modes, unit-tested in `scripts/__tests__/pr-review-gate.test.sh`, wired into `make check-agent-config`). Fixes all three #786 failure modes: sentinel git-dir resolved from the hook payload's cwd (worktree sessions touch their OWN git-dir; no cross-agent sentinel sharing), deny message states the touch must be its own command, and heredoc bodies + quoted spans are stripped before matching so the phrase as data no longer trips the gate. gotchas.md + AGENTS.md updated. NOTE: settings.json hook edits are an owner-ratified change — lands only via PR merge.
+- **2026-08-21 (Ponytail audit — universal-engine pass, items 15/21–24, branch `refactor/ponytail-universal-cuts`).** Worked the last open universal-component items from `docs/plans/2026-07-24-ponytail-audit-findings.md`, verifying each against the tree before touching it. **Cut 22 and 23**, both of which the 2026-07-25 third pass had rejected as "stale" — that rejection was scoped to the inside of `entity-data-table.tsx`, where each construct genuinely appears once, and missed that the second copy lives in a sibling file. The ~45-line empty-state block was byte-identical between `entity-data-table`'s `noResultsContent` and `entity-mobile-card-list`'s zero-row branch, and is now one `EntityEmptyState` (structurally typed on `displayName`/`displayNamePlural` so both call sites pass their config without a generic cast); the common-bulk-transition intersection ran once in `entity-data-table` (gating whether the bulk bar renders) and once in `bulk-status-action-bar` (building its options), verified line-by-line to compute the same thing, and is now one exported `commonBulkTransitions`. That pair was the live risk: a drift between them shows up as a bar that appears and then reports "no common status transitions", or one that hides options the selection really has. Neither path had a single test, which is how two copies sat unnoticed through three audit passes, so both got focused coverage (12 new cases: the intersection's mixed/terminal/unknown/missing-state/empty-selection/no-state-machine branches, and the empty state's filtered-vs-unfiltered split — the filtered branch must *not* offer "Create", since the entity may be full of rows that simply don't match). Net **+160/−147 production lines** (+13): raw LOC is flat because the two extracted pieces carry the module and JSDoc comments the repo requires, while the duplication itself is gone. **Rejected 24:** kanban's `formatCardFieldValue` is not a re-implementation of `lib/format`'s `formatValue` — they differ in four user-visible ways (`date` → `"Jul 15, 2026"` vs `"7/15/2026"`, `datetime` → `"Jul 15, 2026 2:14 PM"` vs `"7/15/2026, 2:14:00 PM"`, null/empty → `"-"` vs `"—"`/`""`, unparseable date → the raw string vs `"Invalid Date"`), and the divergence is live, not theoretical: the `order` and `batch` kanban configs both set `format: "date"` (`order_date`, `requested_date`, `planned_start_date`), so the swap would restyle every kanban card date. This independently confirms the same rejection made on 2026-07-25. **Items 15 and 21 were already done and the tickets were stale:** `src/lib/utils.ts` is 15 lines (`cn`, `getCurrentDateTimeLocal`) and holds neither escape helper, and no `escapeLike` exists in the tree — the surviving pair is `escapeIlikePattern` (escapes `` [\%_*] ``) and reorder.ts's `escapeLikePrefix` (escapes `` [\%_] ``), whose `*` difference is deliberate and documented at both sites (escaping `*` fails CLOSED, which is right for an identity match but wrong for the reorder probe, where an empty result makes `nextDuplicateOrderNumber` hand back an order number that already exists); `withEntityErrorBoundary` and the `onRetry` prop both went in the first pass (dfe0f667, #590). `make check` green. One environment note for the next session in this worktree: a stray empty `node_modules/` (holding only a `.vite` cache) shadowed the root install and made 22 pre-existing tests fail with `Cannot find package 'pino'` on a pristine checkout — `bun install` in the worktree fixes it, and it was not caused by any code change.
 - **2026-08-21 (ponytail audit items 18–20: data-table).** Worked items 18, 19 and
   20 of `docs/plans/2026-07-24-ponytail-audit-findings.md` against
   `src/components/data-table/`. Almost all of the candidate surface was already
@@ -36,6 +37,169 @@
   a dead-config cleanup. No drag-kit dependency was removed —
   `@/components/ui/sortable` is still live via the sort list.
   `make check` green.
+# Integration-harness fixtures + plpgsql guard tests
+
+Date: 2026-08-21
+Branch: `test/plpgsql-guard-fixtures`
+Backlog: item 21, P3 "Test debt" (`docs/plans/2026-07-10-audit-fix-backlog.md`), audit refs TC-1, TC-2, TC-7, TC-10.
+
+## Audit premise corrected
+
+TC-1 was filed as CRITICAL on the framing that the integration harness "has no
+usable fixtures, which is why the DB layer has near-zero behavioral coverage".
+That is **stale**. As of this branch's base the harness already provided:
+
+- `vitest.integration.config.ts` — node environment, 15 s timeout,
+  `fileParallelism: false` (with a measured justification in its docstring).
+- `src/__tests__/integration/_helpers/role-client.ts` — role impersonation via
+  `SET LOCAL request.jwt.claims`, `withRoleClient`, `requireDatabaseUrl`.
+- `src/__tests__/integration/_fixtures/seed-roles.sql` (283 lines) and
+  `bootstrap-plain-postgres.sql`.
+- `scripts/db-local.sh` / `make db-local` — a documented zero-to-running path
+  that replays every migration and loads the role fixtures.
+- **36 integration test files / 239 tests**, most of them genuinely behavioral.
+
+So the CRITICAL framing no longer describes reality. What was actually missing
+was coverage of the four named DB guards, and one reusable seed helper for the
+packaging chain. That is what this branch adds.
+
+## What landed
+
+### Harness
+
+`src/__tests__/integration/_helpers/packaging-fixture.ts` — a reusable builder
+for the parent chain every packaging/finished-goods test needs
+(brand → container → selling_format → batches → session → line items, plus an
+optional location + bin), with `completePackagingSession()` to fire the
+completion trigger and return the created finished goods index-aligned to the
+line items. Container type (`package` vs `keg`) is a first-class option because
+that is the branch `create_finished_goods_from_packaging` and
+`revise_packaging_session` both switch on.
+
+`packaging-completion-trigger.test.ts` deliberately keeps its own inlined seed
+helpers. It is long-standing passing coverage of the exact ids it seeds, and
+rewriting it to route through the shared helper would risk that coverage for no
+behavioral gain. New suites use the helper.
+
+### Guard coverage
+
+| Guard | Before | After |
+|---|---|---|
+| `debit_bin_inventory` clamp | none | **16 tests** (`bin-inventory-clamp.test.ts`, incl. `credit_bin_inventory`) |
+| availability / outbound guards (00212, 00216) | already covered — 5 behavioral tests in `inventory-guards.test.ts` | unchanged |
+| keg receive → fill → ship netting | none | **9 tests** (`keg-netting.test.ts`) |
+| `revise_packaging_session` | 1 test (below-committed rejection) | **+16 tests** (`revise-packaging-session.test.ts`) |
+
+Integration suite: **36 files / 239 tests → 38 files / 280 tests**, all passing.
+
+Highlights of what is now pinned:
+
+- **`debit_bin_inventory`**: the exact-sellout boundary (`old = qty` lands at 0
+  but is NOT a clamp) versus a true oversell; clamping at zero instead of
+  violating `chk_bin_inventory_quantity_nonneg`; refusal of a negative quantity
+  (which would silently CREDIT the bin through the `GREATEST`); the
+  missing-row defensive path returning a full clamp without resurrecting the
+  row; and that only the addressed `(bin, finished_good)` pair moves.
+- **Keg netting**: the conservation invariant — kegs received must always equal
+  empty + filled + shipped. That is the only assertion that catches the
+  `HAVING sum > 0` failure mode behind migrations 00228/00229/00232/00234/00238,
+  where a stranded outflow is silently dropped and the fleet inflates with no
+  error. Includes the 00238 owner re-attribution case (fill owner NULL, ship
+  owner named → fleet stays 50, not 62) and its other half, that customer
+  deposits still key on the raw stamp.
+- **`revise_packaging_session`**: every input-validation refusal (unknown
+  session, never-completed session, empty payload, missing `line_item_id`,
+  cross-session line item, negative/fractional quantity, no-op), each asserting
+  the rows are unchanged afterwards; plus the revalue-down/up paths, the audit
+  note, re-revision of an already-`revised` session, and the status flip itself
+  — the mechanism behind the `revised` live outage cited in backlog item 22.
+
+Every refusal test drives the function to the actual rejection and then reads
+the rows back. No test asserts that a function exists or that policy text
+matches a string.
+
+## DB bug found — issue #917
+
+**`enum_values` registry drift blocks keg receive/ship on any from-scratch database.**
+<https://github.com/energee/mgr/issues/917>
+
+The `enum_values` registry for `keg_transaction_type` (seeded by
+`00037_enum_registry.sql`) holds a vocabulary that never matched the Postgres
+enum:
+
+```
+pg enum:   receive, fill, ship, return, clean, adjust, retire, maintain
+registry:  fill, deliver, return, tap, empty, adjust, lost, found
+```
+
+The 00040 `validate_enum_value` trigger validates against the registry, so
+`receive`, `ship`, `clean`, `retire` and `maintain` are all rejected:
+
+```
+ERROR:  Invalid keg_transaction_type value: receive. Valid values are: fill, deliver, return, tap, empty, adjust, lost, found
+```
+
+Impact: a keg fleet cannot be received into a chain-replayed database at all,
+and `create_keg_ship_transactions_from_order` cannot insert its ship legs — so
+fulfilling an order with keg line items aborts. This is very likely why keg
+netting had no integration coverage: the scenario was unreachable. Live is
+evidently hand-patched, so this is chain-vs-live drift rather than a live
+outage, but it means the chain is not reproducible.
+
+Not fixed here (tests-only scope). `keg-netting.test.ts` seeds the missing
+registry rows inside its own transaction via `seedEnumRegistry()`, loudly
+commented as compensating for #917 — **delete it when #917 lands**, and if the
+tests then fail, the fix is incomplete.
+
+## Verification
+
+- **Integration suite: GREEN.** 38 files / 280 tests passing.
+  ```
+  make db-local     # once, if you have no local DB
+  DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' bun run test:integration
+  ```
+  The local database was already running and fully migrated (274 migrations,
+  role fixtures seeded), so no `make db-local` reset was performed — it is
+  shared infrastructure and the reset is destructive.
+- **`make check`: GREEN** (lint + typecheck + unit suite + check-db + check-wip +
+  check-deploy-state + build). Lint required the repo's `interface` → `type`
+  convention on the added files.
+
+  Worth recording, because the first diagnosis was wrong. `make check` initially
+  failed with 11 unit files / 22 tests erroring on `Cannot find package 'pino'
+  imported from src/lib/logger.ts`. `pino@10.3.1` was declared in `package.json`
+  and resolved fine from Node, and this branch touches no tracked source file, so
+  it was written up as pre-existing and unrelated to the change. **That was
+  wrong.** The worktree simply had an incomplete `node_modules` — a
+  fresh-worktree artifact, not a repository problem. `bun install` in the
+  worktree (1150 packages) fixed it and `make check` passed with no code change.
+
+  Two other sessions hit the identical 22-test / 11-file pino signature in
+  freshly created worktrees the same day, with the same fix. **Run `bun install`
+  in a new worktree before concluding anything about a pino resolution
+  failure**: the "declared, resolves from Node, fails only under vitest"
+  combination looks like a toolchain bug and is not one. "My diff cannot have
+  caused this" is evidence about the diff, not evidence that the environment is
+  sound.
+
+## Not reached
+
+- **Concurrency coverage.** `create_keg_ship_transactions_from_order` takes a
+  transaction-scoped advisory lock and `debit_bin_inventory` row-locks
+  `FOR UPDATE`; neither is exercised under contention. The
+  `beginBounded` two-connection pattern in `inventory-guard-concurrency.test.ts`
+  is the right model.
+- **Ship-writer idempotency and brand-scoped FIFO ordering.** The
+  per-`(selling_format, keg_owner)` idempotency guard and the
+  `ORDER BY oi.brand_id NULLS LAST` / production-date FIFO tiebreak (00234) are
+  untested; only the single-lot draw is covered.
+- **The `revise_packaging_session` keg and BOM arms.** The revision paths that
+  rewrite keg transactions and re-drive BOM material consumption are untested —
+  the new suite covers package-container lines with no BOM rows.
+- **The 00232(b) stranded-outflow negative case.** Omitting `from_location_id`
+  on a fill silently strands the empty-pool decrement. Worth a characterization
+  test; not written.
+- **2026-08-21 (static guard for migration number collisions; dropped the duplicate replay job).** Duplicate `NNNNN_` version prefixes have broken migration replay on every branch three times (00260 in #545, 00297/00298 in #920) because the defect is a filename property that no pre-push check looked at: `db-lint`'s `psql -1` loop is structurally blind to it (it never writes `supabase_migrations.schema_migrations`, where the collision actually lands), so only a Docker-backed CLI boot in CI ever caught it. `scripts/check-migration-numbers.sh` now runs in `make check-db` with an exit-code contract test, and fails on an empty file list rather than reporting clean over nothing. It does **not** close the underlying race — two in-flight PRs each adding their own 00297 both pass, since neither tree holds the other's file, and nothing runs on push to main; that needs branches required to be up to date before merge, which is not enabled. With the guard in place the advisory `supabase-reset` job ("Fresh Supabase Migration Replay") was removed from `db-lint.yml`: it booted a third Docker Supabase per PR to replay a chain `db-lint` and `E2E Tests` already replay, and on #878 it produced nothing but a second red X for a failure `E2E Tests` had already reported. `make db-dry-run` is unchanged for local use.
 - **2026-08-21 (migration number collision fix).** #910 (00297_drop_dead_columns, 00298_constraint_tightening) and #903/#906 (00297_save_qbo_tokens_atomic, 00298_sync_status_preserving_upserts) merged near-simultaneously with colliding version prefixes, breaking every branch's Fresh Supabase Migration Replay. Neither pair was applied on live yet, so the later-merged pair renumbers: save_qbo_tokens_atomic → 00299, sync_status_preserving_upserts → 00300, with all code/doc references updated. Root cause is that branch CI validates against the main that existed at branch time — a same-number race between two in-flight PRs is only caught after both merge.
 - **2026-08-21 (memory consolidation + schema audit).** Consolidated agent memory to one source of truth: repo docs now hold everything project-true — moved the write-overlay/pooler sandbox gotchas, gh `--search`-under-`GITHUB_TOKEN` gotcha, worktree file-copy lesson, and library API gotchas (AI SDK/Supabase/Zod v4/Recharts v3) into `docs/agents/gotchas.md`; added the single-tenant role-based RLS summary to `docs/agents/db-security.md`; extended AGENTS.md rule 12 to bar AI-attribution footers in PRs/issues, not just commits. Claude auto-memory slimmed to machine-specific facts only (20 stale/duplicate files archived); redundant ECC instincts deleted. Also landed the 5-subagent full-schema audit report as `docs/plans/2026-08-21-schema-audit.md` (6 high / 11 medium findings: dead `recipe_variants` subsystem, dead `packages`/`recipe_collaborators`/`vessel_cleanings` tables, unbounded log growth, missing `orders.status` CHECK, ~25 dead columns).
 - **2026-08-21 (Loading-pattern & skeleton bloat audit).** Audited the reported loading jank (/dashboard mismatch, /production/batches too-short skeleton): the 2026-07-15 sitewide loading plan stalled at Phase 0, leaving 7 disagreeing skeleton implementations, 3/132 pages on server prefetch, and 161 inline skeleton blocks across 65 files; the batches prefetch is discarded on every default visit because the "Active" quick filter is applied post-mount. Ranked findings + fix plan in `docs/plans/2026-08-21-loading-pattern-audit.md` (worktree `loading-audit`, branch `chore/loading-bloat-audit`). Then implemented items 1–7 on the same branch: all skeleton surfaces unified onto the `ui/skeletons.tsx` kit (+`DashboardSkeleton`), dashboard/batches/brands route fallbacks fixed, `quickFilters` moved to entity core so the batches prefetch key matches the client's first render (regression test `list-query-prefetch-key.test.ts`), and the onboarding checklist reserves its space while loading.
