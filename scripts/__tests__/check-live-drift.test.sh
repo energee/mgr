@@ -102,7 +102,7 @@ expect 1 "missing expected object"
 
 # 6. Usage errors → exit 2: no SUPABASE_DB_URL; empty live catalog;
 #    unsorted snapshot (bad merge).
-DB_URL= expect 2 "missing SUPABASE_DB_URL"
+DB_URL='' expect 2 "missing SUPABASE_DB_URL"
 : > "$CATALOG"
 expect 2 "empty live catalog"
 catalog <<'EOF'
