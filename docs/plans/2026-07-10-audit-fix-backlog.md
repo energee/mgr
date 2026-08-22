@@ -57,8 +57,9 @@ Owners per `CLAUDE.md` expert-agent table. Check items off as PRs land; note the
 
 - [ ] **21. Integration-harness fixtures + plpgsql guard tests** (TC-1 C, TC-2, TC-7, TC-10) — owner: `test-surgeon` + `data-layer-expert`
   Seed fixtures for `vitest.integration.config.ts`; behavioral tests for `debit_bin_inventory` clamp, availability/outbound guards, keg receive→fill→ship netting, `revise_packaging_session` flow.
-- [ ] **22. TS↔DB state-machine parity test** (TC-6, S effort) — owner: `test-surgeon`
+- [x] **22. TS↔DB state-machine parity test** (TC-6, S effort) — owner: `test-surgeon`
   Diff `get_state_transitions()` against `src/lib/state-machines.ts` per entity — would have caught the 'revised' live outage.
+  Landed: the existing parity block was pinned to migration `00143`, two `CREATE OR REPLACE` generations stale; it now resolves the *winning* definition (`00205`) by scanning all migrations, adds `deliveries` coverage plus SQL→entity and stateful-entity-enforcement checks, and self-tests the comparison against a dropped `revised`. No real TS↔SQL mismatch found; 125→141 tests in the file.
 - [ ] **23. Behavioral upgrades for text-assertion suites** (TC-4, TC-5) — owner: `test-surgeon` + `data-layer-expert`
   One seeded TTB summary invocation; two-customer JWT RLS round-trip.
 - [x] **24. Characterization for known-unfixed edges** (TC-3, TC-12) — owner: `test-surgeon` — see `docs/progress/2026-08-21-characterization-edges.md`
