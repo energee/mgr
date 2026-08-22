@@ -1,9 +1,9 @@
 {
- "commit": "94f4dc43182cbf0d56bbb393d9198a1c28c08f35",
- "built_at": "2026-08-22T02:28:04.518Z",
+ "commit": "b63efa39da7d4fdf3e91ed062d955850faebdc31",
+ "built_at": "2026-08-22T02:37:58.340Z",
  "inputs": {
-  "count": 1387,
-  "digest": "e81798c2be6b445f"
+  "count": 1389,
+  "digest": "ed966e9ec0db2f84"
  },
  "nodes": [
   {
@@ -7686,8 +7686,8 @@
   {
    "name": "recipes_with_estimates",
    "type": "VIEW",
-   "description": "Postgres view 'recipes_with_estimates', last defined in 00218_recipe_ibu_tinseth.sql. Views are absent from the live snapshot, so this is chain-only.",
-   "file_path": "supabase/migrations/00218_recipe_ibu_tinseth.sql",
+   "description": "Postgres view 'recipes_with_estimates', last defined in 00297_drop_dead_columns.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
    "aliases": [],
    "extractor": "sql",
    "db_source": "chain",
@@ -8004,8 +8004,8 @@
   {
    "name": "recipes_with_cogs",
    "type": "VIEW",
-   "description": "Postgres view 'recipes_with_cogs', last defined in 00021_recipe_cogs.sql. Views are absent from the live snapshot, so this is chain-only.",
-   "file_path": "supabase/migrations/00021_recipe_cogs.sql",
+   "description": "Postgres view 'recipes_with_cogs', last defined in 00297_drop_dead_columns.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
    "aliases": [],
    "extractor": "sql",
    "db_source": "chain"
@@ -8950,8 +8950,8 @@
   {
    "name": "batches_with_blend_info",
    "type": "VIEW",
-   "description": "Postgres view 'batches_with_blend_info', last defined in 00294_drop_dead_schema_objects.sql. Views are absent from the live snapshot, so this is chain-only.",
-   "file_path": "supabase/migrations/00294_drop_dead_schema_objects.sql",
+   "description": "Postgres view 'batches_with_blend_info', last defined in 00297_drop_dead_columns.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
    "aliases": [],
    "extractor": "sql",
    "db_source": "chain",
@@ -9466,8 +9466,8 @@
   {
    "name": "batch_additions_with_costs",
    "type": "VIEW",
-   "description": "Postgres view 'batch_additions_with_costs', last defined in 00101_view_correlated_subquery_fixes.sql. Views are absent from the live snapshot, so this is chain-only.",
-   "file_path": "supabase/migrations/00101_view_correlated_subquery_fixes.sql",
+   "description": "Postgres view 'batch_additions_with_costs', last defined in 00297_drop_dead_columns.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
    "aliases": [],
    "extractor": "sql",
    "db_source": "chain"
@@ -10311,8 +10311,8 @@
   {
    "name": "yeast_pitches_with_remaining",
    "type": "VIEW",
-   "description": "Postgres view 'yeast_pitches_with_remaining', last defined in 00191_capture_drifted_packaging_objects.sql. Views are absent from the live snapshot, so this is chain-only.",
-   "file_path": "supabase/migrations/00191_capture_drifted_packaging_objects.sql",
+   "description": "Postgres view 'yeast_pitches_with_remaining', last defined in 00297_drop_dead_columns.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
    "aliases": [],
    "extractor": "sql",
    "db_source": "chain",
@@ -10667,8 +10667,8 @@
   {
    "name": "order_items_with_details",
    "type": "VIEW",
-   "description": "Postgres view 'order_items_with_details', last defined in 00190_capture_out_of_band_objects.sql. Views are absent from the live snapshot, so this is chain-only.",
-   "file_path": "supabase/migrations/00190_capture_out_of_band_objects.sql",
+   "description": "Postgres view 'order_items_with_details', last defined in 00297_drop_dead_columns.sql. Views are absent from the live snapshot, so this is chain-only.",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
    "aliases": [],
    "extractor": "sql",
    "db_source": "chain"
@@ -11620,6 +11620,22 @@
    "type": "MIGRATION",
    "description": "Migration 00296_log_retention_cron.sql.",
    "file_path": "supabase/migrations/00296_log_retention_cron.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "00297_drop_dead_columns.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00297_drop_dead_columns.sql.",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "00298_constraint_tightening.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00298_constraint_tightening.sql.",
+   "file_path": "supabase/migrations/00298_constraint_tightening.sql",
    "aliases": [],
    "extractor": "sql"
   },
@@ -53869,6 +53885,286 @@
    "predicate": "creates",
    "target": "email_notification_log.Authenticated users can read email log",
    "file_path": "supabase/migrations/00296_log_retention_cron.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00297_drop_dead_columns.sql",
+   "predicate": "creates",
+   "target": "recipes_with_estimates",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_estimates",
+   "predicate": "derives_from",
+   "target": "recipe_malts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_estimates",
+   "predicate": "derives_from",
+   "target": "malts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_estimates",
+   "predicate": "derives_from",
+   "target": "recipe_hops",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_estimates",
+   "predicate": "derives_from",
+   "target": "hops",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_estimates",
+   "predicate": "derives_from",
+   "target": "recipes",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_estimates",
+   "predicate": "derives_from",
+   "target": "batches",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_estimates",
+   "predicate": "derives_from",
+   "target": "beer_styles",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_estimates",
+   "predicate": "derives_from",
+   "target": "yeasts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00297_drop_dead_columns.sql",
+   "predicate": "creates",
+   "target": "batches_with_blend_info",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "batch_blends",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "batches_with_brew_info",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "recipes",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "recipes_with_estimates",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batches_with_blend_info",
+   "predicate": "derives_from",
+   "target": "batches",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00297_drop_dead_columns.sql",
+   "predicate": "creates",
+   "target": "recipes_with_cogs",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_cogs",
+   "predicate": "derives_from",
+   "target": "recipe_malts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_cogs",
+   "predicate": "derives_from",
+   "target": "malts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_cogs",
+   "predicate": "derives_from",
+   "target": "recipe_hops",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_cogs",
+   "predicate": "derives_from",
+   "target": "hops",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_cogs",
+   "predicate": "derives_from",
+   "target": "recipe_adjuncts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_cogs",
+   "predicate": "derives_from",
+   "target": "adjuncts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_cogs",
+   "predicate": "derives_from",
+   "target": "recipes",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "recipes_with_cogs",
+   "predicate": "derives_from",
+   "target": "yeasts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00297_drop_dead_columns.sql",
+   "predicate": "creates",
+   "target": "batch_additions_with_costs",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_additions_with_costs",
+   "predicate": "derives_from",
+   "target": "batch_additions",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_additions_with_costs",
+   "predicate": "derives_from",
+   "target": "hops",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_additions_with_costs",
+   "predicate": "derives_from",
+   "target": "adjuncts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "batch_additions_with_costs",
+   "predicate": "derives_from",
+   "target": "fruits",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00297_drop_dead_columns.sql",
+   "predicate": "creates",
+   "target": "order_items_with_details",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "order_items_with_details",
+   "predicate": "derives_from",
+   "target": "order_items",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "order_items_with_details",
+   "predicate": "derives_from",
+   "target": "brands",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "order_items_with_details",
+   "predicate": "derives_from",
+   "target": "selling_formats",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "order_items_with_details",
+   "predicate": "derives_from",
+   "target": "containers",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00297_drop_dead_columns.sql",
+   "predicate": "creates",
+   "target": "yeast_pitches_with_remaining",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "yeast_pitches_with_remaining",
+   "predicate": "derives_from",
+   "target": "yeast_pitch_events",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "yeast_pitches_with_remaining",
+   "predicate": "derives_from",
+   "target": "yeast_pitches",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "yeast_pitches_with_remaining",
+   "predicate": "derives_from",
+   "target": "yeasts",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "yeast_pitches_with_remaining",
+   "predicate": "derives_from",
+   "target": "vessels",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "yeast_pitches_with_remaining",
+   "predicate": "derives_from",
+   "target": "locations",
+   "file_path": "supabase/migrations/00297_drop_dead_columns.sql",
    "extractor": "sql"
   },
   {
