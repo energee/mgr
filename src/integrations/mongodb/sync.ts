@@ -169,6 +169,25 @@ function rowIdentifier(row: Record<string, unknown>, onConflict: string): string
 }
 
 /**
+ * Extract a human-readable message from a thrown sync error. PostgrestError
+ * extends Error, but unwrap can also surface plain `{ message }` shapes (and
+ * the test mock throws one), so `instanceof Error` alone is not enough.
+ */
+function errorMessage(error: unknown): string {
+  return error && typeof error === "object" && "message" in error
+    ? String((error as { message: unknown }).message)
+    : String(error);
+}
+
+/** Normalize an RPC's INTEGER return (number, numeric string, or null) into a count. */
+function rpcCount(data: unknown): number {
+  return typeof data === "number" ? data : Number(data ?? 0);
+}
+
+/** Rows per bulk write — shared by the PostgREST upsert and RPC upsert paths. */
+const BATCH_SIZE = 50;
+
+/**
  * Retry a chunk row-by-row after its batched upsert failed. A single bad row
  * (e.g. a check_violation raised by a trigger, not just an ON CONFLICT
  * collision — dedupeByConflictKey already handles that case) rolls back the
@@ -191,11 +210,13 @@ const MAX_CONSECUTIVE_FAILURES = 3;
 const MAX_ROW_ERRORS_REPORTED = 10;
 
 async function upsertRowsIndividually(
-  admin: AdminClient,
-  table: string,
   rows: Record<string, unknown>[],
   onConflict: string,
-  chunkError: string
+  chunkError: string,
+  /** Write one row; resolve `null` on success, the thrown/returned error otherwise. */
+  writeOne: (row: Record<string, unknown>) => Promise<unknown>,
+  /** Structured log fields ({ table } for PostgREST, { fn } for RPC) and per-row message. */
+  log: { context: Record<string, unknown>; message: string }
 ): Promise<{ synced: number; failed: number; errors: Array<{ mongoId: string; error: string }> }> {
   let synced = 0;
   let failed = 0;
@@ -213,15 +234,16 @@ async function upsertRowsIndividually(
     }
 
     const row = rows[i]!;
-    const { error } = await dynamicFrom(admin, table)
-      .upsert([row], { onConflict, ignoreDuplicates: false });
-    if (error) {
+    const error = await writeOne(row);
+    if (error != null) {
       failed++;
       consecutiveFailures++;
       const mongoId = rowIdentifier(row, onConflict);
       if (errors.length < MAX_ROW_ERRORS_REPORTED) {
-        logger.error({ err: error, table, mongoId }, "Upsert error (row retry)");
-        errors.push({ mongoId, error: error.message });
+        // Pass the real error instance so logger.ts routes it to
+        // Sentry.captureException with message/stack/code (SENTRY-7542174707).
+        logger.error({ err: error, ...log.context, mongoId }, log.message);
+        errors.push({ mongoId, error: errorMessage(error) });
       }
     } else {
       synced++;
@@ -242,7 +264,6 @@ async function upsertRows(
   const dedupedRows = dedupeByConflictKey(rows, onConflict, table);
 
   const admin = await createAdminClient();
-  const BATCH_SIZE = 50;
   let synced = 0;
   let failed = 0;
   const errors: Array<{ mongoId: string; error: string }> = [];
@@ -264,7 +285,14 @@ async function upsertRows(
     // a generic captureMessage with no table/batch/error diagnostic).
     logger.error({ err: error, table, batchIndex: i / BATCH_SIZE }, "Upsert error, retrying chunk row-by-row");
 
-    const retried = await upsertRowsIndividually(admin, table, batch, onConflict, error.message);
+    const retried = await upsertRowsIndividually(
+      batch,
+      onConflict,
+      error.message,
+      async (row) =>
+        (await dynamicFrom(admin, table).upsert([row], { onConflict, ignoreDuplicates: false })).error,
+      { context: { table }, message: "Upsert error (row retry)" }
+    );
     synced += retried.synced;
     failed += retried.failed;
     errors.push(...retried.errors);
@@ -303,25 +331,65 @@ async function selectRowsByKey<T>(
 
 
 /**
- * Overwrite each row's `status` with the live PG value for rows PG already
- * has, keyed by `keyColumn` — the frozen Mongo snapshot must not regress live
- * state on re-sync (fd60d58 for batches, #839 for vessels). Mongo still sets
- * status on first insert of a row PG has never seen.
+ * Upsert vessel/batch rows through a status-preserving RPC
+ * (`sync_upsert_vessels` / `sync_upsert_batches`, 00300): the DB-side
+ * ON CONFLICT update omits `status`, so an existing row's live status is
+ * never written — the frozen Mongo snapshot cannot regress live state on
+ * re-sync (fd60d58 for batches, #839 for vessels), and unlike the previous
+ * app-side read-modify-write there is no TOCTOU window for a live transition
+ * to be clobbered in (#855). Mongo still sets status on first insert of a
+ * row PG has never seen.
+ *
+ * Same shape as `upsertRows`: dedupe by conflict key app-side (one canonical
+ * last-wins rule; the RPC errors loudly on intra-statement duplicates), send
+ * BATCH_SIZE chunks, and retry a failed chunk row-by-row through the shared
+ * `upsertRowsIndividually` loop so one bad row fails only itself, bounded by
+ * the same bail-out (the 60s sync budget concern above applies here too).
  */
-async function preserveExistingStatuses(
+async function upsertRowsStatusPreserving(
   admin: AdminClient,
-  table: string,
+  fn: string,
   rows: Array<Record<string, unknown>>,
   keyColumn: string
-): Promise<void> {
-  const existing = await selectRowsByKey<Record<string, string>>(
-    admin, table, `${keyColumn}, status`, rows.map((row) => row[keyColumn] as string), keyColumn
-  );
-  const statuses = new Map(existing.map((r) => [r[keyColumn], r.status]));
-  for (const row of rows) {
-    const current = statuses.get(row[keyColumn] as string);
-    if (current !== undefined) row.status = current;
+): Promise<{ synced: number; failed: number; errors: Array<{ mongoId: string; error: string }> }> {
+  if (rows.length === 0) return { synced: 0, failed: 0, errors: [] };
+
+  const dedupedRows = dedupeByConflictKey(rows, keyColumn, fn);
+
+  const writeOne = async (row: Record<string, unknown>): Promise<unknown> => {
+    try {
+      await unwrap<number>(dynamicRpc(admin, fn, { p_rows: [row] }));
+      return null;
+    } catch (error) {
+      return error;
+    }
+  };
+
+  let synced = 0;
+  let failed = 0;
+  const errors: Array<{ mongoId: string; error: string }> = [];
+
+  for (let i = 0; i < dedupedRows.length; i += BATCH_SIZE) {
+    const batch = dedupedRows.slice(i, i + BATCH_SIZE);
+    try {
+      synced += rpcCount(await unwrap<number>(dynamicRpc(admin, fn, { p_rows: batch })));
+      continue;
+    } catch (error) {
+      logger.error(
+        { err: error, fn, batchIndex: i / BATCH_SIZE },
+        "Status-preserving upsert RPC failed, retrying chunk row-by-row"
+      );
+      const retried = await upsertRowsIndividually(batch, keyColumn, errorMessage(error), writeOne, {
+        context: { fn },
+        message: "Status-preserving upsert RPC error (row retry)",
+      });
+      synced += retried.synced;
+      failed += retried.failed;
+      errors.push(...retried.errors);
+    }
   }
+
+  return { synced, failed, errors };
 }
 
 /** Call an aggregate reconciliation RPC and preserve phase/entity/operation context. */
@@ -333,17 +401,14 @@ async function reconcileAggregate(
 ): Promise<{ synced: number; failed: number; errors: Array<{ mongoId: string; error: string }> }> {
   try {
     const data = await unwrap<number>(dynamicRpc(admin, fn, args));
-    return { synced: typeof data === "number" ? data : Number(data ?? 0), failed: 0, errors: [] };
+    return { synced: rpcCount(data), failed: 0, errors: [] };
   } catch (error) {
-    const message = error && typeof error === "object" && "message" in error
-      ? String(error.message)
-      : String(error);
     return {
       synced: 0,
       failed: 1,
       errors: [{
         mongoId: context.mongoId,
-        error: `phase=${context.phase} entity=${context.entity} operation=reconcile: ${message}`,
+        error: `phase=${context.phase} entity=${context.entity} operation=reconcile: ${errorMessage(error)}`,
       }],
     };
   }
@@ -567,10 +632,11 @@ async function syncVessels(): Promise<SyncResult> {
   // no transition trigger to reject the regression — a plain re-sync would
   // silently mark an in-use vessel "ready_for_use" while current_batch_id
   // (not in the transform's column set) stays stale (#839; same guard as
-  // syncBatches, fd60d58). Mongo still sets status on first insert.
-  await preserveExistingStatuses(admin, "vessels", rows, "name");
-
-  const result = await upsertRows("vessels", rows, "name");
+  // syncBatches, fd60d58). Preservation lives DB-side in sync_upsert_vessels
+  // (00300) — its ON CONFLICT update omits `status`, closing the TOCTOU race
+  // the old app-side read-modify-write had (#855). Mongo still sets status on
+  // first insert.
+  const result = await upsertRowsStatusPreserving(admin, "sync_upsert_vessels", rows, "name");
 
   await completeSyncLog(logId, result);
   return { entityType: "vessels", phase: 2, ...result };
@@ -784,10 +850,13 @@ async function syncBatches(): Promise<SyncResult> {
   // rejects regressions outright — a legacy Mongo doc still saying "fermenting"
   // against a PG batch that completed fails the whole upsert chunk
   // ("Invalid state transition: completed -> fermenting", 2026-08-12 sync).
-  // Mongo still sets status on first insert of a batch PG has never seen.
-  await preserveExistingStatuses(admin, "batches", rows as Array<Record<string, unknown>>, "id");
-
-  const result = await upsertRows("batches", rows, "id");
+  // Preservation lives DB-side in sync_upsert_batches (00300) — its
+  // ON CONFLICT update omits `status`, closing the TOCTOU race the old
+  // app-side read-modify-write had (fd60d58, #855). Mongo still sets status
+  // on first insert of a batch PG has never seen.
+  const result = await upsertRowsStatusPreserving(
+    admin, "sync_upsert_batches", rows as Array<Record<string, unknown>>, "id"
+  );
 
   await completeSyncLog(logId, result);
   return { entityType: "batches", phase: 3, ...result };

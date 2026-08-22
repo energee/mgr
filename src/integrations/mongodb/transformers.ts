@@ -163,6 +163,9 @@ const VESSEL_STATUS_MAP: Record<string, string> = {
   dirty: "dirty",
 };
 
+// Column set mirrored in 00300_sync_status_preserving_upserts.sql
+// (sync_upsert_vessels) — a column added here must be added there or the RPC
+// silently drops it. Pinned by sync.test.ts.
 export function transformVessel(doc: MongoVessel) {
   let vesselType = VESSEL_TYPE_MAP[doc.type] ?? null;
   if (!vesselType) {
@@ -203,6 +206,10 @@ export function transformRecipe(doc: MongoRecipe) {
 // Phase 3 — Production chain
 // =============================================================================
 
+// Column set mirrored in 00300_sync_status_preserving_upserts.sql
+// (sync_upsert_batches) — a column added here (or to the recipe_id/volume_bbl
+// enrichment in syncBatches) must be added there or the RPC silently drops
+// it. Pinned by sync.test.ts.
 export function transformBatch(doc: MongoBatch) {
   // Infer status from available data
   let status: string;

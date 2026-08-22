@@ -365,7 +365,7 @@ Line items for location transfers. Supports both finished goods and raw material
 | transfer_id | UUID | FK to location_transfers |
 | finished_good_id | UUID | FK to finished_goods (nullable) |
 | inventory_lot_id | UUID | FK to inventory_lots (nullable) |
-| quantity | INTEGER | Quantity requested for transfer |
+| quantity | INTEGER | Quantity requested for transfer (CHECK > 0 since 00298) |
 | quantity_shipped | INTEGER | Actual quantity shipped (nullable). NULL = not yet shipped. Less than quantity = partial shipment. |
 | created_at | TIMESTAMPTZ | Created timestamp |
 

@@ -168,7 +168,6 @@ Malt and grain catalog.
 | type | TEXT | Type: base, specialty, roasted, adjunct |
 | color_lovibond | DECIMAL(5,1) | Color in Lovibond |
 | potential_ppg | DECIMAL(4,1) | Potential points per pound per gallon |
-| max_percentage | INTEGER | Max % of grain bill |
 | requires_mash | BOOLEAN | Whether it needs to be mashed |
 | diastatic_power | DECIMAL(5,1) | Diastatic power (°Lintner) |
 | protein_percent | DECIMAL(4,1) | Protein content % |
@@ -189,10 +188,6 @@ ALTER TABLE malts ADD CONSTRAINT chk_malt_color_nonnegative
 -- Potential PPG must be positive
 ALTER TABLE malts ADD CONSTRAINT chk_malt_ppg_positive
   CHECK (potential_ppg > 0);
-
--- Max percentage must be 0-100
-ALTER TABLE malts ADD CONSTRAINT chk_malt_max_percentage
-  CHECK (max_percentage IS NULL OR (max_percentage >= 0 AND max_percentage <= 100));
 
 -- Percentages (protein, moisture) must be 0-100
 ALTER TABLE malts ADD CONSTRAINT chk_malt_percentages_valid
@@ -221,14 +216,8 @@ Hop varieties catalog.
 | alpha_acid_typical | DECIMAL(4,1) | Typical alpha acid % |
 | beta_acid_min | DECIMAL(4,1) | Min beta acid % |
 | beta_acid_max | DECIMAL(4,1) | Max beta acid % |
-| hsi | DECIMAL(4,1) | Hop Storage Index (% loss/6mo) |
 | oil_ml_100g | DECIMAL(5,2) | Total oil mL/100g |
-| myrcene_percent | DECIMAL(4,1) | Myrcene oil % |
-| humulene_percent | DECIMAL(4,1) | Humulene oil % |
-| caryophyllene_percent | DECIMAL(4,1) | Caryophyllene oil % |
-| farnesene_percent | DECIMAL(4,1) | Farnesene oil % |
 | flavor_profile | TEXT | Flavor/aroma description |
-| substitutes | TEXT | Suggested substitutes |
 | cost_per_lb | DECIMAL(8,4) | Cost per pound |
 | bag_weight_lbs | DECIMAL(6,2) | Standard package weight |
 | is_active | BOOLEAN | Active flag |
@@ -252,17 +241,6 @@ ALTER TABLE hops ADD CONSTRAINT chk_hop_alpha_acid_order
 ALTER TABLE hops ADD CONSTRAINT chk_hop_beta_acid_range
   CHECK ((beta_acid_min IS NULL OR (beta_acid_min >= 0 AND beta_acid_min <= 100))
     AND (beta_acid_max IS NULL OR (beta_acid_max >= 0 AND beta_acid_max <= 100)));
-
--- Oil percentages must be 0-100
-ALTER TABLE hops ADD CONSTRAINT chk_hop_oil_percentages
-  CHECK ((myrcene_percent IS NULL OR (myrcene_percent >= 0 AND myrcene_percent <= 100))
-    AND (humulene_percent IS NULL OR (humulene_percent >= 0 AND humulene_percent <= 100))
-    AND (caryophyllene_percent IS NULL OR (caryophyllene_percent >= 0 AND caryophyllene_percent <= 100))
-    AND (farnesene_percent IS NULL OR (farnesene_percent >= 0 AND farnesene_percent <= 100)));
-
--- HSI must be non-negative
-ALTER TABLE hops ADD CONSTRAINT chk_hop_hsi_nonnegative
-  CHECK (hsi IS NULL OR hsi >= 0);
 ```
 
 ---
@@ -299,7 +277,6 @@ Sugar/syrup ingredients.
 | type | TEXT | Type: simple, invert, honey, maple, etc. |
 | color_lovibond | DECIMAL(5,1) | Color contribution |
 | potential_ppg | DECIMAL(4,1) | Potential extract |
-| fermentability | DECIMAL(5,1) | % fermentable |
 | description | TEXT | Usage notes |
 | cost_per_lb | DECIMAL(8,4) | Cost per pound |
 | is_active | BOOLEAN | Active flag |
@@ -320,7 +297,6 @@ Spices and botanicals.
 | description | TEXT | Flavor profile and usage |
 | typical_amount | DECIMAL(8,4) | Typical amount per BBL |
 | typical_unit | TEXT | Unit for typical amount |
-| cost_per_unit | DECIMAL(8,4) | Cost per unit |
 | unit | TEXT | Standard unit (oz, g, etc.) |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
@@ -338,7 +314,6 @@ Fruit additions.
 | name | TEXT | Fruit name |
 | type | TEXT | Type: whole, puree, juice, concentrate, dried |
 | form | TEXT | Form: fresh, frozen, aseptic, canned |
-| sugar_content | DECIMAL(4,1) | Typical sugar content % (Brix) |
 | description | TEXT | Usage notes |
 | cost_per_lb | DECIMAL(8,4) | Cost per pound |
 | is_active | BOOLEAN | Active flag |
@@ -359,7 +334,6 @@ All brewing additives: water chemistry (salts, acids), clarifiers, nutrients, en
 | description | TEXT | Usage notes |
 | typical_amount | DECIMAL(8,4) | Typical amount per BBL |
 | typical_unit | TEXT | Unit for typical amount |
-| cost_per_unit | DECIMAL(8,4) | Cost per unit |
 | unit | TEXT | Standard unit |
 | is_active | BOOLEAN | Active flag |
 | created_at | TIMESTAMPTZ | Created timestamp |
