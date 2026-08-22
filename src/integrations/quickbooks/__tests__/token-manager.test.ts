@@ -17,7 +17,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { createAdminClient } from "@/lib/supabase/server";
-import { saveTokens } from "../token-manager";
+import { saveTokens, clearTokens } from "../token-manager";
 
 const mockedCreateAdminClient = vi.mocked(createAdminClient);
 
@@ -82,5 +82,22 @@ describe("saveTokens", () => {
     setup({ data: null, error: { message: "boom" } });
 
     await expect(saveTokens(TOKENS)).rejects.toThrow("Failed to save QBO tokens: boom");
+  });
+});
+
+describe("clearTokens", () => {
+  it("deletes via the lock-taking RPC, not a direct table delete", async () => {
+    const { rpcCalls, writes } = setup({ data: null, error: null });
+
+    await clearTokens();
+
+    expect(rpcCalls).toEqual([{ fn: "clear_qbo_tokens_atomic", args: undefined }]);
+    expect(writes).toHaveLength(0);
+  });
+
+  it("throws on RPC error", async () => {
+    setup({ data: null, error: { message: "boom" } });
+
+    await expect(clearTokens()).rejects.toThrow("Failed to clear QBO tokens: boom");
   });
 });

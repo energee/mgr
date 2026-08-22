@@ -75,10 +75,44 @@ REVOKE ALL ON FUNCTION save_qbo_tokens_atomic(TEXT, TEXT, TEXT, TEXT, TEXT)
 GRANT EXECUTE ON FUNCTION save_qbo_tokens_atomic(TEXT, TEXT, TEXT, TEXT, TEXT)
   TO service_role;
 
+-- Disconnect goes through the same lock. Without it, a delete can commit
+-- between the RPC's CAS check and its INSERT, and the insert then proceeds as
+-- a fresh 4-row write — resurrecting a token pair Intuit has already revoked
+-- ("connected" status with dead tokens). Serialized on the advisory lock, a
+-- clear lands either before the save (whose CAS then misses the deleted
+-- refresh-token row and writes nothing) or after it (delete wins) — both
+-- consistent.
+--
+-- Deliberately scoped to the four TOKEN rows: qbo_client_id /
+-- qbo_client_secret / qbo_environment are operator configuration with no app
+-- write path (save_qbo_client_credentials below is the only writer), so a
+-- disconnect must not turn credential setup into a one-way door.
+CREATE OR REPLACE FUNCTION clear_qbo_tokens_atomic()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('qbo_tokens', 0));
+  DELETE FROM system_settings
+    WHERE key IN ('qbo_access_token', 'qbo_refresh_token',
+                  'qbo_realm_id', 'qbo_token_expires_at');
+END;
+$$;
+
+COMMENT ON FUNCTION clear_qbo_tokens_atomic() IS
+  'Deletes the four qbo_* token rows under the same advisory xact lock as save_qbo_tokens_atomic, so a disconnect cannot interleave with an in-flight token persist and resurrect revoked tokens (#855). Leaves qbo_client_id / qbo_client_secret / qbo_environment configuration in place. SECURITY INVOKER and service_role-only.';
+
+REVOKE ALL ON FUNCTION clear_qbo_tokens_atomic() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION clear_qbo_tokens_atomic() TO service_role;
+
 -- Retire the superseded 00100 token RPCs: no app callers (audited in 00205),
 -- and save_qbo_tokens does the same four-row write with no lock and no CAS —
 -- leaving it in place invites the next `save_qbo_tokens` grep hit to silently
--- reintroduce the #840 race.
+-- reintroduce the #840 race. save_qbo_client_credentials is deliberately
+-- KEPT: it is the only writer for qbo_client_id/qbo_client_secret (the app
+-- only reads them), so dropping it would leave no supported way to seed
+-- credentials.
 DROP FUNCTION IF EXISTS save_qbo_tokens(TEXT, TEXT, TEXT, TEXT);
 DROP FUNCTION IF EXISTS clear_qbo_tokens();
-DROP FUNCTION IF EXISTS save_qbo_client_credentials(TEXT, TEXT);

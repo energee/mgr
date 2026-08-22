@@ -21,7 +21,13 @@ afterAll(async () => {
 async function withTransaction<T>(fn: (db: PoolClient) => Promise<T>): Promise<T> {
   const db = await pool.connect();
   try {
+    // Bounded like the other lock-taking suites (see the vitest.integration
+    // config comment): the RPCs take the qbo_tokens advisory lock, and a
+    // bounded wait fails naming the blocked statement instead of expiring as
+    // an opaque 15s test timeout when another backend holds it.
     await db.query("BEGIN");
+    await db.query("SET LOCAL lock_timeout = '5s'");
+    await db.query("SET LOCAL statement_timeout = '10s'");
     // Seed data may include qbo_* rows; start each case from none (rolled back).
     await db.query("DELETE FROM system_settings WHERE key LIKE 'qbo_%'");
     return await fn(db);
@@ -96,22 +102,48 @@ describe("save_qbo_tokens_atomic", () => {
 
   it("refresh path: missing refresh-token row (cleared mid-refresh) is a miss", async () => {
     await withTransaction(async (db) => {
-      await db.query("DELETE FROM system_settings WHERE key = 'qbo_refresh_token'");
+      // withTransaction already cleared every qbo_% row — no token rows exist.
       expect(await save(db, "rt-old")).toBe(false);
     });
   });
 
-  it("is service_role-only and the 00100 predecessors are gone", async () => {
+  it("clear_qbo_tokens_atomic removes token rows but preserves operator config", async () => {
+    await withTransaction(async (db) => {
+      expect(await save(db, null)).toBe(true);
+      await db.query(
+        `INSERT INTO system_settings (key, value) VALUES
+           ('qbo_client_id', '"cid"'::jsonb),
+           ('qbo_client_secret', '"secret"'::jsonb),
+           ('qbo_environment', '"production"'::jsonb)`
+      );
+      await db.query("SELECT clear_qbo_tokens_atomic()");
+      const settings = await readSettings(db);
+      expect(settings.has("qbo_access_token")).toBe(false);
+      expect(settings.has("qbo_refresh_token")).toBe(false);
+      expect(settings.has("qbo_realm_id")).toBe(false);
+      expect(settings.has("qbo_token_expires_at")).toBe(false);
+      expect(settings.get("qbo_client_id")).toBe("cid");
+      expect(settings.get("qbo_client_secret")).toBe("secret");
+      expect(settings.get("qbo_environment")).toBe("production");
+    });
+  });
+
+  it("is service_role-only, racy 00100 predecessors gone, credentials writer kept", async () => {
     await withTransaction(async (db) => {
       const { rows } = await db.query<{ ok: boolean }>(
         `SELECT has_function_privilege('authenticated',
            'save_qbo_tokens_atomic(text,text,text,text,text)', 'EXECUTE') AS ok`
       );
       expect(rows[0]!.ok).toBe(false);
-      const { rows: old } = await db.query(
-        "SELECT 1 FROM pg_proc WHERE proname IN ('save_qbo_tokens', 'clear_qbo_tokens', 'save_qbo_client_credentials')"
-      );
+      const inPublic = `SELECT p.proname FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE n.nspname = 'public' AND p.proname = ANY($1)`;
+      const { rows: old } = await db.query(inPublic, [["save_qbo_tokens", "clear_qbo_tokens"]]);
       expect(old).toHaveLength(0);
+      // The credentials writer survives — it is the only way to seed
+      // qbo_client_id / qbo_client_secret (the app only reads them).
+      const { rows: kept } = await db.query(inPublic, [["save_qbo_client_credentials"]]);
+      expect(kept).toHaveLength(1);
     });
   });
 });

@@ -98,18 +98,15 @@ export async function saveTokens(
 }
 
 /**
- * Deliberately NOT serialized against save_qbo_tokens_atomic's advisory lock:
- * a disconnect racing a refresh leaves either no rows (delete won) or a fresh
- * pair the upstream Intuit revoke has already killed (persist won) — both
- * surface as a clean reconnect, and the refresh path's CAS treats a deleted
- * refresh-token row as a miss (saved: false).
+ * Deletes the four token rows via clear_qbo_tokens_atomic (00297), which
+ * takes the same advisory lock as the save RPC — an unserialized delete could
+ * commit between the save's CAS check and its insert, resurrecting a token
+ * pair Intuit has already revoked. Client credentials and environment
+ * (operator configuration, no app write path) survive a disconnect.
  */
 export async function clearTokens(): Promise<void> {
   const admin = await createAdminClient();
-  const { error } = await admin
-    .from("system_settings")
-    .delete()
-    .in("key", Object.values(SETTINGS_KEYS));
+  const { error } = await dynamicRpc(admin, "clear_qbo_tokens_atomic");
   if (error) throw new Error(`Failed to clear QBO tokens: ${error.message}`);
 }
 
