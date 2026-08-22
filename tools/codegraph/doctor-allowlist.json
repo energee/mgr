@@ -61,6 +61,7 @@
     "notify_batch_cancelled": "function: no app .rpc() call and no trigger executes it",
     "notify_data_integrity_findings": "function: no app .rpc() call and no trigger executes it",
     "order_change_has_fulfillment_artifacts": "function: no app .rpc() call and no trigger executes it",
+    "prune_log_tables": "function: no app .rpc() call and no trigger executes it",
     "recalculate_order_materials": "function: no app .rpc() call and no trigger executes it",
     "reconcile_mongodb_batch_reading_aggregate": "function: no app .rpc() call and no trigger executes it",
     "reconcile_mongodb_brew_aggregate": "function: no app .rpc() call and no trigger executes it",
