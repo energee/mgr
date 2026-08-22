@@ -1,9 +1,9 @@
 {
- "commit": "b63efa39da7d4fdf3e91ed062d955850faebdc31",
- "built_at": "2026-08-22T02:37:58.340Z",
+ "commit": "54b695e271454c91b7f18d0b4cb8fc1664ef7e2c",
+ "built_at": "2026-08-22T03:15:23.528Z",
  "inputs": {
-  "count": 1389,
-  "digest": "ed966e9ec0db2f84"
+  "count": 1394,
+  "digest": "d572539a1c2b5960"
  },
  "nodes": [
   {
@@ -946,6 +946,15 @@
    "name": "prevent_completed_allocation_delete",
    "type": "DB_FUNCTION",
    "description": "Postgres function prevent_completed_allocation_delete(), confirmed live.",
+   "file_path": "supabase/live-catalog.snapshot.txt",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "snapshot"
+  },
+  {
+   "name": "prune_log_tables",
+   "type": "DB_FUNCTION",
+   "description": "Postgres function prune_log_tables(p_log_days integer, p_revision_days integer), confirmed live.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -2854,33 +2863,6 @@
    "db_source": "snapshot"
   },
   {
-   "name": "packages.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on packages: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "packages.packages_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'packages_select' on packages: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "packages.packages_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'packages_write' on packages: ALL, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
    "name": "packaging_sessions.current_user_enabled",
    "type": "RLS_POLICY",
    "description": "RLS policy 'current_user_enabled' on packaging_sessions: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
@@ -3010,33 +2992,6 @@
    "name": "po_receives.po_receives_write",
    "type": "RLS_POLICY",
    "description": "RLS policy 'po_receives_write' on po_receives: ALL, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "pricing_channel_formats.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on pricing_channel_formats: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "pricing_channel_formats.pricing_channel_formats_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'pricing_channel_formats_select' on pricing_channel_formats: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "pricing_channel_formats.pricing_channel_formats_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'pricing_channel_formats_write' on pricing_channel_formats: ALL, PERMISSIVE, role public. Confirmed live.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -3286,33 +3241,6 @@
    "db_source": "snapshot"
   },
   {
-   "name": "recipe_collaborators.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on recipe_collaborators: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_collaborators.recipe_collaborators_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_collaborators_select' on recipe_collaborators: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_collaborators.recipe_collaborators_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_collaborators_write' on recipe_collaborators: ALL, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
    "name": "recipe_fruits.current_user_enabled",
    "type": "RLS_POLICY",
    "description": "RLS policy 'current_user_enabled' on recipe_fruits: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
@@ -3442,141 +3370,6 @@
    "name": "recipe_sugars.recipe_sugars_write",
    "type": "RLS_POLICY",
    "description": "RLS policy 'recipe_sugars_write' on recipe_sugars: ALL, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_adjuncts.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on recipe_variant_adjuncts: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_adjuncts.recipe_variant_adjuncts_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variant_adjuncts_select' on recipe_variant_adjuncts: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_adjuncts.recipe_variant_adjuncts_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variant_adjuncts_write' on recipe_variant_adjuncts: ALL, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_fruits.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on recipe_variant_fruits: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_fruits.recipe_variant_fruits_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variant_fruits_select' on recipe_variant_fruits: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_fruits.recipe_variant_fruits_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variant_fruits_write' on recipe_variant_fruits: ALL, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_hops.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on recipe_variant_hops: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_hops.recipe_variant_hops_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variant_hops_select' on recipe_variant_hops: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_hops.recipe_variant_hops_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variant_hops_write' on recipe_variant_hops: ALL, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_spices.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on recipe_variant_spices: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_spices.recipe_variant_spices_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variant_spices_select' on recipe_variant_spices: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_spices.recipe_variant_spices_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variant_spices_write' on recipe_variant_spices: ALL, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variants.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on recipe_variants: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variants.recipe_variants_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variants_select' on recipe_variants: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variants.recipe_variants_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'recipe_variants_write' on recipe_variants: ALL, PERMISSIVE, role public. Confirmed live.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -4171,33 +3964,6 @@
    "name": "user_profiles.user_profiles_update",
    "type": "RLS_POLICY",
    "description": "RLS policy 'user_profiles_update' on user_profiles: UPDATE, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "vessel_cleanings.current_user_enabled",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'current_user_enabled' on vessel_cleanings: ALL, RESTRICTIVE, role authenticated. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "vessel_cleanings.vessel_cleanings_select",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'vessel_cleanings_select' on vessel_cleanings: SELECT, PERMISSIVE, role public. Confirmed live.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "vessel_cleanings.vessel_cleanings_write",
-   "type": "RLS_POLICY",
-   "description": "RLS policy 'vessel_cleanings_write' on vessel_cleanings: ALL, PERMISSIVE, role public. Confirmed live.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -5314,15 +5080,6 @@
    ]
   },
   {
-   "name": "packages",
-   "type": "TABLE",
-   "description": "Postgres table 'packages', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
    "name": "packaging_sessions",
    "type": "TABLE",
    "description": "Postgres table 'packaging_sessions', confirmed present in the live catalog snapshot.",
@@ -5384,15 +5141,6 @@
    "name": "po_receives",
    "type": "TABLE",
    "description": "Postgres table 'po_receives', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "pricing_channel_formats",
-   "type": "TABLE",
-   "description": "Postgres table 'pricing_channel_formats', confirmed present in the live catalog snapshot.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -5474,15 +5222,6 @@
    "name": "recipe_adjuncts",
    "type": "TABLE",
    "description": "Postgres table 'recipe_adjuncts', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_collaborators",
-   "type": "TABLE",
-   "description": "Postgres table 'recipe_collaborators', confirmed present in the live catalog snapshot.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -5584,51 +5323,6 @@
    "name": "recipe_sugars",
    "type": "TABLE",
    "description": "Postgres table 'recipe_sugars', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_adjuncts",
-   "type": "TABLE",
-   "description": "Postgres table 'recipe_variant_adjuncts', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_fruits",
-   "type": "TABLE",
-   "description": "Postgres table 'recipe_variant_fruits', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_hops",
-   "type": "TABLE",
-   "description": "Postgres table 'recipe_variant_hops', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variant_spices",
-   "type": "TABLE",
-   "description": "Postgres table 'recipe_variant_spices', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
-  },
-  {
-   "name": "recipe_variants",
-   "type": "TABLE",
-   "description": "Postgres table 'recipe_variants', confirmed present in the live catalog snapshot.",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "aliases": [],
    "extractor": "sql",
@@ -5932,15 +5626,6 @@
     "supabase/migrations/00097_permission_based_roles.sql",
     "supabase/migrations/00156_security_invoker_corrections.sql"
    ]
-  },
-  {
-   "name": "vessel_cleanings",
-   "type": "TABLE",
-   "description": "Postgres table 'vessel_cleanings', confirmed present in the live catalog snapshot.",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "aliases": [],
-   "extractor": "sql",
-   "db_source": "snapshot"
   },
   {
    "name": "vessel_transfers",
@@ -11536,6 +11221,33 @@
    "extractor": "sql"
   },
   {
+   "name": "pricing_channel_formats.pricing_channel_formats_select",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pricing_channel_formats.pricing_channel_formats_select' on pricing_channel_formats, defined in 00285_capture_channel_formats.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pricing_channel_formats.pricing_channel_formats_write",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pricing_channel_formats.pricing_channel_formats_write' on pricing_channel_formats, defined in 00285_capture_channel_formats.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
+   "name": "pricing_channel_formats.current_user_enabled",
+   "type": "RLS_POLICY",
+   "description": "RLS policy 'pricing_channel_formats.current_user_enabled' on pricing_channel_formats, defined in 00285_capture_channel_formats.sql. Not present in the live snapshot.",
+   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
+   "aliases": [],
+   "extractor": "sql",
+   "db_source": "chain"
+  },
+  {
    "name": "00286_suppliers_delete_revision_trail.sql",
    "type": "MIGRATION",
    "description": "Migration 00286_suppliers_delete_revision_trail.sql.",
@@ -11636,6 +11348,22 @@
    "type": "MIGRATION",
    "description": "Migration 00298_constraint_tightening.sql.",
    "file_path": "supabase/migrations/00298_constraint_tightening.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "00299_save_qbo_tokens_atomic.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00299_save_qbo_tokens_atomic.sql.",
+   "file_path": "supabase/migrations/00299_save_qbo_tokens_atomic.sql",
+   "aliases": [],
+   "extractor": "sql"
+  },
+  {
+   "name": "00300_sync_status_preserving_upserts.sql",
+   "type": "MIGRATION",
+   "description": "Migration 00300_sync_status_preserving_upserts.sql.",
+   "file_path": "supabase/migrations/00300_sync_status_preserving_upserts.sql",
    "aliases": [],
    "extractor": "sql"
   },
@@ -12080,6 +11808,14 @@
    "type": "TEST",
    "description": "TEST at src/__tests__/integration/portal-revocation-rls.test.ts.",
    "file_path": "src/__tests__/integration/portal-revocation-rls.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/__tests__/integration/qbo-save-tokens-atomic.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/__tests__/integration/qbo-save-tokens-atomic.test.ts.",
+   "file_path": "src/__tests__/integration/qbo-save-tokens-atomic.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -26736,6 +26472,16 @@
    "extractor": "ast"
   },
   {
+   "name": "src/lib/__tests__/sql-def-helpers.ts#migrationsMatching",
+   "type": "FUNCTION",
+   "description": "Exported function 'migrationsMatching' in src/lib/__tests__/sql-def-helpers.ts.",
+   "file_path": "src/lib/__tests__/sql-def-helpers.ts",
+   "aliases": [
+    "migrationsMatching"
+   ],
+   "extractor": "ast"
+  },
+  {
    "name": "src/lib/__tests__/actual-og-sg.test.ts",
    "type": "TEST",
    "description": "TEST at src/lib/__tests__/actual-og-sg.test.ts.",
@@ -26812,6 +26558,14 @@
    "type": "TEST",
    "description": "TEST at src/lib/__tests__/batch-record-invalidation-keys.test.ts.",
    "file_path": "src/lib/__tests__/batch-record-invalidation-keys.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/__tests__/bin-placement-sql.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/lib/__tests__/bin-placement-sql.test.ts.",
+   "file_path": "src/lib/__tests__/bin-placement-sql.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -26972,6 +26726,14 @@
    "type": "TEST",
    "description": "TEST at src/lib/__tests__/report-export.test.ts.",
    "file_path": "src/lib/__tests__/report-export.test.ts",
+   "aliases": [],
+   "extractor": "ast"
+  },
+  {
+   "name": "src/lib/__tests__/sellable-inventory-sql.test.ts",
+   "type": "TEST",
+   "description": "TEST at src/lib/__tests__/sellable-inventory-sql.test.ts.",
+   "file_path": "src/lib/__tests__/sellable-inventory-sql.test.ts",
    "aliases": [],
    "extractor": "ast"
   },
@@ -37529,27 +37291,6 @@
    "extractor": "sql"
   },
   {
-   "source": "packages.current_user_enabled",
-   "predicate": "protects",
-   "target": "packages",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "packages.packages_select",
-   "predicate": "protects",
-   "target": "packages",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "packages.packages_write",
-   "predicate": "protects",
-   "target": "packages",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
    "source": "packaging_sessions.current_user_enabled",
    "predicate": "protects",
    "target": "packaging_sessions",
@@ -37651,27 +37392,6 @@
    "source": "po_receives.po_receives_write",
    "predicate": "protects",
    "target": "po_receives",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "pricing_channel_formats.current_user_enabled",
-   "predicate": "protects",
-   "target": "pricing_channel_formats",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "pricing_channel_formats.pricing_channel_formats_select",
-   "predicate": "protects",
-   "target": "pricing_channel_formats",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "pricing_channel_formats.pricing_channel_formats_write",
-   "predicate": "protects",
-   "target": "pricing_channel_formats",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "extractor": "sql"
   },
@@ -37865,27 +37585,6 @@
    "extractor": "sql"
   },
   {
-   "source": "recipe_collaborators.current_user_enabled",
-   "predicate": "protects",
-   "target": "recipe_collaborators",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_collaborators.recipe_collaborators_select",
-   "predicate": "protects",
-   "target": "recipe_collaborators",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_collaborators.recipe_collaborators_write",
-   "predicate": "protects",
-   "target": "recipe_collaborators",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
    "source": "recipe_fruits.current_user_enabled",
    "predicate": "protects",
    "target": "recipe_fruits",
@@ -37987,111 +37686,6 @@
    "source": "recipe_sugars.recipe_sugars_write",
    "predicate": "protects",
    "target": "recipe_sugars",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_adjuncts.current_user_enabled",
-   "predicate": "protects",
-   "target": "recipe_variant_adjuncts",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_adjuncts.recipe_variant_adjuncts_select",
-   "predicate": "protects",
-   "target": "recipe_variant_adjuncts",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_adjuncts.recipe_variant_adjuncts_write",
-   "predicate": "protects",
-   "target": "recipe_variant_adjuncts",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_fruits.current_user_enabled",
-   "predicate": "protects",
-   "target": "recipe_variant_fruits",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_fruits.recipe_variant_fruits_select",
-   "predicate": "protects",
-   "target": "recipe_variant_fruits",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_fruits.recipe_variant_fruits_write",
-   "predicate": "protects",
-   "target": "recipe_variant_fruits",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_hops.current_user_enabled",
-   "predicate": "protects",
-   "target": "recipe_variant_hops",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_hops.recipe_variant_hops_select",
-   "predicate": "protects",
-   "target": "recipe_variant_hops",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_hops.recipe_variant_hops_write",
-   "predicate": "protects",
-   "target": "recipe_variant_hops",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_spices.current_user_enabled",
-   "predicate": "protects",
-   "target": "recipe_variant_spices",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_spices.recipe_variant_spices_select",
-   "predicate": "protects",
-   "target": "recipe_variant_spices",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_spices.recipe_variant_spices_write",
-   "predicate": "protects",
-   "target": "recipe_variant_spices",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants.current_user_enabled",
-   "predicate": "protects",
-   "target": "recipe_variants",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants.recipe_variants_select",
-   "predicate": "protects",
-   "target": "recipe_variants",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants.recipe_variants_write",
-   "predicate": "protects",
-   "target": "recipe_variants",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "extractor": "sql"
   },
@@ -38554,27 +38148,6 @@
    "source": "user_profiles.user_profiles_update",
    "predicate": "protects",
    "target": "user_profiles",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "vessel_cleanings.current_user_enabled",
-   "predicate": "protects",
-   "target": "vessel_cleanings",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "vessel_cleanings.vessel_cleanings_select",
-   "predicate": "protects",
-   "target": "vessel_cleanings",
-   "file_path": "supabase/live-catalog.snapshot.txt",
-   "extractor": "sql"
-  },
-  {
-   "source": "vessel_cleanings.vessel_cleanings_write",
-   "predicate": "protects",
-   "target": "vessel_cleanings",
    "file_path": "supabase/live-catalog.snapshot.txt",
    "extractor": "sql"
   },
@@ -39582,13 +39155,6 @@
   {
    "source": "00001_initial_schema.sql",
    "predicate": "creates",
-   "target": "packages",
-   "file_path": "supabase/migrations/00001_initial_schema.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00001_initial_schema.sql",
-   "predicate": "creates",
    "target": "customers",
    "file_path": "supabase/migrations/00001_initial_schema.sql",
    "extractor": "sql"
@@ -39709,13 +39275,6 @@
    "source": "00001_initial_schema.sql",
    "predicate": "creates",
    "target": "packages.package_access",
-   "file_path": "supabase/migrations/00001_initial_schema.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "packages.package_access",
-   "predicate": "protects",
-   "target": "packages",
    "file_path": "supabase/migrations/00001_initial_schema.sql",
    "extractor": "sql"
   },
@@ -40100,13 +39659,6 @@
   {
    "source": "00006_vessels.sql",
    "predicate": "creates",
-   "target": "vessel_cleanings",
-   "file_path": "supabase/migrations/00006_vessels.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00006_vessels.sql",
-   "predicate": "creates",
    "target": "locations.location_access",
    "file_path": "supabase/migrations/00006_vessels.sql",
    "extractor": "sql"
@@ -40150,13 +39702,6 @@
    "source": "00006_vessels.sql",
    "predicate": "creates",
    "target": "vessel_cleanings.vessel_cleaning_access",
-   "file_path": "supabase/migrations/00006_vessels.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "vessel_cleanings.vessel_cleaning_access",
-   "predicate": "protects",
-   "target": "vessel_cleanings",
    "file_path": "supabase/migrations/00006_vessels.sql",
    "extractor": "sql"
   },
@@ -40241,13 +39786,6 @@
    "source": "00006_vessels.sql",
    "predicate": "creates",
    "target": "recent_vessel_cleanings",
-   "file_path": "supabase/migrations/00006_vessels.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recent_vessel_cleanings",
-   "predicate": "derives_from",
-   "target": "vessel_cleanings",
    "file_path": "supabase/migrations/00006_vessels.sql",
    "extractor": "sql"
   },
@@ -40982,13 +40520,6 @@
   {
    "source": "00011_catalog_and_recipe_junction.sql",
    "predicate": "creates",
-   "target": "recipe_collaborators",
-   "file_path": "supabase/migrations/00011_catalog_and_recipe_junction.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00011_catalog_and_recipe_junction.sql",
-   "predicate": "creates",
    "target": "recipes_with_estimates",
    "file_path": "supabase/migrations/00011_catalog_and_recipe_junction.sql",
    "extractor": "sql"
@@ -41277,13 +40808,6 @@
    "source": "00011_catalog_and_recipe_junction.sql",
    "predicate": "creates",
    "target": "recipe_collaborators.recipe_collaborators_access",
-   "file_path": "supabase/migrations/00011_catalog_and_recipe_junction.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_collaborators.recipe_collaborators_access",
-   "predicate": "protects",
-   "target": "recipe_collaborators",
    "file_path": "supabase/migrations/00011_catalog_and_recipe_junction.sql",
    "extractor": "sql"
   },
@@ -41802,13 +41326,6 @@
    "source": "00014_security_fixes.sql",
    "predicate": "creates",
    "target": "recent_vessel_cleanings",
-   "file_path": "supabase/migrations/00014_security_fixes.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recent_vessel_cleanings",
-   "predicate": "derives_from",
-   "target": "vessel_cleanings",
    "file_path": "supabase/migrations/00014_security_fixes.sql",
    "extractor": "sql"
   },
@@ -46183,28 +45700,7 @@
   {
    "source": "00083_recipe_variants.sql",
    "predicate": "creates",
-   "target": "recipe_variants",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00083_recipe_variants.sql",
-   "predicate": "creates",
    "target": "recipe_variants.Authenticated users can manage recipe_variants",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants.Authenticated users can manage recipe_variants",
-   "predicate": "protects",
-   "target": "recipe_variants",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00083_recipe_variants.sql",
-   "predicate": "creates",
-   "target": "recipe_variant_hops",
    "file_path": "supabase/migrations/00083_recipe_variants.sql",
    "extractor": "sql"
   },
@@ -46216,37 +45712,9 @@
    "extractor": "sql"
   },
   {
-   "source": "recipe_variant_hops.Authenticated users can manage recipe_variant_hops",
-   "predicate": "protects",
-   "target": "recipe_variant_hops",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00083_recipe_variants.sql",
-   "predicate": "creates",
-   "target": "recipe_variant_adjuncts",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
    "source": "00083_recipe_variants.sql",
    "predicate": "creates",
    "target": "recipe_variant_adjuncts.Authenticated users can manage recipe_variant_adjuncts",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_adjuncts.Authenticated users can manage recipe_variant_adjuncts",
-   "predicate": "protects",
-   "target": "recipe_variant_adjuncts",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00083_recipe_variants.sql",
-   "predicate": "creates",
-   "target": "recipe_variant_fruits",
    "file_path": "supabase/migrations/00083_recipe_variants.sql",
    "extractor": "sql"
   },
@@ -46258,30 +45726,9 @@
    "extractor": "sql"
   },
   {
-   "source": "recipe_variant_fruits.Authenticated users can manage recipe_variant_fruits",
-   "predicate": "protects",
-   "target": "recipe_variant_fruits",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00083_recipe_variants.sql",
-   "predicate": "creates",
-   "target": "recipe_variant_spices",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
    "source": "00083_recipe_variants.sql",
    "predicate": "creates",
    "target": "recipe_variant_spices.Authenticated users can manage recipe_variant_spices",
-   "file_path": "supabase/migrations/00083_recipe_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variant_spices.Authenticated users can manage recipe_variant_spices",
-   "predicate": "protects",
-   "target": "recipe_variant_spices",
    "file_path": "supabase/migrations/00083_recipe_variants.sql",
    "extractor": "sql"
   },
@@ -46316,13 +45763,6 @@
   {
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
-   "target": "recipe_variant_hops",
-   "file_path": "supabase/migrations/00085_variant_cost_views.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
    "target": "hops",
    "file_path": "supabase/migrations/00085_variant_cost_views.sql",
    "extractor": "sql"
@@ -46330,21 +45770,7 @@
   {
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
-   "target": "recipe_variant_adjuncts",
-   "file_path": "supabase/migrations/00085_variant_cost_views.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
    "target": "adjuncts",
-   "file_path": "supabase/migrations/00085_variant_cost_views.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
-   "target": "recipe_variant_fruits",
    "file_path": "supabase/migrations/00085_variant_cost_views.sql",
    "extractor": "sql"
   },
@@ -46359,13 +45785,6 @@
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
    "target": "recipes_with_cogs",
-   "file_path": "supabase/migrations/00085_variant_cost_views.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
-   "target": "recipe_variants",
    "file_path": "supabase/migrations/00085_variant_cost_views.sql",
    "extractor": "sql"
   },
@@ -46498,21 +45917,7 @@
   {
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
-   "target": "recipe_variant_hops",
-   "file_path": "supabase/migrations/00086_refresh_views_for_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
    "target": "hops",
-   "file_path": "supabase/migrations/00086_refresh_views_for_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
-   "target": "recipe_variant_adjuncts",
    "file_path": "supabase/migrations/00086_refresh_views_for_variants.sql",
    "extractor": "sql"
   },
@@ -46526,21 +45931,7 @@
   {
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
-   "target": "recipe_variant_fruits",
-   "file_path": "supabase/migrations/00086_refresh_views_for_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
    "target": "fruits",
-   "file_path": "supabase/migrations/00086_refresh_views_for_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
-   "target": "recipe_variant_spices",
    "file_path": "supabase/migrations/00086_refresh_views_for_variants.sql",
    "extractor": "sql"
   },
@@ -46555,13 +45946,6 @@
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
    "target": "recipes_with_cogs",
-   "file_path": "supabase/migrations/00086_refresh_views_for_variants.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
-   "target": "recipe_variants",
    "file_path": "supabase/migrations/00086_refresh_views_for_variants.sql",
    "extractor": "sql"
   },
@@ -46582,21 +45966,7 @@
   {
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
-   "target": "recipe_variant_hops",
-   "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
    "target": "hops",
-   "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
-   "target": "recipe_variant_adjuncts",
    "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
    "extractor": "sql"
   },
@@ -46610,21 +45980,7 @@
   {
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
-   "target": "recipe_variant_fruits",
-   "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
    "target": "fruits",
-   "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
-   "target": "recipe_variant_spices",
    "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
    "extractor": "sql"
   },
@@ -46639,13 +45995,6 @@
    "source": "recipe_variants_with_costs",
    "predicate": "derives_from",
    "target": "recipes_with_cogs",
-   "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recipe_variants_with_costs",
-   "predicate": "derives_from",
-   "target": "recipe_variants",
    "file_path": "supabase/migrations/00087_cost_view_unit_conversion.sql",
    "extractor": "sql"
   },
@@ -48963,13 +48312,6 @@
    "source": "00156_security_invoker_corrections.sql",
    "predicate": "creates",
    "target": "recent_vessel_cleanings",
-   "file_path": "supabase/migrations/00156_security_invoker_corrections.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "recent_vessel_cleanings",
-   "predicate": "derives_from",
-   "target": "vessel_cleanings",
    "file_path": "supabase/migrations/00156_security_invoker_corrections.sql",
    "extractor": "sql"
   },
@@ -53589,13 +52931,6 @@
   {
    "source": "00285_capture_channel_formats.sql",
    "predicate": "creates",
-   "target": "pricing_channel_formats",
-   "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
-   "extractor": "sql"
-  },
-  {
-   "source": "00285_capture_channel_formats.sql",
-   "predicate": "creates",
    "target": "pricing_channel_formats.pricing_channel_formats_select",
    "file_path": "supabase/migrations/00285_capture_channel_formats.sql",
    "extractor": "sql"
@@ -53884,6 +53219,13 @@
    "source": "00296_log_retention_cron.sql",
    "predicate": "creates",
    "target": "email_notification_log.Authenticated users can read email log",
+   "file_path": "supabase/migrations/00296_log_retention_cron.sql",
+   "extractor": "sql"
+  },
+  {
+   "source": "00296_log_retention_cron.sql",
+   "predicate": "creates",
+   "target": "prune_log_tables",
    "file_path": "supabase/migrations/00296_log_retention_cron.sql",
    "extractor": "sql"
   },
@@ -54431,6 +53773,13 @@
    "predicate": "imports",
    "target": "src/__tests__/integration/_helpers/role-client.ts",
    "file_path": "src/__tests__/integration/portal-revocation-rls.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/__tests__/integration/qbo-save-tokens-atomic.test.ts",
+   "predicate": "imports",
+   "target": "src/__tests__/integration/_helpers/role-client.ts",
+   "file_path": "src/__tests__/integration/qbo-save-tokens-atomic.test.ts",
    "extractor": "ast"
   },
   {
@@ -59608,6 +58957,13 @@
   },
   {
    "source": "src/integrations/quickbooks/token-manager.ts",
+   "predicate": "imports",
+   "target": "src/services/types.ts",
+   "file_path": "src/integrations/quickbooks/token-manager.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/integrations/quickbooks/token-manager.ts",
    "predicate": "defines",
    "target": "src/integrations/quickbooks/token-manager.ts#getTokens",
    "file_path": "src/integrations/quickbooks/token-manager.ts",
@@ -59631,13 +58987,6 @@
    "source": "src/integrations/quickbooks/token-manager.ts",
    "predicate": "defines",
    "target": "src/integrations/quickbooks/token-manager.ts#saveTokens",
-   "file_path": "src/integrations/quickbooks/token-manager.ts",
-   "extractor": "ast"
-  },
-  {
-   "source": "src/integrations/quickbooks/token-manager.ts",
-   "predicate": "writes_to",
-   "target": "system_settings",
    "file_path": "src/integrations/quickbooks/token-manager.ts",
    "extractor": "ast"
   },
@@ -76225,6 +75574,20 @@
    "extractor": "ast"
   },
   {
+   "source": "src/integrations/mongodb/__tests__/sync.test.ts",
+   "predicate": "imports",
+   "target": "src/integrations/mongodb/transformers.ts",
+   "file_path": "src/integrations/mongodb/__tests__/sync.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/integrations/mongodb/__tests__/sync.test.ts",
+   "predicate": "imports",
+   "target": "src/integrations/mongodb/types.ts",
+   "file_path": "src/integrations/mongodb/__tests__/sync.test.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/integrations/mongodb/transformers.ts",
    "predicate": "tested_by",
    "target": "src/integrations/mongodb/__tests__/transformers.test.ts",
@@ -76582,6 +75945,13 @@
    "extractor": "ast"
   },
   {
+   "source": "src/lib/__tests__/sql-def-helpers.ts",
+   "predicate": "defines",
+   "target": "src/lib/__tests__/sql-def-helpers.ts#migrationsMatching",
+   "file_path": "src/lib/__tests__/sql-def-helpers.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/lib/__tests__/actual-og-sg.test.ts",
    "predicate": "imports",
    "target": "src/domain/units.ts",
@@ -76705,6 +76075,13 @@
    "predicate": "imports",
    "target": "src/lib/query-keys.ts",
    "file_path": "src/lib/__tests__/batch-record-invalidation-keys.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/__tests__/bin-placement-sql.test.ts",
+   "predicate": "imports",
+   "target": "src/lib/__tests__/sql-def-helpers.ts",
+   "file_path": "src/lib/__tests__/bin-placement-sql.test.ts",
    "extractor": "ast"
   },
   {
@@ -76946,6 +76323,13 @@
    "extractor": "ast"
   },
   {
+   "source": "src/lib/__tests__/sellable-inventory-sql.test.ts",
+   "predicate": "imports",
+   "target": "src/lib/__tests__/sql-def-helpers.ts",
+   "file_path": "src/lib/__tests__/sellable-inventory-sql.test.ts",
+   "extractor": "ast"
+  },
+  {
    "source": "src/lib/__tests__/square-integration.test.ts",
    "predicate": "imports",
    "target": "src/integrations/square/webhook.ts",
@@ -77026,6 +76410,13 @@
    "source": "src/lib/__tests__/state-machines.test.ts",
    "predicate": "imports",
    "target": "src/entities/recipe/index.ts",
+   "file_path": "src/lib/__tests__/state-machines.test.ts",
+   "extractor": "ast"
+  },
+  {
+   "source": "src/lib/__tests__/state-machines.test.ts",
+   "predicate": "imports",
+   "target": "src/entities/delivery/index.ts",
    "file_path": "src/lib/__tests__/state-machines.test.ts",
    "extractor": "ast"
   },
