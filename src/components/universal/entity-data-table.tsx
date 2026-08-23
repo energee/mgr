@@ -68,7 +68,11 @@ import {
   quickFilterColumnFilters,
   type ResolvedListParams,
 } from "@/components/universal/list-query-options";
-import { getFiltersStateParser, getSortingStateParser } from "@/lib/parsers";
+import {
+  filterStatesEqual,
+  getFiltersStateParser,
+  getSortingStateParser,
+} from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { EntityKanban } from "@/components/universal/entity-kanban";
 import { EntityDeleteDialog, EntityBulkDeleteDialog } from "./entity-delete-dialog";
@@ -954,7 +958,15 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Check for active filters
   // ---------------------------------------------------------------------------
-  const hasActiveFilters = debouncedSearch || urlFilters.length > 0;
+  // urlFilters defaults to the entity's default quick-filter preset (see
+  // defaultQuickFilterFilters above), so a bare `.length > 0` check is true
+  // on first load for any entity with a default preset even though the user
+  // never touched a filter control — the empty state would then wrongly
+  // claim "no matching results" (and hide the Create button) instead of "no
+  // {entity} yet". Compare against the preset instead of just checking length.
+  const hasActiveFilters =
+    debouncedSearch ||
+    !filterStatesEqual(urlFilters, defaultQuickFilterFilters);
 
   // ---------------------------------------------------------------------------
   // Render
