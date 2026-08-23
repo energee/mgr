@@ -72,6 +72,30 @@ the 80-turn cap from #598 was hitting the ceiling simply stopped recurring.
 Re-open the investigation the next time a scheduled run hits
 `error_max_turns`; until then there is nothing to revise.)
 
+(**sentry-fix flagged 2026-08-23 as a retire/revise candidate to watch, not
+yet acted on.** The loop scoreboard's 4-week window (since 07-26) reads 20
+scheduled runs / 0 PRs opened / 0 merged — entirely quiet, which is the
+scoreboard's own named criterion ("a loop whose PRs trend toward zero
+merges"). The needs-human issues it did file in that window cluster on one
+recurring, already-diagnosed signature: dev-machine `Unregistered API key`
+credential noise (five prior instances, #636–#642, recurring again as
+#832/#833 on 08-18) that `gotchas.md`'s "Unregistered API key" entry
+diagnoses in full, yet nothing short-circuits a fresh `fix-error` dispatch
+the next time the same signature resurfaces in Sentry. Two competing reads,
+not yet distinguished: (a) the scored issue stream is genuinely dominated by
+dev-environment noise with no production signal to act on, in which case 0
+PRs is correct and this loop is a rare-event safety net rather than a weekly
+producer; or (b) `score-errors` should recognize a known-noise signature
+(matching message + no Postgres error code, per the gotchas.md tell) and skip
+it before spending a fix-job on a diagnosis it already reached five times.
+Falsifies toward (b) if the next 4-week scoreboard window still shows 0
+merged PRs for sentry-fix *and* more than half its needs-human issues in that
+window are the same `Unregistered API key` signature — that combination means
+the loop is spending its bounded run budget re-diagnosing one known
+non-actionable pattern instead of triaging anything new. Falsifies toward (a)
+if a PR merges, or if the needs-human issues in the next window are mostly
+distinct signatures. Stays open otherwise.)
+
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
 the week's merges actually moved codebase health — its trend log is the

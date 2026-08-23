@@ -75,6 +75,20 @@ WITH CHECK (true)
 WITH CHECK (auth.uid() = user_id)
 ```
 
+## Enum values gated by `validate_enum_value()`
+
+Some enum-shaped columns are policed by a trigger (`validate_enum_value()`,
+since migration 00040) against value lists seeded into the `enum_values`
+table — a separate object from the Postgres `enum` type itself, and nothing
+keeps the two in sync automatically. Any migration that adds, renames, or
+removes a value on an enum type gated by this trigger **MUST** update the
+matching `enum_values` rows in the same migration, and verify with
+`SELECT enum_range(NULL::the_enum_type)` compared against
+`SELECT value FROM enum_values WHERE column_name = '...'`. #917 found a
+`keg_transaction_type` registry that never matched its Postgres enum since
+the initial seed (00037) — five of eight legal values were silently rejected
+on every from-scratch database until integration tests exercised them.
+
 ## After applying migrations
 
 If you hit `column not found` or stale enum errors, refresh the PostgREST
@@ -83,6 +97,11 @@ cache:
 ```sql
 NOTIFY pgrst, 'reload schema';
 ```
+
+If the same enum value is still rejected after a reload, it may not be a
+cache problem at all — check whether the value is gated by
+`validate_enum_value()` (above). A bad `enum_values` seed reads identically
+to a stale cache, but a schema reload will never fix it (#917).
 
 See [`debugging.md`](./debugging.md) for the full database-debugging order of
 operations.

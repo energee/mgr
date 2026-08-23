@@ -215,7 +215,7 @@ Add a `_schema_registry` entry in the migration whenever you create a new table.
 - Pattern: `00XXX_description.sql` in `supabase/migrations/`
 - Pick the next number: ``ls supabase/migrations/ | tail -1`` shows the highest existing; use highest + 1.
 - Follow [`db-security.md`](docs/agents/db-security.md) for every new view, function, and policy.
-- Push with `scripts/db-push.sh` (runs `db push --include-all` and regenerates `supabase/live-catalog.snapshot.txt` — commit both).
+- Push with `scripts/db-push.sh` (runs `db push --include-all` and regenerates `supabase/live-catalog.snapshot.txt` — commit both). It does **not** regenerate `src/types/supabase.ts` (#912) — run `bun run db:generate` and commit that file in the same PR, or the next unrelated regeneration bundles your schema's drift into an unreviewable diff.
 - After applying: verify success before continuing with dependent code changes.
 
 ## AI integration

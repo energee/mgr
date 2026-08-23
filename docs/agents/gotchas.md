@@ -56,11 +56,17 @@ first; do not re-point the seed at a database that already has data.
 **Never pick a migration number from the local checkout alone.** `ls
 supabase/migrations | tail -1` shows only what *this* branch knows. Sibling
 worktrees, unmerged remote branches, and the live project each may hold a
-number you are about to reuse. Duplicate prefixes have happened twice — the
-PR #213 cleanup left `supabase/repair-migration-renumbering.sql` behind, and
-a 00260 collision had to be renumbered to 00266 in #545. Take the max across
-worktrees, remote branches, and `supabase migration list` before naming a
-file. The `preflight` skill does this check.
+number you are about to reuse. Duplicate prefixes have happened three times —
+the PR #213 cleanup left `supabase/repair-migration-renumbering.sql` behind, a
+00260 collision had to be renumbered to 00266 in #545, and 00297/00298
+collided again in #920. Take the max across worktrees, remote branches, and
+`supabase migration list` before naming a file. The `preflight` skill does
+this check. `make check-db` also runs `scripts/check-migration-numbers.sh`
+(#923) as a static backstop now, but it only sees one tree: two PRs that each
+add their own `00297` independently both pass it, and the collision only
+surfaces once both land on the same tree (a merge, or the second branch
+rebasing onto the first) — it catches the mistake late, not before you
+commit. The cross-worktree check above is still the actual prevention.
 
 **Push migrations with `scripts/db-push.sh`, never bare `supabase db push`.**
 The wrapper always passes `--include-all` (required here) and refreshes
