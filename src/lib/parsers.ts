@@ -76,11 +76,10 @@ const filterItemSchema = z.object({
 export type FilterItemSchema = z.infer<typeof filterItemSchema>;
 
 /**
- * Whether two filter states are equivalent, ignoring array order sensitivity
- * within each filter's own value. Shared by the parser's `clearOnDefault`
- * check and by callers that need to know whether the URL's current filter
- * state is just the entity's default quick-filter preset (e.g. deciding
- * whether to treat the list as "actively filtered by the user").
+ * Whether two filter states are equivalent. Comparison is positional (same
+ * length and same id/value/variant/operator at each index), including array
+ * values. Shared by the parser's `eq`/`clearOnDefault` check and by callers
+ * that need to know whether URL filters still match the default preset.
  */
 export function filterStatesEqual<TData>(
   a: ExtendedColumnFilter<TData>[],

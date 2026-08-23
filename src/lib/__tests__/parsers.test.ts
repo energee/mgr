@@ -89,6 +89,12 @@ describe("filterStatesEqual", () => {
     ).toBe(false);
   });
 
+  it("treats All-tab empty filters as unequal to a non-empty default preset", () => {
+    expect(
+      filterStatesEqual<Record<string, unknown>>([], [NAME_FILTER]),
+    ).toBe(false);
+  });
+
   it("treats different filter values as different", () => {
     const changed = { ...NAME_FILTER, value: "ipa" };
     expect(
