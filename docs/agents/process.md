@@ -112,7 +112,7 @@ When the user requests a feature with **"I want to implement a new feature: [des
 
 - Create and apply migrations only in the correct worktree/branch — never on `main`.
 - Verify apply succeeded before dependent code changes.
-- After enum/constraint changes, expect stale PostgREST / `enum_values` cache; suggest refresh when errors appear.
+- After enum/constraint changes, expect a stale PostgREST cache first — but if a `NOTIFY pgrst, 'reload schema'` doesn't clear the error, check the `enum_values` registry itself for drift rather than assuming it's still a cache issue (see [`db-security.md`](db-security.md#enum-values-gated-by-validate_enum_value); #917).
 
 ### Approach validation
 
