@@ -9,6 +9,32 @@
 
 ## Current state
 
+- **2026-08-22 (repo hygiene: 150 GB of scratch, stale worktrees, knip config rot).**
+  The checkout had grown to **153 GB**, of which ~25 MB was tracked content.
+  `.autoharness/` alone held **121 GB**: every run of the `src/lib` screening loop
+  serializes a full recursive file manifest into its JSON records
+  (`iter_0031/summary.json` = 829 MB / 16.6 M lines / 3,327,904 `{path, size}`
+  pairs), unscoped to the configured editable surface and not honoring
+  `.gitignore` — it walks `.claude/`, `.pnpm-store/`, `.next/`, `.git/` and
+  `.autoharness/` itself, so each run snapshots the prior runs' records and the
+  growth compounds. Stored ~4x per iteration across `summary.json`,
+  `execution_manifest.json`, `tracks/main/registry/` and `tracks/main/proposals/`.
+  The bug is upstream (`~/.local/bin/autoharness`, not this repo); filed as #943.
+  Deleted `.autoharness/` (121 GB), `.next/` (27 GB), `.pnpm-store/` (984 MB —
+  the repo uses bun) and stopped a `next dev` server idle since 2026-08-12.
+  Also removed 15 merged worktrees (35 GB → 0) and 100 local branches, each
+  verified content-identical to `main` before deletion; `git gc` took `.git`
+  from 43 MB to 11 MB. **153 GB → 2.7 GB.** Kept `docs/phase-4-rebaselined-plan`,
+  the one branch with unique content not in main.
+  Code-side, the 2026-07-24 ponytail audit is fully worked through (all 45 items
+  dispositioned), and its two un-hunted areas turned out moot: `src/components/rest`
+  does not exist, and every `scripts/` entry is referenced. A fresh knip pass
+  surfaced only config rot: three `entry` patterns Next.js auto-detects, an
+  `ignoreUnresolved` for `jsr:@supabase/.*` that no longer matched (knip reported
+  `jsr` as an unlisted dependency instead — now an `ignoreDependencies` entry),
+  and an unused `yaml` devDependency. Knip's remaining 134 export / 73 type
+  findings are the known false-positive classes AGENTS.md rule 17 describes
+  (shadcn re-exports, `z.infer` types, entity-registry indirection).
 - **2026-08-22 (README accuracy + license).** Fixed the README setup path to the canonical `make db-local` flow (it previously told readers to run `supabase db push`, which leaves no seed data and a broken `bun run test:integration`); corrected the stale `00001–00300` migration-naming claim to cover both the `00XXX_description.sql` and pulled-back `<timestamp>_*.sql` conventions; named the domain as brewery/TTB to match `AGENTS.md`; added an environment-variable table, and Testing, Deployment, and Troubleshooting sections; added `LICENSE` (AGPL-3.0-only, SPDX text) and a matching README section.
 - **2026-08-21 (mongodb syncVessels preserves live vessel status, #839).** Re-syncing the frozen Mongo snapshot no longer resets live vessel occupancy: syncVessels now reads existing PG vessels by name and keeps their status (same guard fd60d58 gave syncBatches; vessels have no transition trigger to reject the regression). New vessels still take their initial status from Mongo. selectRowsByIds gained an optional key column. Test added.
 - **2026-08-21 (DB-side status-preserving upserts for vessels/batches sync).** Closed the #855 TOCTOU in the MongoDB sync's status preservation: `preserveExistingStatuses` read live PG statuses then upserted, so a live transition between read and upsert could be clobbered. Migration `00300_sync_status_preserving_upserts.sql` adds service-role-only `sync_upsert_vessels` / `sync_upsert_batches` RPCs whose ON CONFLICT update omits `status` (Mongo still sets it on first insert; intra-payload duplicate keys deduped last-wins). `syncVessels`/`syncBatches` now call the RPCs with per-row fallback on batch failure; tests pin the RPC name+args contract and the fallback.
