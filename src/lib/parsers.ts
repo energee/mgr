@@ -76,6 +76,28 @@ const filterItemSchema = z.object({
 export type FilterItemSchema = z.infer<typeof filterItemSchema>;
 
 /**
+ * Whether two filter states are equivalent. Comparison is positional (same
+ * length and same id/value/variant/operator at each index), including array
+ * values. Shared by the parser's `eq`/`clearOnDefault` check and by callers
+ * that need to know whether URL filters still match the default preset.
+ */
+export function filterStatesEqual<TData>(
+  a: ExtendedColumnFilter<TData>[],
+  b: ExtendedColumnFilter<TData>[],
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (filter, index) =>
+        filter.id === b[index]?.id &&
+        deepEqualValue(filter.value, b[index]?.value) &&
+        filter.variant === b[index]?.variant &&
+        filter.operator === b[index]?.operator,
+    )
+  );
+}
+
+/**
  * nuqs parser for URL-synced table filter state.
  *
  * Validates each filter INDIVIDUALLY and drops only the bad ones: a saved or
@@ -111,14 +133,6 @@ export const getFiltersStateParser = <TData>(
       }
     },
     serialize: (value) => JSON.stringify(value),
-    eq: (a, b) =>
-      a.length === b.length &&
-      a.every(
-        (filter, index) =>
-          filter.id === b[index]?.id &&
-          deepEqualValue(filter.value, b[index]?.value) &&
-          filter.variant === b[index]?.variant &&
-          filter.operator === b[index]?.operator,
-      ),
+    eq: filterStatesEqual,
   });
 };

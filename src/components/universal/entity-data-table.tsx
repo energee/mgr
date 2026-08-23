@@ -68,7 +68,11 @@ import {
   quickFilterColumnFilters,
   type ResolvedListParams,
 } from "@/components/universal/list-query-options";
-import { getFiltersStateParser, getSortingStateParser } from "@/lib/parsers";
+import {
+  filterStatesEqual,
+  getFiltersStateParser,
+  getSortingStateParser,
+} from "@/lib/parsers";
 import { EntityErrorBoundary } from "./entity-error-boundary";
 import { EntityKanban } from "@/components/universal/entity-kanban";
 import { EntityDeleteDialog, EntityBulkDeleteDialog } from "./entity-delete-dialog";
@@ -954,7 +958,12 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // Check for active filters
   // ---------------------------------------------------------------------------
-  const hasActiveFilters = debouncedSearch || urlFilters.length > 0;
+  // User-narrowed list, not "URL has filters": a default preset is non-empty
+  // on first load, and All persists []. Empty filters stay unfiltered.
+  const hasActiveFilters =
+    Boolean(debouncedSearch) ||
+    (urlFilters.length > 0 &&
+      !filterStatesEqual(urlFilters, defaultQuickFilterFilters));
 
   // ---------------------------------------------------------------------------
   // Render

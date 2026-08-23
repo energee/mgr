@@ -11,12 +11,16 @@
 
 import { describe, it, expect } from "vitest";
 
-import { getFiltersStateParser } from "@/lib/parsers";
+import {
+  filterStatesEqual,
+  getFiltersStateParser,
+  type FilterItemSchema,
+} from "@/lib/parsers";
 
 const parse = (filters: unknown[], columnIds = ["name", "status"]) =>
   getFiltersStateParser(columnIds).parse(JSON.stringify(filters));
 
-const NAME_FILTER = {
+const NAME_FILTER: FilterItemSchema = {
   id: "name",
   value: "stout",
   variant: "text",
@@ -54,5 +58,47 @@ describe("getFiltersStateParser", () => {
     const parser = getFiltersStateParser(["name"]);
     expect(parser.parse(JSON.stringify({ id: "name" }))).toBeNull();
     expect(parser.parse("not json")).toBeNull();
+  });
+});
+
+/**
+ * `filterStatesEqual` backs the parser's `eq`, used by nuqs to decide whether
+ * the current URL state matches the parser's default value. entity-data-table
+ * also uses it directly to tell "the URL still holds the entity's default
+ * quick-filter preset" apart from "the user changed the filters" — a bare
+ * `urlFilters.length > 0` check can't make that distinction once an entity's
+ * default preset is itself a non-empty filter array (batch's "Active" quick
+ * filter), and conflating them wrongly marks the unfiltered default view as
+ * "actively filtered".
+ */
+describe("filterStatesEqual", () => {
+  it("treats two empty arrays as equal", () => {
+    expect(filterStatesEqual([], [])).toBe(true);
+  });
+
+  it("treats a filter array as equal to an identical default preset", () => {
+    const preset = [{ ...NAME_FILTER }];
+    expect(
+      filterStatesEqual<Record<string, unknown>>([{ ...NAME_FILTER }], preset),
+    ).toBe(true);
+  });
+
+  it("treats a non-empty filter state as different from an empty default", () => {
+    expect(
+      filterStatesEqual<Record<string, unknown>>([NAME_FILTER], []),
+    ).toBe(false);
+  });
+
+  it("treats All-tab empty filters as unequal to a non-empty default preset", () => {
+    expect(
+      filterStatesEqual<Record<string, unknown>>([], [NAME_FILTER]),
+    ).toBe(false);
+  });
+
+  it("treats different filter values as different", () => {
+    const changed = { ...NAME_FILTER, value: "ipa" };
+    expect(
+      filterStatesEqual<Record<string, unknown>>([NAME_FILTER], [changed]),
+    ).toBe(false);
   });
 });
