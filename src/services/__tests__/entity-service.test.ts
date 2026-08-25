@@ -264,6 +264,20 @@ describe("entityService.list", () => {
     );
   });
 
+  it("escapes an embedded double quote so it can't terminate the quoted PostgREST token early", async () => {
+    const { supabase, builders } = makeSupabase([{ data: [], error: null }]);
+
+    // Reserved-char quoting (comma) plus an embedded `"` — an unescaped
+    // quote closes the PostgREST quoted value right after `Acme `, leaving
+    // `Inc", Co%"` dangling and producing a malformed .or() filter (400 from
+    // PostgREST) instead of a search for the literal string.
+    await entityService.list(supabase, widgetCore, { search: 'Acme "Inc", Co' });
+
+    expect(builders[0].spies.or).toHaveBeenCalledWith(
+      'name.ilike."%Acme \\"Inc\\", Co%",sku.ilike."%Acme \\"Inc\\", Co%"',
+    );
+  });
+
   it('QUIRK: a literal "." in the search term also triggers quoting, even with no comma/paren present', async () => {
     const { supabase, builders } = makeSupabase([{ data: [], error: null }]);
 

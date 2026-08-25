@@ -34,11 +34,12 @@ import {
  * Escape a search value for use inside a PostgREST .or() filter string.
  * PostgREST uses commas and parens as delimiters inside .or(); the correct
  * way to embed these in a value is to double-quote the entire filter token.
- * We also escape `%` and `_` which are LIKE/ILIKE wildcards.
+ * We also escape `%` and `_` which are LIKE/ILIKE wildcards, and `"` (and the
+ * backslash used to escape it) so an embedded quote can't terminate a
+ * double-quoted token early and corrupt the filter string.
  */
 function escapePostgrestValue(value: string): string {
-  // Escape LIKE wildcards (these are interpreted inside ilike patterns)
-  return value.replace(/[%_\\]/g, (c) => `\\${c}`);
+  return value.replace(/[%_"\\]/g, (c) => `\\${c}`);
 }
 
 // =============================================================================
