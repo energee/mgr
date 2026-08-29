@@ -98,6 +98,21 @@ export function filterStatesEqual<TData>(
 }
 
 /**
+ * Count of user-applied filters, treating a match against the entity's
+ * default quick-filter preset as zero: `urlFilters` defaults to that preset
+ * (see `getFiltersStateParser(...).withDefault(defaultQuickFilterFilters)`
+ * in entity-data-table.tsx), so its raw `.length` is non-zero from first
+ * paint for any entity with an `isDefault: true` quick filter (currently
+ * `batch`) even though the user has narrowed nothing.
+ */
+export function activeFilterCount<TData>(
+  urlFilters: ExtendedColumnFilter<TData>[],
+  defaultFilters: ExtendedColumnFilter<TData>[],
+): number {
+  return filterStatesEqual(urlFilters, defaultFilters) ? 0 : urlFilters.length;
+}
+
+/**
  * nuqs parser for URL-synced table filter state.
  *
  * Validates each filter INDIVIDUALLY and drops only the bad ones: a saved or
