@@ -69,7 +69,7 @@ import {
   type ResolvedListParams,
 } from "@/components/universal/list-query-options";
 import {
-  filterStatesEqual,
+  activeFilterCount,
   getFiltersStateParser,
   getSortingStateParser,
 } from "@/lib/parsers";
@@ -960,10 +960,11 @@ export function EntityDataTable<T = Record<string, unknown>>({
   // ---------------------------------------------------------------------------
   // User-narrowed list, not "URL has filters": a default preset is non-empty
   // on first load, and All persists []. Empty filters stay unfiltered.
-  const hasActiveFilters =
-    Boolean(debouncedSearch) ||
-    (urlFilters.length > 0 &&
-      !filterStatesEqual(urlFilters, defaultQuickFilterFilters));
+  const activeUrlFilterCount = activeFilterCount(
+    urlFilters,
+    defaultQuickFilterFilters
+  );
+  const hasActiveFilters = Boolean(debouncedSearch) || activeUrlFilterCount > 0;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -1094,7 +1095,7 @@ export function EntityDataTable<T = Record<string, unknown>>({
               )}
               <MobileFilterSheet
                 table={table}
-                activeFilterCount={urlFilters.length}
+                activeFilterCount={activeUrlFilterCount}
                 defaultFilters={defaultQuickFilterFilters}
               />
             </div>

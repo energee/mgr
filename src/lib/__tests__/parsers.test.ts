@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  activeFilterCount,
   filterStatesEqual,
   getFiltersStateParser,
   type FilterItemSchema,
@@ -100,5 +101,45 @@ describe("filterStatesEqual", () => {
     expect(
       filterStatesEqual<Record<string, unknown>>([NAME_FILTER], [changed]),
     ).toBe(false);
+  });
+});
+
+/**
+ * `activeFilterCount` backs MobileFilterSheet's badge/aria-label. Like
+ * `hasActiveFilters` in entity-data-table, it must not count an untouched
+ * default quick-filter preset — otherwise an entity with an `isDefault: true`
+ * preset (batch's "Active" filter) shows "1 active" / a "1" badge on first
+ * load even though the user hasn't applied anything (same root cause as #945,
+ * which fixed the sibling `hasActiveFilters` computation but left this one).
+ */
+describe("activeFilterCount", () => {
+  it("is zero when urlFilters still holds the default preset", () => {
+    const preset = [{ ...NAME_FILTER }];
+    expect(
+      activeFilterCount<Record<string, unknown>>([{ ...NAME_FILTER }], preset),
+    ).toBe(0);
+  });
+
+  it("is zero when there is no default preset and no filters", () => {
+    expect(activeFilterCount<Record<string, unknown>>([], [])).toBe(0);
+  });
+
+  it("counts user-applied filters against an empty default", () => {
+    expect(
+      activeFilterCount<Record<string, unknown>>([NAME_FILTER], []),
+    ).toBe(1);
+  });
+
+  it("is zero when the All tab explicitly clears a non-empty default preset", () => {
+    expect(
+      activeFilterCount<Record<string, unknown>>([], [NAME_FILTER]),
+    ).toBe(0);
+  });
+
+  it("counts a changed filter value against a matching-length default preset", () => {
+    const changed = { ...NAME_FILTER, value: "ipa" };
+    expect(
+      activeFilterCount<Record<string, unknown>>([changed], [NAME_FILTER]),
+    ).toBe(1);
   });
 });
