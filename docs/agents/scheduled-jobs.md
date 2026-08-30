@@ -27,6 +27,32 @@ real money, so AI-driven jobs stay bounded (caps on fixes/PRs per run).
 | Branch Hygiene (`hygiene.yml`) | cron `23 7 * * 1` (Mon 07:23 UTC) | Prunes remote-tracking refs in its checkout, lists commit-merged branches and 30-day-stale branches (cross-referenced with open PRs). **Report-only — never deletes anything** | Job summary of the run | Disable workflow; nothing depends on it |
 | db-lint (`db-lint.yml`) | pull_request only (not scheduled; listed for completeness) | Replays the full migration chain with `ON_ERROR_STOP` as the PR gate | PR check | It is the PR-time drift gate — do not remove without a replacement |
 
+**Live DB Drift Check's "unapplied migrations" mode has no escalation
+threshold, and #933 shows why that's a gap.** The watchdog covers two
+distinct failure shapes under one issue type: catalog drift (live doesn't
+match the snapshot) and committed-but-unapplied migrations (catalog matches
+the snapshot, but `supabase/migrations/` has files nothing has pushed live).
+Both just re-open/comment on one issue daily and wait. That's sufficient for
+catalog drift, which `AGENTS.md`'s `deployment_conventions` gate also polices
+per-feature. It is not sufficient for the unapplied-migration shape when the
+migration in question isn't yet tied to any `docs/feature_list.json` entry —
+schema-audit/cleanup migrations bundled into unrelated fix/chore PRs (e.g.
+00297-00300, landed 08-22 via #903/#906/#920) are exactly this: no feature
+references them as its `migrations`, so `check-deploy-state` never sees them,
+and the *only* forcing function is the live-drift issue's daily comment. #933
+opened 2026-08-22 and has now re-opened on every single scheduled run for 8
+straight days (through 08-29) with zero PRs or pushes in response — the
+auto-reopen loop is working exactly as designed and that design has no point
+at which "still failing" becomes "someone must act now." Proposed threshold,
+mirroring the `deployment_conventions.pending` 90-day re-confirmation rule
+already in `AGENTS.md`: after 5 consecutive daily reopens, the next session
+touching this repo treats it as a session-start blocking item (alongside
+`PROGRESS.md`/`gotchas.md`) rather than a routine gotcha, and runs
+`scripts/db-push.sh` or explains why not. Falsifies once a run of this
+workflow finds a way to close the loop itself (e.g. auto-escalating the issue
+label past some reopen count); until then it's a human process gap, not a
+code one.
+
 ## pg_cron jobs (run inside the live Postgres)
 
 | Job | Schedule | What it does | Output | Kill / rollback |

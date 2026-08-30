@@ -59,6 +59,24 @@ with zero permission denials. Stays failed if either failure mode recurs
 after two more scheduled runs — and if so, the retire/revise question should
 be reopened, not re-closed under the 07-26 framing.)
 
+(**2026-08-30: the failure mode recurred four more times (08-21, 08-27,
+08-28, 08-30 all scheduled-run `conclusion: failure`, cross-checked against
+`bug-patrol` PRs — no PR exists dated between 08-26's #954 and 08-29's #958,
+so 08-27/08-28 produced neither a PR nor a `quiet-run.md`) and the diagnostic
+step this section has now recommended twice — a `show_full_output: true`
+dispatch, or an equivalent way to see the denied tool name — still has not
+happened, over three weeks after the 08-10 write-up called it out and five
+weeks after the 07-26 original. Re-stating "someone should audit this" a
+third time is exactly the prose-without-enforcement pattern this loop is
+meant to correct, not repeat. Concrete proposal for a human to action instead
+of another watch note: default `show_full_output: true` in
+`bug-patrol.yml`'s `claude-code-action` step permanently (the workflow never
+handles secrets in its own output — it's a docs/code-search/fix agent — so
+the security rationale for hiding output doesn't obviously apply here); that
+turns every future occurrence into a self-diagnosing run instead of a fourth
+research task nobody has picked up. Falsifies once that change lands and the
+next occurrence names the denied tool in its own log.)
+
 (Bug Patrol's 2026-07-26 revise-candidate flag is retired as of 2026-08-02:
 its own falsification clause fired. The two `error_max_turns` runs on
 07-25/07-26 were followed by seven consecutive green scheduled runs
@@ -95,6 +113,26 @@ the loop is spending its bounded run budget re-diagnosing one known
 non-actionable pattern instead of triaging anything new. Falsifies toward (a)
 if a PR merges, or if the needs-human issues in the next window are mostly
 distinct signatures. Stays open otherwise.)
+
+(**2026-08-30 update: the single-signature falsification test above was too
+narrow, and this window's evidence shows why.** Scoreboard is unchanged (20
+scheduled runs / 0 PRs / 0 merged, still entirely quiet). But of the 7 open
+`needs-human` issues this window, only 2 (#832, #833) match the literal
+`Unregistered API key` signature the test named — 29%, under the ">half"
+bar — while 3 more (#951, #953, #955) are a *second*, previously
+uncatalogued noise signature: Turbopack Fast-Refresh HMR `ReferenceError`
+artifacts (13 instances total going back to #405; now documented in
+`gotchas.md`). Counting both catalogued non-actionable signatures together,
+5 of 7 (71%) of this window's needs-human output is dev-tooling noise with
+no code fix possible — comfortably over the bar — but the test as literally
+written measured only one signature and would have reported "falsifies
+toward (a)" on a technicality, because the noise this loop produces doesn't
+stay one shape. Revised test: check needs-human issues against `gotchas.md`'s
+growing noise catalog (2 entries now) rather than one exact string. Falsifies
+toward (b) — a `score-errors` pre-filter is worth building — if next
+window's needs-human issues are still majority catalog-matched with 0 merged
+PRs. Falsifies toward (a) if a PR merges, or if new needs-human issues stop
+matching any catalogued signature. Still a human call, not yet acted on.)
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether

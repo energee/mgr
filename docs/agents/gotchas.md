@@ -131,6 +131,31 @@ sets it from `NODE_ENV`, so `next dev` against the *hosted* project still
 reports `development`. Judge severity by the instance step 1 names, not by the
 environment tag.
 
+**A Sentry `ReferenceError: <identifier> is not defined` for an identifier
+that plainly exists — correctly declared/imported at the line the trace
+names — is a Turbopack Fast Refresh HMR artifact, not a real bug.** Sentry
+error harness triage has independently re-derived this same forensic
+conclusion at least 13 times now (#405, #408, #414, #430, #492, #509, #512,
+#519, #520, #525, #951, #953, #955), each time re-reading the stack trace and
+source from scratch. **The tells**, all of which have held across every
+instance: the event tag `turbopack: True`; the stack trace running through
+Fast-Refresh/HMR internals (`scheduleRefresh`, `applyUpdate`,
+`performReactRefresh`, `recursivelyTraverseAndDoubleInvokeEffectsInDEV`) with
+`installHook.js` frames from the Turbopack runtime, not application code; a
+breadcrumb showing `[Fast Refresh] rebuilding` firing 10-30ms before the
+error; and the named identifier being an ordinary in-scope `const`/`useRef`/
+import with no conditional declaration, closure hazard, or hoisting issue —
+i.e. nothing the compiled source could actually throw on a cold render. It
+fires when a file's dependency graph changes (a new import, a new local)
+while Turbopack hot-swaps the chunk, executing the new code briefly against a
+scope that hasn't finished re-linking. Unlike `Unregistered API key` above,
+this one *is* environment-scoped correctly — it is inherently a live-editing
+artifact and does not occur on a cold dev-server start or in a production
+build (Fast Refresh doesn't exist there). If a future instance shows either a
+stack trace *not* running through Fast-Refresh internals, or an
+`environment: production` tag, that falsifies this diagnosis and it needs a
+real investigation instead of this entry.
+
 **`/api/auth/dev-login` 404s — or `bun e2e` / `verify.sh` / `smoke-test.sh`
 fails to authenticate — when your dev server points at a hosted project.**
 Since #679 that route requires a loopback `NEXT_PUBLIC_SUPABASE_URL` even under
