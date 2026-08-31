@@ -84,7 +84,12 @@ async function qboRequest<T>(
   method: string,
   path: string,
   body?: unknown,
-  retryCount = 0
+  retryCount = 0,
+  // Tracked separately from retryCount (429 rate-limit retries): a 429 retry
+  // bumps retryCount before the auth guard ever runs, so gating the one
+  // allowed refresh on retryCount === 0 skips it for a 401 that arrives on
+  // a 429 retry — even though no refresh has actually been attempted yet.
+  authRetried = false
 ): Promise<T> {
   const tokens = await getTokens();
   if (!tokens) throw new QBOClientError("QBO not connected");
@@ -115,16 +120,16 @@ async function qboRequest<T>(
   });
 
   // Handle 401 - try refresh once
-  if (response.status === 401 && retryCount === 0) {
+  if (response.status === 401 && !authRetried) {
     await refreshAccessToken();
-    return qboRequest<T>(method, path, body, retryCount + 1);
+    return qboRequest<T>(method, path, body, retryCount, true);
   }
 
   // Handle rate limiting (429)
   if (response.status === 429 && retryCount < 3) {
     const retryAfter = parseInt(response.headers.get("Retry-After") || "5", 10);
     await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-    return qboRequest<T>(method, path, body, retryCount + 1);
+    return qboRequest<T>(method, path, body, retryCount + 1, authRetried);
   }
 
   if (!response.ok) {
