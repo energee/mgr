@@ -98,6 +98,20 @@ export function filterStatesEqual<TData>(
 }
 
 /**
+ * Number of filters that diverge from the default preset — 0 when `filters`
+ * still equals `defaultFilters` (the unfiltered default state). Backs any
+ * "N active filters" badge so it doesn't misreport an entity's own default
+ * quick-filter preset (batch's "Active" tab) as a user-applied filter, the
+ * same distinction `filterStatesEqual` draws for `hasActiveFilters`.
+ */
+export function countActiveFilters<TData>(
+  filters: ExtendedColumnFilter<TData>[],
+  defaultFilters: ExtendedColumnFilter<TData>[],
+): number {
+  return filterStatesEqual(filters, defaultFilters) ? 0 : filters.length;
+}
+
+/**
  * nuqs parser for URL-synced table filter state.
  *
  * Validates each filter INDIVIDUALLY and drops only the bad ones: a saved or

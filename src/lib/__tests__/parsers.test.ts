@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  countActiveFilters,
   filterStatesEqual,
   getFiltersStateParser,
   type FilterItemSchema,
@@ -100,5 +101,38 @@ describe("filterStatesEqual", () => {
     expect(
       filterStatesEqual<Record<string, unknown>>([NAME_FILTER], [changed]),
     ).toBe(false);
+  });
+});
+
+/**
+ * `countActiveFilters` backs the mobile "N active" filter badge
+ * (entity-mobile-filter-sheet.tsx via entity-data-table.tsx). #945 fixed the
+ * equivalent bug for the empty-state predicate but left this badge computed
+ * as a bare `urlFilters.length`, so on a fresh load of an entity whose
+ * default quick-filter preset is non-empty (batch's "Active" tab) the mobile
+ * filter button showed "1 active" for a view the user never filtered.
+ */
+describe("countActiveFilters", () => {
+  it("is zero when filters match a non-empty default preset", () => {
+    expect(
+      countActiveFilters<Record<string, unknown>>([NAME_FILTER], [NAME_FILTER]),
+    ).toBe(0);
+  });
+
+  it("is zero when both are empty", () => {
+    expect(countActiveFilters([], [])).toBe(0);
+  });
+
+  it("counts filters when they diverge from an empty default (All tab)", () => {
+    expect(
+      countActiveFilters<Record<string, unknown>>([NAME_FILTER], []),
+    ).toBe(1);
+  });
+
+  it("counts filters when they diverge from a non-empty default", () => {
+    const changed = { ...NAME_FILTER, value: "ipa" };
+    expect(
+      countActiveFilters<Record<string, unknown>>([changed], [NAME_FILTER]),
+    ).toBe(1);
   });
 });
