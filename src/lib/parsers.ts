@@ -98,6 +98,19 @@ export function filterStatesEqual<TData>(
 }
 
 /**
+ * Number of filters representing a user narrowing beyond the entity's
+ * default quick-filter preset — 0 when `filters` exactly matches
+ * `defaultFilters` (e.g. the unfiltered default view), otherwise
+ * `filters.length`. See `filterStatesEqual` for the comparison rule.
+ */
+export function countActiveFilters<TData>(
+  filters: ExtendedColumnFilter<TData>[],
+  defaultFilters: ExtendedColumnFilter<TData>[] = [],
+): number {
+  return filterStatesEqual(filters, defaultFilters) ? 0 : filters.length;
+}
+
+/**
  * nuqs parser for URL-synced table filter state.
  *
  * Validates each filter INDIVIDUALLY and drops only the bad ones: a saved or

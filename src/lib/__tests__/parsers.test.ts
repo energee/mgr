@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  countActiveFilters,
   filterStatesEqual,
   getFiltersStateParser,
   type FilterItemSchema,
@@ -100,5 +101,37 @@ describe("filterStatesEqual", () => {
     expect(
       filterStatesEqual<Record<string, unknown>>([NAME_FILTER], [changed]),
     ).toBe(false);
+  });
+});
+
+/**
+ * `countActiveFilters` backs the mobile filter-sheet trigger's badge count and
+ * aria-label (entity-mobile-filter-sheet.tsx via entity-data-table.tsx). It
+ * must apply the same "default preset is not an active filter" rule as
+ * `hasActiveFilters` — a bare `urlFilters.length` (the pre-fix behavior)
+ * shows a "1 active" badge on batch's list on first load, before the user has
+ * touched any filter, because batch's default "Active" quick filter is a
+ * non-empty preset.
+ */
+describe("countActiveFilters", () => {
+  it("is 0 when there are no filters", () => {
+    expect(countActiveFilters<Record<string, unknown>>([])).toBe(0);
+  });
+
+  it("is 0 when filters exactly match the default preset", () => {
+    expect(
+      countActiveFilters<Record<string, unknown>>([NAME_FILTER], [{ ...NAME_FILTER }]),
+    ).toBe(0);
+  });
+
+  it("counts filters when there is no default preset", () => {
+    expect(countActiveFilters<Record<string, unknown>>([NAME_FILTER])).toBe(1);
+  });
+
+  it("counts filters that differ from the default preset", () => {
+    const changed = { ...NAME_FILTER, value: "ipa" };
+    expect(
+      countActiveFilters<Record<string, unknown>>([changed], [NAME_FILTER]),
+    ).toBe(1);
   });
 });
