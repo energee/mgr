@@ -159,6 +159,36 @@ contradict the file in front of you usually mean a stale
 `tsconfig.tsbuildinfo` or `.next/`. Run `make clean` before investigating a
 type error you cannot reproduce by reading the code.
 
+**A nightly `Test` run failing only at `Production Build` → `bun audit
+--audit-level=high` is a dependency-advisory gate, not an application bug —
+and it can stay red for weeks because that step never runs on a PR.**
+`Production Build` is schedule/dispatch-only (`ci.md`), so a fresh advisory in
+a transitive dependency shows up exclusively as a nightly red X and a standing
+`nightly-red` issue, never as a per-PR failure. This has happened before
+(#639, cleared 2026-07-30 by #658) and again from 2026-09-02 (#963): `bun
+audit` flags 2 high advisories in `browserslist`
+(GHSA-c83g-rgw3-j3cx, GHSA-73wf-gq98-2v4g), pulled in purely as a transitive
+build/lint dependency — via `@babel/core` → `browserslist`/
+`update-browserslist-db`, required by `@vitejs/plugin-react`,
+`@sentry/nextjs`, and `eslint-config-next` — never shipped to the runtime
+bundle. Fix with `bun update browserslist` (or an override pin) and confirm
+locally with `bun audit --audit-level=high` before assuming it is a false
+positive.
+
+**A `ReferenceError` naming an identifier that is plainly declared/imported at
+the cited line is a Turbopack Fast Refresh HMR artifact, not a real defect.**
+Recurred three times in one week (#951 `groups`, #953 `useSyncExternalStore`,
+#955 `hasAppliedDefault`; 2026-08-24 to 08-26), each independently re-deriving
+the same multi-paragraph "this is an HMR artifact" reasoning from scratch. The
+tell: `environment: development`, `turbopack: True`, and the error fires
+within milliseconds of a `[Fast Refresh] rebuilding` breadcrumb, for a symbol
+with no conditional declaration and no code path that could reference it
+before its own declaration — a real `ReferenceError` for an in-scope local
+used correctly is not something the compiled source can produce, so the
+bundle was mid-hot-swap, not the source wrong. No application fix applies.
+Only treat it as real if the same stack recurs with `environment: production`,
+or against source where the identifier genuinely isn't in scope.
+
 ~~Two lockfiles, one warning~~ — removed 2026-07-26. Fixed 2026-07-24 by
 pinning `turbopack.root` to `__dirname` in `next.config.ts` (PR #585,
 `docs/progress/2026-07-24-turbopack-root.md`); the workspace-root warning no
