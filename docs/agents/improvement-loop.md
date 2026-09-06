@@ -23,54 +23,43 @@ allowlist explicitly and, like every scheduled agentic workflow, ends in the
 `require-durable-outcome` gate; the once-promised scheduled-agent replacement
 was never built and that route is retired.)
 
-(Bug Patrol's 07-26 permission-denial pattern receded, then came back. Seven
-straight scheduled runs (07-27 through 08-02) went green with no
-`error_max_turns`, opening PRs that mostly merged, and the 07-26
-revise-candidate flag was retired on that basis — in still-unmerged PR #732.
-But the underlying cause was never diagnosed, only outlasted: starting 08-03
-the pattern resumed on 4 of the next 6 scheduled runs. 08-05 hit
-`error_max_turns` again (81 turns, 10 permission denials) and 08-08 did too
-(18 denials — the most since the pattern's 08-03 recurrence, though still
-below 07-26's 20). The other two failures in that window (08-04,
-08-07) are a distinct, newly observed mode: the agent finishes cleanly —
-`is_error: false`, 0-10 permission denials, well under the turn cap — but the
-run still ends with **no PR and no `quiet-run.md`**, so
-`require-durable-outcome` fails it red anyway. Two separate gaps, not one:
+(**Bug Patrol's two named-but-unfixed failure modes are both still live as of
+2026-09-06, and one has now spread to a second loop.** Permission-denial/
+max-turns (first flagged 07-26; the recommended diagnostic — a one-off run
+with `show_full_output: true` to see which tool is denied, since
+`claude-code-action`'s job log hides full agent output by design — still has
+not been run, over five weeks later): recurred again on 09-03
+(`error_max_turns` at 81 turns, 14 permission denials), the third confirmed
+spike after 07-26 (20 denials) and 08-05/08-08 (10 and 18). Clean-run-no-
+durable-outcome (first flagged 08-10; proposed fix — add `sentry-harness.yml`'s
+explicit "write `quiet-run.md` even when there is nothing to fix" guardrail to
+`bug-patrol.yml`'s prompt — has not been applied to the workflow file in the
+month since): recurred on 08-27, 08-30, 09-02, and 09-06 — 4 of the last 10
+scheduled bug-patrol runs failed at the `require-durable-outcome` step while
+the agent's own "hunt and fix" step reported a clean exit. **New this week:**
+Docs Dream Sweep hit both of the same failure modes for the first time —
+clean-run-no-durable-outcome on 08-29, and `error_max_turns` with 8 permission
+denials on 09-05 — so whatever keeps reaching for a disallowed tool and
+skipping the closing artifact is not specific to bug-patrol's prompt.
+Falsifies if the next 5 scheduled runs across both loops each land a PR or
+`quiet-run.md` with zero permission denials. Stays open — and should escalate
+from "name the fix" to "apply the fix to the workflow file," since naming it
+has not been sufficient for a month — if either failure mode recurs in either
+loop before the next distillation.)
 
-1. Something in the task still reaches for a disallowed tool on a large
-   minority of runs, and the diagnostic step recommended on 07-26 — "audit
-   which tool that is" — has not happened in two weeks, because
-   `claude-code-action`'s job log hides full agent output by design
-   (`"Running Claude Code via SDK (full output hidden for security)"`), so the
-   tool name behind `permission_denials_count` is not visible in any run log
-   sampled. Confirming it needs either a one-off run with `show_full_output:
-   true` or an equivalent way to surface the denied tool name, not another
-   `--max-turns` increase.
-2. Even a clean run does not reliably leave the durable-outcome artifact the
-   gate requires. `sentry-harness.yml`'s prompt carries an explicit closing
-   guardrail for exactly this case — *"Whatever the outcome, end by writing
-   `outbox/plan.json`... A run that ends without it fails red"* — and
-   `bug-patrol.yml`'s prompt should carry the equivalent: finishing with
-   nothing to fix still requires writing `quiet-run.md`, stated as a
-   guardrail rather than left implicit.
-
-Falsifies if two more consecutive scheduled runs land a PR or `quiet-run.md`
-with zero permission denials. Stays failed if either failure mode recurs
-after two more scheduled runs — and if so, the retire/revise question should
-be reopened, not re-closed under the 07-26 framing.)
-
-(Bug Patrol's 2026-07-26 revise-candidate flag is retired as of 2026-08-02:
-its own falsification clause fired. The two `error_max_turns` runs on
-07-25/07-26 were followed by seven consecutive green scheduled runs
-(07-27 through 08-02, run IDs 30248989067 through 30738495520), none hitting
-the turn/permission-denial ceiling, and the loop scoreboard now shows 7 PRs
-opened / 5 merged / 0 closed unmerged / 2 still open since the loop started —
-a merge rate that is not trending toward zero. No workflow-file change
-coincides with the recovery (`bug-patrol.yml` was last touched by #599 on
-07-25, before the streak began), so whatever combination of task content and
-the 80-turn cap from #598 was hitting the ceiling simply stopped recurring.
-Re-open the investigation the next time a scheduled run hits
-`error_max_turns`; until then there is nothing to revise.)
+(**New this week: Bug Patrol generated three near-duplicate PRs for the same
+bug** — #958 (08-29), #962 (09-01), and #964 (09-04) all fix "mobile filter
+badge counts an entity's default quick filter as active" with materially the
+same diagnosis and the same `countActiveFilters`/`activeFilterCount` fix
+shape. Cause: each run only reads the live tree, not its own loop's open PR
+queue, so when a prior fix PR for the same bug sits unreviewed (see the
+review-capacity-gap entry below), the next run rediscovers the bug fresh and
+files another PR for it — compounding the review backlog rather than just
+sitting in it, three PRs to read instead of one. Durable owner: bug-patrol's
+prompt should list currently-open `bug-patrol`-labeled PRs before hunting and
+skip a bug whose description already matches one. Falsifies if a week passes
+with no 2+-PR duplicate cluster; stays a live gap if another duplicate cluster
+appears before the prompt changes.)
 
 (**sentry-fix flagged 2026-08-23 as a retire/revise candidate to watch, not
 yet acted on.** The loop scoreboard's 4-week window (since 07-26) reads 20
@@ -95,6 +84,23 @@ the loop is spending its bounded run budget re-diagnosing one known
 non-actionable pattern instead of triaging anything new. Falsifies toward (a)
 if a PR merges, or if the needs-human issues in the next window are mostly
 distinct signatures. Stays open otherwise.)
+
+(**Postscript, 2026-09-06:** the scoreboard's 4-week window still shows 0
+merged sentry-fix PRs, but the needs-human signature shifted — the three most
+recent needs-human issues (#951, #953, #955, all 2026-08-24–26) are not the
+old `Unregistered API key` cluster but a new one: a `ReferenceError` naming an
+identifier that is plainly declared/imported at the cited line, always in
+`environment: development` with `turbopack: True`, immediately after a
+`[Fast Refresh] rebuilding` breadcrumb. Each of the three independently
+re-derived the same multi-paragraph "this is a Turbopack HMR artifact, not a
+real defect" reasoning. Added a `gotchas.md` entry for the pattern (mirroring
+the existing `Unregistered API key` one) so the next occurrence is a lookup,
+not a re-diagnosis — orthogonal to whether sentry-fix itself should
+special-case known-noise clusters before spending a run, which is still open.
+This is evidence for reading (a) over (b) from the 08-23 note above (the
+issues are a distinct signature, not a recurrence of the one named there),
+but the general shape — a bounded loop repeatedly re-diagnosing a known
+non-actionable pattern from scratch — persists under a new name.)
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
@@ -149,6 +155,17 @@ fix is "clear the queue," not "revise the prompt." Falsifies if next week's
 scoreboard shows merges resuming without a queue-clearing session; stays a
 live risk to scoreboard-reading — recheck it every week — as long as 5+
 mergeable automated PRs stay open past 7 days.
+
+(**Recheck, 2026-09-06:** still live, and this is now a second stall of
+comparable length to the one above. Six `bug-patrol`-labeled PRs are open,
+green, and mergeable — #952, #954, #958, #961, #962, #964 — the oldest (#952)
+open 12 days. No PR of any kind has merged since #949 on 08-23, a 14-day gap
+as of this writing. Three of the six (#958/#962/#964) are the duplicate
+cluster named above, so clearing the backlog now also means recognizing
+duplicates rather than reviewing all six as distinct fixes. Falsifies next
+week if merges resume without a dedicated queue-clearing session; the
+5+/7-day condition still holds, so this stays a live risk to
+scoreboard-reading.)
 
 ## Worker epochs
 
