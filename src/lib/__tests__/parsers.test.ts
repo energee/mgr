@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  activeFilterCount,
   filterStatesEqual,
   getFiltersStateParser,
   type FilterItemSchema,
@@ -100,5 +101,36 @@ describe("filterStatesEqual", () => {
     expect(
       filterStatesEqual<Record<string, unknown>>([NAME_FILTER], [changed]),
     ).toBe(false);
+  });
+});
+
+/**
+ * `activeFilterCount` backs the mobile filter sheet's badge/aria-label
+ * (entity-data-table's `MobileFilterSheet`). Like `hasActiveFilters`, it must
+ * not count an entity's default quick-filter preset — otherwise an entity
+ * with a non-empty default (batch's "Active" preset) shows "1 active" on a
+ * fresh, unfiltered page load.
+ */
+describe("activeFilterCount", () => {
+  it("is 0 when the URL still holds the default preset", () => {
+    expect(
+      activeFilterCount<Record<string, unknown>>([NAME_FILTER], [NAME_FILTER]),
+    ).toBe(0);
+  });
+
+  it("is 0 when there is no default preset and no filters", () => {
+    expect(activeFilterCount<Record<string, unknown>>([], [])).toBe(0);
+  });
+
+  it("counts filters that differ from the default preset", () => {
+    expect(
+      activeFilterCount<Record<string, unknown>>([NAME_FILTER], []),
+    ).toBe(1);
+  });
+
+  it("counts an explicit All-tab empty state as 0 even with a non-empty default", () => {
+    expect(
+      activeFilterCount<Record<string, unknown>>([], [NAME_FILTER]),
+    ).toBe(0);
   });
 });
