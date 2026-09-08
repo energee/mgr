@@ -98,6 +98,20 @@ export function filterStatesEqual<TData>(
 }
 
 /**
+ * Count of filters a user has actively applied, as opposed to the entity's
+ * default quick-filter preset sitting unmodified in the URL. `urlFilters`
+ * defaults to that preset (not `[]`), so a raw `urlFilters.length` overcounts
+ * by the preset's length until the user changes something — see
+ * `filterStatesEqual`'s doc comment.
+ */
+export function activeFilterCount<TData>(
+  filters: ExtendedColumnFilter<TData>[],
+  defaultFilters: ExtendedColumnFilter<TData>[],
+): number {
+  return filterStatesEqual(filters, defaultFilters) ? 0 : filters.length;
+}
+
+/**
  * nuqs parser for URL-synced table filter state.
  *
  * Validates each filter INDIVIDUALLY and drops only the bad ones: a saved or
