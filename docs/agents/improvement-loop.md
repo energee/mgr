@@ -150,6 +150,55 @@ scoreboard shows merges resuming without a queue-clearing session; stays a
 live risk to scoreboard-reading — recheck it every week — as long as 5+
 mergeable automated PRs stay open past 7 days.
 
+(**Recheck, 2026-09-13: the stall this entry tracks is now 21 days (0 merges
+since #949 on 08-23) with 14 automated PRs open** — up from the 14-day/6-PR
+reading a week earlier (PR #965, still unmerged itself; see below). Three
+more `bug-patrol` PRs opened in the interim (#961, #964, #967), one
+`quality-regrade` (#966), and one more `feedback-distill` (this PR's
+predecessor, #965) — every open PR is reportedly green/mergeable per prior
+checks. This is now the third occurrence of this exact pattern (11 days
+08-10, 14 days 09-06, 21 days 09-13), each longer than the last, and each
+time the diagnosis has been "review-capacity gap, clear the queue" with no
+change to how the queue is worked. **New this week:** the review backlog is
+now large enough that it is delaying its own documented fixes — see the next
+entry. Proposal beyond "clear the queue": give docs-only bot PRs
+(`feedback-distill`, `quality-regrade`, `docs-dream`) a lighter merge bar than
+code PRs, since they touch no code/config/migrations and cannot merge-break
+anything — a spot-check-and-merge within a couple of days, rather than the
+same queue as code changes. Falsifies if next week's scoreboard shows the
+stall shrinking without a dedicated clearing session and without a lighter
+bar for docs-only PRs; stays open otherwise.)
+
+(**New this week, 2026-09-13: an already-drafted fix aged out before it could
+take effect.** PR #965 (opened 09-06) already proposes the fix for Bug
+Patrol's duplicate-PR problem (check the open-PR queue before hunting) after
+three near-duplicate PRs (#958/#962/#964) fixing the same mobile-filter-badge
+bug. Because #965 itself sat unreviewed for a week — an instance of the
+review-capacity gap above — Bug Patrol ran three more times unaware anything
+had changed and opened a **fourth** near-duplicate PR, #967 (09-08), for the
+identical bug. A correct, already-written docs fix cannot prevent a
+recurrence it hasn't landed yet; the earlier this class of fix merges, the
+fewer duplicates accumulate. This is additional evidence for the lighter
+merge-bar proposal above, not a new dedup mechanism to design. Falsifies if
+#965 (or its equivalent) merges within a week of this entry and no fifth
+duplicate appears; stays open if another duplicate PR lands for a bug whose
+fix is already sitting in an unmerged bot PR.)
+
+(**New this week, 2026-09-13: a third, previously unobserved Bug Patrol
+failure signature.** 3 of the last 5 scheduled runs (09-09, 09-10, 09-11)
+failed near-instantly: `is_error: true`, `num_turns: 1`, `total_cost_usd: 0`,
+`permission_denials_count: 0` — no assistant turn, no tool call, no cost,
+distinct from both failure modes tracked above (permission-denial/max-turns;
+clean-run-no-durable-outcome). This is the second distinct failure signature
+now blocked by the same undone diagnostic: `show_full_output: true` has not
+been enabled on a single run since it was first called for on 07-26 — over
+seven weeks — so neither this zero-turn failure nor the denied-tool identity
+from the max-turns mode has ever been directly observed. Two independently
+unexplained failure modes across seven weeks is past the point where "wait
+and see" is a reasonable diagnostic strategy. Falsifies once a
+`show_full_output: true` (or equivalent) dispatch run captures either
+failure's real error text; stays open otherwise.)
+
 ## Worker epochs
 
 Two loops (health audit, feedback distillation) deliberately ride the
