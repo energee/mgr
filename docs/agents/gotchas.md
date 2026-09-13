@@ -159,6 +159,25 @@ contradict the file in front of you usually mean a stale
 `tsconfig.tsbuildinfo` or `.next/`. Run `make clean` before investigating a
 type error you cannot reproduce by reading the code.
 
+**A `critical`-severity line in `bun audit --audit-level=high` is not the
+same finding as the routine transitive-build-tool advisories that make
+`Production Build` flaky on `main` — don't let it age inside the generic
+`nightly-red` thread.** As of 2026-09-11 the nightly audit lists 19
+vulnerabilities (2 critical, 17 high), and the two critical ones are
+unauthenticated-RCE advisories against `next` itself (direct dependency:
+GHSA-p293-qw3h-jr36, GHSA-2xp9-vwfh-vxw4) — not a transitive lint/build tool
+like `browserslist` or `smol-toml`. It has been failing since at least
+2026-09-06 (`nightly-red` issue #963), accumulating only "still failing"
+comments with no severity called out, no dependabot PR open for `next`, and
+no `needs-human` issue naming it. Because `Production Build` only runs on the
+nightly schedule and dispatch (never on a PR — see `ci.md`), a critical
+advisory here has no other path to human attention than someone opening the
+run log. Treat a `critical` line in the audit output as a signal that needs
+an explicit escalation (a dedicated issue or a comment on the nightly-red
+thread quoting the advisory ID and "critical"), separate from waiting out the
+routine advisories — the fix for those (see `bun update` guidance the
+feedback-distill loop adds alongside this entry) does not also cover these.
+
 ~~Two lockfiles, one warning~~ — removed 2026-07-26. Fixed 2026-07-24 by
 pinning `turbopack.root` to `__dirname` in `next.config.ts` (PR #585,
 `docs/progress/2026-07-24-turbopack-root.md`); the workspace-root warning no
