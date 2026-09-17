@@ -106,7 +106,11 @@ export const entityService = {
       if (options?.search && entity.searchableFields?.length) {
         const escaped = escapePostgrestValue(options.search);
         const needsQuoting = /[,().]/.test(escaped);
-        const pattern = needsQuoting ? `"%${escaped}%"` : `%${escaped}%`;
+        // Inside a quoted token, an embedded `"` must itself be escaped or
+        // it closes the token early and produces a malformed .or() filter.
+        const pattern = needsQuoting
+          ? `"%${escaped.replace(/"/g, '\\"')}%"`
+          : `%${escaped}%`;
         const searchCondition = entity.searchableFields
           .map((field) => `${field}.ilike.${pattern}`)
           .join(",");
