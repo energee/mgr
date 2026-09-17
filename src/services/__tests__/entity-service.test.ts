@@ -277,6 +277,19 @@ describe("entityService.list", () => {
     );
   });
 
+  it("escapes embedded double quotes when the search term also triggers quoting", async () => {
+    const { supabase, builders } = makeSupabase([{ data: [], error: null }]);
+
+    // The comma forces needsQuoting; the embedded `"` must itself be escaped
+    // or it prematurely closes the PostgREST quoted token, producing a
+    // malformed .or() filter that PostgREST rejects with a parse error.
+    await entityService.list(supabase, widgetCore, { search: 'Big "Tap" Co, LLC' });
+
+    expect(builders[0].spies.or).toHaveBeenCalledWith(
+      'name.ilike."%Big \\"Tap\\" Co, LLC%",sku.ilike."%Big \\"Tap\\" Co, LLC%"',
+    );
+  });
+
   it("applies entity.defaultSort when no options.sort is given", async () => {
     const { supabase, builders } = makeSupabase([{ data: [], error: null }]);
 
