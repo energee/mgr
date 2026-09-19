@@ -175,7 +175,7 @@ export const vesselEntity: EntityConfig<Vessel> = {
 - Calculated fields are needed in list view (e.g., inventory with remaining quantity)
 - Complex aggregations are required for display (e.g., orders with total value)
 
-**Implementation**: EntityList component uses `entity.viewTable || entity.table` for queries ([entity-list.tsx:90-91](https://github.com/energee/mgr/blob/feature/phase-2-vessel-brewlog/src/components/universal/entity-list.tsx#L90-L91))
+**Implementation**: EntityList component uses `entity.viewTable || entity.table` for queries (`src/components/universal/list-query-options.ts`)
 
 #### Dynamic Options for Form Fields
 

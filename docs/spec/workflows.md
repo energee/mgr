@@ -351,7 +351,7 @@ interface Revision {
 
 ## Permission-Based Access Control
 
-User access is controlled via a multi-role system with granular permission checks (migration `00092_permission_based_roles.sql`).
+User access is controlled via a multi-role system with granular permission checks (migration `00097_permission_based_roles.sql`).
 
 ### Role Model
 
@@ -412,7 +412,7 @@ Ingredient catalogs (malts, hops, yeasts, etc.), enum_values, brands, package_ty
 
 ## Yeast Pitch Events Workflow
 
-Yeast tracking uses an event-driven model (migration `00095_yeast_workflow_unification.sql`) where pitch sources and batch deductions are separated.
+Yeast tracking uses an event-driven model (migration `00158_yeast_pitch_events_and_remaining_view.sql`) where pitch sources and batch deductions are separated.
 
 ### Model
 

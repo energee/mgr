@@ -465,8 +465,8 @@ annotation when:
   `testMatch` would otherwise leave a green gate that exercised nothing. The
   floor is a tripwire, not a coverage target, but it is not free-floating: a
   contract in `ci-workflows.test.ts` counts the enabled `test(` declarations
-  under `e2e/` and reds if the floor drifts more than 2 below them (16 against
-  17 enabled specs + the auth setup today). Raise both together as the
+  under `e2e/` and reds if the floor drifts more than 2 below them (22 against
+  22 enabled specs + the auth setup today). Raise both together as the
   remaining scaffolds get implemented.
 
 **Cost**, measured on the real `pull_request` runs of this job — all of which

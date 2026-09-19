@@ -8,7 +8,7 @@ DEC-SEC-003).
 
 MGR is **single-tenant**: there is no `org_id`/tenancy column anywhere. RLS is
 **role-based**, enforced through `user_has_permission()` (since migration
-00092) against roles cached on `user_profiles`. Do not conflate "no
+00097) against roles cached on `user_profiles`. Do not conflate "no
 multi-tenancy" with "no RLS" — every policied table still needs RLS enabled,
 and new tables get permission-checked policies, not `USING (true)` (documented
 exceptions carry a `check-permissive-rls: skip` comment).

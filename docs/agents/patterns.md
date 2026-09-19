@@ -64,8 +64,8 @@ All entity pages use universal components:
 
 | Pattern | Reference file |
 |---|---|
-| Entity config with state machine | `src/entities/batch.tsx` |
-| Entity config with `viewTable` | `src/entities/vessel.tsx` |
+| Entity config with state machine | `src/entities/batch/core.ts` |
+| Entity config with `viewTable` | `src/entities/vessel/core.ts` |
 | Domain component (editor) | `src/components/domain/grain-bill-editor.tsx` |
 | Entity pages | `src/app/(app)/production/batches/` |
 | Catalog selector | `src/components/domain/hop-schedule-editor.tsx` |
