@@ -119,7 +119,7 @@ import { AIQueryHelpers } from '@/domain/ai';
 
 ## Chat Tools Reference
 
-All tools are defined in `src/app/api/chat/tools.ts` and bound to the authenticated user's Supabase client. Read tools query data directly. Navigation tools return a `NavigationIntent` that the chat panel renders as an action card — clicking navigates the user to a pre-filled form.
+All tools are defined in `src/app/api/chat/tools.ts` and bound to the authenticated user's Supabase client. Read tools query data directly. Write tools return a `ConfirmWriteIntent` that the chat panel renders as a Confirm/Cancel card (see [Confirm-Gated Write Tools](#confirm-gated-write-tools-phase-4c-extended-in-4b) below) — there is no navigation-and-prefill path any more.
 
 ### RPC Tools (Database Functions)
 
@@ -636,7 +636,7 @@ SRM = 1.4922 * MCU^0.6859
 
 ### API
 - `src/app/api/chat/route.ts` — Chat endpoint (auth, API key resolution, streaming)
-- `src/app/api/chat/tools.ts` — Tool definitions (32 read tools + 3 navigation tools)
+- `src/app/api/chat/tools.ts` — Tool definitions (18 read tools + 4 confirm-gated write tools)
 
 ### Prefill Store
 - `src/contexts/prefill-store.ts` — sessionStorage-backed prefill handoff (`setPrefill` / `consumePrefill`) for NavigationIntent data (prefill + dialog auto-open)
