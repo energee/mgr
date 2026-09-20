@@ -150,6 +150,49 @@ scoreboard shows merges resuming without a queue-clearing session; stays a
 live risk to scoreboard-reading — recheck it every week — as long as 5+
 mergeable automated PRs stay open past 7 days.
 
+(**Recheck, 2026-09-20: the stall is now 28 days with zero merges across
+every loop at once, not just a majority.** No PR of any kind has merged
+since #949 on 2026-08-23 (confirmed via `git log` and `gh pr list --state
+merged`, both stop at that commit/number). The scoreboard's rolling 4-week
+window (since 2026-08-23) reads, per loop, scheduled-runs / PRs-opened /
+merged / open: bug-patrol 29/8/0/8, sentry-fix 20/0/0/0, feedback-distill
+5/3/0/3, quality-regrade 4/4/0/4 — 18 open automated PRs total, every one
+`MERGEABLE` with 0 reviews (`gh pr list --state open --json
+number,mergeable,reviews`). This is the fourth consecutive recheck of this
+entry (9 days 08-09, 11 days 08-10, 21 days 09-13 per still-open #968, now 28)
+and the first where the window shows literally 0 merged PRs for all four
+loops simultaneously rather than most of them. Three feedback-distill PRs
+are themselves stacked unreviewed in the same queue — #959, #965, #968 —
+each documenting more of this exact gap and each structurally unable to
+close it, since this loop is constitutionally forbidden from merging its own
+output. Falsifies if next week's scoreboard shows any merge without a
+dedicated clearing session; stays a live, worsening risk otherwise.)
+
+(**New 2026-09-20: the bug-patrol duplicate-PR gap — proposed fix: check the
+loop's own open-PR queue before hunting, already written up in still-open
+#965/#968 but not yet applied to `bug-patrol.yml` — has now recurred on a
+second, unrelated bug, confirming it is a systemic prompt gap rather than
+one bug's bad luck.** #952 (opened 2026-08-25, still open) fixes
+`escapePostgrestValue()` in `src/services/entity-service.ts` so an embedded
+`"` in a search term can't prematurely close a quoted PostgREST filter
+token. #971 (opened 2026-09-17, three weeks later) rediscovers the identical
+unescaped-quote bug from scratch and fixes it a second, differently-shaped
+way — escaping inside the `pattern` template instead of inside
+`escapePostgrestValue()` — because #952 never merged, so the bug was still
+live on `main` for the next run to re-find. This is the second distinct bug
+(after the mobile-filter-badge cluster: #945 merged, then #958→#962→#964→#967
+duplicated the still-open fix four times) to accumulate duplicate unmerged
+PRs for the same reason, and it fires exactly the falsification clause
+#965/#968 named: "stays a live gap if another duplicate PR lands for a bug
+whose fix is already sitting in an unmerged bot PR." Durable owner is
+unchanged from #965/#968 — add an open-PR-queue check to `bug-patrol.yml`'s
+prompt before it starts hunting — but the priority should change: two
+independent bugs duplicating is evidence of a systemic gap, not a fluke, so
+this should be read as due for landing, not merely proposed. Falsifies once
+that check is applied to the workflow file and a week passes with no new
+duplicate cluster; stays open, and escalates again, if a third unrelated
+duplicate-PR pair appears before the fix lands.)
+
 ## Worker epochs
 
 Two loops (health audit, feedback distillation) deliberately ride the
