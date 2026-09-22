@@ -857,7 +857,7 @@ export function createChatTools(supabase: SupabaseClient<Database>) {
           );
         }
 
-        const validation = validateReading(type, value);
+        const validation = validateReading(type, value, resolvedUnit);
         if (!validation.valid) {
           throw new Error(
             `Invalid ${config.label} value: ${validation.warning ?? String(value)}`

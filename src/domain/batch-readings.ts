@@ -110,6 +110,11 @@ export type ValidationResult = {
  *
  * @param type - The type of reading being validated
  * @param value - The value to validate (numeric or string for option-based readings)
+ * @param unit - The unit `value` is expressed in. Only matters for
+ *   temperature, whose bounds are defined in °F (see READING_TYPES) — a
+ *   Celsius value is converted before the bounds check so a legitimate
+ *   reading in the other supported unit isn't checked on the wrong scale.
+ *   Omit (or pass the canonical unit) to check the value as-is.
  * @returns ValidationResult with valid flag and optional warning message
  * @example
  * ```ts
@@ -118,11 +123,15 @@ export type ValidationResult = {
  *
  * validateReading("temperature", 100)
  * // Returns: { valid: true, warning: "Value outside typical range (55-85)" }
+ *
+ * validateReading("temperature", 20, "c")
+ * // Returns: { valid: true } — 20°C is 68°F, a normal ale fermentation temp
  * ```
  */
 export function validateReading(
   type: ReadingType,
-  value: number | string
+  value: number | string,
+  unit?: string
 ): ValidationResult {
   const config = READING_TYPES[type];
   if (!config) {
@@ -139,10 +148,14 @@ export function validateReading(
   }
 
   // Handle numeric readings
-  const numValue = typeof value === "string" ? parseFloat(value) : value;
+  let numValue = typeof value === "string" ? parseFloat(value) : value;
 
   if (isNaN(numValue)) {
     return { valid: false, warning: "Value must be a number" };
+  }
+
+  if (type === "temperature" && unit === "c") {
+    numValue = convertTemperature(numValue, "c", "f");
   }
 
   if (config.min !== undefined && numValue < config.min) {

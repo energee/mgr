@@ -40,6 +40,26 @@ describe("validateReading", () => {
       expect(result.valid).toBe(true);
       expect(result.warning).toContain("outside typical range");
     });
+
+    it("rejects a raw value below the Fahrenheit min when no unit is given", () => {
+      // 20 is a normal ale fermentation temp in Celsius, but bounds default
+      // to °F — without a unit hint the value must be checked as-is.
+      const result = validateReading("temperature", 20);
+      expect(result.valid).toBe(false);
+    });
+
+    it("accepts a normal Celsius fermentation temp instead of checking it as Fahrenheit", () => {
+      // 20°C = 68°F. Reading tools (recordBatchReading) document "c" as a
+      // valid unit; without unit-aware conversion this was rejected as
+      // "must be at least 32" (Fahrenheit bounds applied to a Celsius value).
+      expect(validateReading("temperature", 20, "c")).toEqual({ valid: true });
+    });
+
+    it("still rejects a genuinely too-cold Celsius reading", () => {
+      // -5°C = 23°F, below the 32°F min even after conversion.
+      const result = validateReading("temperature", -5, "c");
+      expect(result.valid).toBe(false);
+    });
   });
 
   describe("ph", () => {
