@@ -109,7 +109,7 @@ async function addBatchReading(
     );
   }
 
-  const validation = validateReading(reading.reading_type, reading.value);
+  const validation = validateReading(reading.reading_type, reading.value, reading.unit);
   if (!validation.valid) {
     return errorResponse(
       "VALIDATION_ERROR",
