@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  activeFilterCount,
   filterStatesEqual,
   getFiltersStateParser,
   type FilterItemSchema,
@@ -100,5 +101,44 @@ describe("filterStatesEqual", () => {
     expect(
       filterStatesEqual<Record<string, unknown>>([NAME_FILTER], [changed]),
     ).toBe(false);
+  });
+});
+
+/**
+ * `activeFilterCount` backs the mobile filter-sheet's badge (audit 10.3):
+ * batch's "Active" quick filter is a non-empty default preset, so on first
+ * paint `urlFilters` already holds one filter item with no user action taken.
+ * A raw `urlFilters.length` count — what entity-data-table used before this
+ * fix — shows a stale "1 active" badge on that unfiltered default view.
+ */
+describe("activeFilterCount", () => {
+  it("is 0 when filters still match the default preset", () => {
+    const preset = [{ ...NAME_FILTER }];
+    expect(
+      activeFilterCount<Record<string, unknown>>([{ ...NAME_FILTER }], preset),
+    ).toBe(0);
+  });
+
+  it("is 0 for two empty arrays", () => {
+    expect(activeFilterCount([], [])).toBe(0);
+  });
+
+  it("counts filters once the user changes them away from the default", () => {
+    const changed = { ...NAME_FILTER, value: "ipa" };
+    expect(
+      activeFilterCount<Record<string, unknown>>([changed], [NAME_FILTER]),
+    ).toBe(1);
+  });
+
+  it("counts an explicit empty All-tab selection against a non-empty default", () => {
+    expect(
+      activeFilterCount<Record<string, unknown>>([], [NAME_FILTER]),
+    ).toBe(0);
+  });
+
+  it("counts user-added filters when there is no default preset", () => {
+    expect(
+      activeFilterCount<Record<string, unknown>>([NAME_FILTER], []),
+    ).toBe(1);
   });
 });
