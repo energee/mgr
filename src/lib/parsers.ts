@@ -98,6 +98,21 @@ export function filterStatesEqual<TData>(
 }
 
 /**
+ * Number of filters a user has actively applied — 0 when `filters` still
+ * matches the entity's default quick-filter preset, since that preset is
+ * non-empty from first paint (not a user action). Mirrors the
+ * `filterStatesEqual` check entity-data-table's `hasActiveFilters` already
+ * uses; callers that surface a raw count (e.g. a mobile filter-sheet badge)
+ * need the same distinction, not `filters.length`.
+ */
+export function activeFilterCount<TData>(
+  filters: ExtendedColumnFilter<TData>[],
+  defaultFilters: ExtendedColumnFilter<TData>[],
+): number {
+  return filterStatesEqual(filters, defaultFilters) ? 0 : filters.length;
+}
+
+/**
  * nuqs parser for URL-synced table filter state.
  *
  * Validates each filter INDIVIDUALLY and drops only the bad ones: a saved or

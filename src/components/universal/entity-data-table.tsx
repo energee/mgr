@@ -69,6 +69,7 @@ import {
   type ResolvedListParams,
 } from "@/components/universal/list-query-options";
 import {
+  activeFilterCount,
   filterStatesEqual,
   getFiltersStateParser,
   getSortingStateParser,
@@ -1094,7 +1095,10 @@ export function EntityDataTable<T = Record<string, unknown>>({
               )}
               <MobileFilterSheet
                 table={table}
-                activeFilterCount={urlFilters.length}
+                activeFilterCount={activeFilterCount(
+                  urlFilters,
+                  defaultQuickFilterFilters
+                )}
                 defaultFilters={defaultQuickFilterFilters}
               />
             </div>
