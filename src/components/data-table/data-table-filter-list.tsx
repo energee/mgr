@@ -51,7 +51,7 @@ import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 import { getDefaultFilterOperator, getFilterOperators } from "@/lib/data-table";
 import { formatDate } from "@/lib/format";
 import { generateId } from "@/lib/id";
-import { getFiltersStateParser } from "@/lib/parsers";
+import { countActiveFilters, getFiltersStateParser } from "@/lib/parsers";
 import { cn } from "@/lib/utils";
 import type {
   ExtendedColumnFilter,
@@ -105,6 +105,13 @@ export function DataTableFilterList<TData>({
       }),
   );
   const debouncedSetFilters = useDebouncedCallback(setFilters, DEBOUNCE_MS);
+
+  // `filters` defaults to the entity's default quick-filter preset (see
+  // `defaultFilters`), not `[]` — a bare `filters.length` overcounts the
+  // unfiltered default view as "active" the same way pre-#945
+  // `hasActiveFilters` did. The badge should only reflect filters the user
+  // actually added or changed.
+  const activeFilterCount = countActiveFilters(filters, defaultFilters);
 
   const [joinOperator, setJoinOperator] = useQueryState(
     "joinOperator",
@@ -218,12 +225,12 @@ export function DataTableFilterList<TData>({
         >
           <ListFilter className="text-muted-foreground" />
           Filter
-          {filters.length > 0 && (
+          {activeFilterCount > 0 && (
             <Badge
               variant="secondary"
               className="h-[18.24px] rounded-[3.2px] px-[5.12px] font-mono font-normal text-[10.4px]"
             >
-              {filters.length}
+              {activeFilterCount}
             </Badge>
           )}
         </Button>
