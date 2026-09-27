@@ -72,6 +72,32 @@ the 80-turn cap from #598 was hitting the ceiling simply stopped recurring.
 Re-open the investigation the next time a scheduled run hits
 `error_max_turns`; until then there is nothing to revise.)
 
+(**Bug Patrol's duplicate-PR gap, evidenced 2026-09-27: one root-cause bug
+has now produced 7 PRs across 3 files.** The "default quick-filter counted
+as active" bug was fixed once and merged (#945, 2026-08-23, touching
+`entity-data-table.tsx` + `parsers.ts`), then independently re-discovered
+and re-fixed five more times against that first re-fix's *own unmerged*
+follow-up: #958 (08-29), #962 (09-01), #964 (09-04), #967 (09-08) and #976
+(09-26) all introduce a functionally identical helper (named
+`countActiveFilters` or `activeFilterCount` depending on the run) that
+replaces `urlFilters.length` with a count excluding the default preset, for
+the exact same `MobileFilterSheet` call site — because #958 never merged,
+so every subsequent nightly run re-scans the same still-broken file and
+re-derives the same fix. #977 (09-27) generalizes the same root cause to a
+third, previously untouched file (`data-table-filter-list.tsx`, the desktop
+Filter button's own badge count) — a genuinely new bug, not a duplicate,
+but in the same family, and a single shared helper applied to all call
+sites would resolve the whole cluster in one PR. Durable owner, precise
+enough to implement the moment review capacity frees up (see the
+review-capacity-gap entry below): before selecting a target bug,
+`bug-patrol.yml`'s prompt should list open `bug-patrol`-labeled PRs and
+their changed files (`gh pr list --label bug-patrol --state open --json
+number,files`) and skip any candidate whose file set overlaps, logging the
+skip in the run's step summary instead of opening a near-duplicate.
+Falsifies if two more weeks pass with no new duplicate-file `bug-patrol`
+PR; escalates again if an 8th instance — of this cluster or a new one —
+lands before the check does.)
+
 (**sentry-fix flagged 2026-08-23 as a retire/revise candidate to watch, not
 yet acted on.** The loop scoreboard's 4-week window (since 07-26) reads 20
 scheduled runs / 0 PRs opened / 0 merged — entirely quiet, which is the
@@ -149,6 +175,29 @@ fix is "clear the queue," not "revise the prompt." Falsifies if next week's
 scoreboard shows merges resuming without a queue-clearing session; stays a
 live risk to scoreboard-reading — recheck it every week — as long as 5+
 mergeable automated PRs stay open past 7 days.
+
+**2026-09-27 recheck: the gap is now five weeks old, and four straight
+docs-only promotions of it have failed to land.** Nothing has merged to
+`main` since #949 (2026-08-23) — 35 days as of this writing, confirmed by
+`gh pr list --state merged --json mergedAt --jq '[.[] | select(.mergedAt >=
+"2026-08-30")]'` returning `[]` and the loop scoreboard's own 4-week window
+(since 2026-08-30) reading 0 merged across all four loops (bug-patrol 8
+PRs opened, feedback-distill 4, quality-regrade 4, sentry-fix 0 runs
+opening any). 23 open PRs sit unreviewed, 22 of them green end to end
+(`gh pr list --state open --json statusCheckRollup`; the one exception is
+an unrelated dependabot check failure) — the oldest, quality-regrade #950,
+has waited 34 days. This exact gap was already named and re-evidenced in
+#959 (08-30), #965 (09-06), #968 (09-13), and #973 (09-20); none of those
+four PRs has merged either, which is the sharpest evidence yet that a
+docs-only promotion cannot fix a pure review-capacity shortage — the fix
+for "nobody is reviewing automated PRs" is itself an automated PR nobody is
+reviewing. Restating the finding a sixth time would not change that; what
+would is a human queue-clearing session, as this entry already prescribed
+in 2026-08-09. Falsifies if next week's scoreboard shows any merge, in
+which case re-open the still-untested question from the 2026-08-10
+postscript above: do merges start carrying real review, or just clear in
+another unreviewed burst. Stays open, unfalsified, for a fifth straight
+week otherwise.
 
 ## Worker epochs
 
