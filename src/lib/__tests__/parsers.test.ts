@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  countActiveFilters,
   filterStatesEqual,
   getFiltersStateParser,
   type FilterItemSchema,
@@ -100,5 +101,38 @@ describe("filterStatesEqual", () => {
     expect(
       filterStatesEqual<Record<string, unknown>>([NAME_FILTER], [changed]),
     ).toBe(false);
+  });
+});
+
+/**
+ * `countActiveFilters` backs filter-count badges (e.g. the desktop
+ * `DataTableFilterList` "Filter" button). A bare `urlFilters.length`
+ * overcounts the same way the pre-#945 `hasActiveFilters` did: on an entity
+ * with a non-empty default quick-filter preset (batch's "Active" preset),
+ * the unfiltered default view would show a "1 active" badge with nothing
+ * for the user to clear.
+ */
+describe("countActiveFilters", () => {
+  it("is zero when urlFilters still match the default preset", () => {
+    const preset = [{ ...NAME_FILTER }];
+    expect(countActiveFilters<Record<string, unknown>>(preset, preset)).toBe(
+      0,
+    );
+  });
+
+  it("is zero when there is no default preset and no filters", () => {
+    expect(countActiveFilters<Record<string, unknown>>([], [])).toBe(0);
+  });
+
+  it("counts filters when they differ from an empty default preset", () => {
+    expect(
+      countActiveFilters<Record<string, unknown>>([NAME_FILTER], []),
+    ).toBe(1);
+  });
+
+  it("is zero on the All tab (empty urlFilters) even when the default preset is non-empty", () => {
+    expect(
+      countActiveFilters<Record<string, unknown>>([], [NAME_FILTER]),
+    ).toBe(0);
   });
 });

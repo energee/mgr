@@ -98,6 +98,21 @@ export function filterStatesEqual<TData>(
 }
 
 /**
+ * Number of filters that represent a user change, not the entity's own
+ * default quick-filter preset. `urlFilters.length` alone overcounts once an
+ * entity's default preset is itself non-empty (batch's "Active" quick
+ * filter) — a raw length would show e.g. a filter-button badge as "1 active"
+ * on the unfiltered default view. Mirrors the distinction `filterStatesEqual`
+ * draws for `hasActiveFilters`.
+ */
+export function countActiveFilters<TData>(
+  urlFilters: ExtendedColumnFilter<TData>[],
+  defaultFilters: ExtendedColumnFilter<TData>[],
+): number {
+  return filterStatesEqual(urlFilters, defaultFilters) ? 0 : urlFilters.length;
+}
+
+/**
  * nuqs parser for URL-synced table filter state.
  *
  * Validates each filter INDIVIDUALLY and drops only the bad ones: a saved or
