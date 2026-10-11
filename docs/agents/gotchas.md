@@ -159,6 +159,24 @@ contradict the file in front of you usually mean a stale
 `tsconfig.tsbuildinfo` or `.next/`. Run `make clean` before investigating a
 type error you cannot reproduce by reading the code.
 
+**A `ReferenceError: <name> is not defined` for a name that *is* correctly
+declared/imported in the current source is a Turbopack Fast Refresh artifact,
+not a real bug.** Sentry has filed this shape repeatedly (MGR-19
+`hasAppliedDefault`, MGR-1A `useSyncExternalStore`, MGR-1B `groups` — 13+
+instances by 2026-09-30, #951/#953/#955 and earlier predecessors) for
+identifiers that `grep -rn <name> src` confirms are ordinary,
+correctly-scoped `const`/`useRef` declarations with no conditional
+declaration and no closure that could execute before the line runs — a
+`ReferenceError` the compiled source cannot produce for that shape. **The
+tell**: Sentry `environment: development`, tag `turbopack: True`, and the
+event fires within ~10 seconds of a `[Fast Refresh] rebuilding` breadcrumb,
+clustered in a single few-second burst (one HMR cycle) rather than a steady
+trickle. It means the bundle was mid-rebuild and inconsistent, not that the
+code is wrong. Diagnose by checking breadcrumb timing against a Fast Refresh
+rebuild and confirming the identifier's declaration is unconditional in
+current source; don't re-file it as a new bug or re-run the full diagnosis
+each time the signature recurs.
+
 ~~Two lockfiles, one warning~~ — removed 2026-07-26. Fixed 2026-07-24 by
 pinning `turbopack.root` to `__dirname` in `next.config.ts` (PR #585,
 `docs/progress/2026-07-24-turbopack-root.md`); the workspace-root warning no
@@ -201,6 +219,19 @@ Harness-environment failures, not repo bugs — but they read like repo bugs.
 **`bun -e` and `bun run <file>.ts` can exit 1 silently under a sandboxed
 shell.** Probe with `bun -e 'console.log("hi")'`; if that fails, rerun the
 command with the sandbox disabled rather than debugging the script.
+
+**`gh api` and `gh workflow view` require interactive approval in this
+harness's sandbox and have no path to approval in an unattended/scheduled
+run.** `gh run list`, `gh pr list`, `gh issue list`, and `gh pr view` / `gh
+issue view` (all with `--json`) work fine; anything that shells out to `gh
+api` directly — including `gh run view --log-failed` and `gh workflow
+view`'s enabled/disabled state — gets denied outright. This has now cost two
+sessions the same workaround (the 2026-09-27 Bug Patrol job-annotation check
+noted in [`improvement-loop.md`](improvement-loop.md), and that doc's
+2026-10-11 scheduled-workflow-outage entry): prefer a `gh run list --json
+conclusion,createdAt,event` sweep — the run-gap itself is usually enough —
+over reaching for `gh api`/`gh workflow view`, and hand off anything that
+genuinely needs them to a human or an interactive session.
 
 **Too many worktrees overflow the sandbox argv.** Around ~50 worktrees the
 allow-list argument list exceeds `ARG_MAX` and every sandboxed command fails
