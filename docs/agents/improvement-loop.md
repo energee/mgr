@@ -96,6 +96,64 @@ non-actionable pattern instead of triaging anything new. Falsifies toward (a)
 if a PR merges, or if the needs-human issues in the next window are mostly
 distinct signatures. Stays open otherwise.)
 
+(**2026-10-11: eight of this table's ten scheduled workflows have produced
+zero runs since 2026-09-28/09-29, independent of the review-capacity-gap
+narrative below.** Checked via `gh run list --workflow=<file>.yml` for every
+cron-triggered job in this file and in [`scheduled-jobs.md`](scheduled-jobs.md).
+Last scheduled run for each: Bug Patrol 09-29, `test.yml`'s schedule trigger
+09-29 (after 17 straight scheduled failures 09-07→09-29 that PR-triggered runs
+of the identical workflow never showed — a job-definition difference, not a
+flaky test), Sentry Error Harness 09-28, Scheduled Health Audit 09-23, Live DB
+Drift Check 09-29 (itself failing its last 4 runs before going dark),
+Production Health Probe 09-29T13:44 (a 15-minute cron — 12+ days with zero
+production checks), Docs Dream Sweep 09-26 (also failing its last 4 runs
+before going dark), Weekly Quality Re-grade 09-28. This is not a repo-wide
+Actions outage: this very loop (`feedback-distill.yml`, weekly Sunday) and
+Branch Hygiene (weekly Monday) both kept firing on schedule straight through
+today — 10-04, 10-05, and the run that produced this entry on 10-11 — so the
+cron trigger mechanism works for this repo; something specific to the other
+eight stopped them. The cause is not diagnosed here: `gh workflow view` and
+`gh api repos/.../actions/workflows` (which report each workflow's `state:
+active|disabled_manually`) were both denied by this session's sandbox — see
+the new entry in [`gotchas.md`](gotchas.md#agent-sandboxes). Concrete cost
+already accrued: the production health monitor and the live-drift watchdog
+both close their own tracking issue on the next green run, so neither a
+`prod-down`-style issue nor a `live-drift` issue can self-resolve (or
+re-open on fresh drift) while dark. Smallest durable owner: a human with
+repo Settings → Actions access checks each workflow's enabled/disabled state
+directly (five minutes, not diagnosable from a read-only session) and
+re-enables or investigates; if the cause is an org/billing Actions-usage cap,
+that is a different fix entirely, not a docs one. Recurrence signal: next
+week's equivalent `gh run list` sweep still shows nothing newer than 09-29 for
+any of the eight. Falsifies once every listed workflow shows at least one
+fresh scheduled run.)
+
+(**Review-capacity-gap, self-referential update, 2026-10-11**: the merge
+stall is 49 days since #949 (2026-08-23) — confirmed via `gh pr list --state
+merged`, nothing has landed since — up from 42 days a week ago (#981) and 35
+(#978). This loop's own record is part of the pattern it keeps naming: of 7
+feedback-distill PRs since inception, only the first (#946, landed the same
+day as #949) merged; the six since — #959, #965, #968, #973, #978, #981 — are
+all still open, each largely reconfirming the same finding with refreshed
+counters. By this doc's own stated criterion two sections up ("a loop whose
+PRs trend toward zero merges is a retire/revise candidate: name it"),
+feedback-distill must name itself alongside Bug Patrol and sentry-fix, not
+just audit them. A docs-only PR cannot manufacture review capacity, and an
+eighth near-duplicate restatement would spend a scheduled run producing
+exactly the prose-without-enforcement this doc warns against. Proposed, in
+prose only, for a human to fold into `feedback-distill.yml`'s prompt: when
+the prior week's feedback-distill PR is still open and unmerged *and* this
+week's harvest turns up no recurring correction beyond a bigger number on the
+same one, the run should write `quiet-run.md` citing the still-open prior PR
+instead of opening another one — "materially new" means a distinct
+corrective idea, not a wider date range on an old one. This week's PR itself
+carries two items that clear that bar (this entry and the scheduled-workflow
+finding above), so it is not the test case for the rule it proposes.
+Recurrence signal: a future week opens a PR that only refreshes the
+merge-stall day-count with no new mechanism, while a prior one still sits
+open. Falsifies once either a merge breaks the stall or a quiet week
+correctly produces `quiet-run.md` instead of a duplicate PR.)
+
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
 the week's merges actually moved codebase health — its trend log is the
