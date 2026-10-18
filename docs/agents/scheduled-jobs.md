@@ -9,6 +9,24 @@ stop it?".
 Actions minutes are free (public repo); per-run Anthropic/Sentry API spend is
 real money, so AI-driven jobs stay bounded (caps on fixes/PRs per run).
 
+**Nine of the rows below are currently `disabled_manually` and have run
+zero times since 2026-09-29** — confirmed via
+`gh api -X GET repos/{owner}/{repo}/actions/workflows` (a plain GET,
+no interactive Settings access needed): `test.yml`, `bug-patrol.yml`,
+`nightly-watch.yml`, `prod-health.yml`, `live-drift.yml`,
+`health-audit.yml`, `sentry-harness.yml`, `docs-dream.yml`, and
+`quality-regrade.yml`, all disabled within the same two-minute window on
+2026-09-29. Only `hygiene.yml` and `feedback-distill.yml` (this loop) are
+still `active`. This table otherwise describes each job's *designed*
+behavior, not its current run state — check the API call above before
+assuming any "daily"/"weekly" cadence below is actually firing. Disabling
+`test.yml` is also the diagnosed root cause of the merge stall tracked in
+[`improvement-loop.md`](improvement-loop.md): it carries three of the four
+required status checks on `main`, so every PR since 2026-09-29 is
+mechanically blocked regardless of review. Re-enabling (or deliberately
+retiring) each of the nine is a pending human action, not something this
+docs-only loop can do.
+
 ## GitHub Actions crons
 
 | Job (workflow) | Trigger | What it does | Output | Kill / rollback |

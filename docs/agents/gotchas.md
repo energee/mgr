@@ -216,6 +216,19 @@ edits while the real tree never changes. Before committing, confirm with an
 `scripts/db-push.sh` and anything dialing `*.pooler.supabase.com` needs the
 sandbox bypassed for that command.
 
+**`gh workflow list` / `gh workflow view` need interactive approval and can
+be silently denied in a non-interactive session — `gh api -X GET
+repos/{owner}/{repo}/actions/workflows` is the allowlisted equivalent.**
+Confirmed 2026-10-18 while diagnosing the scheduled-workflow outage tracked
+in [`improvement-loop.md`](improvement-loop.md): the plain `gh workflow`
+subcommands returned "This command requires approval" with no prompt
+reachable, but the raw GET endpoint (a read, like the `gh api -X GET`
+pattern already used for PR review comments) returned each workflow's
+`state` (`active` / `disabled_manually` / ...) without any approval step.
+Reach for the `gh api -X GET .../actions/workflows` form first when you
+need a workflow's enabled/disabled state; don't conclude the fact is
+unreachable without interactive Settings access until you've tried it.
+
 **The pre-PR review gate cannot be satisfied in the same command it guards
 (#786).** The gate is a `PreToolUse` hook on `Bash` in `.claude/settings.json`.
 `PreToolUse` sees the *whole* command string before any of it runs, and the
