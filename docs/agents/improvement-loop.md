@@ -96,6 +96,70 @@ non-actionable pattern instead of triaging anything new. Falsifies toward (a)
 if a PR merges, or if the needs-human issues in the next window are mostly
 distinct signatures. Stays open otherwise.)
 
+(**The 56-day merge stall's root cause is diagnosed as of 2026-10-18, and it
+is not a review-capacity gap.** Seven straight feedback-distill PRs
+(#959/#965/#968/#973/#978/#981/#982, all still open/unmerged) attributed
+`main`'s zero merges since #949 (2026-08-23) to either a human review
+backlog or an "undiagnosed scheduled-workflow outage... needs a human with
+Settings → Actions access" (#982's words). Both framings are wrong, and the
+real cause does not need interactive Settings access to see:
+`gh api -X GET repos/{owner}/{repo}/actions/workflows` (a GET request,
+allowlisted) shows nine workflows at `state: "disabled_manually"`, all
+disabled within the same two-minute window on 2026-09-29 between 18:34 and
+18:37 UTC — Nightly Watch, Nightly Bug Patrol, Production Health Probe,
+Live DB Drift Check, Docs Dream Sweep, Sentry Error Harness, Scheduled
+Health Audit, **Test** (`test.yml`), and Weekly Quality Re-grade. Only
+Branch Hygiene and this loop (Weekly Feedback Distillation) were left
+active. `disabled_manually` is the GitHub API's label for an explicit
+disable action (UI button or `gh workflow disable`), not a failure streak
+or the 60-day-inactivity auto-disable — this was a deliberate action, by
+someone with repo admin access, on all nine at once.
+
+Disabling `test.yml` is the mechanical blocker: that single workflow carries
+three of the four required status checks on `main` declared by ruleset
+11725742 — `Static Checks`, `Unit Tests`, `E2E Tests` (the fourth,
+`Database Lint and Integration Tests`, lives in `db-lint.yml`, which was
+**not** disabled and still reports green on every PR, e.g. #982 on
+2026-10-11). A disabled workflow runs on no trigger, `pull_request`
+included — confirmed via `gh run list --workflow=test.yml`: its last
+`pull_request`-triggered run of any kind was 2026-09-28 (PR #979), and every
+PR opened since (#980 onward) shows `mergeable_state: "blocked"` via
+`gh api -X GET repos/{owner}/{repo}/pulls/<n>` because the three required
+contexts never report — not because nobody reviewed them. Every PR behind
+the stall, including this loop's own six open PRs, has been mechanically
+unmergeable since 2026-09-29, independent of review effort.
+
+**Promotion 1** (this entry): the next agent diagnosing a scheduled-workflow
+gap or a merge stall should run
+`gh api -X GET repos/{owner}/{repo}/actions/workflows` *before* writing
+"undiagnosed, needs human Settings access" or "review-capacity gap" — both
+are now a documented dead end for this exact situation. Observable behavior
+to change: a distillation/health-audit pass checks workflow enabled-state
+via this call as a standard step. Recurrence signal marking this failed:
+a future week's harvest re-frames a dark-workflow cluster as unexplained or
+interactive-access-only, without having run this check first.
+
+**Promotion 2** (action item for a human, not executable by this loop):
+re-enable `test.yml` at minimum — it is the only one of the nine whose
+disablement mechanically blocks every PR, including routine dependabot
+bumps. Confirm whether the other eight were disabled for the same reason
+(a deliberate pause, e.g. while triaging the stall itself) or by mistake,
+and re-enable or formally retire each one explicitly rather than leaving
+`scheduled-jobs.md` describing nine workflows as running when none has
+executed since 2026-09-29. Falsifies once `gh api -X GET
+repos/{owner}/{repo}/actions/workflows` shows all nine back at
+`state: "active"` and a subsequent PR merges with all four required checks
+reporting.
+
+**Correction to the 2026-08-09 "zero-merge stretch" entry below**: that
+entry's two-cause framing — review-capacity gap vs. loop-quality signal —
+was correct for the stall it described, but incomplete as a general
+diagnostic, since it does not name "a required-check-producing workflow was
+disabled" as a third cause. The current stall is that third cause, not
+either of the two named there; re-open that entry's "check `statusCheckRollup`"
+step to also check `actions/workflows` state next time a stall like this
+recurs.)
+
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
 the week's merges actually moved codebase health — its trend log is the
