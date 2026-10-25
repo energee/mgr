@@ -11,6 +11,23 @@ real money, so AI-driven jobs stay bounded (caps on fixes/PRs per run).
 
 ## GitHub Actions crons
 
+**Nine of the rows below are not currently executing.** Confirmed via `gh
+api -X GET repos/{owner}/{repo}/actions/workflows` (re-checked 2026-10-25,
+first found by feedback-distill PR #983 on 2026-10-18): Nightly Watch,
+Production Health Probe, Live DB Drift Check, Scheduled Health Audit,
+Sentry Error Harness, Nightly Bug Patrol, Docs Dream Sweep, Weekly Quality
+Re-grade, and **Test** (`test.yml`) were all set `disabled_manually` within
+one two-minute window on 2026-09-29 18:34–18:37 UTC — a deliberate disable
+action, not a failure-streak auto-disable. Only Branch Hygiene and Weekly
+Feedback Distillation (this loop) are still `active` among the scheduled
+jobs below. `test.yml` carries three of `main`'s four required status
+checks, so every PR opened since has been mechanically unmergeable
+regardless of content — see `docs/agents/improvement-loop.md`'s 2026-10-25
+entry. Re-enabling is an operator action (Settings → Actions, or `gh api -X
+PUT repos/{owner}/{repo}/actions/workflows/<id>/enable`) that no agent in
+this repo can reach; check current `state` with the GET call above before
+trusting the per-row cadence prose that follows.
+
 | Job (workflow) | Trigger | What it does | Output | Kill / rollback |
 |---|---|---|---|---|
 | Nightly build + E2E (`test.yml`) | cron `13 6 * * 1-5` (weekdays 06:13 UTC) + PRs (static/unit only) | Full build and Playwright E2E against main; PRs get lint/typecheck/vitest | Red/green run; consumed by Nightly Watch | Disable workflow in Actions UI; PR gate keeps running |
