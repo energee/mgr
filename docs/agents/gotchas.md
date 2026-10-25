@@ -279,6 +279,21 @@ can close this — dropping db-lint's `paths:` filter (#713) fixes filtered-out
 runs, not suppressed ones. Never put `[skip ci]` in a commit that will become a PR;
 `progress.yml` already avoids it deliberately for this reason.
 
+**A `disabled_manually` workflow strands a required check pending, the same
+way `[skip ci]` does above — and `gh workflow list`/`view` can't see it.**
+If a required status context (`Static Checks`, `Unit Tests`, `E2E Tests`,
+`Database Lint and Integration Tests`) never reports on a PR that otherwise
+looks fine, check whether the workflow that produces it is disabled before
+assuming a `[skip ci]`-style suppression or a flaky run: `gh workflow list`
+and `gh workflow view` require interactive approval in an agent session and
+can be silently denied with no prompt reachable, which reads like "nothing
+to see." `gh api -X GET repos/{owner}/{repo}/actions/workflows` is a plain
+GET, is not blocked, and answers directly with each workflow's `state`
+(`active` vs `disabled_manually`). Found 2026-10-18 (#983) diagnosing why
+`test.yml` — three of `main`'s four required checks — had gone dark since
+2026-09-29, blocking every PR's `mergeStateStatus` at `BLOCKED` with no
+workflow-run failure to point at.
+
 **`make check | tail` reports `tail`'s exit code, not `make`'s — so a failing
 gate looks green.** A pipeline's status is its *last* command's, so
 `make check 2>&1 | tail -20` exits 0 even when `make check` failed. Observed

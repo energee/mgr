@@ -72,29 +72,60 @@ the 80-turn cap from #598 was hitting the ceiling simply stopped recurring.
 Re-open the investigation the next time a scheduled run hits
 `error_max_turns`; until then there is nothing to revise.)
 
-(**sentry-fix flagged 2026-08-23 as a retire/revise candidate to watch, not
-yet acted on.** The loop scoreboard's 4-week window (since 07-26) reads 20
-scheduled runs / 0 PRs opened / 0 merged — entirely quiet, which is the
-scoreboard's own named criterion ("a loop whose PRs trend toward zero
-merges"). The needs-human issues it did file in that window cluster on one
-recurring, already-diagnosed signature: dev-machine `Unregistered API key`
-credential noise (five prior instances, #636–#642, recurring again as
-#832/#833 on 08-18) that `gotchas.md`'s "Unregistered API key" entry
-diagnoses in full, yet nothing short-circuits a fresh `fix-error` dispatch
-the next time the same signature resurfaces in Sentry. Two competing reads,
-not yet distinguished: (a) the scored issue stream is genuinely dominated by
-dev-environment noise with no production signal to act on, in which case 0
-PRs is correct and this loop is a rare-event safety net rather than a weekly
-producer; or (b) `score-errors` should recognize a known-noise signature
-(matching message + no Postgres error code, per the gotchas.md tell) and skip
-it before spending a fix-job on a diagnosis it already reached five times.
-Falsifies toward (b) if the next 4-week scoreboard window still shows 0
-merged PRs for sentry-fix *and* more than half its needs-human issues in that
-window are the same `Unregistered API key` signature — that combination means
-the loop is spending its bounded run budget re-diagnosing one known
-non-actionable pattern instead of triaging anything new. Falsifies toward (a)
-if a PR merges, or if the needs-human issues in the next window are mostly
-distinct signatures. Stays open otherwise.)
+(**sentry-fix's 2026-08-23 retire/revise question is moot as of 2026-10-25,
+not resolved.** `sentry-harness.yml` is one of nine workflows found
+`disabled_manually` since 2026-09-29 — see the merge-stall entry below — so
+it has filed no new needs-human issues and opened no PRs because it has not
+run at all, not because the noise-vs-signal question below was ever settled.
+Re-open the (a)/(b) question — (a) the issue stream is genuinely
+noise-dominated and 0 PRs is correct, vs (b) `score-errors` should skip a
+known-noise signature (`Unregistered API key`, five-plus prior instances)
+before spending a fix-job re-diagnosing it — from a fresh measurement once
+the workflow is re-enabled; a silent loop proves nothing either way.)
+
+(**2026-10-25: the zero-merge scoreboard is a blocked-on-operator-action
+signal, not a prompt-quality one — confirmed, not newly found.** #983
+(2026-10-18) diagnosed the root cause via `gh api -X GET
+repos/{owner}/{repo}/actions/workflows`: nine workflows — Nightly Watch,
+Nightly Bug Patrol, Production Health Probe, Live DB Drift Check, Docs Dream
+Sweep, Sentry Error Harness, Scheduled Health Audit, **Test** (`test.yml`),
+and Weekly Quality Re-grade — were all set `disabled_manually` within the
+same two-minute window on 2026-09-29 18:34–18:37 UTC. `test.yml` carries
+three of `main`'s four required status checks (`Static Checks`, `Unit
+Tests`, `E2E Tests`, ruleset 11725742); a disabled workflow never reports on
+any trigger, so every PR opened since #979 (2026-09-28) — docs-only
+distillation PRs included — shows `mergeStateStatus: BLOCKED` via `gh api -X
+GET repos/{owner}/{repo}/pulls/<n>`. Re-run 2026-10-25: all nine still read
+`disabled_manually`, no PR has merged since #949 (2026-08-23 — 63 days now,
+up from 56 at #983's reading), and #983's own human action item ("re-enable
+`test.yml` at minimum") is still outstanding seven days after being named.
+The loop scoreboard's 0-merged columns for bug-patrol, sentry-fix,
+feedback-distill, and quality-regrade are real, but the fix is an operator
+action outside any PR's reach (Settings → Actions, or `gh api -X PUT
+repos/{owner}/{repo}/actions/workflows/<id>/enable`), not a prompt revision.
+Do not retire or revise those loops on this scoreboard reading alone;
+re-evaluate once the nine are active again and at least one PR has merged.
+
+New rule, adopted now: **self-throttle duplicate restatements.** #982
+proposed this and #983 declined it because #983 itself carried a genuinely
+new fact (the root-cause diagnosis above). This week's harvest does not —
+it only re-confirms #983's finding with an incremented day-count — so this
+entry follows the rule it is adopting: no new PR duplicating #983's
+diagnosis, a short addendum here instead. Going forward: when a week's
+draft finding is materially identical to the immediately-prior open
+same-label PR (same root cause, same unresolved status, no new fact beyond
+elapsed time), write `quiet-run.md` citing that PR instead of opening a new
+one. Observable behavior: the run diffs its draft root-cause paragraph
+against the most recent open `feedback-distill` PR before writing anything.
+Falsifies if a future week still opens a new `feedback-distill` PR whose
+root-cause paragraph restates the immediately-prior open PR's with no new
+fact and no newly-adopted rule.
+
+Retirement recommendation for a human: once `test.yml` is re-enabled and a
+PR merges, close #959, #965, #968, #973, #978, #981, and #982 as superseded
+— all seven are earlier partial readings of the same stall now fully
+diagnosed in #983, and leaving them open just grows the restatement queue
+this rule exists to stop.)
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
@@ -163,6 +194,13 @@ before adding anything new. Current epoch at last review (2026-07-24):
 Sonnet loops on `claude-sonnet-5`, default loops on the action default.
 
 ## Weekly rhythm
+
+**As of 2026-10-25 this rhythm is paused for most of its own triggers** —
+Sentry harness, bug patrol, health audit, quality re-grade, docs dream, and
+the scheduled `test.yml` run are all `disabled_manually` (see the dated
+entry above); only this loop and Branch Hygiene remain active. Read steps
+2–4 below as dormant pending re-enable, not as evidence that nothing
+happened.
 
 1. Merged sentry-fix PRs accumulate during the week; review/merge them like
    any PR. `needs-human` label = the harness gave up, finish manually.
