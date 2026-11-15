@@ -94,7 +94,63 @@ window are the same `Unregistered API key` signature — that combination means
 the loop is spending its bounded run budget re-diagnosing one known
 non-actionable pattern instead of triaging anything new. Falsifies toward (a)
 if a PR merges, or if the needs-human issues in the next window are mostly
-distinct signatures. Stays open otherwise.)
+distinct signatures. Stays open otherwise. **Superseded 2026-09-29:**
+`sentry-harness.yml` is one of nine workflows a human set `disabled_manually`
+that day — see the 2026-11-15 entry below. A disabled loop cannot merge a PR
+by definition, so this question is moot, not resolved, until it is
+re-enabled.)
+
+(**Merge pipeline has been fully blocked on operator action since
+2026-08-23, now 84 days — re-confirmed 2026-11-15, not re-discovered.**
+Nothing has merged to `main` since #949 (2026-08-23T20:45Z). `gh api -X GET
+repos/{owner}/{repo}/actions/workflows` (plain `gh workflow list`/`gh run
+view` need interactive approval in this harness and hang; the `gh api` GET
+form does not) shows nine workflows — Nightly Watch, Nightly Bug Patrol,
+Production Health Probe, Live DB Drift Check, Docs Dream Sweep, Sentry Error
+Harness, Scheduled Health Audit, **Test** (`test.yml`), and Weekly Quality
+Re-grade — were all set `disabled_manually` in one window on 2026-09-29
+18:34-18:37 UTC, and all nine are still disabled as of this reading. Since
+`test.yml` carries three of `main`'s four required status checks, every PR
+is blocked regardless of content — docs-only ones included. #983
+(2026-10-18) first named the human action item "re-enable `test.yml` at
+minimum"; it is now 28 days outstanding across four more weekly
+distillations (#985, and two quiet weeks). This has produced a visible
+secondary cost: **nine open `feedback-distill` PRs are stacked**
+(#959, #965, #968, #973, #978, #981, #982, #983, #985), each an earlier
+partial reading of the same stall — the "prose accumulation must not grow"
+rule this doc states above, failing on its own loop. **Retirement
+recommendation (for a human):** once `test.yml` is re-enabled and a PR
+merges, close all nine as superseded by whichever distillation PR lands
+first; do not review them individually, their content is subsumed.
+
+**New this week, not a restatement:** the 2026-11-01 scheduled run
+(databaseId `41287674740`) is the first time *this loop itself* hit the
+"clean completion, no durable artifact" failure mode this doc's Worker
+epochs/Durable-outcomes sections describe for bug-patrol — `gh api -X GET
+repos/{owner}/{repo}/actions/runs/41287674740/jobs` shows `Distill and open
+a docs-only PR` completed `success` while `Require durable outcome`
+completed `failure`: the run finished without leaving a PR *or* a
+`quiet-run.md`. The very next scheduled run (2026-11-08, `42491625329`)
+completed cleanly with no PR, meaning it correctly judged the week quiet and
+wrote the evidence file — so the gate is catching real misses, not
+systematically broken. Recurrence signal: a third `feedback-distill` run
+hits this same "Require durable outcome: failure" step without an
+intervening prompt change, which would mean the guardrail sentry-harness.yml
+already carries ("whatever the outcome, end by writing the evidence
+file... a run that ends without it fails red", stated explicitly in its own
+prompt per the Worker epochs section) needs to be made equally explicit in
+feedback-distill's own prompt rather than left implicit in this doc.
+
+**Self-throttle rule, adopted:** before opening a PR, a run diffs its draft
+root-cause paragraph against the most recent still-open same-label PR; if
+the only delta is elapsed time (no new fact, no newly-adoptable rule), it
+writes `quiet-run.md` citing that PR instead of opening a new one. This
+week qualifies to open (the 2026-11-01 durable-outcome miss and the
+nine-PR stack are new facts); the 2026-11-08 run's quiet result is the
+rule already working. Observable behavior: a run's diff against the
+latest open same-label PR before deciding to write. Recurrence signal: a
+future `feedback-distill` PR whose root-cause paragraph restates the
+immediately-prior open PR's with no new fact and no newly-adopted rule.)
 
 The loops compose: CI gates make the generative loops safe (a bad
 automated PR cannot merge green), and the weekly re-grade tells you whether
@@ -163,6 +219,12 @@ before adding anything new. Current epoch at last review (2026-07-24):
 Sonnet loops on `claude-sonnet-5`, default loops on the action default.
 
 ## Weekly rhythm
+
+**As of 2026-11-15, six of the triggers below are dormant, not silent**:
+sentry-fix, the Monday re-grade, the Wednesday health audit, and bug-patrol
+all depend on workflows a human set `disabled_manually` on 2026-09-29 (see
+the Durable outcomes section above). Steps 1-4 will not fire until those are
+re-enabled; don't read their silence as "nothing to do."
 
 1. Merged sentry-fix PRs accumulate during the week; review/merge them like
    any PR. `needs-human` label = the harness gave up, finish manually.

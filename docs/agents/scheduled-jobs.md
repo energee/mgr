@@ -9,6 +9,21 @@ stop it?".
 Actions minutes are free (public repo); per-run Anthropic/Sentry API spend is
 real money, so AI-driven jobs stay bounded (caps on fixes/PRs per run).
 
+**Nine of the rows below are currently `disabled_manually`, not just
+dormant by lack of a trigger match: Nightly Watch, Nightly Bug Patrol,
+Production Health Probe, Live DB Drift Check, Docs Dream Sweep, Sentry
+Error Harness, Scheduled Health Audit, Weekly Quality Re-grade, and
+`test.yml` itself — set that way by a human in one window on 2026-09-29
+18:34-18:37 UTC, still disabled as of 2026-11-15.** The per-row cadence
+prose below describes what each job does *when enabled*; it does not mean
+the job is currently running. Check live state before trusting the cadence
+column: `gh workflow list --all` and `gh run view` need interactive
+approval and hang in this harness, but `gh api -X GET
+repos/{owner}/{repo}/actions/workflows --jq '.workflows[] |
+select(.state=="disabled_manually") | .name'` is a plain GET and works. See
+[`improvement-loop.md`](improvement-loop.md)'s Durable outcomes section for
+the downstream merge-pipeline stall this has caused.
+
 ## GitHub Actions crons
 
 | Job (workflow) | Trigger | What it does | Output | Kill / rollback |
