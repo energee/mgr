@@ -271,6 +271,20 @@ order of preference:
 3. Before committing, run `git status` in the **main** checkout as well — a
    stray modification there is the signature of this bug.
 
+**A bot-managed tracking issue that says "closed automatically by the next
+green run" can stay open forever if its workflow gets disabled.** Issue
+#963 ("Nightly CI failing: Test", opened 2026-09-02) carries exactly that
+promise from `nightly-watch.yml` — but `nightly-watch.yml` (and `test.yml`,
+the workflow it watches) were both set `disabled_manually` on 2026-09-29.
+Neither will ever run again to close it, so as of 2026-11-15 it has sat
+open 74+ days looking like an unresolved red build when the real state is
+"the watcher stopped watching." Before treating an old bot-filed tracking
+issue (`nightly-red`, `live-drift`, `prod-down`) as live signal, check
+whether its owning workflow is enabled — `gh api -X GET
+repos/{owner}/{repo}/actions/workflows` (see
+[`scheduled-jobs.md`](scheduled-jobs.md) for the current disabled list and
+why `gh workflow list` itself hangs here).
+
 **`[skip ci]` in a commit message strands a required check pending.** GitHub
 suppresses the whole workflow run, so `Static Checks`, `Unit Tests`,
 `E2E Tests` and `Database Lint and Integration Tests` never report — and a
